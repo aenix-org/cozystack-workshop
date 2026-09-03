@@ -14,9 +14,9 @@ technical terms are identical across languages.
 | Directory | Language | Status |
 |-----------|----------|--------|
 | [`ru/`](ru/) | Russian — the authored source of truth | complete |
-| [`en/`](en/) | English — flagship translation, and the pivot for the others | in progress |
-| [`zh/`](zh/) | Chinese (Simplified) | in progress |
-| [`es/`](es/) | Spanish | in progress |
+| [`en/`](en/) | English — flagship translation, and the pivot for the others | complete |
+| [`zh/`](zh/) | Chinese (Simplified) | complete |
+| [`es/`](es/) | Spanish | complete |
 
 Russian is where the text is written and edited first. English is translated
 from Russian and polished to flagship quality; the other languages are produced
@@ -55,11 +55,29 @@ At the root of each language:
 ## What gets translated, and what does not
 
 Translated: prose only — every `README.md`, the `chat/*.md` messages,
-`CONVENTIONS.md`, `REQUIREMENTS.md`.
+`CONVENTIONS.md`, `REQUIREMENTS.md`, and the human-language **comments inside
+code blocks** (a `# …` in a bash block is teaching, so it is translated).
 
 Never translated: commands, code, YAML manifests, file and directory names,
-shell scripts and `check.sh`, command output, and the technical terms fixed in
-[`GLOSSARY.md`](GLOSSARY.md). A lab must run identically in every language.
+command output, the demo apps' data and UI strings, and the technical terms
+fixed in [`GLOSSARY.md`](GLOSSARY.md). A lab must run identically in every
+language — the executable content of every code block is byte-identical across
+languages.
+
+The shipped assets under `scripts/`, `manifests/` and each lab's `check.sh`
+are the Russian originals in every language tree (their in-file comments and
+`check.sh` on-screen output are not yet localized); the labs run the same in
+all languages, and the prose that surrounds them is fully translated.
+
+## How the translations were made
+
+Russian is authored first. English is translated from Russian and polished to
+flagship quality; Chinese and Spanish are translated from the English pivot.
+Every language's prose was then reviewed by **five independent reviewers**, each
+on a different lens — technical accuracy, terminology against
+[`GLOSSARY.md`](GLOSSARY.md), literary fluency, absence of anglicisms, and
+structural integrity (code/output byte-identity, Markdown parity) — and every
+finding was applied before the language was committed.
 
 ## Contributing a fix or a translation
 

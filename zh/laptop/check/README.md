@@ -53,11 +53,11 @@ export COZY_TENANT=workshop07
 在终端里——每项检查一行：
 
 ```
-[  OK  ] приложение развёрнуто и отвечает
-[  OK  ] имя пода подставляется в страницу
-[ FAIL ] автомасштабирование не настроено
-         не найден HorizontalPodAutoscaler для deployment/rickroll
-         подсказка: примените hpa.yaml из этой папки
+[  OK  ] application deployed and responding
+[  OK  ] Pod name is injected into the page
+[ FAIL ] autoscaling is not configured
+         no HorizontalPodAutoscaler found for deployment/rickroll
+         hint: apply hpa.yaml from this folder
 ```
 
 ⚠️ **报告会写入实验目录，并带有日期和时间。** 如果仓库是共用的，或者你已经跑过好几次检查，那里就会堆积起好几个文件——看名字里的时间，别把别人的或之前的一次运行当成自己的。
