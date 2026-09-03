@@ -1,42 +1,42 @@
-## 11. Карта файлов: что где лежит и где запускается
+## 11. Mapa de archivos: qué vive dónde y dónde se ejecuta
 
-**Прочитайте один раз — дальше не будете гадать**
+**Léelo una vez — después no tendrás que adivinar**
 
-В репозитории два типа файлов, и живут они в разных местах. Это главное, что стоит
-усвоить до начала практики.
+En el repositorio hay dos tipos de archivos, y viven en lugares distintos. Esto es lo principal que
+debes captar antes de empezar la parte práctica.
 
-**Манифесты — `manifests/*.yaml`. Применяются с вашего ноутбука.**
-Это описание того, что создать в кластере. Команда всегда одна: `kubectl apply -f <файл>`.
+**Manifiestos — `manifests/*.yaml`. Se aplican desde tu laptop.**
+Describen qué crear en el clúster. El comando es siempre el mismo: `kubectl apply -f <file>`.
 
-• `01-bucket.yaml` — хранилище под образ · шаг 1
-• `02-conversion-vm.yaml` — машина-конвертер · шаг 2
-• `03-app-vm.yaml` — ваша виртуалка · шаг 4 (сюда руками вписывается presigned-ссылка)
-• `04-managed.yaml` — Postgres и Kafka из каталога · шаг 5
+• `01-bucket.yaml` — almacenamiento para la imagen · paso 1
+• `02-conversion-vm.yaml` — la máquina conversora · paso 2
+• `03-app-vm.yaml` — tu app-VM · paso 4 (aquí es donde pegas a mano el enlace prefirmado)
+• `04-managed.yaml` — Postgres y Kafka del catálogo · paso 5
 
-**Скрипты — `scripts/*`. Запускаются не у вас, а внутри виртуалок.**
-На ноутбуке они вам не нужны вообще.
+**Scripts — `scripts/*`. No se ejecutan en tu máquina, sino dentro de las VMs.**
+En tu laptop no los necesitas para nada.
 
-• `convert.sh` — внутри машины-конвертера · шаг 3
-• `netfix-dhcp.sh` — внутри вашей виртуалки · шаг 6
-• `connect-managed.sh` — внутри вашей виртуалки · шаг 7
-• `orders-schema.sql` — таблица для базы, изнутри виртуалки · шаг 8 (её мы наберём запросом,
-  файл — чтобы посмотреть, что именно создаётся)
+• `convert.sh` — dentro de la máquina conversora · paso 3
+• `netfix-dhcp.sh` — dentro de tu app-VM · paso 6
+• `connect-managed.sh` — dentro de tu app-VM · paso 7
+• `orders-schema.sql` — una tabla para la base de datos, desde dentro de la app-VM · paso 8 (la escribiremos
+  como una consulta; el archivo está ahí para que veas exactamente qué se crea)
 
-**Как скрипт попадает внутрь виртуалки — и почему по-разному.**
+**Cómo llega un script dentro de una máquina — y por qué es distinto.**
 
-В **машине-конвертере** есть сеть, поэтому она скачивает файл сама. Репозиторий
-открытый, ключи не нужны:
+La **máquina conversora** tiene red, así que descarga el archivo ella misma. El repositorio es
+público, no hacen falta claves:
 ```bash
 curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/laptop/scripts/convert.sh
 ```
 
-В **вашей виртуалке сети сначала нет вообще** — она и есть та поломка, которую мы чиним
-на шаге 6. Скачать туда нечего и нечем, файлы через консоль не передаются. Поэтому
-`netfix-dhcp.sh` и `connect-managed.sh` вы не качаете, а **набираете руками**: команд
-там по две-три, я дам их в чате готовыми. Сами файлы в репозитории — это то же самое,
-но подробно и с комментариями: удобно перечитать потом, когда будете повторять
-у себя.
+**Tu app-VM al principio no tiene red en absoluto** — ese estado roto es justo lo que arreglamos
+en el paso 6. No hay con qué descargar ni a dónde descargar, y los archivos no se pueden
+pasar por la consola. Por eso `netfix-dhcp.sh` y `connect-managed.sh` no los descargas —
+los **escribes a mano**: son solo dos o tres comandos cada uno, y te los daré ya listos en el chat.
+Los archivos mismos en el repositorio son lo mismo, pero escritos por extenso y con comentarios:
+prácticos para releer después, cuando repitas esto por tu cuenta.
 
-⚠️ **Тонкость, из-за которой всё ломается.** Замену `tenant-workshopXX` на свой номер вы делали
-на ноутбуке. Файл, скачанный внутри машины-конвертера, приходит свежий, с заглушками —
-значения в него вписываются заново, руками.
+⚠️ **La sutileza por la que todo se rompe.** Reemplazaste `tenant-workshopXX` por tu propio número
+en tu laptop. El archivo descargado dentro de la máquina conversora llega fresco, con marcadores —
+los valores se introducen de nuevo en él, a mano.

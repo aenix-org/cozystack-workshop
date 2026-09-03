@@ -1,63 +1,65 @@
-## 1. Что мы вообще делаем
+## 1. Qué estamos haciendo en realidad
 
-**Прочитайте это до первой команды. Дальше всё будет понятнее.**
+**Lee esto antes de tu primer comando. Todo lo que sigue tendrá más sentido.**
 
-### Что у вас есть сейчас
+### Qué tienes ahora mismo
 
-Внутренний сервис «Заказы». В vSphere под него отведены **три виртуальные машины** —
-ровно так, как это обычно и выглядит:
+Un servicio interno de «Pedidos». En vSphere tiene asignadas **tres máquinas virtuales** —
+exactamente como suele verse esto:
 
-| Машина | Что на ней | Адрес |
+| Máquina | Qué hay en ella | Dirección |
 |---|---|---|
-| `app` | приложение `orders-api` на Java, CentOS 7 | — |
-| `db` | PostgreSQL, поставлен вручную | `192.168.10.30` |
-| `mq` | Kafka, поставлена вручную | `192.168.10.40` |
+| `app` | la aplicación `orders-api` en Java, CentOS 7 | — |
+| `db` | PostgreSQL, instalado a mano | `192.168.10.30` |
+| `mq` | Kafka, instalado a mano | `192.168.10.40` |
 
-Приложение написано на Spring Boot, работает как обычная служба systemd, настройки лежат
-в `/etc/orders/application.properties`. И вот там — самое интересное:
+La aplicación está escrita en Spring Boot, funciona como un servicio systemd corriente, y su
+configuración vive en `/etc/orders/application.properties`. Y ahí está lo interesante:
 
 ```properties
 spring.datasource.url=jdbc:postgresql://192.168.10.30:5432/orders
 spring.kafka.bootstrap-servers=192.168.10.40:9092
 ```
 
-**Адреса прописаны намертво.** Не имена — цифры. Кто-то однажды поднял три машины,
-вписал IP в конфиг, и с тех пор эти три числа держат всю инсталляцию. Поменяется подсеть —
-приложение встанет. Переедет база на другой хост — надо лезть в файл руками и
-перезапускать службу.
+**Las direcciones están fijadas a fuego.** No son nombres: son números. Alguien un día levantó tres
+máquinas, tecleó las IP en la configuración, y desde entonces esos tres números sostienen toda la
+instalación. Cambia la subred y la aplicación se cae. Mueve la base de datos a otro host y tienes
+que abrir el archivo a mano y reiniciar el servicio.
 
-Если вы сейчас узнали свою инфраструктуру — да, так у всех.
+Si acabas de reconocer tu propia infraestructura: sí, a todo el mundo le pasa lo mismo.
 
-### Что мы будем с этим делать
+### Qué vamos a hacer al respecto
 
-Везём **только `app`**. Две остальные машины не едут никуда — вместо них берём готовые
-Postgres и Kafka из каталога Cozystack.
+Movemos **solo `app`**. Las otras dos máquinas no van a ninguna parte — en su lugar tomamos
+Postgres y Kafka ya listos del catálogo de Cozystack.
 
-Разница принципиальная. Перевезти все три виртуалки вы могли бы и без нас — получили бы
-тот же самый зоопарк, только на новом железе. Тот же Postgres, который поставили в 2019-м,
-который никто не обновляет и который никто не бэкапит, потому что «там же скрипт был».
-Управляемый сервис приезжает с репликацией, бэкапами и мониторингом, и вы про него больше
-не думаете.
+La diferencia es fundamental. Mover las tres VM podrías hacerlo sin nosotros — y acabarías con
+el mismo zoológico, solo que sobre hardware nuevo. El mismo Postgres que instalaste allá por 2019,
+que nadie actualiza y del que nadie hace respaldo, porque «para eso había un script, ¿no?». Un
+servicio gestionado llega con replicación, respaldos y monitoreo, y dejas de pensar en él por
+completo.
 
-**Данные при этом теряться не должны** — заказы за все годы нужно перенести в новую базу.
-Это отдельный шаг, и он в реальной миграции самый нервный.
+**Y en el proceso no se puede perder ningún dato** — los pedidos de todos estos años tienen que
+trasladarse a la nueva base de datos. Ese es un paso aparte, y en una migración real es el que
+más nervios cuesta.
 
-Вот эта разница — «перевезли зоопарк» против «перевезли приложение, а зоопарк выбросили» —
-и есть содержание воркшопа.
+Esa diferencia — «mover el zoológico» frente a «mover la aplicación y tirar el zoológico a la
+basura» — es de lo que trata este taller.
 
-Дорога состоит из трёх фаз.
+El camino tiene tres fases.
 
-**Фаза 1 — вывозим образ.** Диск виртуальной машины из vSphere нужно превратить в формат,
-который понимает Cozystack, и положить куда-то, откуда кластер его заберёт. Это шаги 1–3.
+**Fase 1 — sacar la imagen.** Hay que convertir el disco de la máquina virtual de vSphere a un
+formato que Cozystack entienda, y ponerlo en algún lugar de donde el clúster pueda descargarlo.
+Son los pasos 1–3.
 
-**Фаза 2 — заводим машину на новом месте.** Из вывезенного образа поднимаем виртуалку уже
-в Cozystack и приводим её в чувство: у неё не будет сети, потому что железо вокруг стало
-другим. Это шаги 4 и 6.
+**Fase 2 — levantar la máquina en su nuevo hogar.** A partir de la imagen exportada levantamos una
+VM, ahora en Cozystack, y la hacemos volver en sí: no tendrá red, porque el hardware a su alrededor
+ha cambiado. Son los pasos 4 y 6.
 
-**Фаза 3 — выбрасываем зоопарк.** Заводим Postgres и Kafka из каталога, **переносим данные
-из старой базы**, перенастраиваем приложение с прибитых IP на нормальные имена. Это шаги
-5, 7, 8, 9.
+**Fase 3 — tirar el zoológico a la basura.** Levantamos Postgres y Kafka del catálogo, **sacamos
+los datos de la vieja base de datos**, y reconfiguramos la aplicación para pasarla de las IP
+clavadas a fuego a nombres como es debido. Son los pasos 5, 7, 8, 9.
 
-> **Если вы не работали с Kubernetes — это нормально, так и задумано.** Все термины
-> объясняются по ходу, а следующим сообщением идёт словарик, где всё это переведено на
-> язык vSphere.
+> **Si nunca has trabajado con Kubernetes — no pasa nada, está pensado así.** Cada término se
+> explica sobre la marcha, y el siguiente mensaje es un pequeño glosario donde todo esto está
+> traducido al lenguaje de vSphere.

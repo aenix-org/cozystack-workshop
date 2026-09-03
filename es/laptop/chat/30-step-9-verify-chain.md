@@ -1,59 +1,60 @@
-## 30. Шаг 9: проверяем всю цепочку
+## 30. Paso 9: verificamos toda la cadena
 
-**Момент истины**
+**El momento de la verdad**
 
-⚠️ **Сначала — внутри виртуалки — погасите firewalld.** Мигрированный CentOS принёс
-правила из прошлой жизни и наружу отдаёт только SSH. Порт приложения закрыт, и проброс
-с ноутбука упрётся в `no route to host` — а выглядеть это будет как «приложение не работает».
+⚠️ **Primero — dentro de la máquina virtual — apaga firewalld.** El CentOS migrado
+arrastró reglas de su vida anterior y solo expone SSH hacia el exterior. El puerto de la
+aplicación está cerrado, y un reenvío de puertos desde tu laptop chocará con `no route to host`
+— y esto parecerá que «la aplicación no funciona».
 
 ```bash
 systemctl stop firewalld
 systemctl disable firewalld
 ```
 
-Проверьте прямо там же, изнутри машины, что приложение живо:
+Comprueba allí mismo, desde dentro de la máquina, que la aplicación está viva:
 
 ```bash
 curl -s -o /dev/null -w '%{http_code}\n' localhost:8080/actuator/health
 ```
 
-`200` — можно пробрасывать. `503` — вернитесь к шагу с сетью.
+`200` — puedes hacer reenvío de puertos. `503` — vuelve al paso de la red.
 
-📍 **Дальше — на ноутбуке.** Пробрасываем порт приложения к себе:
+📍 **A continuación — en tu laptop.** Reenvía hacia ti el puerto de la aplicación:
 ```bash
 virtctl port-forward --namespace=tenant-workshopXX vmi/vm-instance-app-1 8080:8080
 ```
-Окно с этой командой не закрывайте: туннель живёт, пока она работает.
+No cierres la ventana con este comando: el túnel vive mientras siga corriendo.
 
-⚠️ **Здесь `vmi/` обязателен, а в `virtctl console` — наоборот, мешает.** Это не
-опечатка и не наша прихоть: у двух команд разный синтаксис цели. `port-forward` требует
-`тип/имя` и без префикса отвечает `target must contain type and name separated by '/'`.
-`console` ждёт просто имя и с префиксом отвечает `forbidden`, потому что принимает
-слово `vmi` за имя машины.
+⚠️ **Aquí `vmi/` es obligatorio, mientras que en `virtctl console` es al revés — estorba.** Esto
+no es una errata ni un capricho nuestro: los dos comandos tienen una sintaxis de destino distinta.
+`port-forward` exige `tipo/nombre` y sin el prefijo responde `target must contain type and name
+separated by '/'`. `console` espera solo el nombre y con el prefijo responde `forbidden`, porque
+toma la palabra `vmi` por el nombre de la máquina.
 
-Если virtctl ругается на разницу версий клиента и кластера — это предупреждение,
-а не ошибка, работать не мешает.
+Si virtctl se queja de una diferencia de versiones entre el cliente y el clúster — es una
+advertencia, no un error, y no estorba.
 
-Если проброс всё равно не поднимается, тот же туннель делается через под машины:
+Si el reenvío aun así no se levanta, el mismo túnel se puede hacer a través del Pod de la máquina:
 ```bash
 kubectl get pod -n tenant-workshopXX -l vm.kubevirt.io/name=vm-instance-app-1
-kubectl port-forward -n tenant-workshopXX <имя-пода-из-вывода> 8080:8080
+kubectl port-forward -n tenant-workshopXX <nombre-del-pod-del-resultado> 8080:8080
 ```
 
-В другом окне терминала:
+En otra ventana de terminal:
 ```bash
-# здоровье
+# salud
 curl -s http://localhost:8080/actuator/health
 
-# создаём заказ
+# creamos un pedido
 curl -s -X POST http://localhost:8080/api/orders \
   -H 'Content-Type: application/json' -d '{"item":"test"}'
 
-# смотрим, что он записался
+# vemos que quedó registrado
 curl -s http://localhost:8080/api/orders
 ```
 
-Если заказ создался — вы прошли путь целиком. Приложение приехало из VMware, работает
-в кластере, пишет в управляемую базу и отправляет события в управляемую очередь.
+Si el pedido se creó — recorriste el camino completo. La aplicación llegó desde VMware,
+corre en el clúster, escribe en una base de datos gestionada y envía eventos a una cola gestionada.
 
-Полчаса назад эта система жила на ESXi.
+Hace media hora este sistema vivía en ESXi.

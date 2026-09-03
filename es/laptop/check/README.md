@@ -1,69 +1,70 @@
-# Скрипты проверки
+# Scripts de verificación
 
-В каждой папке лабы лежит `check.sh`. Он проверяет, что лаба действительно выполнена —
-не «файл применён», а **работает по сути**.
+En cada carpeta de laboratorio hay un `check.sh`. Verifica que el laboratorio esté realmente hecho —
+no que «se aplicó un archivo», sino que **funciona en lo esencial**.
 
-Участник запускает его сам, когда захочет. Результат — отчёт в терминале и файл-артефакт,
-который можно приложить куда угодно: в чат сообщества, в заявку на сертификацию, себе в
-заметки.
+Lo ejecutas tú mismo, cuando quieras. El resultado es un informe en la terminal y un archivo de artefacto
+que puedes adjuntar donde quieras: el chat de la comunidad, una solicitud de certificación, tus propias
+notas.
 
-## Как запустить
+## Cómo ejecutarlo
 
 ```bash
 cd labs/03-scale
 ./check.sh
 ```
 
-### Если у вас Windows
+### Si tienes Windows
 
-Скрипты написаны на bash и в самом Windows не запустятся. Нужен **WSL** — подсистема
-Linux, которая ставится одной командой в PowerShell от администратора:
+Los scripts están escritos en bash y no se ejecutan en el propio Windows. Necesitas **WSL** — un subsistema
+de Linux que se instala con un solo comando en un PowerShell de administrador:
 
 ```powershell
 wsl --install
 ```
 
-Компьютер попросит перезагрузку, после неё откроется консоль Ubuntu. Дальше всё как у
-всех, только `kubectl` внутри WSL нужен свой:
+El equipo pedirá reiniciarse; después se abrirá una consola de Ubuntu. A partir de ahí todo es igual
+que para los demás, solo que dentro de WSL necesitas tu propio `kubectl`:
 
 ```bash
 sudo snap install kubectl --classic
 ```
 
-Файл доступа к учебному кластеру — тот самый `lab.kubeconfig`, который вы создали в
-лабе 0, — скрипт находит через переменную `KUBECONFIG`. Если вы сохранили его внутри
-WSL, путь обычный:
+Las credenciales para el clúster de laboratorio — ese mismo `lab.kubeconfig` que creaste en el laboratorio 0 —
+las encuentra el script a través de la variable `KUBECONFIG`. Si lo guardaste dentro de WSL, la ruta
+es la habitual:
 
 ```bash
 export KUBECONFIG=~/lab.kubeconfig
 ```
 
-Если сохранили на диск Windows — копировать его в WSL не нужно, диски видны изнутри
-по пути `/mnt/c/...`. Подставьте своё имя пользователя Windows и папку, куда сохранили:
+Si lo guardaste en el disco de Windows, no hace falta copiarlo dentro de WSL — los discos son
+visibles desde dentro en `/mnt/c/...`. Sustituye tu nombre de usuario de Windows y la carpeta donde
+lo guardaste:
 
 ```bash
-export KUBECONFIG=/mnt/c/Users/<ваше-имя>/lab.kubeconfig
+export KUBECONFIG=/mnt/c/Users/<tu-nombre>/lab.kubeconfig
 ```
 
-⚠️ **Если WSL поставить нельзя** — на корпоративном ноутбуке это частая ситуация — лабы
-всё равно проходятся полностью, кроме автопроверки. Отчёт-артефакт в этом случае не
-получится: попросите коллегу с Linux или macOS прогнать скрипт по вашему кубконфигу либо
-приложите к заявке вывод команд из раздела «Проверка» соответствующей лабы.
+⚠️ **Si no se puede instalar WSL** — una situación frecuente en una laptop corporativa — aún puedes
+hacer los laboratorios por completo, todos excepto la verificación automática. En ese caso no obtendrás el
+informe de artefacto: pide a un colega con Linux o macOS que ejecute el script contra tu kubeconfig, o
+adjunta a tu solicitud la salida de comandos de la sección «Verificación» del laboratorio correspondiente.
 
-Скрипт сам поймёт, куда смотреть, по переменной `KUBECONFIG`. Если её нет — скажет об этом
-и остановится.
+El script averigua por sí solo dónde mirar, mediante la variable `KUBECONFIG`. Si no está
+definida, te lo dice y se detiene.
 
-Для лаб, где нужен доступ к тенанту на управляющем кластере, дополнительно нужна
-переменная `COZY_TENANT` — имя вашего тенанта, например `workshop07`:
+Para los laboratorios que necesitan acceso a un tenant en el clúster de gestión, además necesitas la
+variable `COZY_TENANT` — el nombre de tu tenant, por ejemplo `workshop07`:
 
 ```bash
 export COZY_TENANT=workshop07
 ./check.sh
 ```
 
-## Что получается на выходе
+## Qué obtienes con ello
 
-В терминале — по строке на проверку:
+En la terminal — una línea por verificación:
 
 ```
 [  OK  ] приложение развёрнуто и отвечает
@@ -73,43 +74,44 @@ export COZY_TENANT=workshop07
          подсказка: примените hpa.yaml из этой папки
 ```
 
-⚠️ **Отчёт кладётся в папку лабы и содержит дату со временем.** Если репозиторий общий или
-вы прогоняли проверку несколько раз, там накопится несколько файлов — смотрите на время в
-имени, чтобы не принять чужой или прошлый прогон за свой.
+⚠️ **El informe se escribe en la carpeta del laboratorio y lleva la fecha y la hora.** Si el
+repositorio es compartido o has ejecutado la verificación varias veces, allí se acumularán varios archivos
+— fíjate en la hora en el nombre para no confundir la ejecución de otra persona, o una anterior,
+con la tuya.
 
-Рядом появляется файл `report-<лаба>-<дата>.md` — тот же результат в разметке, вместе с
-собранными свидетельствами: версии, вывод команд, имена объектов. Это и есть артефакт.
+Junto a él aparece un archivo `report-<lab>-<date>.md` — el mismo resultado en Markdown, junto
+con las evidencias recogidas: versiones, salida de comandos, nombres de objetos. Ese es el artefacto.
 
-## Требования к автору скрипта
+## Requisitos para el autor del script
 
-**Проверяем суть, а не факт применения.** Плохо: «существует объект Deployment». Хорошо:
-«приложение отвечает по HTTP и в ответе есть имя пода».
+**Verifica lo esencial, no el hecho de la aplicación.** Mal: «existe un objeto Deployment». Bien:
+«la aplicación responde por HTTP y en la respuesta está el nombre del Pod».
 
-**Каждый провал объясняет, что делать.** Строка `FAIL` без подсказки — брак. Читатель
-запускает скрипт именно потому, что застрял.
+**Cada fallo explica qué hacer.** Una línea `FAIL` sin una pista es defectuosa. El lector
+ejecuta el script precisamente porque está atascado.
 
-**Скрипт не чинит и не создаёт.** Только читает. Единственное исключение — временный под
-для проверки сетевой доступности, который удаляется за собой.
+**El script no arregla ni crea.** Solo lee. La única excepción es un Pod temporal
+para probar la accesibilidad de red, que se limpia solo.
 
-**Работает на macOS и Linux.** Никакого GNU-специфичного `sed -i`, `readlink -f`,
-`date -d`. Проверять на обеих системах.
+**Funciona en macOS y Linux.** Nada de `sed -i`, `readlink -f`, `date -d` específicos de GNU.
+Probar en ambos sistemas.
 
-**Не падает на первой ошибке.** Прогоняет все проверки и показывает полную картину.
-`set -e` не использовать.
+**No se detiene en el primer error.** Ejecuta todas las verificaciones y muestra el panorama completo.
+No usar `set -e`.
 
-**Не печатает пароли и токены.** Если значение секретное — писать `<скрыто>`.
+**No imprime contraseñas ni tokens.** Si un valor es secreto, escribe `<hidden>`.
 
-**Идемпотентен.** Запуск десять раз подряд не меняет состояние кластера.
+**Idempotente.** Ejecutarlo diez veces seguidas no cambia el estado del clúster.
 
-## Общая библиотека
+## Biblioteca compartida
 
-`check/lib.sh` — общие функции, подключается в начале каждого скрипта:
+`check/lib.sh` — funciones compartidas, incluidas al inicio de cada script:
 
-- `ok "текст"` / `fail "текст" "подсказка"` / `warn "текст"` — вывод результата
-- `need_kubeconfig` — проверить, что `KUBECONFIG` задан и кластер отвечает
-- `need_tenant` — проверить, что задан `COZY_TENANT`
-- `evidence "заголовок" "значение"` — добавить свидетельство в артефакт
-- `finish` — подвести итог, записать отчёт, вернуть код возврата
+- `ok "text"` / `fail "text" "hint"` / `warn "text"` — imprimir un resultado
+- `need_kubeconfig` — verificar que `KUBECONFIG` esté definido y que el clúster responda
+- `need_tenant` — verificar que `COZY_TENANT` esté definido
+- `evidence "heading" "value"` — añadir una evidencia al artefacto
+- `finish` — resumir, escribir el informe, devolver el código de salida
 
-Код возврата: `0` — всё прошло, `1` — есть провалы. Так скрипт можно использовать
-в автоматике.
+Código de salida: `0` — todo pasó, `1` — hay fallos. Así el script se puede usar
+en automatización.

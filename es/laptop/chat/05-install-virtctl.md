@@ -1,10 +1,8 @@
-## 5. Ставим virtctl
+## 5. Instalar virtctl
 
-**virtctl — управление виртуалками**
+**virtctl — gestionar las VM**
 
-⚠️ **Внимание: ставим не самую свежую, а ту, что в кластере.** Клиент новее сервера
-меняет синтаксис команд, и половина вопросов на прошлых воркшопах была именно из-за этого.
-В нашем кластере **v1.8.4** — она и указана во всех блоках ниже. Не меняйте её на latest.
+⚠️ **Atención: instala la versión que coincide con el clúster, no la más reciente.** Un cliente más nuevo que el servidor cambia la sintaxis de los comandos, y la mitad de las preguntas en talleres anteriores venían justo de esto. Nuestro clúster corre la **v1.8.4** — esa es la versión fijada en todos los bloques de abajo. No la cambies a latest.
 
 **macOS**
 ```bash
@@ -14,7 +12,7 @@ curl -L -o virtctl "https://github.com/kubevirt/kubevirt/releases/download/${VER
 chmod +x virtctl
 sudo mv virtctl /usr/local/bin/
 ```
-Если macOS ругается «не удалось проверить разработчика»:
+Si macOS se queja de que «no puede verificar al desarrollador»:
 ```bash
 sudo xattr -d com.apple.quarantine /usr/local/bin/virtctl
 ```
@@ -28,7 +26,7 @@ chmod +x virtctl
 sudo mv virtctl /usr/local/bin/
 ```
 
-**Windows** (PowerShell, запускать от обычного пользователя)
+**Windows** (PowerShell, ejecutar como usuario normal)
 ```powershell
 $ver = "v1.8.4"
 New-Item -ItemType Directory -Force "$HOME\bin" | Out-Null
@@ -36,20 +34,14 @@ Invoke-WebRequest -Uri "https://github.com/kubevirt/kubevirt/releases/download/$
 $old = [Environment]::GetEnvironmentVariable("Path","User")
 [Environment]::SetEnvironmentVariable("Path", "$old;$HOME\bin", "User")
 ```
-После этого **закройте окно PowerShell и откройте новое** — иначе новый PATH не подхватится.
+Después de esto, **cierra la ventana de PowerShell y abre una nueva** — de lo contrario el PATH actualizado no se aplicará.
 
-**Проверяем (везде одинаково):**
+**Verificar (igual en todas partes):**
 ```
 virtctl version
 ```
-Должна появиться строчка `Client Version:` с номером. Ругань на отсутствие связи
-с сервером на этом шаге нормальна — мы к нему ещё не подключались.
+Debería aparecer una línea `Client Version:` con un número. Una queja por no poder alcanzar el servidor es normal en este paso — todavía no nos hemos conectado a él.
 
-**Про имя машины в командах.** С клиентом v1.8.4 машина указывается по голому имени,
-без приставки: `vm-instance-app-1`. Если у вас всё же встал клиент поновее и он отвечает
-`target must contain type and name separated by '/'` — добавьте приставку **`vmi/`**:
-`vmi/vm-instance-app-1`.
+**Sobre el nombre de la máquina en los comandos.** Con el cliente v1.8.4 la máquina se indica por su nombre pelado, sin prefijo: `vm-instance-app-1`. Si de todos modos te quedó instalado un cliente más nuevo y responde `target must contain type and name separated by '/'` — añade el prefijo **`vmi/`**: `vmi/vm-instance-app-1`.
 
-⚠️ Приставка именно `vmi/`, не `vm/`. С `vm/` придёт отказ по правам
-(`cannot get resource "virtualmachines/portforward"`): участнику выданы права
-на запущенные экземпляры машин, а не на их описания.
+⚠️ El prefijo es `vmi/`, no `vm/`. Con `vm/` obtendrás un error de permisos (`cannot get resource "virtualmachines/portforward"`): al participante se le otorgan permisos sobre las instancias de máquinas en ejecución, no sobre sus definiciones.

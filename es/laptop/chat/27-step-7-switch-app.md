@@ -1,31 +1,27 @@
-## 27. Шаг 7: переключаем приложение на управляемые сервисы
+## 27. Paso 7: cambiar la aplicación a los servicios gestionados
 
-**Меняем прибитые адреса на имена**
+**Reemplazar las direcciones fijas por nombres**
 
-📍 **Где:** внутри вашей виртуалки, после перезагрузки.
+📍 **Dónde:** dentro de tu VM, después del reinicio.
 
-📄 Это содержимое `scripts/connect-managed.sh`. Тоже набираем руками — по той же
-причине, и потому что команд всего три.
+📄 Este es el contenido de `scripts/connect-managed.sh`. Escríbelo a mano también — por la misma razón, y porque son solo tres comandos.
 
-Внутри машины откройте конфиг приложения:
+Dentro de la máquina, abre la configuración de la aplicación:
 ```bash
 cat /etc/orders/application.properties
 ```
-Вы увидите те самые `192.168.10.30` и `192.168.10.40`. Это боль любой легаси-системы:
-никто уже не помнит, почему именно эти адреса.
+Verás esas mismas `192.168.10.30` y `192.168.10.40`. Este es el dolor de todo sistema heredado: ya nadie recuerda por qué precisamente estas direcciones.
 
-Замените их на имена сервисов (подставьте свой номер вместо `XX`):
+Reemplázalas por los nombres de los servicios (sustituye `XX` por tu propio número):
 ```bash
 sed -i 's|192.168.10.30|postgres-db-rw.tenant-workshopXX.svc.cozy.local|g' /etc/orders/application.properties
 sed -i 's|192.168.10.40|kafka-kafka-kafka-bootstrap.tenant-workshopXX.svc.cozy.local|g' /etc/orders/application.properties
 systemctl restart orders-api
 ```
-(двумя командами, а не одной с переносом: перенос строки при копировании из чата
-часто теряется, и команда выполняется наполовину)
+(dos comandos en lugar de uno con salto de línea: al copiar desde el chat el salto de línea suele perderse, y el comando termina ejecutándose solo a medias)
 
-Проверяем:
+Compruébalo:
 ```bash
 curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/actuator/health
 ```
-`200` — приложение видит и базу, и очередь. Если `503` — вернитесь на шаг с сетью,
-скорее всего адрес не сменился.
+`200` — la aplicación ve tanto la base de datos como la cola. Si obtienes `503`, vuelve al paso de red; lo más probable es que la dirección no haya cambiado.

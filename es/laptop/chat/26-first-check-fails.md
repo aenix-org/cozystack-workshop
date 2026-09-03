@@ -1,48 +1,39 @@
-## 26. Первая проверка: пробуем запустить и ловим ошибку
+## 26. Primera comprobación: intentamos arrancarla y atrapamos el error
 
-**Не пропускайте этот шаг. Он самый полезный из всех.**
+**No te saltes este paso. Es el más útil de todos.**
 
-📍 **Где:** внутри вашей виртуалки.
+📍 **Dónde:** dentro de tu VM.
 
-Машина переехала, загрузилась, сеть работает. По логике всё должно поехать — приложение
-как стояло на этой машине, так и стоит, мы его не трогали. Проверим:
+La VM migró, arrancó y la red funciona. Por toda lógica debería funcionar sin más — la aplicación está en esta VM exactamente donde siempre estuvo, no la tocamos. Comprobemos:
 
 ```bash
 systemctl status orders-api
 curl -s -o /dev/null -w 'HTTP %{http_code}\n' localhost:8080/actuator/health
 ```
 
-**Не работает.** Служба либо не поднялась, либо отвечает `503`. Смотрим, на что жалуется:
+**No funciona.** El servicio o no arrancó o responde con `503`. Veamos de qué se queja:
 
 ```bash
 journalctl -u orders-api --no-pager | tail -20
 ```
 
-В логе будет что-то в духе `Connection to 192.168.10.30:5432 refused` или таймаут на
-том же адресе.
+El registro mostrará algo del estilo `Connection to 192.168.10.30:5432 refused`, o un tiempo de espera agotado contra esa misma dirección.
 
-> **Остановитесь и подумайте, прежде чем читать дальше.**
+> **Detente y piensa antes de seguir leyendo.**
 >
-> Приложение мы не трогали, машина загрузилась, сеть работает. Почему не поднимается?
+> No tocamos la aplicación, la VM arrancó, la red funciona. ¿Por qué no levanta?
 
 <details>
-<summary><b>Ответ и урок шире, чем эта ошибка</b></summary>
+<summary><b>La respuesta, y una lección más amplia que este error</b></summary>
 
-Потому что в конфиге прибиты адреса `192.168.10.30` и `192.168.10.40` — база и очередь,
-которые жили на **двух других виртуалках в vSphere**. Мы их не везли и везти не собирались.
-Здесь по этим адресам нет ничего.
+Porque la configuración tiene las direcciones `192.168.10.30` y `192.168.10.40` clavadas a fuego — la base de datos y la cola, que vivían en **otras dos VMs en vSphere**. No las trajimos ni pensábamos hacerlo. Aquí no hay nada en esas direcciones.
 
-Приложение исправно, машина исправна, сеть исправна. Сломана единственная вещь —
-предположение, что мир вокруг остался прежним.
+La aplicación está bien, la VM está bien, la red está bien. Lo único que está roto es la suposición de que el mundo a su alrededor seguía siendo el mismo.
 
-**Это и есть настоящая миграция.** Перевезти диск — самая простая её часть, и на ней
-обычно всё внимание. А ломается всегда то, что снаружи: адреса, DNS-имена, доступы,
-сертификаты, соседние системы. Поэтому в реальном проекте на перевоз машины закладывают
-день, а на «доведение до работоспособности» — недели.
+**Esto es lo que es una migración de verdad.** Mover un disco es la parte más fácil, y es la parte que normalmente se lleva toda la atención. Lo que se rompe es siempre lo que está afuera: direcciones, nombres DNS, credenciales, certificados, sistemas vecinos. Por eso en un proyecto real presupuestas un día para mover la VM y semanas para «hacerla funcionar».
 
-Сейчас вы это увидели за две минуты и на своей шкуре, а не в чужой презентации.
+Acabas de verlo por ti mismo en dos minutos y en carne propia, no en la presentación de otro.
 
 </details>
 
-**Что делаем дальше.** Чинить будем не приложение, а его представление о мире: подставим
-вместо прибитых IP имена managed-сервисов, которые подняли на шаге 5.
+**Qué hacemos a continuación.** No vamos a arreglar la aplicación sino su imagen del mundo: en lugar de las IP clavadas a fuego pondremos los nombres de los servicios gestionados que levantamos en el paso 5.

@@ -1,110 +1,114 @@
-# Лаба 13 · Своё приложение в каталоге Cozystack
+# Laboratorio 13 · Tu propia aplicación en el catálogo de Cozystack
 
 | | |
 |---|---|
-| **Время** | 40 минут |
-| **Что доказывает** | Каталог платформы открыт: своё приложение встаёт в него рядом с Redis и виртуалками |
-| **Что понадобится** | `helm` на ноутбуке, `kubectl`, тенантный доступ. Кластер `lab` здесь не нужен |
+| **Tiempo** | 40 minutos |
+| **Qué demuestra** | El catálogo de la plataforma está abierto: tu propia aplicación ocupa su lugar en él, justo al lado de Redis y las VMs |
+| **Qué necesitas** | `helm` en la laptop, `kubectl`, acceso de tenant. El clúster `lab` no hace falta aquí |
 
-## Зачем это
+## Por qué esto importa
 
-«Пропуск» заработал. Через неделю о нём узнали в дочерней компании — у них та же
-проходная и та же проблема. Ещё через неделю пришли из второй дочерней.
+El «Guest Pass» ya está en marcha. Una semana después se entera la filial: tienen la misma
+recepción y el mismo problema. Una semana más tarde llega la segunda filial.
 
-Первым двум вы объясняли устно: какие образы, какой конфиг, какие параметры, что
-поднять первым. На третий раз стало ясно, что так нельзя. Объяснение живёт в голове,
-голова одна, а компаний будет пять.
+A las dos primeras se lo explicaste de palabra: qué imágenes, qué configuración, qué
+parámetros, qué levantar primero. A la tercera quedó claro que así no se podía seguir. La
+explicación vive en la cabeza de una persona, esa cabeza es una sola, y las empresas serán
+cinco.
 
-Нужно, чтобы «Пропуск» появился у них так же, как появлялся Redis: пункт в каталоге,
-форма с параметрами, кнопка. Без вас.
+Lo que necesitas es que «Guest Pass» les aparezca igual que apareció Redis: una entrada en
+el catálogo, un formulario con parámetros, un botón. Sin ti.
 
-Это и есть финал воркшопа. Мы прошли путь от «разверни мне под» до «вот вам платформа
-с нашим сервисом внутри».
+Este es el final del taller. Hemos recorrido el camino desde «despliégame un Pod» hasta
+«aquí tienes una plataforma con nuestro servicio dentro».
 
-## Сразу о главном: где заканчиваются ваши права
+## Antes que nada: dónde terminan tus permisos
 
-Этой лабой мы **не** развернём приложение в каталог. И это не потому, что мы не успели
-написать нужную часть.
+Este laboratorio **no** desplegará la aplicación en el catálogo. Y no es porque nos faltara
+tiempo para escribir la parte que lo haría.
 
-Объект `ApplicationDefinition`, которым приложение регистрируется в каталоге, —
-**cluster-scoped**: он один на весь кластер, у него нет namespace, и он меняет каталог
-сразу для всех тенантов. Тенант такой объект создать не может. Проверьте сами, прямо
-сейчас: о своих правах кластер можно спросить, ничего при этом не создавая.
+El objeto `ApplicationDefinition`, el que registra una aplicación en el catálogo, es
+**cluster-scoped**: hay uno por clúster, no tiene namespace, y cambia el catálogo para todos
+los tenants a la vez. Un tenant no puede crear un objeto así. Compruébalo tú mismo, ahora
+mismo: al clúster se le puede preguntar por tus permisos sin crear nada.
 
 ```bash
-# KUBECONFIG — переменная, из которой kubectl берёт адрес кластера и данные для входа.
-# Здесь это тенантный доступ, тот же файл, что и в остальных лабах.
+# KUBECONFIG — la variable que kubectl lee para encontrar la dirección del clúster y tus credenciales.
+# Aquí es el acceso de tenant, el mismo archivo que en todos los demás laboratorios.
 export KUBECONFIG=~/.kube/workshop
-# auth can-i = «а мне это можно?». Кластер отвечает yes или no и ничего не меняет:
-#   create                   какое действие проверяем
-#   applicationdefinitions   над каким типом объектов
+# auth can-i = «¿me está permitido?». El clúster responde yes o no y no cambia nada:
+#   create                   qué acción comprobamos
+#   applicationdefinitions   sobre qué tipo de objeto
 kubectl auth can-i create applicationdefinitions
 ```
 
-**Что вы увидите:**
+**Lo que verás:**
 
 ```
 no
 ```
 
-Никакого обхода тут нет и не предполагается. Поэтому лаба устроена честно: **вы пишете
-чарт и определение приложения, проверяете их локально, и отдаёте админу платформы.**
-Ровно так это и работает в жизни: разработка каталога и его эксплуатация — разные роли.
+Aquí no hay ningún atajo, ni se pretende que lo haya. Por eso el laboratorio está planteado
+con honestidad: **tú escribes el chart y la definición de la aplicación, los verificas
+localmente y se los entregas al administrador de la plataforma.** Así es exactamente como
+funciona en la vida real: construir el catálogo y operarlo son roles distintos.
 
-Аналогия из знакомого мира: содержимое OVF-шаблона готовите вы, а в Content Library
-общего пользования его кладёт тот, у кого есть права на эту библиотеку.
+Una analogía del mundo conocido: el contenido de la plantilla OVF lo preparas tú, pero en la
+Content Library compartida lo coloca quien tiene los derechos sobre esa biblioteca.
 
-## Словарик
+## Pequeño glosario
 
-| Термин | Что это | Похоже на… но |
+| Término | Qué es | Se parece a… pero |
 |---|---|---|
-| **Helm** | Шаблонизатор манифестов с параметрами и версиями | ближе всего к OVF-шаблону с полями ввода, но текстом и в Git |
-| **Чарт (chart)** | Пакет Helm: шаблоны, значения по умолчанию, схема | **OVF-шаблон**, но разворачивается многократно с разными параметрами в одном месте |
-| **Релиз (release)** | Конкретное разворачивание чарта под своим именем | **Развёрнутая из шаблона VM**, но помнит свою историю версий и умеет откатываться |
-| **values** | Параметры, с которыми разворачивают чарт | **Поля мастера развёртывания OVF**, но обычный YAML, лежит в Git рядом с остальным |
-| **values.schema.json** | Описание допустимых значений | **Валидация полей в мастере**, но проверяет до применения, а не в процессе |
-| **ApplicationDefinition** | Запись в каталоге платформы: что показать и что развернуть | **Пункт в Content Library**, но один на кластер и виден всем тенантам |
-| **Namespace** | Раздел кластера, в котором лежат объекты одного владельца | **Папка или пул ресурсов**, но по нему проходит граница прав: ваш тенант — это namespace |
-| **Cluster-scoped** | Объект без namespace, общий для всего кластера | **Настройка уровня vCenter**, но права на него у платформенной команды, не у тенанта |
-| **CRD** | Способ добавить в Kubernetes новый тип объектов | после регистрации ваш тип неотличим от встроенных |
+| **Helm** | Una herramienta de plantillas de manifiestos con parámetros y versiones | lo más cercano a una plantilla OVF con campos de entrada, pero en texto y en Git |
+| **Chart (chart)** | Un paquete de Helm: plantillas, valores por defecto, esquema | una **plantilla OVF**, pero desplegada muchas veces con distintos parámetros desde un solo lugar |
+| **Release (release)** | Un despliegue concreto de un chart bajo su propio nombre | una **VM desplegada desde una plantilla**, pero recuerda su historial de versiones y sabe revertir |
+| **values** | Los parámetros con los que se despliega un chart | los **campos del asistente de despliegue de OVF**, pero YAML plano, guardado en Git junto con todo lo demás |
+| **values.schema.json** | Una descripción de los valores permitidos | la **validación de campos en el asistente**, pero comprueba antes de aplicar, no durante |
+| **ApplicationDefinition** | Una entrada en el catálogo de la plataforma: qué mostrar y qué desplegar | una **entrada en la Content Library**, pero una por clúster y visible para todos los tenants |
+| **Namespace** | Una sección del clúster donde viven los objetos de un solo dueño | una **carpeta o resource pool**, pero por él pasa la frontera de permisos: tu tenant es un namespace |
+| **Cluster-scoped** | Un objeto sin namespace, compartido por todo el clúster | un **ajuste a nivel de vCenter**, pero los derechos sobre él pertenecen al equipo de plataforma, no al tenant |
+| **CRD** | La forma de añadir un nuevo tipo de objeto a Kubernetes | una vez registrado, tu tipo es indistinguible de los integrados |
 
-## Что лежит в папке лабы
+## Qué hay en la carpeta del laboratorio
 
-Все файлы уже у вас — вы забрали их вместе с репозиторием. Создавать и печатать заново
-ничего не нужно: там, где ниже написано `kubectl apply -f имя.yaml`, файл берётся отсюда.
+Todos los archivos ya están ahí: los obtuviste junto con el repositorio. No hay nada que
+crear ni volver a teclear: allí donde más abajo dice `kubectl apply -f name.yaml`, el archivo
+se toma de aquí.
 
 ```bash
 cd labs/13-catalog
 ```
 
-| Файл | Что это | Когда пригодится |
+| Archivo | Qué es | Cuándo resulta útil |
 |---|---|---|
-| `chart/` | Ваше приложение, упакованное для каталога: шаблоны, значения, схема полей формы | читаете и проверяете локально |
-| `applicationdefinition.yaml` | Описание позиции каталога: как она называется и что показывать в дашборде | пробуете применить, чтобы увидеть отказ в правах |
-| `guestpass-example.yaml` | Как будет выглядеть заказ вашего приложения после публикации | читаете; применить его можно только после публикации |
-| `icon.svg`, `icon.b64` | Иконка позиции — исходник и он же строкой; в описание уже вшита | пригодится, если будете менять иконку |
-| `check.sh` | Проверка, что чарт рендерится и кластер его принимает | запускаете в конце лабы |
+| `chart/` | Tu aplicación, empaquetada para el catálogo: plantillas, values, esquema de los campos del formulario | lo lees y verificas localmente |
+| `applicationdefinition.yaml` | La descripción de la entrada del catálogo: cómo se llama y qué mostrar en el panel | intentas aplicarlo, para ver la denegación de permisos |
+| `guestpass-example.yaml` | Qué aspecto tendrá el pedido de tu aplicación una vez publicada | lo lees; solo puedes aplicarlo tras la publicación |
+| `icon.svg`, `icon.b64` | El icono de la entrada: el fuente y eso mismo como cadena; ya está incrustado en la definición | resulta útil si alguna vez cambias el icono |
+| `check.sh` | Una comprobación de que el chart se renderiza y el clúster lo acepta | lo ejecutas al final del laboratorio |
 
-## Шаг 1. Смотрим, что мы упаковываем
+## Paso 1. Miramos qué empaquetamos
 
-В папке `chart/` лежит готовый чарт «Пропуска». Приложение внутри намеренно простое —
-nginx со страницей, — потому что лаба не про приложение, а про упаковку.
+La carpeta `chart/` contiene un chart terminado del «Guest Pass». La aplicación de dentro es
+deliberadamente simple —nginx con una página— porque el laboratorio no va de la aplicación,
+va del empaquetado.
 
 ```
 chart/
-├── Chart.yaml            имя, версия, описание
-├── values.yaml           параметры и значения по умолчанию
-├── values.schema.json    какие значения считать допустимыми
+├── Chart.yaml            nombre, versión, descripción
+├── values.yaml           parámetros y valores por defecto
+├── values.schema.json    qué values considerar válidos
 └── templates/
-    ├── configmap.yaml    страница и конфиг nginx
-    ├── deployment.yaml   само приложение
-    └── service.yaml      адрес
+    ├── configmap.yaml    la página y la configuración de nginx
+    ├── deployment.yaml   la propia aplicación
+    └── service.yaml      la dirección
 ```
 
 <details>
-<summary><b>Разбираем чарт по файлам</b></summary>
+<summary><b>Miramos de cerca: qué hay dentro del chart</b></summary>
 
-### `Chart.yaml` — паспорт
+### `Chart.yaml` — el pasaporte
 
 ```yaml
 name: guest-pass
@@ -112,18 +116,19 @@ version: 0.1.0
 appVersion: "1.0"
 ```
 
-Два разных номера версии, и их постоянно путают.
+Dos números de versión distintos, y constantemente se confunden.
 
-`version` — версия **чарта**, то есть упаковки. Поправили шаблон, добавили параметр,
-исправили опечатку в описании — подняли её.
+`version` es la versión del **chart**, es decir, del empaquetado. Ajustaste una plantilla,
+añadiste un parámetro, corregiste una errata en la descripción: súbela.
 
-`appVersion` — версия **приложения** внутри. Она меняется, когда выходит новая версия
-самого «Пропуска», и с версией упаковки никак не связана.
+`appVersion` es la versión de la **aplicación** de dentro. Cambia cuando sale una nueva
+versión del propio «Guest Pass», y no tiene ninguna relación con la versión del empaquetado.
 
-Практический смысл: по `version` админ понимает, обновляется ли у него сам механизм
-развёртывания, а по `appVersion` — обновляется ли то, что пользуются люди.
+El sentido práctico: por `version` el administrador entiende si se actualiza el propio
+mecanismo de despliegue, y por `appVersion` si se actualiza aquello que la gente realmente
+usa.
 
-### `values.yaml` — параметры
+### `values.yaml` — los parámetros
 
 ```yaml
 ## @param {int} replicas=2 - Number of application replicas.
@@ -136,28 +141,27 @@ greeting: "Order a pass for your guest"
 external: false
 ```
 
-Комментарии `## @param` — не украшение и не документация для людей. По ним генератор
-Cozystack (`cozyvalues-gen`) собирает `values.schema.json` и таблицу параметров в
-README чарта. Один источник правды: поменяли комментарий — перегенерировали схему,
-и форма в дашборде поменялась вместе с ней.
+Los comentarios `## @param` no son adorno ni documentación para humanos. A partir de ellos el
+generador de Cozystack (`cozyvalues-gen`) construye `values.schema.json` y la tabla de
+parámetros en el README del chart. Una única fuente de verdad: cambias el comentario,
+regeneras el esquema, y el formulario en el panel cambia con él.
 
-Формат строгий: `## @param {тип} имя=значение-по-умолчанию - Описание.`
+El formato es estricto: `## @param {tipo} nombre=valor-por-defecto - Descripción.`
 
-Параметров сознательно мало. Каждый новый параметр — это ещё одно поле в форме, ещё
-один способ развернуть приложение неправильно и ещё одна ветка, которую вам поддерживать.
-Хороший чарт даёт настраивать то, что действительно различается между установками, и
-ничего сверх.
+Los parámetros son pocos a propósito. Cada nuevo parámetro es un campo más en el formulario,
+una forma más de desplegar mal la aplicación y una rama más que tendrás que mantener. Un buen
+chart deja configurar lo que de verdad difiere entre instalaciones, y nada más.
 
-### `values.schema.json` — что считать допустимым
+### `values.schema.json` — qué considerar válido
 
-Схема проверяется Helm **до** того, как что-то поедет в кластер. Проверьте на месте:
-подсуньте в числовой параметр строку.
+El esquema lo comprueba Helm **antes** de que nada viaje al clúster. Compruébalo en el acto:
+cuela una cadena en un parámetro numérico.
 
 ```bash
-# template = «собери манифесты из чарта и напечатай их», кластер при этом не трогается:
-#   gp                    имя релиза, под которым чарт как бы разворачивается
-#   chart                 папка с чартом
-#   --set replicas=abc    переопределить один параметр прямо в командной строке
+# template = «arma los manifiestos a partir del chart e imprímelos», el clúster no se toca:
+#   gp                    el nombre del release bajo el que el chart se despliega de forma nominal
+#   chart                 la carpeta con el chart
+#   --set replicas=abc    sobrescribe un solo parámetro directamente en la línea de comandos
 helm template gp chart --set replicas=abc
 ```
 
@@ -167,75 +171,77 @@ guest-pass:
 - at '/replicas': got string, want integer
 ```
 
-Ошибка поймана на ноутбуке за полсекунды. Без схемы она уехала бы в кластер и превратилась
-бы в Deployment, который не создаётся, с сообщением в три экрана.
+El error se atrapa en la laptop en medio segundo. Sin el esquema habría llegado hasta el
+clúster y se habría convertido en un Deployment que nunca se crea, con un mensaje de tres
+pantallas.
 
-Эта же схема, слово в слово, пойдёт в `ApplicationDefinition` — и там из неё вырастет
-форма создания в дашборде.
+Este mismo esquema, palabra por palabra, irá al `ApplicationDefinition`, y allí crece hasta
+convertirse en el formulario de creación del panel.
 
-### `templates/configmap.yaml` — страница
+### `templates/configmap.yaml` — la página
 
 ```yaml
     <h1>{{ .Values.greeting }}</h1>
 ```
 
-Вот ради чего вообще нужен шаблонизатор: значение из `values` попадает в манифест при
-рендере. Без Helm пришлось бы держать по копии манифеста на каждую дочернюю компанию и
-править их руками.
+Esta es la razón misma por la que existe una herramienta de plantillas: un valor de `values`
+aterriza en el manifiesto en el momento del render. Sin Helm tendrías que mantener una copia
+del manifiesto por cada filial y editarlas a mano.
 
-### `templates/deployment.yaml` — приложение
+### `templates/deployment.yaml` — la aplicación
 
 ```yaml
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
 ```
 
-Строка, которую забывают все, и которая потом стоит часа отладки.
+La línea que todos olvidan, y que luego cuesta una hora de depuración.
 
-Kubernetes **не перезапускает поды, когда меняется ConfigMap**. Вы правите текст, делаете
-обновление, дашборд показывает «обновлено», а на странице по-прежнему старое приветствие.
-Аннотация с хэшем конфигурации меняется вместе с конфигурацией, а изменение аннотации в
-шаблоне пода — это уже изменение самого пода, и кластер их пересоздаёт.
+Kubernetes **no reinicia los Pods cuando cambia un ConfigMap**. Editas el texto, lanzas una
+actualización, el panel muestra «actualizado», y la página sigue mostrando el saludo viejo.
+La anotación con el hash de la configuración cambia junto con la configuración, y un cambio en
+una anotación de la plantilla del Pod ya es un cambio del propio Pod, así que el clúster lo
+recrea.
 
 ```yaml
             requests:
               cpu: {{ .Values.resources.cpu | quote }}
 ```
 
-`quote` здесь обязателен. Без кавычек значение `100m` YAML прочитает как строку, а вот
-`1` — как число, и в одном случае из двух получите ошибку типа. Кавычки снимают весь класс
-этих проблем разом.
+`quote` es obligatorio aquí. Sin comillas, YAML lee el valor `100m` como cadena, pero `1`
+como número, y en uno de cada dos casos obtienes un error de tipo. Las comillas eliminan de
+golpe toda esta clase de problemas.
 
-### `templates/service.yaml` — адрес
+### `templates/service.yaml` — la dirección
 
 ```yaml
   type: {{ if .Values.external }}LoadBalancer{{ else }}ClusterIP{{ end }}
 ```
 
-Один булев параметр решает, получит приложение адрес за пределами кластера или нет.
-Именно так устроены штатные приложения Cozystack — у большинства из них есть поле
-`external` ровно с этим смыслом. Следовать чужим соглашениям в каталоге стоит: человек,
-который развернул до вас три managed-сервиса, будет искать это поле там же и под тем же
-именем.
+Un único parámetro booleano decide si la aplicación obtiene una dirección fuera del clúster o
+no. Así es exactamente como están hechas las aplicaciones integradas de Cozystack: la mayoría
+tiene un campo `external` con precisamente este significado. Vale la pena seguir las
+convenciones de otros en el catálogo: quien desplegó tres servicios gestionados antes que tú
+buscará este campo en el mismo sitio y con el mismo nombre.
 
 </details>
 
-## Шаг 2. Проверяем чарт локально
+## Paso 2. Verificamos el chart localmente
 
-📍 **Где:** на ноутбуке. Кластер для этого не нужен.
+📍 **Dónde:** en la laptop. Para esto no hace falta clúster.
 
-Сначала линтер. Он читает чарт как набор файлов и ловит структурные ошибки: не тот
-отступ, потерянное обязательное поле, шаблон, который не разбирается.
+Primero el linter. Lee el chart como un conjunto de archivos y atrapa errores estructurales:
+la indentación equivocada, un campo obligatorio perdido, una plantilla que no se puede analizar.
 
 ```bash
 cd labs/13-catalog
-# lint = «проверь пакет на ошибки оформления и обязательные поля»
-#   chart   путь к папке с чартом; внутри неё Helm ждёт Chart.yaml, values.yaml
-#           и папку templates/
+# lint = «comprueba el paquete en busca de errores de formato y campos obligatorios»
+#   chart   ruta a la carpeta del chart; dentro Helm espera Chart.yaml, values.yaml
+#           y la carpeta templates/
 helm lint chart
 ```
 
-**Что вы должны увидеть:**
+**Lo que deberías ver:**
 
 ```
 ==> Linting chart
@@ -244,30 +250,32 @@ helm lint chart
 1 chart(s) linted, 0 chart(s) failed
 ```
 
-`[INFO]` — замечание, а не ошибка: у чарта нет поля `icon`. Для каталога Cozystack оно
-и не нужно, иконку берут из `ApplicationDefinition`, до неё дойдём.
+`[INFO]` es una observación, no un error: el chart no tiene campo `icon`. Para el catálogo de
+Cozystack no hace falta de todos modos, el icono se toma del `ApplicationDefinition`, al que
+llegaremos.
 
-Теперь рендер. Шаблон — это манифест, в котором часть значений заменена подстановками
-вида `{{ .Values.replicas }}`. Рендер — превращение шаблонов в готовые манифесты: Helm
-берёт значения из `values.yaml`, подставляет их в текст и печатает результат.
+Ahora el render. Una plantilla es un manifiesto en el que parte de los valores están
+reemplazados por sustituciones de la forma `{{ .Values.replicas }}`. Renderizar es convertir
+las plantillas en manifiestos terminados: Helm toma los valores de `values.yaml`, los
+sustituye en el texto e imprime el resultado.
 
 ```bash
-# main — имя релиза, то есть этого конкретного разворачивания чарта. Оно попадает
-# в имена создаваемых объектов, поэтому две установки рядом не столкнутся именами.
+# main — el nombre del release, es decir, de este despliegue concreto del chart. Va
+# a los nombres de los objetos creados, por lo que dos instalaciones contiguas no chocarán.
 helm template main chart
 ```
 
-Вывод — обычные манифесты, те же, что вы писали руками в первых лабах. Ничего
-волшебного в Helm нет: он подставляет значения в текст.
+La salida son manifiestos corrientes, los mismos que escribiste a mano en los primeros
+laboratorios. No hay nada mágico en Helm: sustituye valores en texto.
 
-Проверьте, что параметры действительно доходят до манифестов. Рендерим дважды с разными
-значениями и оставляем в выводе только ту строку, которая должна была измениться.
+Comprueba que los parámetros de verdad llegan a los manifiestos. Renderizamos dos veces con
+valores distintos y conservamos en la salida solo la línea que debía cambiar.
 
 ```bash
-# --set replicas=5 переопределяет значение из values.yaml на время одного запуска.
-# | grep 'replicas:' — из всего вывода оставить только строки с этим словом.
+# --set replicas=5 sobrescribe el valor de values.yaml durante una sola ejecución.
+# | grep 'replicas:' — de toda la salida conserva solo las líneas con esta palabra.
 helm template main chart --set replicas=5 | grep 'replicas:'
-# то же для булева параметра: от external зависит, какой тип Service попадёт в манифест
+# lo mismo para el parámetro booleano: external decide qué tipo de Service acaba en el manifiesto
 helm template main chart --set external=true | grep 'type:'
 ```
 
@@ -277,23 +285,24 @@ helm template main chart --set external=true | grep 'type:'
           type: RuntimeDefault
 ```
 
-Третья строка — не ошибка и не ваша опечатка. `grep` ищет слово по всему тексту, а
-`type:` встречается ещё и в требованиях безопасности (`seccompProfile`). Полезное
-напоминание о том, что `grep` не понимает структуру YAML: он ищет строки, а не поля.
+La tercera línea no es un error ni una errata tuya. `grep` busca la palabra por todo el texto,
+y `type:` aparece también en los requisitos de seguridad (`seccompProfile`). Un recordatorio
+útil de que `grep` no entiende la estructura de YAML: busca líneas, no campos.
 
-⚠️ **`helm template` ничего не отправляет в кластер и ничего не проверяет на его стороне.**
-Он рендерит текст. Манифест, прошедший `helm template`, может быть отвергнут кластером —
-например, из-за отсутствующего CRD. Это дешёвая проверка, а не полная.
+⚠️ **`helm template` no envía nada al clúster ni comprueba nada de su lado.** Renderiza texto.
+Un manifiesto que pasó `helm template` todavía puede ser rechazado por el clúster; por
+ejemplo, por un CRD que falta. Es una comprobación barata, no una completa.
 
-## Шаг 3. Разбираем ApplicationDefinition
+## Paso 3. Desglosamos el ApplicationDefinition
 
-Чарт умеет разворачивать приложение. Но каталог о нём пока не знает: чтобы «Пропуск»
-появился списком в дашборде и стал типом объекта в API, нужен ещё один файл.
+El chart sabe desplegar la aplicación. Pero el catálogo aún no sabe de ella: para que «Guest
+Pass» aparezca como entrada en el panel y se convierta en un tipo de objeto en la API, hace
+falta un archivo más.
 
-Он лежит рядом — `applicationdefinition.yaml`.
+Está justo ahí: `applicationdefinition.yaml`.
 
 <details>
-<summary><b>Разбираем applicationdefinition.yaml по блокам</b></summary>
+<summary><b>Miramos de cerca: qué hay dentro de applicationdefinition.yaml</b></summary>
 
 ```yaml
 apiVersion: cozystack.io/v1alpha1
@@ -302,11 +311,11 @@ metadata:
   name: guest-pass
 ```
 
-Обратите внимание, чего здесь **нет**: поля `namespace`. Это и есть та самая
-cluster-scoped природа объекта. Он один на кластер, и появившийся из-за него пункт
-каталога увидят все тенанты сразу.
+Fíjate en lo que **no** está aquí: el campo `namespace`. Esta es esa misma naturaleza
+cluster-scoped del objeto. Hay uno por clúster, y la entrada del catálogo que produce la verán
+todos los tenants a la vez.
 
-### Блок `application` — как это выглядит в API
+### El bloque `application` — cómo se ve esto en la API
 
 ```yaml
   application:
@@ -315,57 +324,59 @@ cluster-scoped природа объекта. Он один на кластер,
     singular: guestpass
 ```
 
-После применения этого файла в кластере появляется новый тип объектов. Не «интеграция»
-и не «плагин» — полноценный тип, с которым работают обычным `kubectl`. Эти две команды
-заработают у любого тенанта, как только админ применит определение:
+Tras aplicar este archivo, en el clúster aparece un nuevo tipo de objeto. No una
+«integración» ni un «plugin»: un tipo con todas las de la ley con el que trabajas usando
+`kubectl` de siempre. Estos dos comandos funcionarán para cualquier tenant en cuanto el
+administrador aplique la definición:
 
 ```bash
-# get = «покажи, что есть». guestpasses — то самое имя из поля plural ниже:
-#   -n tenant-workshopXX   в каком namespace смотреть; XX замените на свой номер
+# get = «muéstrame qué hay». guestpasses es ese mismo nombre del campo plural de abajo:
+#   -n tenant-workshopXX   en qué namespace mirar; reemplaza XX por tu propio número
 kubectl get guestpasses -n tenant-workshopXX
-# describe = «покажи всё про один объект»: параметры, состояние, последние события.
-# main здесь — имя конкретного заказанного приложения, а не имя типа.
+# describe = «muéstrame todo sobre un objeto»: parámetros, estado, eventos recientes.
+# main aquí es el nombre de una aplicación concreta pedida, no el nombre del tipo.
 kubectl describe guestpass main -n tenant-workshopXX
 ```
 
-`plural` — то, что подставляется в команды и в URL API. `singular` — то, что пишут в
-`kubectl describe`. Оба пишутся строчными буквами и без пробелов, это требование
-Kubernetes, а не стилистика.
+`plural` es lo que se sustituye en los comandos y en la URL de la API. `singular` es lo que
+escribes en `kubectl describe`. Ambos se escriben en minúsculas y sin espacios: un requisito
+de Kubernetes, no una cuestión de estilo.
 
 ```yaml
     openAPISchema: |-
       {"title":"Chart Values","type":"object","properties":{...}}
 ```
 
-Та же схема, что лежит в чарте файлом `values.schema.json`, только записанная одной
-строкой JSON. Она работает в двух местах: API отказывает в неверных значениях, а
-дашборд рисует по ней форму создания — типы полей, значения по умолчанию, подсказки.
+El mismo esquema que está en el chart como el archivo `values.schema.json`, solo que escrito
+en una única línea de JSON. Funciona en dos sitios: la API rechaza los valores inválidos, y el
+panel dibuja a partir de él el formulario de creación: tipos de campo, valores por defecto,
+pistas.
 
-⚠️ **Схема здесь и схема в чарте должны совпадать.** Никакой автоматической связи между
-ними нет: это два файла, и синхронизировать их — ваша задача. Разъехались — форма в
-дашборде показывает одни поля, а чарт ждёт другие. `check.sh` сверяет их за вас, но
-привыкать к этой проверке стоит.
+⚠️ **El esquema de aquí y el esquema del chart deben coincidir.** No hay ningún vínculo
+automático entre ellos: son dos archivos, y mantenerlos sincronizados es tu tarea. Deja que se
+separen, y el formulario del panel muestra un conjunto de campos mientras el chart espera
+otro. `check.sh` los coteja por ti, pero vale la pena acostumbrarse a esa comprobación.
 
-### Блок `release` — что разворачивать
+### El bloque `release` — qué desplegar
 
 ```yaml
   release:
     prefix: guest-pass-
 ```
 
-Имя релиза складывается из префикса и имени объекта: `GuestPass` с именем `main`
-развернётся релизом `guest-pass-main`. Поле обязательное. Нужно оно затем, чтобы релизы
-разных приложений не сталкивались именами в одном namespace: `main` бывает у многих,
-`guest-pass-main` — только у вас.
+El nombre del release se compone del prefijo y del nombre del objeto: un `GuestPass` llamado
+`main` se despliega como el release `guest-pass-main`. El campo es obligatorio. Hace falta
+para que los releases de distintas aplicaciones no choquen de nombre en un mismo namespace:
+muchas cosas se llaman `main`, pero `guest-pass-main` es solo tuyo.
 
 ```yaml
     labels:
       sharding.fluxcd.io/key: tenants
 ```
 
-Служебная метка Cozystack: по ней релизы тенантов распределяются между обработчиками
-Flux. Без неё релиз некому будет обслуживать, и он останется висеть в ожидании.
-Это не то место, где стоит проявлять самостоятельность, — копируйте как есть.
+Una etiqueta de servicio de Cozystack: por ella, los releases de los tenants se reparten entre
+los manejadores de Flux. Sin ella no habrá quién atienda el release, y se quedará colgado
+esperando. Este no es el lugar para mostrar iniciativa: cópiala tal cual.
 
 ```yaml
     chartRef:
@@ -374,20 +385,20 @@ Flux. Без неё релиз некому будет обслуживать, �
       namespace: cozy-public
 ```
 
-Откуда взять чарт. Допустимых значений `kind` три: `OCIRepository`, `HelmChart`,
+De dónde tomar el chart. Hay tres valores válidos de `kind`: `OCIRepository`, `HelmChart`,
 `ExternalArtifact`.
 
-Внешние каталоги обычно приезжают цепочкой `GitRepository` → `HelmChart`: админ добавляет
-ваш репозиторий как источник в namespace `cozy-public`, Flux вытаскивает из него чарт,
-а `ApplicationDefinition` на этот чарт ссылается. Именно этот путь показан в
-`cozystack/external-apps-example`, и с него разумно начинать.
+Los catálogos externos suelen llegar por la cadena `GitRepository` → `HelmChart`: el
+administrador añade tu repositorio como fuente en el namespace `cozy-public`, Flux extrae de él
+el chart, y el `ApplicationDefinition` referencia ese chart. Este es exactamente el camino que
+se muestra en `cozystack/external-apps-example`, y es un punto sensato por donde empezar.
 
-⚠️ **Имена в `chartRef` придумываете не вы одни.** Они должны совпасть с тем, как админ
-зарегистрирует источник. Согласуйте их до того, как отправите файл, — иначе определение
-применится, а разворачивать будет нечего, и ошибка вылезет только у первого, кто нажмёт
-«создать».
+⚠️ **Los nombres en `chartRef` no los inventas tú solo.** Deben coincidir con cómo el
+administrador registre la fuente. Acuérdalos antes de enviar el archivo; de lo contrario la
+definición se aplicará pero no habrá nada que desplegar, y el error solo saldrá a la luz para
+la primera persona que pulse «crear».
 
-### Блок `dashboard` — как это выглядит в интерфейсе
+### El bloque `dashboard` — cómo se ve esto en la interfaz
 
 ```yaml
   dashboard:
@@ -398,63 +409,64 @@ Flux. Без неё релиз некому будет обслуживать, �
     tags: [internal, web]
 ```
 
-`category` — раздел каталога. В Cozystack их используется пять: `PaaS`, `IaaS`, `NaaS`,
-`Administration`, `Networking`. Берите существующий. Свой раздел означает раздел из
-одного пункта, в котором ваше приложение никто не найдёт.
+`category` es la sección del catálogo. Cozystack usa cinco: `PaaS`, `IaaS`, `NaaS`,
+`Administration`, `Networking`. Toma una existente. Una sección propia significa una sección de
+una sola entrada, en la que nadie encontrará tu aplicación.
 
-`singular` и `plural` здесь — **человеческие** названия, с пробелами и заглавными
-буквами. Не путайте с теми, что в блоке `application`: те для API, эти для глаз.
+`singular` y `plural` aquí son los nombres **humanos**, con espacios y mayúsculas. No los
+confundas con los del bloque `application`: aquellos son para la API, estos para el ojo.
 
 ```yaml
     icon: PHN2ZyB3aWR0aD0iMTQ0IiBoZWlnaHQ9IjE0NCIgdmlld0JveD0iMCAwIDE0NCAxNDQi...
 ```
 
-Иконка — SVG, закодированный в base64. Именно закодированный, а не путь и не ссылка:
-дашборд не ходит никуда её скачивать, картинка лежит в самом объекте.
+El icono es un SVG codificado en base64. Codificado, no una ruta ni un enlace: el panel no va
+a ninguna parte a descargarlo, la imagen vive en el propio objeto.
 
-Исходник рядом, в `icon.svg`, а готовая строка — в `icon.b64`. Если правили исходник,
-строку надо пересобрать. Кодировщик по умолчанию разбивает вывод на строки, а в поле
-`icon` нужна одна сплошная — поэтому переводы строк убираются отдельным шагом.
+El fuente está justo ahí, en `icon.svg`, y la cadena lista, en `icon.b64`. Si editaste el
+fuente, la cadena hay que reconstruirla. El codificador por defecto parte la salida en líneas,
+pero el campo `icon` necesita una única cadena continua, así que los saltos de línea se
+eliminan en un paso aparte.
 
 ```bash
-# base64 = перевести двоичный файл в строку из букв, цифр и знаков + / =
-#   -i icon.svg   что кодировать (написание ключа для macOS и BSD)
-# tr -d '\n' = выбросить из вывода все переводы строк, склеив его в одну
+# base64 = convertir un archivo binario en una cadena de letras, dígitos y los signos + / =
+#   -i icon.svg   qué codificar (la grafía del flag para macOS y BSD)
+# tr -d '\n' = descartar todos los saltos de línea de la salida, pegándola en una sola
 base64 -i icon.svg | tr -d '\n'
 ```
 
-На Linux у той же команды другие ключи: `base64 -w0 icon.svg`, где `-w0` означает
-«не переносить вывод вообще». Написание ключей GNU и BSD здесь не совпадает.
+En Linux el mismo comando tiene otros flags: `base64 -w0 icon.svg`, donde `-w0` significa «no
+ajustar la salida en absoluto». Las grafías de los flags de GNU y BSD no coinciden aquí.
 
-Размер холста 144×144 — как у штатных иконок платформы. Больше не нужно: в каталоге она
-рисуется маленькой.
+El tamaño del lienzo 144×144 coincide con los iconos integrados de la plataforma. Más no hace
+falta: en el catálogo se dibuja pequeño.
 
 ```yaml
     keysOrder: [["apiVersion"], ["kind"], ["metadata"], ..., ["spec", "replicas"], ...]
 ```
 
-Порядок полей в YAML-представлении объекта. Косметика, но без неё поля выстраиваются
-как попало — сначала редкий `resources`, потом главный `replicas`, — и форма читается
-хуже, чем могла бы.
+El orden de los campos en la representación YAML del objeto. Cosmético, pero sin él los campos
+se alinean de cualquier manera —primero el poco usado `resources`, después el principal
+`replicas`— y el formulario se lee peor de lo que podría.
 
 </details>
 
-## Шаг 4. Пробуем применить — и получаем отказ
+## Paso 4. Intentamos aplicar — y recibimos una denegación
 
-📍 **Где:** на ноутбуке, с тенантным доступом.
+📍 **Dónde:** en la laptop, con acceso de tenant.
 
-Файл готов и синтаксически исправен — попробуем применить его так, будто прав хватает.
-Отказ придёт от кластера, а не от `kubectl`, и в тексте отказа будет сказано, чего
-именно не хватило.
+El archivo está listo y es sintácticamente correcto: intentemos aplicarlo como si tuviéramos
+los derechos. La denegación vendrá del clúster, no de `kubectl`, y el texto de la denegación
+dirá exactamente qué faltaba.
 
 ```bash
-# тенантный доступ — тот же, с которым вы работали весь воркшоп
+# acceso de tenant — el mismo con el que has trabajado durante todo el taller
 export KUBECONFIG=~/.kube/workshop
-# apply = «приведи кластер к тому, что написано в файле»; -f — читать из файла
+# apply = «pon el clúster en línea con lo que está escrito en el archivo»; -f — leer de un archivo
 kubectl apply -f applicationdefinition.yaml
 ```
 
-**Что вы увидите:**
+**Lo que verás:**
 
 ```
 Error from server (Forbidden): error when creating "applicationdefinition.yaml":
@@ -462,63 +474,65 @@ applicationdefinitions.cozystack.io is forbidden: User "workshopXX" cannot creat
 resource "applicationdefinitions" in API group "cozystack.io" at the cluster scope
 ```
 
-Отказ ожидаемый: о нём сказано в начале лабы. Содержательны здесь последние четыре
-слова — **at the cluster scope**.
+La denegación es esperada: se dijo al comienzo del laboratorio. Lo que importa aquí son las
+últimas cuatro palabras: **at the cluster scope**.
 
 <details>
-<summary><b>Почему прав нет и почему их не стоит просить</b></summary>
+<summary><b>La respuesta, y una lección más amplia que este error</b></summary>
 
-Ваши права в тенанте — это права внутри namespace. Вы полный хозяин своего кусочка:
-заводите кластеры, базы, виртуалки, удаляете их, ломаете, чините. Ни один ваш объект
-не виден и не мешает соседу.
+Tus derechos en el tenant son derechos dentro de un namespace. Eres el dueño absoluto de tu
+propio trozo: levantas clústeres, bases de datos, VMs, las borras, las rompes, las arreglas.
+Ni uno solo de tus objetos es visible para un vecino ni le estorba.
 
-`ApplicationDefinition` устроен иначе. Он меняет каталог **для всех тенантов сразу**.
-Приложение с ошибкой в схеме, применённое вами, увидят и попытаются развернуть люди из
-других отделов. Приложение, названное так же, как существующее, — сломает существующее.
+`ApplicationDefinition` está construido de otra manera. Cambia el catálogo **para todos los
+tenants a la vez**. Una aplicación con un error en su esquema, aplicada por ti, la verán e
+intentarán desplegar personas de otros departamentos. Una aplicación con el mismo nombre que
+una existente romperá la existente.
 
-Поэтому граница проходит именно здесь, и она не про недоверие. То же самое было в
-vSphere: свои VM в своём пуле вы создавали сами, а вот содержимое общей Content Library
-и права на неё — нет.
+Por eso la frontera pasa justo aquí, y no es cuestión de desconfianza. Lo mismo ocurría en
+vSphere: tus propias VMs en tu propio pool las creabas tú, pero el contenido de la Content
+Library compartida, y los derechos sobre ella, no.
 
-**Что делать практически.** Отдать админу платформы два файла и одно согласование:
+**Qué hacer en la práctica.** Entrega al administrador de la plataforma dos archivos y un
+acuerdo:
 
-| Что отдать | Зачем |
+| Qué entregar | Por qué |
 |---|---|
-| `applicationdefinition.yaml` | сам объект, который он применит |
-| ссылку на репозиторий с чартом | из него админ соберёт источник в `cozy-public` |
-| согласованные имена в `chartRef` | чтобы определение нашло чарт |
+| `applicationdefinition.yaml` | el objeto en sí, que él aplicará |
+| un enlace al repositorio con el chart | a partir de él el administrador construye la fuente en `cozy-public` |
+| los nombres acordados en `chartRef` | para que la definición encuentre el chart |
 
-И проверить перед отправкой, что оба файла в порядке, — потому что цикл обратной связи
-здесь длинный: применил админ, а ошибку увидит третий человек.
+Y comprueba antes de enviar que ambos archivos están en orden, porque el ciclo de
+retroalimentación aquí es largo: el administrador lo aplica, y un tercero ve el error.
 
 </details>
 
-Отказ мог бы прийти и из-за ошибки в самом файле. Разделим одно с другим: сначала
-спросим про права, потом заставим `kubectl` разобрать файл целиком, никуда его не
-отправляя.
+La denegación también podría haber venido de un error en el propio archivo. Separemos ambas
+cosas: primero preguntamos por los permisos, luego hacemos que `kubectl` analice el archivo
+entero, sin enviarlo a ninguna parte.
 
 ```bash
-# auth can-i = «а мне это можно?». Ответ yes или no, кластер при этом не меняется.
+# auth can-i = «¿me está permitido?». La respuesta es yes o no, y el clúster no se cambia.
 kubectl auth can-i create applicationdefinitions
-# --dry-run=client = «разбери файл и покажи, что получилось бы, но в кластер не ходи».
-# client значит, что вся проверка идёт на ноутбуке и кластер о ней даже не узнает.
+# --dry-run=client = «analiza el archivo y muestra qué saldría, pero no vayas al clúster».
+# client significa que toda la comprobación corre en la laptop y el clúster ni siquiera se entera.
 kubectl apply -f applicationdefinition.yaml --dry-run=client
 ```
 
-**Что вы должны увидеть.** Первая команда — `no`. Вторая —
-`applicationdefinition.cozystack.io/guest-pass created (dry run)`: файл разобран,
-синтаксис в порядке, дело действительно в правах.
+**Lo que deberías ver.** El primer comando: `no`. El segundo:
+`applicationdefinition.cozystack.io/guest-pass created (dry run)`: el archivo se analiza, la
+sintaxis está bien, el problema de verdad son los permisos.
 
-⚠️ **`--dry-run=client` проверяет только синтаксис.** Он не спрашивает кластер вообще
-ни о чём. `--dry-run=server` спросил бы, но для этого нужны те самые права, которых нет.
+⚠️ **`--dry-run=client` comprueba solo la sintaxis.** No le pregunta nada en absoluto al
+clúster. `--dry-run=server` sí preguntaría, pero eso requiere esos mismos derechos que faltan.
 
-## Шаг 5. Что увидят дочерние компании
+## Paso 5. Qué verán las filiales
 
-Когда админ применит определение, каталог пополнится. С этого момента любой тенант
-разворачивает «Пропуск» так же, как разворачивал Redis: **Создать приложение** →
-`Guest Pass` → форма из ваших четырёх параметров → кнопка.
+Cuando el administrador aplique la definición, el catálogo gana una entrada. A partir de ese
+momento cualquier tenant despliega «Guest Pass» igual que desplegó Redis: **Create
+application** → `Guest Pass` → un formulario a partir de tus cuatro parámetros → un botón.
 
-Или текстом — файл `guestpass-example.yaml` из этой папки:
+O como texto: el archivo `guestpass-example.yaml` de esta carpeta:
 
 ```yaml
 apiVersion: apps.cozystack.io/v1alpha1
@@ -532,89 +546,96 @@ spec:
   external: false
 ```
 
-Обратите внимание на группу: `apps.cozystack.io` — та же, что у `Bucket` и `VMInstance`.
-Ваше приложение встало **в один ряд** со штатными, а не куда-то сбоку. Его так же видно
-в списке приложений тенанта, так же считаются его ресурсы, так же работают права.
+Fíjate en el grupo: `apps.cozystack.io`, el mismo que para `Bucket` y `VMInstance`. Tu
+aplicación ha ocupado su lugar **en la misma fila** que las integradas, no en un aparte. Se ve
+igual en la lista de aplicaciones del tenant, sus recursos se cuentan igual, los permisos
+funcionan igual.
 
-⚠️ Применить этот файл до того, как админ зарегистрировал определение, нельзя: `kubectl`
-ответит `no matches for kind "GuestPass"` — такого типа объектов в кластере пока
-нет.
+⚠️ No puedes aplicar este archivo antes de que el administrador haya registrado la definición:
+`kubectl` responderá `no matches for kind "GuestPass"` — todavía no existe ese tipo de objeto
+en el clúster.
 
-## Шаг 6. Как не писать всё это руками
+## Paso 6. Cómo no escribir todo esto a mano
 
-Всё, что вы разобрали в этой лабе, — скелет: `Chart.yaml`, `values.yaml`, схема, шаблоны,
-`ApplicationDefinition` с правильными именами и метками. Половина файла — обязательные
-поля, которые везде одинаковы, и ошибиться в них легче, чем написать.
+Todo lo que desglosaste en este laboratorio es un esqueleto: `Chart.yaml`, `values.yaml`, el
+esquema, las plantillas, el `ApplicationDefinition` con los nombres y las etiquetas correctas.
+La mitad del archivo son campos obligatorios que son iguales en todas partes, y es más fácil
+equivocarse en ellos que escribirlos.
 
-Для этого есть готовый инструмент.
+Para esto hay una herramienta ya lista.
 
-| Что | Где | Зачем |
+| Qué | Dónde | Por qué |
 |---|---|---|
-| Репозиторий `cozystack/ccp` | github.com/cozystack/ccp | набор плагинов и скиллов для Claude Code |
-| Плагин `cozystack` | оттуда же | учит Claude Code структуре пакетов Cozystack |
-| Скилл `external-app-create` | в плагине | генерирует скелет внешнего приложения целиком |
-| Репозиторий-образец | github.com/cozystack/external-apps-example | рабочий пример со сборкой и публикацией чарта |
+| El repositorio `cozystack/ccp` | github.com/cozystack/ccp | un conjunto de plugins y skills para Claude Code |
+| El plugin `cozystack` | de ahí mismo | le enseña a Claude Code la estructura de los paquetes de Cozystack |
+| El skill `external-app-create` | en el plugin | genera el esqueleto completo de la aplicación externa |
+| El repositorio de ejemplo | github.com/cozystack/external-apps-example | un ejemplo funcional con la construcción y publicación del chart |
 
-Скилл спрашивает имя приложения, kind, категорию и параметры — и раскладывает готовое
-дерево файлов: чарт со схемой, `ApplicationDefinition` с правильными префиксами и
-метками, Makefile для сборки.
+El skill pregunta el nombre de la aplicación, el kind, la categoría y los parámetros, y
+despliega un árbol de archivos terminado: el chart con su esquema, el `ApplicationDefinition`
+con los prefijos y las etiquetas correctas, un Makefile para la construcción.
 
-Разбирать всё это руками смысла не теряет. Сгенерированный скелет придётся читать
-и править, а править то, чего не понимаешь, — худший из известных способов работы.
+Desglosar todo esto a mano no pierde su sentido. El esqueleto generado habrá que leerlo y
+editarlo igualmente, y editar lo que no entiendes es la peor forma conocida de trabajar.
 
-## Проверка
+## La comprobación
 
-📍 **Где:** на ноутбуке, в том же окне терминала, где вы работали с `kubectl`.
+📍 **Dónde:** en la laptop, en la misma ventana de terminal donde trabajaste con `kubectl`.
 
-Скрипт работает **локально** и кластер не трогает: проверяет, что чарт проходит линтер,
-что он рендерится, что параметры действительно доходят до манифестов, что
-`ApplicationDefinition` разбирается и содержит все обязательные поля, что иконка
-раскодируется в SVG — и, главное, что схема в определении совпадает со схемой в чарте.
+El script corre **localmente** y no toca el clúster: comprueba que el chart pasa el linter,
+que se renderiza, que los parámetros de verdad llegan a los manifiestos, que el
+`ApplicationDefinition` se analiza y contiene todos los campos obligatorios, que el icono se
+decodifica en SVG y, lo más importante, que el esquema de la definición coincide con el
+esquema del chart.
 
 ```bash
-# ./ перед именем означает «файл из текущей папки», то есть из labs/13-catalog
+# ./ antes del nombre significa «el archivo de la carpeta actual», es decir, de labs/13-catalog
 ./check.sh
 ```
 
-⚠️ **На Windows скрипт запускается из WSL**, а не из PowerShell — как его поставить,
-написано в начале лабы 0. Без WSL лабу можно пройти, но отчёта-артефакта не будет.
+⚠️ **En Windows el script se ejecuta desde WSL**, no desde PowerShell — cómo configurarlo está
+escrito al comienzo del laboratorio 0. Sin WSL puedes completar el laboratorio, pero no habrá
+informe-artefacto.
 
-Если задан `KUBECONFIG`, скрипт заодно спросит у кластера про права и подтвердит, что
-применять определение вам не положено. Отсутствие прав скрипт засчитывает как
-ожидаемый результат, а не как ошибку.
+Si `KUBECONFIG` está definido, el script además preguntará al clúster por los permisos y
+confirmará que no tienes derecho a aplicar la definición. El script cuenta la ausencia de
+derechos como el resultado esperado, no como un error.
 
-## Уборка
+## Limpieza
 
-Убирать нечего: в кластере вы ничего не создали. Это единственная лаба воркшопа, которая
-не оставляет следов, и в этом её особенность — работа платформенной команды по большей
-части выглядит именно так: текст, ревью, чужие руки на применении.
+No hay nada que limpiar: no creaste nada en el clúster. Este es el único laboratorio del taller
+que no deja rastro, y esa es su particularidad: el trabajo del equipo de plataforma en su mayor
+parte se ve exactamente así: texto, revisión, manos ajenas en el apply.
 
-Файлы `chart/` и `applicationdefinition.yaml` заберите с собой. Это рабочая заготовка,
-из неё получится настоящее приложение вашего каталога.
+Llévate contigo los archivos `chart/` y `applicationdefinition.yaml`. Es un punto de partida
+funcional; de él puede crecer una aplicación real para tu catálogo.
 
-## Что мы теперь умеем
+## Qué sabemos hacer ahora
 
-- Упаковывать приложение в чарт Helm со схемой параметров и проверять его локально
-- Писать `ApplicationDefinition` и объяснять назначение каждого его блока
-- Понимать, почему каталог общий и почему прав на него у тенанта нет
-- Готовить передачу админу так, чтобы он применил файл с первого раза
-- Знать, чем сгенерировать скелет и на какой пример смотреть
+- Empaquetar una aplicación en un chart de Helm con un esquema de parámetros y verificarla localmente
+- Escribir un `ApplicationDefinition` y explicar el propósito de cada uno de sus bloques
+- Entender por qué el catálogo es compartido y por qué un tenant no tiene derechos sobre él
+- Preparar la entrega al administrador para que aplique el archivo a la primera
+- Saber con qué generar el esqueleto y qué ejemplo mirar
 
-## А в vSphere это было бы
+## Y en vSphere esto sería
 
-Content Library и OVF-шаблон с полями ввода. Механика похожа сильнее, чем кажется:
-шаблон готовит одна команда, в общую библиотеку кладёт другая, разворачивают третьи.
+La Content Library y una plantilla OVF con campos de entrada. La mecánica se parece más de lo
+que aparenta: un equipo prepara la plantilla, otro la coloca en la biblioteca compartida, y
+otros la despliegan.
 
-Разница в том, что получается на выходе. OVF-шаблон — это машина с диском: развернули,
-и дальше она живёт сама по себе, а обновлять её вы будете руками на каждой копии.
-`ApplicationDefinition` — это описание, за которым стоит чарт: обновили чарт, подняли
-версию, и все установки обновляются по одному механизму.
+La diferencia está en lo que obtienes al final. Una plantilla OVF es una máquina con un disco:
+la despliegas, y a partir de entonces vive por su cuenta, y la actualizarás a mano en cada
+copia. Un `ApplicationDefinition` es una descripción respaldada por un chart: actualizas el
+chart, subes la versión, y todas las instalaciones se actualizan por un solo mecanismo.
 
-**Где vSphere удобнее, честно.** Content Library — готовый интерфейс: положил файл,
-раздал права, всё. Здесь вам нужно завести репозиторий, настроить сборку и публикацию
-чарта, договориться с админом об именах источника — и всё это до того, как в каталоге
-что-то появится. Порог входа выше, и на первое приложение уйдёт день, а не час.
+**Dónde vSphere es más cómodo, con honestidad.** La Content Library es una interfaz ya lista:
+sueltas el archivo, repartes los derechos, y listo. Aquí necesitas montar un repositorio,
+configurar la construcción y publicación del chart, acordar con el administrador los nombres de
+la fuente — y todo eso antes de que algo aparezca en el catálogo. La barrera de entrada es más
+alta, y la primera aplicación llevará un día, no una hora.
 
-Окупается это на втором и третьем приложении, и особенно — на первом обновлении. Обновить
-приложение, разошедшееся по пяти дочерним компаниям, из чарта и обновить его же на пяти
-разъехавшихся копиях OVF — это разный объём работы. Порядок величины разный.
+Se amortiza en la segunda y la tercera aplicación, y especialmente en la primera
+actualización. Actualizar una aplicación que se ha extendido por cinco filiales, desde un
+chart, frente a actualizar la misma aplicación en cinco copias OVF que se han separado entre sí
+— es una cantidad de trabajo distinta. Un orden de magnitud distinto.

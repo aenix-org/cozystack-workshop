@@ -1,65 +1,62 @@
-## 18. Шаг 3: конвертация образа
+## 18. Paso 3: conversión de la imagen
 
-**Превращаем образ VMware в образ для KVM**
+**Convertimos una imagen de VMware en una imagen para KVM**
 
-📍 **Где:** внутри машины-конвертера, куда вы только что зашли через консоль. Не на
-ноутбуке.
+📍 **Dónde:** dentro de la máquina conversora a la que acabas de entrar por la consola. No en tu laptop.
 
-📄 Работаем со `scripts/convert.sh`. У этой машины сеть есть, поэтому она скачает
-файл сама — копировать через буфер не нужно.
+📄 Trabajamos con `scripts/convert.sh`. Esta máquina sí tiene acceso a la red, así que descargará el
+archivo por su cuenta — no hace falta copiar nada por el portapapeles.
 
-Забираем скрипт с гитхаба прямо в машину:
+Trae el script desde GitHub directamente a la máquina:
 ```bash
 curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/laptop/scripts/convert.sh
 ```
 
-Открываем его:
+Ábrelo:
 ```bash
 nano convert.sh
 ```
 
-**Вот и пригодились три значения, которые вы записали в блокнот на шаге 1.** В начале
-файла есть блок «ВСТАВЬТЕ СВОИ ЗНАЧЕНИЯ» — замените в нём заглушки на свои, оставив
-кавычки на месте:
+**Aquí es donde te sirven los tres valores que anotaste en el paso 1.** Cerca del inicio del
+archivo hay un bloque titulado «PEGA TUS VALORES» — reemplaza en él los marcadores por los
+tuyos, dejando las comillas en su lugar:
 
 ```
-BUCKET="имя-вашего-бакета"
-ACCESS_KEY="ваш-accessKey"
-SECRET_KEY="ваш-secretKey"
+BUCKET="your-bucket-name"
+ACCESS_KEY="your-accessKey"
+SECRET_KEY="your-secretKey"
 ```
 
-Строку `S3_ENDPOINT` и ссылку на исходный образ не трогайте — они уже правильные
-и одинаковые у всех.
+No toques la línea `S3_ENDPOINT` ni el enlace a la imagen de origen — ya están correctos
+y son iguales para todos.
 
-Сохранить в nano: `Ctrl+O`, затем `Enter`, затем `Ctrl+X` для выхода. Проверить, что
-заглушек не осталось:
+Para guardar en nano: `Ctrl+O`, luego `Enter`, y después `Ctrl+X` para salir. Comprueba que no
+queden marcadores:
 ```bash
-grep ВСТАВЬТЕ convert.sh || echo "всё заполнено, можно запускать"
+grep ВСТАВЬТЕ convert.sh || echo "all filled in, ready to run"
 ```
 
-Запускаем — обязательно через `sudo`, скрипту нужны права root:
+Ejecútalo — siempre a través de `sudo`, el script necesita privilegios de root:
 ```bash
 sudo bash convert.sh
 ```
 
-Что происходит внутри: скрипт скачивает исходный образ, запускает `virt-v2v`,
-сжимает результат и заливает его в ваш бакет.
+Lo que ocurre por dentro: el script descarga la imagen de origen, ejecuta `virt-v2v`,
+comprime el resultado y lo sube a tu bucket.
 
-Самое важное делает `virt-v2v`. Он меняет не только формат файла: он подкладывает
-внутрь гостевой системы драйверы virtio и правит загрузчик. Без этого машина
-на новом гипервизоре не стартует вовсе.
+El trabajo más importante lo hace `virt-v2v`. No solo cambia el formato del archivo: introduce
+los controladores virtio dentro del sistema invitado y arregla el gestor de arranque. Sin esto, la máquina
+no arrancará en absoluto en el nuevo hipervisor.
 
-⏳ **Это займёт около пяти минут.** На нашем стенде нет вложенной виртуализации,
-поэтому конвертация идёт в режиме эмуляции. Прогресс виден в консоли — не закрывайте её.
+⏳ **Esto tardará unos cinco minutos.** Nuestro entorno de pruebas no tiene virtualización anidada,
+así que la conversión se ejecuta en modo de emulación. El progreso se ve en la consola — no la cierres.
 
-В конце скрипт напечатает **presigned-ссылку** на ваш образ — ищите в выводе строку,
-начинающуюся со слова `Share:`, ссылка идёт сразу за ним.
+Al final el script imprimirá un **enlace prefirmado** a tu imagen — busca en la salida una línea
+que empiece con la palabra `Share:`, el enlace va justo después.
 
-**Что с ней делать:** скопируйте её в тот же блокнот. На следующем шаге вы вернётесь
-на ноутбук, откроете `manifests/03-app-vm.yaml` и вставите её в поле `url` — туда, где
-сейчас стоит заглушка `ВСТАВЬТЕ_PRESIGNED_URL`. Та самая, про которую я предупреждал,
-когда мы подставляли номера.
+**Qué hacer con él:** cópialo en ese mismo bloc de notas. En el siguiente paso volverás a tu laptop, abrirás `manifests/03-app-vm.yaml` y lo pegarás en el campo `url` — donde
+ahora está el marcador `ВСТАВЬТЕ_PRESIGNED_URL`. El mismo del que te avisé
+cuando estábamos rellenando los números.
 
-Это временная подписанная ссылка: хранилище наружу не открыто, а ссылку вы сделали
-своими же ключами. Она живёт неделю — на воркшоп и на эксперименты после хватит
-с запасом.
+Es un enlace firmado temporal: el almacenamiento no está expuesto al exterior, y el enlace lo generaste
+con tus propias claves. Vive una semana — de sobra para el taller y para experimentar después.

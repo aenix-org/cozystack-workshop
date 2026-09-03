@@ -1,17 +1,17 @@
-## 4. Ставим kubectl
+## 4. Instalar kubectl
 
-**kubectl — под вашу систему**
+**kubectl — para tu sistema**
 
 **macOS**
 ```bash
 brew install kubectl
 ```
-Без Homebrew:
+Sin Homebrew:
 ```bash
 curl -LO "https://dl.k8s.io/release/$(curl -Ls https://dl.k8s.io/release/stable.txt)/bin/darwin/arm64/kubectl"
 chmod +x kubectl && sudo mv kubectl /usr/local/bin/
 ```
-На компьютерах с процессором Intel замените `arm64` на `amd64`.
+En equipos con procesador Intel, reemplaza `arm64` por `amd64`.
 
 **Linux**
 ```bash
@@ -23,11 +23,11 @@ chmod +x kubectl && sudo mv kubectl /usr/local/bin/
 ```powershell
 winget install -e --id Kubernetes.kubectl
 ```
-После установки закройте и откройте PowerShell заново, иначе команда не найдётся.
+Tras la instalación, cierra PowerShell y ábrelo de nuevo; de lo contrario el comando no se encontrará.
 
-⚠️ **Если Windows ответила «Имя "winget" не распознано»** — значит, в вашей сборке нет
-«Установщика приложений», такое бывает на Windows 10. Ничего страшного, ставим напрямую.
-Копируйте блок целиком:
+⚠️ **Si Windows responde «El término "winget" no se reconoce»** — significa que tu compilación no tiene
+el «Instalador de aplicaciones»; esto ocurre en Windows 10. No pasa nada, lo instalamos directamente.
+Copia el bloque completo:
 ```powershell
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $ver = (Invoke-WebRequest -UseBasicParsing https://dl.k8s.io/release/stable.txt).Content.Trim()
@@ -36,12 +36,12 @@ Invoke-WebRequest -UseBasicParsing -Uri "https://dl.k8s.io/release/$ver/bin/wind
 $old = [Environment]::GetEnvironmentVariable("Path","User")
 [Environment]::SetEnvironmentVariable("Path", "$old;$HOME\bin", "User")
 ```
-Затем обязательно закройте окно PowerShell и откройте новое.
+Luego asegúrate de cerrar la ventana de PowerShell y abrir una nueva.
 
-Эта же папка `$HOME\bin` пригодится дальше — в неё лягут virtctl и kubelogin,
-и в PATH она уже добавлена.
+Esta misma carpeta `$HOME\bin` te vendrá bien más adelante — ahí quedarán virtctl y kubelogin,
+y ya está añadida a tu PATH.
 
-**Проверка — везде одинаковая:**
+**Comprobación — igual en todos lados:**
 ```
 kubectl version --client
 ```

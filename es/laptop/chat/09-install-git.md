@@ -1,28 +1,28 @@
-## 9. Ставим git
+## 9. Instalar git
 
-**Последний инструмент — им заберём материалы**
+**La última herramienta — con ella descargaremos los materiales**
 
-📍 **Где:** на ноутбуке.
+📍 **Dónde:** en tu laptop.
 
-Сначала проверьте, вдруг он уже есть: на macOS и в большинстве сборок Linux git
-предустановлен.
+Primero comprueba si ya lo tienes: en macOS y en la mayoría de las compilaciones de Linux
+git viene preinstalado.
 ```
 git --version
 ```
-Если ответила версия — пропускайте это сообщение.
+Si te mostró una versión — salta este mensaje.
 
-**macOS.** Проще всего дождаться системного окошка: наберите `git --version`, и если
-git не установлен, macOS сама предложит поставить инструменты разработчика. Соглашайтесь.
-Либо явно:
+**macOS.** Lo más fácil es dejar que el cuadro de diálogo del sistema haga el trabajo: escribe `git --version`, y si
+git no está instalado, macOS te ofrecerá por sí sola instalar las herramientas de desarrollo. Acéptalo.
+O bien de forma explícita:
 ```bash
 xcode-select --install
 ```
-С Homebrew:
+Con Homebrew:
 ```bash
 brew install git
 ```
 
-**Linux** — зависит от семейства дистрибутива:
+**Linux** — depende de la familia de la distribución:
 ```bash
 sudo apt-get update && sudo apt-get install -y git    # Debian, Ubuntu
 sudo dnf install -y git                               # Fedora, RHEL, CentOS Stream
@@ -32,20 +32,20 @@ sudo dnf install -y git                               # Fedora, RHEL, CentOS Str
 ```powershell
 winget install -e --id Git.Git
 ```
-Затем закройте и откройте PowerShell заново, иначе команда не найдётся.
+Luego cierra PowerShell y ábrelo de nuevo, de lo contrario no se encontrará el comando.
 
-⚠️ **Если `winget` не найден** — git ставится обычным установщиком: откройте
-https://git-scm.com/download/win, скачайте файл, запустите и жмите «Далее» на всех
-шагах, ничего менять не надо. После установки — новое окно PowerShell.
-Либо обойдитесь без git — вариантом с Download ZIP ниже.
+⚠️ **Si no se encuentra `winget`** — git se instala con un instalador común: abre
+https://git-scm.com/download/win, descarga el archivo, ejecútalo y haz clic en «Siguiente» en cada
+paso, no hay que cambiar nada. Después de la instalación — una nueva ventana de PowerShell.
+O prescinde de git — usa la opción Download ZIP de más abajo.
 
-**Проверяем:**
+**Comprobamos:**
 ```
 git --version
 ```
 
-🖱 **Если ставить git не хочется** — он нужен ровно один раз, чтобы скачать папку
-с файлами. Можно обойтись браузером: откройте
-https://github.com/aenix-org/cozystack-migration-workshop, нажмите зелёную кнопку
-**Code → Download ZIP** и распакуйте архив. Дальше всё то же самое, только вместо
-`cd cozystack-migration-workshop` заходите в распакованную папку.
+🖱 **Si prefieres no instalar git** — se necesita exactamente una vez, para descargar la carpeta
+de archivos. Puedes arreglártelas con un navegador: abre
+https://github.com/aenix-org/cozystack-migration-workshop, haz clic en el botón verde
+**Code → Download ZIP** y descomprime el archivo. Todo lo demás es igual,
+solo que en lugar de `cd cozystack-migration-workshop` entras en la carpeta descomprimida.

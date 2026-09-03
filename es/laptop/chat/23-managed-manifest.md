@@ -1,4 +1,4 @@
-## 23. Разбор: что внутри 04-managed.yaml
+## 23. Una mirada más de cerca: qué hay dentro de 04-managed.yaml
 
 ```yaml
 kind: Postgres
@@ -18,33 +18,18 @@ spec:
         admin: [ orders ]
 ```
 
-`kind: Postgres` — снова позиция каталога, как `Bucket` в первой фазе. Вы не ставите
-СУБД: вы её заказываете. Платформа сама поднимет процессы, настроит репликацию,
-заведёт расписание бэкапов и подключит мониторинг.
+`kind: Postgres` — otro elemento del catálogo, igual que `Bucket` en la primera fase. No estás instalando un motor de base de datos: lo estás pidiendo. La propia plataforma levanta los procesos, configura la replicación, arma un calendario de respaldos y conecta el monitoreo.
 
-`users` и `databases` — платформа заведёт пользователя `orders`, базу `orders` и выдаст
-пользователю права администратора этой базы. Вручную ничего создавать не нужно: именно
-поэтому в файле схемы, который мы накатим позже, нет команд `CREATE DATABASE` и
-`CREATE USER` — они уже выполнены за вас.
+`users` y `databases` — la plataforma creará el usuario `orders`, la base de datos `orders` y otorgará a ese usuario derechos de administrador sobre esa base. No hay nada que crear a mano: por eso mismo el archivo de esquema que aplicamos más adelante no contiene comandos `CREATE DATABASE` ni `CREATE USER` — ya se ejecutaron por ti.
 
-`replicas: 1` — одна копия, учебный стенд. В рабочей системе ставят больше, и тогда
-платформа сама следит, кто главный, и переключает при отказе.
+`replicas: 1` — una sola copia, un entorno de pruebas de práctica. En un sistema de producción configuras más, y entonces la propia plataforma lleva la cuenta de cuál es la primaria y hace conmutación por error (failover) ante una caída.
 
-`resourcesPreset: t1.micro` — размер, готовый набор процессора и памяти. Самый маленький.
+`resourcesPreset: t1.micro` — el tamaño, un paquete ya listo de CPU y memoria. El más pequeño.
 
-⚠️ **Пароль лежит открытым текстом** прямо в файле, который вы кладёте в репозиторий.
-Для учебного стенда так можно, для рабочего — нет: там пароль хранят в хранилище
-секретов, а в описании оставляют только ссылку на него.
+⚠️ **La contraseña está en texto plano** justo en el archivo que subes al repositorio. Para un entorno de pruebas de práctica esto es aceptable; para uno de producción no lo es: allí la contraseña vive en un almacén de secretos, y la descripción conserva solo una referencia a ella.
 
-Ниже в том же файле — объект `kind: Kafka`.
+Más abajo en el mismo archivo hay un objeto `kind: Kafka`.
 
-**Что такое очередь и зачем она здесь.** Kafka — это очередь сообщений. Когда
-приложение принимает заказ, оно делает две вещи: записывает заказ в базу и кладёт в
-очередь сообщение «появился заказ номер такой-то». Дальше это сообщение читают другие
-программы — та, что шлёт письмо клиенту, та, что считает отчёты. Смысл прослойки в том,
-что приложению не нужно знать, кто и когда его прочитает: оно положило и пошло дальше.
-Если читатель в этот момент лежит — сообщение дождётся его в очереди.
+**Qué es una cola y por qué está aquí.** Kafka es una cola de mensajes. Cuando la aplicación acepta un pedido, hace dos cosas: escribe el pedido en la base de datos y deja un mensaje en la cola — "llegó el pedido número tal". A partir de ahí otros programas leen ese mensaje — el que envía el correo al cliente, el que arma los informes. El sentido de esta capa es que la aplicación no necesita saber quién lo leerá, ni cuándo: dejó el mensaje y siguió adelante. Si en ese momento un lector está caído, el mensaje lo espera en la cola.
 
-В нашем стенде читателей нет, очередь стоит для полноты картины: приложение при
-создании заказа пишет в неё, и если Kafka недоступна, проверка здоровья честно скажет,
-что всё плохо. Это ровно то, что происходит и в реальной системе.
+En nuestro entorno de pruebas no hay lectores; la cola está para completar el panorama: la aplicación escribe en ella al crear un pedido, y si Kafka no está disponible, la comprobación de estado informará honestamente que las cosas andan mal. Esto es exactamente lo que ocurre también en un sistema real.

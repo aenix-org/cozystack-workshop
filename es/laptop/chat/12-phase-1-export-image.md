@@ -1,7 +1,7 @@
-## 12. Фаза 1. Вывозим образ из vSphere
+## 12. Fase 1. Sacamos la imagen de vSphere
 
-**Шаги 1–3.** Диск виртуальной машины лежит в формате, который понимает VMware, и никуда
-сам не поедет. Нам нужно превратить его в формат для KVM и положить туда, откуда кластер
-сможет его забрать.
+**Pasos 1–3.** El disco de la máquina virtual está en un formato que VMware entiende, y por sí solo no
+va a ir a ningún lado. Necesitamos convertirlo a un formato para KVM y ponerlo en un lugar del que el clúster
+pueda tomarlo.
 
-Три шага: заводим хранилище, поднимаем временную машину с инструментами, конвертируем.
+Tres pasos: preparamos el almacenamiento, levantamos una máquina temporal con las herramientas, convertimos.

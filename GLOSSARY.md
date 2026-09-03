@@ -146,3 +146,15 @@ Register: participant-facing material uses **tú** throughout; CONVENTIONS.md mu
 use tú too (not usted). Reader-facing password placeholders localized like the
 mongodb lab: e.g. `tu-contraseña-analyst`, `TuContraseñaAquí`. Credential labels
 follow the glossary targets (login: / password: / host: / database:).
+
+### Spanish (es) — laptop-phase additions
+| Concept | Español | not |
+|---|---|---|
+| presigned link/URL | **enlace prefirmado / URL prefirmada** | not presigned/presignado |
+| to run (software/VM) | **ejecutarse / funcionar** | not "correr" |
+| the lab (exercise, abbrev) | **el lab** (masculine) | not "la lab" |
+| a catalog item | **un elemento del catálogo** | not "postura/posición" |
+| the trailing path segment (tail) | **el sufijo / la parte final** | not "la cola" |
+| the reader's machine | **la laptop** | not "portátil" (pick one: laptop) |
+| named Secret object | **el Secret `<name>`** | keep English "Secret"; "un secreto" only for generic confidential data |
+| monitoring | **monitoreo** | pick one (not mix with monitorización) |

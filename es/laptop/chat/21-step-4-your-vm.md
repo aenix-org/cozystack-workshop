@@ -1,58 +1,58 @@
-## 21. Шаг 4: ваша виртуальная машина
+## 21. Paso 4: tu máquina virtual
 
-**Поднимаем машину из собственного образа**
+**Levantamos una máquina a partir de tu propia imagen**
 
-📍 **Где:** на ноутбуке.
+📍 **Dónde:** en tu laptop.
 
-⚠️ **Сначала погасите машину-конвертер** — она своё отработала и держит 8Gi вашей квоты.
-Если её не убрать, новая машина повиснет в `Pending`, и выглядеть это будет
-как поломка стенда. На прошлых воркшопах на этом застряли почти все:
+⚠️ **Primero, apaga la máquina conversora** — ya cumplió su función y está reteniendo 8Gi de tu cuota.
+Si no la eliminas, la nueva máquina quedará colgada en `Pending`, y parecerá
+que el entorno de pruebas está averiado. En talleres anteriores casi todos se quedaron atascados aquí:
 
 ```bash
 kubectl delete vminstance convert --namespace tenant-workshopXX
 kubectl delete vmdisk convert-tools --namespace tenant-workshopXX
 ```
 
-Образ в бакете при этом остаётся — из него и поднимемся.
+La imagen permanece en el bucket — es justo desde donde levantaremos la máquina.
 
-Теперь откройте `manifests/03-app-vm.yaml`, вставьте presigned-ссылку в поле `url`
-и примените:
+Ahora abre `manifests/03-app-vm.yaml`, pega el enlace prefirmado en el campo `url`
+y aplícalo:
 
 ```bash
 kubectl apply -f manifests/03-app-vm.yaml
 kubectl get vminstance -n tenant-workshopXX -w
 ```
 
-Сначала кластер скачает образ по ссылке и разложит его по репликам — это займёт минуту-другую.
-Потом машина запустится.
+Primero el clúster descarga la imagen desde el enlace y la reparte entre las réplicas — esto toma un minuto o dos.
+Después la máquina arranca.
 
-Заходим внутрь:
+Entramos:
 ```bash
 virtctl console --namespace=tenant-workshopXX vm-instance-app-1
 ```
 
-**Доступ в вашу машину:**
+**Acceso a tu máquina:**
 ```
-логин:  root
-пароль: cozydemo
+login:    root
+password: cozydemo
 ```
 
-Выйти из консоли — `Ctrl+]`.
+Para salir de la consola — `Ctrl+]`.
 
-**Здесь та же пара объектов, что и с машиной-конвертером**, только диск берётся
-не из каталога, а качается по вашей ссылке:
+**Aquí tienes el mismo par de objetos que con la máquina conversora**, solo que el disco no se toma
+del catálogo, sino que se descarga desde tu enlace:
 
-• **VM Disk** `app-1` — 10Gi, source = http, тот самый presigned-URL
-• **VM Instance** `app-1` — профиль `centos.7`, instance type `u1.medium`
+• **VM Disk** `app-1` — 10Gi, source = http, esa misma URL prefirmada
+• **VM Instance** `app-1` — perfil `centos.7`, instance type `u1.medium`
 
-Имена совпадают, и это нормально: диск и машина — разные типы объектов. В командах
-`virtctl` машина, как и в прошлый раз, зовётся с приставкой: **`vm-instance-app-1`**.
+Los nombres coinciden, y está bien: el disco y la máquina son tipos de objeto distintos. En los comandos
+`virtctl` la máquina, como la vez anterior, se referencia con su prefijo: **`vm-instance-app-1`**.
 
-🖱 **Через дашборд:** **1)** **VM Disk → Deploy new**: имя `app-1`, source = **http**,
-в поле URL — presigned-ссылка, размер `10Gi`, storage class `replicated`.
-**2)** **VM Instance → Deploy new**: имя `app-1`, instance type `u1.medium`,
-profile `centos.7`, диск — `app-1`. Консоль — кнопка **VNC** на странице машины.
+🖱 **A través del panel:** **1)** **VM Disk → Deploy new**: nombre `app-1`, source = **http**,
+en el campo URL — el enlace prefirmado, tamaño `10Gi`, storage class `replicated`.
+**2)** **VM Instance → Deploy new**: nombre `app-1`, instance type `u1.medium`,
+profile `centos.7`, disco — `app-1`. La consola — el botón **VNC** en la página de la máquina.
 
-Обратите внимание, что вы только что сделали: описали виртуальную машину текстом
-и применили его одной командой. Этот файл можно положить в репозиторий и поднять
-сотню таких же машин, не сделав ни одного клика.
+Fíjate en lo que acabas de hacer: describiste una máquina virtual en texto
+y la aplicaste con un solo comando. Puedes colocar este archivo en un repositorio y levantar
+cien máquinas iguales sin hacer un solo clic.

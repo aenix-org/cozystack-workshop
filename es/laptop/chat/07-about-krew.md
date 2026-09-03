@@ -1,23 +1,23 @@
-## 7. Про krew — и почему мы им не пользуемся
+## 7. Sobre krew — y por qué no lo usamos
 
-**Короткий ответ: не ставьте его сегодня**
+**Respuesta corta: no lo instales hoy**
 
-krew — менеджер плагинов для kubectl, и им можно поставить те же virtctl и kubelogin.
-Но на прошлых воркшопах именно он съел больше всего времени, особенно на Windows.
-Если вы сделали шаги 3 и 4 — **у вас уже всё есть, этот пост пропускайте**.
+krew es un gestor de complementos para kubectl, y con él puedes instalar esos mismos virtctl y kubelogin.
+Pero en talleres anteriores fue precisamente krew lo que más tiempo consumió, sobre todo en Windows.
+Si ya hiciste los pasos 3 y 4 — **ya tienes todo, salta este post**.
 
-Читайте дальше, только если krew у вас уже стоит или очень хочется.
+Sigue leyendo solo si ya tienes krew instalado o de verdad lo quieres.
 
-⚠️ **Три грабли Windows, все встречались вживую:**
-• **PATH не обновился в текущем окне.** Самое частое. Лечится прямо в той же сессии:
+⚠️ **Tres tropiezos en Windows, todos vistos en la práctica:**
+• **El PATH no se actualizó en la ventana actual.** El más común. Se arregla en la misma sesión:
   `$env:Path += ";$HOME\.krew\bin"`
-• **krew.exe не доустановился** — SmartScreen или антивирус его прибили. Проверить:
+• **krew.exe no terminó de instalarse** — SmartScreen o el antivirus lo mataron. Comprueba:
   `Test-Path "$HOME\.krew\bin\kubectl-krew.exe"`
-• **Админское и обычное окно PowerShell — это разные миры.** У них разные `$HOME`
-  и разный пользовательский PATH. Поставили от администратора, запускаете обычным —
-  плагин не найдётся никогда. Ставьте и запускайте в одном и том же обычном окне.
+• **Una ventana de PowerShell como administrador y una normal son mundos distintos.** Tienen distinto `$HOME`
+  y un PATH de usuario distinto. Lo instalas como administrador, lo ejecutas como usuario normal —
+  y el complemento no se encontrará nunca. Instálalo y ejecútalo en una misma ventana normal.
 
-**macOS и Linux** — копируйте блок целиком, он сам определит систему:
+**macOS y Linux** — copia el bloque entero, detecta el sistema por sí solo:
 ```bash
 set -x; cd "$(mktemp -d)" &&
 OS="$(uname | tr '[:upper:]' '[:lower:]')" &&
@@ -26,12 +26,12 @@ curl -fsSLO "https://github.com/kubernetes-sigs/krew/releases/latest/download/kr
 tar zxvf "krew-${OS}_${ARCH}.tar.gz" &&
 ./"krew-${OS}_${ARCH}" install krew
 ```
-Затем добавьте krew в PATH — строчку надо дописать в свой профиль, иначе она забудется
-при следующем запуске терминала:
+Luego añade krew a tu PATH — hay que agregar la línea a tu perfil, de lo contrario se olvidará
+la próxima vez que inicies la terminal:
 ```bash
-echo 'export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"' >> ~/.zshrc   # для zsh, это по умолчанию в macOS
-echo 'export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"' >> ~/.bashrc  # для bash, обычно Linux
-source ~/.zshrc    # или source ~/.bashrc
+echo 'export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"' >> ~/.zshrc   # para zsh, el predeterminado en macOS
+echo 'export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"' >> ~/.bashrc  # para bash, normalmente Linux
+source ~/.zshrc    # o source ~/.bashrc
 ```
 
 **Windows** (PowerShell)
@@ -42,18 +42,18 @@ $old = [Environment]::GetEnvironmentVariable("Path","User")
 [Environment]::SetEnvironmentVariable("Path", "$old;$HOME\.krew\bin", "User")
 Remove-Item "$HOME\krew.exe"
 ```
-Снова закройте и откройте PowerShell.
+Cierra y vuelve a abrir PowerShell otra vez.
 
-**Ставим плагины:**
+**Instalamos los complementos:**
 ```bash
 kubectl krew install virt
 kubectl krew install oidc-login
 ```
 
-⚠️ Важное отличие: при установке через krew команда называется иначе —
-`kubectl virt console …` вместо `virtctl console …`. Дальше в инструкциях я пишу
-`virtctl` — если ставили через krew, мысленно подставляйте `kubectl virt`.
-Чтобы не путаться, можно сделать короткий псевдоним:
+⚠️ Una diferencia importante: al instalarlo con krew el comando se llama de otra manera —
+`kubectl virt console …` en lugar de `virtctl console …`. Más adelante en las instrucciones escribo
+`virtctl` — si lo instalaste con krew, sustituye mentalmente por `kubectl virt`.
+Para no confundirte, puedes crear un alias corto:
 ```bash
 alias virtctl="kubectl virt"
 ```

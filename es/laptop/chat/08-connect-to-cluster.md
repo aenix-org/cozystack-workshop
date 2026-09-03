@@ -1,64 +1,64 @@
-## 8. Заходим в кластер
+## 8. Iniciar sesión en el clúster
 
-**Подключаемся к своему тенанту**
+**Conéctate a tu tenant**
 
-📍 **Где:** дашборд открываем в браузере, команды выполняем на ноутбуке.
+📍 **Dónde:** abre el panel (dashboard) en el navegador; los comandos se ejecutan en tu laptop.
 
-**Ваши доступы:**
+**Tus credenciales:**
 ```
-дашборд: https://dashboard.workshop.aenix.io
-логин:   workshopXX      ← ваш номер, скажу лично
-пароль:  ...             ← скажу лично
+dashboard: https://dashboard.workshop.aenix.io
+login:     workshopXX      ← tu número, te lo diré en persona
+password:  ...             ← te lo diré en persona
 ```
 
-1. Откройте дашборд по ссылке выше.
-2. Войдите под своим логином.
-3. В дашборде: **Info → вкладка Secrets → `kubeconfig-tenant-workshopXX`**. Нажмите *Reveal*,
-   скопируйте содержимое.
-4. Сохраните в файл и укажите на него переменную:
+1. Abre el panel en el enlace de arriba.
+2. Inicia sesión con tu login.
+3. En el panel: **Info → pestaña Secrets → `kubeconfig-tenant-workshopXX`**. Haz clic en *Reveal*
+   y copia el contenido.
+4. Guárdalo en un archivo y apunta la variable hacia él:
 
-**macOS и Linux**
+**macOS y Linux**
 ```bash
 mkdir -p ~/.kube
-nano ~/.kube/workshop      # вставьте скопированное, сохраните
+nano ~/.kube/workshop      # pega lo que copiaste, luego guarda
 export KUBECONFIG=~/.kube/workshop
 ```
 
 **Windows** (PowerShell)
 ```powershell
-notepad $HOME\.kube\workshop   # вставьте, сохраните
+notepad $HOME\.kube\workshop   # pega, luego guarda
 $env:KUBECONFIG = "$HOME\.kube\workshop"
 ```
 
-**Проверяем:**
+**Verifiquémoslo:**
 ```
 kubectl get vminstance -n tenant-workshopXX
 ```
-Откроется браузер — залогиньтесь как `workshopXX`. После этого команда должна ответить
-`No resources found`. Это правильный ответ: машин пока нет, но кластер вас узнал.
+Se abrirá un navegador — inicia sesión como `workshopXX`. Después de eso, el comando debería responder
+`No resources found`. Esa es la respuesta correcta: todavía no hay máquinas, pero el clúster ya te reconoce.
 
-⚠️ Две вещи, на которых спотыкаются чаще всего:
-• `KUBECONFIG` должен указывать ровно на тот файл, куда вы вставили конфиг.
-• `kubectl get vm` и `kubectl get vmi` работать не будут — под вашей учётной записью
-  доступен `vminstance`. Так и задумано.
+⚠️ Dos cosas con las que la gente tropieza más a menudo:
+• `KUBECONFIG` debe apuntar exactamente al archivo donde pegaste el config.
+• `kubectl get vm` y `kubectl get vmi` no funcionarán — bajo tu cuenta el tipo disponible es
+  `vminstance`. Así está diseñado.
 
-⚠️ **`x509: certificate signed by unknown authority`** — вторая частая ошибка, почти
-всегда на Windows. Означает она не проблему с сертификатом, а то, что `kubectl` взял
-**не тот файл доступа**: доверие к внутреннему центру сертификации кластера лежит в вашем
-kubeconfig, в поле `certificate-authority-data`, и в файле по умолчанию его нет.
+⚠️ **`x509: certificate signed by unknown authority`** — el segundo error frecuente, casi
+siempre en Windows. No significa que haya un problema con el certificado; significa que `kubectl` tomó
+**el archivo de acceso equivocado**: la confianza en la autoridad de certificación interna del clúster vive en tu
+kubeconfig, en el campo `certificate-authority-data`, y el archivo por defecto no la tiene.
 
-Разбираемся по шагам, в PowerShell:
+Resolvámoslo paso a paso, en PowerShell:
 ```powershell
 $env:KUBECONFIG
-# пусто — значит берётся файл по умолчанию, а не тот, что вам выдали
+# vacío — significa que se está usando el archivo por defecto, no el que te dieron
 
 Select-String -Path "$HOME\.kube\workshop" -Pattern "certificate-authority-data" -Quiet
-# False — файл сохранён неполностью, скачайте секрет из дашборда заново
+# False — el archivo se guardó incompleto; descarga de nuevo el Secret desde el panel
 
 Get-Content "$HOME\.kube\workshop" -TotalCount 1
-# должно начинаться с apiVersion; квадратики или пустота — файл в UTF-16
+# debería empezar con apiVersion; cuadraditos o vacío significan que el archivo está en UTF-16
 ```
 
-Третий пункт — самая коварная ловушка Windows. Блокнот и перенаправление `>` сохраняют
-файл в **UTF-16**, а `kubectl` такой файл не читает. Сохранять только в UTF-8: в Блокноте
-тип файла «Все файлы», а из команды — через `Out-File -Encoding utf8`, не через `>`.
+El tercer punto es la trampa más traicionera de Windows. El Bloc de notas y la redirección `>` guardan el
+archivo en **UTF-16**, que `kubectl` no lee. Guarda solo en UTF-8: en el Bloc de notas elige el
+tipo de archivo "Todos los archivos", y desde la línea de comandos usa `Out-File -Encoding utf8`, no `>`.

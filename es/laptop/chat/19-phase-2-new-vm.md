@@ -1,8 +1,8 @@
-## 19. Фаза 2. Заводим машину на новом месте
+## 19. Fase 2. Arrancando la máquina en su nuevo hogar
 
-**Шаги 4 и 6.** Образ вывезен. Теперь поднимаем из него виртуалку уже в Cozystack
-и приводим её в чувство.
+**Pasos 4 y 6.** La imagen ya salió. Ahora levantamos una VM a partir de ella, esta vez en Cozystack,
+y la hacemos volver a la vida.
 
-Готовьтесь к тому, что **сети внутри не будет**. Это не поломка стенда и не ошибка
-конвертации — это неизбежное следствие переезда, и мы чиним его на шаге 6 руками
-специально, чтобы вы увидели, как это выглядит и сколько занимает.
+Prepárate para esto: **no habrá red por dentro**. No es un entorno de pruebas averiado ni un
+error de conversión — es una consecuencia inevitable de la mudanza, y en el paso 6 lo arreglamos a
+mano a propósito, para que veas cómo se ve y cuánto tiempo lleva.

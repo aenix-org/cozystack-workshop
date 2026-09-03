@@ -1,139 +1,139 @@
-# Лаба 15 · Что делать в понедельник
+# Lab 15 · Qué hacer el lunes
 
 | | |
 |---|---|
-| **Время** | 20 минут, и ни одной команды |
-| **Что доказывает** | Пройденное можно применить к своему парку, начав с малого |
-| **Что понадобится** | Только вы и список ваших систем |
+| **Tiempo** | 20 minutos, y ni un solo comando |
+| **Qué demuestra** | Que lo aprendido puede aplicarse a tu propio parque, empezando por lo pequeño |
+| **Qué necesitas** | Solo a ti y una lista de tus sistemas |
 
-Здесь нет ни команд, ни `check.sh`: проверить эту лабу может только понедельник.
-Разговор о том, что делать дальше, когда стенд выключен, а на работе всё как было.
+Aquí no hay comandos, ni tampoco `check.sh`: a este lab solo lo puede comprobar el lunes.
+Una conversación sobre qué hacer a continuación, cuando el entorno de pruebas esté apagado y en el trabajo todo siga como estaba.
 
-## Что у нас получилось
+## Con qué nos quedamos
 
-За четырнадцать лаб вы собрали работающий внутренний сервис — «Пропуск», по которому
-сотрудник заказывает пропуск гостю, охрана видит список на проходной, а руководство раз
-в месяц смотрит отчёт. Каждая часть появилась не по очереди, а из-за конкретной боли:
+A lo largo de catorce labs construiste un servicio interno que funciona — «Pase», con el que un
+empleado solicita un pase para un invitado, seguridad ve la lista en el control de acceso y la dirección
+mira un informe una vez al mes. Cada parte no apareció por orden, sino a raíz de un dolor concreto:
 
-| Что появилось | Из-за чего |
+| Qué apareció | Por qué |
 |---|---|
-| Свой реестр образов | ИБ запретила тянуть образы из интернета |
-| Кеш | справочник сотрудников из легаси отвечал 800 мс |
-| Документное хранилище | у пропусков разные поля: разовый, на неделю, на автомобиль, групповой |
-| Хранилище секретов | аудит нашёл пароль от базы в манифесте |
-| Аналитическая база | руководство захотело знать, сколько гостей и когда пики |
-| Бакет | мобильной команде некуда было класть собранные APK |
-| Инфраструктура в Git | вас трое, кто-то поменял руками — и всё легло |
-| Своя позиция в каталоге | дочерние компании захотели такой же сервис себе |
+| Tu propio registro de imágenes | El equipo de seguridad prohibió descargar imágenes de internet |
+| Una caché | el directorio de empleados heredado tardaba 800 ms en responder |
+| Almacenamiento de documentos | los pases tienen campos distintos: de un solo uso, semanal, para vehículo, grupal |
+| Almacenamiento de secretos | una auditoría encontró la contraseña de la base de datos en un manifiesto |
+| Una base de datos analítica | la dirección quería saber cuántos invitados hay y cuándo están los picos |
+| Un `Bucket` | el equipo de móvil no tenía dónde poner los APK que compilaba |
+| Infraestructura en Git | sois tres, alguien hizo un cambio a mano — y todo se cayó |
+| Tu propia entrada en el catálogo | las filiales quisieron el mismo servicio para ellas |
 
-Ни один из этих сервисов вы не устанавливали и не обновляли: это позиции каталога,
-за которые отвечает платформа. Ставили и чинили вы только своё приложение.
+No instalaste ni actualizaste ninguno de estos servicios: son entradas del catálogo de las que
+se responsabiliza la plataforma. Lo único que instalaste y arreglaste fue tu propia aplicación.
 
-Дальше — о том, как повторить это не на стенде.
+A continuación — sobre cómo repetir esto fuera del entorno de pruebas.
 
-## Зачем это
+## Por qué importa
 
-Самая частая судьба такого обучения — «интересно, но у нас так не получится». Не потому,
-что не получится, а потому, что после четырнадцати лаб непонятно, с чего начинать в своей
-инфраструктуре, где триста виртуалок и никто не помнит, что делает половина из них.
+El destino más habitual de una formación así es «interesante, pero a nosotros no nos va a funcionar». No porque
+no vaya a funcionar, sino porque tras catorce labs no queda claro por dónde empezar en tu propia
+infraestructura, donde hay trescientas VM y nadie recuerda qué hace la mitad de ellas.
 
-Разберём это по порядку: с чего начать, чего не трогать и как объяснить смысл тем, кто
-подписывает бюджет.
+Vamos a verlo por orden: por dónde empezar, qué no tocar y cómo explicarle el sentido a quien
+firma el presupuesto.
 
-## С чего начать: три кандидата на первый переезд
+## Por dónde empezar: tres candidatos para el primer movimiento
 
-Не с самого важного приложения. И не с самого запущенного. Начинают с того, где ошибка
-дешева, а результат виден.
+No con la aplicación más importante. Y tampoco con la más abandonada. Empiezas por aquella
+donde equivocarse sale barato y el resultado se ve.
 
-### Кандидат первый: то, что вы и так собирались переставлять
+### Candidato uno: eso que ibas a reinstalar de todos modos
 
-У каждого есть система, про которую давно решено «надо бы перенести на новую ОС» или
-«пора обновить версию». Это идеальный первый переезд: вы всё равно собирались её трогать,
-значит риск уже заложен в план, а согласований нужно ровно столько же.
+Todo el mundo tiene un sistema del que hace tiempo se decidió «habría que pasarlo a un SO nuevo» o
+«ya toca actualizar la versión». Ese es el primer movimiento ideal: ibas a tocarlo de todos modos,
+así que el riesgo ya está contemplado en el plan, y necesitas exactamente la misma cantidad de aprobaciones.
 
-### Кандидат второй: тестовый или демонстрационный контур
+### Candidato dos: un entorno de pruebas o de demostración
 
-Копия боевого приложения, которую не жалко. Здесь вы проверите свою способность повторить
-миграцию, а не платформу — платформу вы уже проверили на воркшопе. Отличие в том, что
-теперь это ваши образы, ваши сети и ваши политики безопасности.
+Una copia de la aplicación de producción que no vas a echar de menos. Aquí pondrás a prueba tu propia capacidad de repetir
+la migración, no la plataforma — a la plataforma ya la probaste en el taller. La diferencia es
+que ahora son tus imágenes, tus redes y tus políticas de seguridad.
 
-### Кандидат третий: то, что просит новых ресурсов
+### Candidato tres: eso que está pidiendo recursos nuevos
 
-Команда, которая пришла за парой виртуалок под новый сервис, — самый удобный случай.
-Ничего не мигрирует, всё создаётся с нуля, и вы сразу показываете им дашборд вместо формы
-заявки. Разницу в скорости увидят обе стороны.
+Un equipo que viene a por un par de VM para un servicio nuevo es el caso más cómodo. No se migra
+nada, todo se crea desde cero, y les muestras un panel de inmediato en lugar de un formulario
+de solicitud. Ambas partes verán la diferencia de velocidad.
 
-## Чего не стоит трогать первым
+## Qué no tocar primero
 
-**Систему с лицензией, привязанной к железу.** Проверьте условия до того, как что-то
-перенесёте. Есть продукты, которые считают лицензии по физическим ядрам гипервизора, и
-переезд может выйти дороже, чем экономия от него.
+**Un sistema con una licencia atada al hardware.** Revisa las condiciones antes de mover nada. Hay
+productos que cuentan las licencias por los núcleos físicos del hipervisor, y el traslado puede acabar costando más
+de lo que ahorra.
 
-**То, что вы не понимаете.** Если приложение поставил подрядчик семь лет назад и внутри
-никто не был — миграция превратится в расследование. Это выполнимая работа, но не первая.
+**Cualquier cosa que no entiendas.** Si un contratista instaló la aplicación hace siete años y desde entonces
+nadie ha entrado en ella, la migración se convierte en una investigación. Es un trabajo que se puede hacer, pero no
+el primero.
 
-**Кластерные системы со своей отказоустойчивостью.** Базы с репликацией, кластеры
-приложений, всё, что само следит за своими копиями. Здесь нужно решать, кто теперь
-отвечает за отказоустойчивость — приложение или платформа — и это отдельный разговор с
-владельцем системы.
+**Sistemas en clúster con su propia tolerancia a fallos.** Bases de datos con replicación, clústeres
+de aplicaciones, todo lo que vigila sus propias copias. Aquí hay que decidir quién se responsabiliza ahora
+de la tolerancia a fallos — la aplicación o la plataforma — y esa es una conversación aparte con el
+dueño del sistema.
 
-## Порядок, который работает
+## Un orden que funciona
 
-1. **Поднять стенд.** Не под миграцию — чтобы было где проверить любую догадку в тот же
-   час, не заводя заявку. Один сервер, одна установка, ноль обязательств.
-2. **Перевезти одну систему из тех, что выше.** Целиком, с данными, до состояния «работает
-   и на неё смотрят пользователи».
-3. **Пожить с ней месяц.** Здесь вы узнаете то, чего не даст ни один воркшоп: как оно
-   ведёт себя в три часа ночи, что ломается при обновлении, чего не хватает в мониторинге.
-4. **Только теперь строить план на остальное.** С цифрами, полученными на своём железе, а
-   не из презентации.
+1. **Levanta un entorno de pruebas.** No para una migración — para tener dónde comprobar cualquier corazonada dentro de la
+   misma hora, sin abrir una solicitud. Un servidor, una instalación, cero compromisos.
+2. **Traslada un sistema de los de arriba.** Entero, con sus datos, hasta el punto de «funciona y los usuarios
+   lo están mirando».
+3. **Convive con él un mes.** Aquí aprenderás lo que ningún taller puede darte: cómo se comporta a
+   las tres de la madrugada, qué se rompe durante una actualización, qué le falta a la monitorización.
+4. **Solo ahora arma el plan para el resto.** Con cifras obtenidas en tu propio hardware, no
+   de una presentación.
 
-Между пунктами 2 и 3 обычно хочется ускориться. Не стоит: месяц эксплуатации одной системы
-даёт больше, чем десять перевезённых за ту же неделю.
+Entre los pasos 2 y 3 lo normal es que quieras acelerar. No lo hagas: un mes operando un sistema en
+producción enseña más que diez sistemas trasladados en la misma semana.
 
-## Как объяснить это руководству
+## Cómo explicarle esto a la dirección
 
-Разговор пойдёт не про технологии. Три вещи, которые обычно решают.
+La conversación no será sobre tecnología. Suelen decidirla tres cosas.
 
-**Стоимость лицензий** — самый частый, но и самый скользкий аргумент. Считайте честно:
-в экономию входит не только вычеркнутая строка, но и стоимость вашего времени на переезд,
-и обучение команды, и период, когда работают обе платформы сразу.
+**El coste de las licencias** — el argumento más habitual, pero también el más resbaladizo. Cuenta
+con honestidad: en el ahorro entra no solo la línea que tachas, sino también el coste de tu tiempo en el traslado,
+la formación del equipo, y el periodo en que ambas plataformas funcionan a la vez.
 
-**Скорость выдачи ресурсов.** Здесь у вас есть личный опыт: вы своими руками завели кластер
-за десять минут и базу за пять. Сравните с тем, сколько занимает та же заявка у вас.
-Это цифра, которую бизнес понимает без перевода.
+**La velocidad de aprovisionamiento de recursos.** Aquí tienes experiencia de primera mano: con tus propias manos
+levantaste un clúster en diez minutos y una base de datos en cinco. Compáralo con lo que tarda la misma
+solicitud en tu empresa. Esa es una cifra que el negocio entiende sin traducción.
 
-**Независимость от одного поставщика.** Аргумент, который стал весомее за последние годы.
-Работает не сам по себе, а в связке с первым: способность сменить платформу — это и есть
-то, что даёт переговорную позицию по цене.
+**La independencia de un único proveedor.** Un argumento que ha ganado peso en los últimos años. Funciona
+no por sí solo, sino en tándem con el primero: la capacidad de cambiar de plataforma es justamente lo que te da
+una posición de negociación sobre el precio.
 
-Чего лучше не обещать: что будет проще. Не будет — по крайней мере первый год. Будет
-дешевле, быстрее по выдаче ресурсов и без привязки к одному вендору, но проще не будет.
-Обещание простоты — самый быстрый способ потерять доверие через полгода.
+Lo que es mejor no prometer: que será más sencillo. No lo será — al menos no el primer año.
+Será más barato, más rápido en el aprovisionamiento de recursos y libre de dependencia de un único proveedor, pero
+no será más sencillo. Prometer sencillez es la forma más rápida de perder la confianza medio año después.
 
-## Куда идти с вопросами
+## Adónde acudir con las preguntas
 
-- **Сообщество в Telegram** — тот же чат, в котором шёл воркшоп. Вопрос «а как правильно
-  сделать вот это» уместен всегда.
-- **Документация** — [cozystack.io/docs](https://cozystack.io/docs/).
-- **Исходники** — [github.com/cozystack/cozystack](https://github.com/cozystack/cozystack).
-  Если что-то ведёт себя не так, как написано, чаще всего быстрее посмотреть в чарт, чем
-  гадать. Вы это уже делали в лабе про свой реестр.
+- **La comunidad en Telegram** — el mismo chat en el que se desarrolló el taller. La pregunta «cómo hago esto
+  bien» siempre es bienvenida.
+- **Documentación** — [cozystack.io/docs](https://cozystack.io/docs/).
+- **Código fuente** — [github.com/cozystack/cozystack](https://github.com/cozystack/cozystack).
+  Si algo se comporta de forma distinta a lo escrito, normalmente es más rápido mirar en el chart que
+  adivinar. Ya lo hiciste en el lab sobre tu propio registro.
 
-## Что мы теперь умеем
+## Qué sabemos hacer ahora
 
-- Выбирать первую систему для переезда по критерию «дёшево ошибиться», а не «важнее всего»
-- Отличать случаи, которые стоит отложить, от тех, что стоит взять сейчас
-- Не обещать руководству простоты, которой не будет
-- Знать, где спросить, когда никто рядом не знает ответа
+- Elegir el primer sistema a trasladar por el criterio de «barato equivocarse», no de «lo más importante»
+- Distinguir los casos que conviene aplazar de los que conviene abordar ahora
+- No prometerle a la dirección una sencillez que no va a haber
+- Saber dónde preguntar cuando nadie alrededor conoce la respuesta
 
-## А в vSphere это было бы
+## Y en vSphere esto sería
 
-Разговор был бы короче: вы уже знаете, что делать в понедельник, потому что делаете это
-десять лет. В этом и разница — не в технологии, а в том, что здесь вам придётся заново
-собирать привычки.
+La conversación sería más corta: ya sabes qué hacer el lunes, porque llevas diez años haciéndolo.
+Esa es la diferencia — no en la tecnología, sino en el hecho de que aquí tendrás que
+construir tus hábitos otra vez desde cero.
 
-Хорошая новость в том, что набирать их можно постепенно, на одной системе за раз. Плохая —
-что первые месяцы вы будете работать медленнее, чем привыкли. Скорость возвращается по
-мере того, как новых привычек становится больше, — но закладывать это отставание в сроки
-придётся заранее.
+La buena noticia es que puedes irlos acumulando poco a poco, un sistema a la vez. La mala es que durante
+los primeros meses trabajarás más despacio de lo que estás acostumbrado. La velocidad vuelve a medida que
+los nuevos hábitos se acumulan — pero ese retraso tendrás que contemplarlo en tus plazos con antelación.
