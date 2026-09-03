@@ -192,3 +192,13 @@ Reader-facing placeholders (YourPasswordHere, YOUR-LOGIN, etc.) are localized in
 each language the same way as the en/zh/es tables above; functional placeholders
 (workshopXX, ВСТАВЬТЕ_*) stay verbatim. Pod, Secret and other K8s object names
 stay in English in all languages.
+
+### Japanese (ja) — resolved renderings
+| Concept | 日本語 | not |
+|---|---|---|
+| step (手順の番号) | **ステップ** | not 手順 (headings are ## ステップN) |
+| bucket | **バケット** | one form |
+| managed service | **マネージドサービス** | not raw "managed" |
+| error (in the pinned callout) | **エラー** | not 誤り/ミス/間違い |
+| credential labels in code (login:/password:) | keep **login: / password:** verbatim (as en) | do not localize the label |
+Fixed callout (CONVENTIONS, verbatim everywhere): spoiler heading = 「答えと、このエラーより広い教訓」; stop-and-think = 「読み進める前に、立ち止まって考えてください。」
