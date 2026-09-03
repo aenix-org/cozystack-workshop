@@ -192,7 +192,7 @@ Log in (username `root`, password `cozydemo`):
 virtctl console --namespace=tenant-workshopXX vm-instance-app-1
 ```
 
-⚠️ **There will be no network inside.** This isn't a broken lab — it's how it should be. We fix
+⚠️ **There will be no network inside.** This isn't a broken testbed — it's how it should be. We fix
 it in phase five.
 
 Manifest walkthrough: [chat/20](chat/20-app-vm-manifest.md) ·
@@ -375,7 +375,7 @@ machine's page in the dashboard.
 
 The rest of the pitfalls — [chat/31](chat/31-troubleshooting.md).
 
-## For those setting up the lab
+## For those setting up the testbed
 
 Quotas, the order for creating tenants, and the platform version — in [REQUIREMENTS.md](../REQUIREMENTS.md).
 

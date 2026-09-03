@@ -165,7 +165,7 @@ kubectl get vmagent -n cozy-monitoring \
 http://vminsert-shortterm.tenant-workshopXX.svc.cozy.local:8480/insert/0/prometheus
 ```
 
-这个地址指向你的租户。这跟实验 12 里 bastion 与应用对话时用的是同一套机制：普通地址之间的普通网络。
+这个地址指向你的租户。这跟实验 12 里那台虚拟机与应用对话时用的是同一套机制：普通地址之间的普通网络。
 
 </details>
 

@@ -193,7 +193,7 @@ Inicia sesión (usuario `root`, contraseña `cozydemo`):
 virtctl console --namespace=tenant-workshopXX vm-instance-app-1
 ```
 
-⚠️ **Dentro no habrá red.** Esto no es un laboratorio roto — es como debe ser. Lo arreglamos
+⚠️ **Dentro no habrá red.** Esto no es un entorno de pruebas roto — es como debe ser. Lo arreglamos
 en la fase cinco.
 
 Recorrido del manifiesto: [chat/20](chat/20-app-vm-manifest.md) ·
@@ -376,7 +376,7 @@ página de la máquina en el panel.
 
 El resto de los escollos — [chat/31](chat/31-troubleshooting.md).
 
-## Para quienes montan el laboratorio
+## Para quienes montan el entorno de pruebas
 
 Las cuotas, el orden para crear tenants y la versión de la plataforma — en [REQUIREMENTS.md](../REQUIREMENTS.md).
 

@@ -154,7 +154,7 @@ kubectl get vminstance app-1 -n tenant-workshopXX -w
 virtctl console --namespace=tenant-workshopXX vm-instance-app-1
 ```
 
-⚠️ **机器内部不会有网络。** 这不是实验环境坏了——本该如此。我们在第五阶段修它。
+⚠️ **机器内部不会有网络。** 这不是测试环境坏了——本该如此。我们在第五阶段修它。
 
 清单讲解：[chat/20](chat/20-app-vm-manifest.md) ·
 整个步骤：[chat/21](chat/21-step-4-your-vm.md)
@@ -306,7 +306,7 @@ virtctl ssh ubuntu@vmi/vm-instance-app-1 --namespace=tenant-workshopXX
 
 其余的坑——[chat/31](chat/31-troubleshooting.md)。
 
-## 给搭建实验环境的人
+## 给搭建测试环境的人
 
 配额、创建租户的顺序、平台版本——都在 [REQUIREMENTS.md](../REQUIREMENTS.md) 里。
 

@@ -196,7 +196,7 @@ kubectl get vmagent -n cozy-monitoring \
 http://vminsert-shortterm.tenant-workshopXX.svc.cozy.local:8480/insert/0/prometheus
 ```
 
-The address points into your tenant. It's the same mechanism the bastion from lab 12 used to talk to the
+The address points into your tenant. It's the same mechanism the virtual machine from lab 12 used to talk to the
 application: an ordinary network between ordinary addresses.
 
 </details>

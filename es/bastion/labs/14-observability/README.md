@@ -196,7 +196,7 @@ kubectl get vmagent -n cozy-monitoring \
 http://vminsert-shortterm.tenant-workshopXX.svc.cozy.local:8480/insert/0/prometheus
 ```
 
-La dirección apunta hacia dentro de tu tenant. Es el mismo mecanismo que el bastion del lab 12 usó para hablar con la
+La dirección apunta hacia dentro de tu tenant. Es el mismo mecanismo que la máquina virtual del lab 12 usó para hablar con la
 aplicación: una red corriente entre direcciones corrientes.
 
 </details>
