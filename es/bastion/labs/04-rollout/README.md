@@ -1,105 +1,91 @@
-# Лаба 4 · Выкатка новой версии и откат
+# Lab 4 · Desplegar una nueva versión y revertir
 
 | | |
 |---|---|
-| **Время** | 30 минут |
-| **Что доказывает** | Версию можно менять и возвращать под боевым трафиком, без окна обслуживания |
-| **Что понадобится** | Кластер из лабы 0, `rickroll` из лабы 1, Fortio из лабы 3, три окна терминала, браузер |
+| **Tiempo** | 30 minutos |
+| **Qué demuestra** | Una versión puede cambiarse y revertirse bajo tráfico real, sin ventana de mantenimiento |
+| **Qué necesitarás** | El clúster de la lab 0, `rickroll` de la lab 1, Fortio de la lab 3, tres ventanas de terminal, un navegador |
 
-## Зачем это
+## Por qué esto importa
 
-Сервис «Пропуск» вы выкатите один раз, а обновлять будете десятки раз. Каждое обновление в
-привычной схеме — это согласование окна, ночь субботы, снапшот перед началом и человек,
-который сидит и смотрит. Такая цена за изменение приводит к тому, что изменения копят: вместо
-десяти маленьких выкатывают одну большую, а большая ломается охотнее.
+El servicio «Pase» lo desplegarás una sola vez, pero lo actualizarás decenas de veces. En el esquema de siempre, cada actualización significa concertar una ventana, un sábado por la noche, una instantánea antes de empezar y una persona sentada mirando. Cuando el cambio cuesta tanto, los cambios se acumulan: en lugar de diez despliegues pequeños haces uno grande, y el grande se rompe con más facilidad.
 
-Сколько это стоит здесь, разберёмся на кошках — то есть на учебном `rickroll`, а не на
-«Пропуске». Мы подменим версию приложения **прямо во время нагрузки** — не в тихий час, а
-посреди тысяч запросов в минуту, — и посмотрим на счётчик ошибок. Потом откатимся, тоже под
-нагрузкой.
+Cuánto cuesta esto lo averiguaremos aquí con conejillos de indias — es decir, con el `rickroll` de práctica, no con «Pase». Cambiaremos la versión de la aplicación **justo en medio de la carga** — no en una hora tranquila, sino entre miles de peticiones por minuto — y observaremos el contador de errores. Después revertiremos, otra vez bajo carga.
 
-## Словарик
+## Glosario breve
 
-| Термин | Что это | Похоже на… но |
+| Término | Qué es | Se parece a… pero |
 |---|---|---|
-| **RollingUpdate** | Замена копий по очереди, а не всех разом | **Обновление ВМ по одной руками**, но кластер делает это сам и останавливается, если новая копия не поднялась |
-| **Ревизия** | Сохранённый снимок описания приложения | **Снапшот ВМ**, но хранит только описание, никаких данных внутри нет |
-| **maxSurge** | Сколько копий сверх заказанного разрешено поднять на время выкатки | прямого аналога нет; считается в процентах от `replicas` и округляется вверх |
-| **maxUnavailable** | Сколько копий разрешено погасить, не дождавшись замены | **Сколько ВМ гасим за раз**, но округляется вниз, поэтому при трёх копиях выходит ноль |
-| **readinessProbe** | Проверка «готов принимать трафик» | **Health check в пуле балансировщика**, но она же тормозит выкатку, а не только выводит из балансировки |
-| **ReplicaSet** | Набор одинаковых копий, отвечающий за одну версию описания | **Пул одинаковых ВМ из шаблона**, но на каждую версию заводится свой набор, а прежний остаётся рядом с нулём копий |
-| **EndpointSlice** | Список адресов копий, готовых принимать трафик | **Список членов пула балансировщика**, но его ведёт кластер по меткам, а не администратор руками |
-| **JSON Patch** | Точечная правка одного поля по пути внутри объекта | прямого аналога нет; путь указывает **номер** элемента в списке, а не имя |
+| **RollingUpdate** | Reemplazar las copias de una en una, no todas de golpe | **Actualizar VMs una por una a mano**, pero el clúster lo hace por sí mismo y se detiene si una copia nueva no arranca |
+| **Revision** | Una instantánea guardada de la descripción de la aplicación | **Una instantánea de VM**, pero solo guarda la descripción — no hay datos dentro |
+| **maxSurge** | Cuántas copias por encima del número solicitado pueden levantarse durante el despliegue | sin analogía directa; se cuenta como porcentaje de `replicas` y se redondea hacia arriba |
+| **maxUnavailable** | Cuántas copias pueden apagarse sin esperar a un reemplazo | **Cuántas VMs apagas a la vez**, pero se redondea hacia abajo, así que con tres copias da cero |
+| **readinessProbe** | Una comprobación de «listo para recibir tráfico» | **Una comprobación de estado en el pool del balanceador**, pero además frena el despliegue, en vez de solo sacar a un miembro del balanceo |
+| **ReplicaSet** | Un conjunto de copias idénticas responsable de una versión de la descripción | **Un pool de VMs idénticas de una plantilla**, pero cada versión tiene su propio conjunto, y el anterior permanece al lado con cero copias |
+| **EndpointSlice** | Una lista de las direcciones de las copias listas para recibir tráfico | **Una lista de miembros del pool del balanceador**, pero la mantiene el clúster por etiquetas, no el administrador a mano |
+| **JSON Patch** | Una edición puntual de un solo campo por su ruta dentro de un objeto | sin analogía directa; la ruta apunta al **índice** de un elemento en una lista, no a su nombre |
 
-## Что лежит в папке лабы
+## Qué hay en la carpeta de la lab
 
-Все файлы уже у вас — вы забрали их вместе с репозиторием. Создавать и печатать заново
-ничего не нужно: там, где ниже написано `kubectl apply -f имя.yaml`, файл берётся отсюда.
+Ya tienes todos los archivos — los recibiste junto con el repositorio. No hay nada que crear ni volver a teclear: dondequiera que abajo veas `kubectl apply -f name.yaml`, el archivo se toma de aquí.
 
 ```bash
-# Дальше все команды выполняются отсюда: пути в `kubectl apply -f` отсчитываются от этой папки.
+# De aquí en adelante, todos los comandos se ejecutan desde esta carpeta: las rutas en `kubectl apply -f` se cuentan desde ella.
 cd labs/04-rollout
 ```
 
-| Файл | Что это | Когда пригодится |
+| Archivo | Qué es | Cuándo viene bien |
 |---|---|---|
-| `rickroll-page-v2.yaml` | Вторая версия страницы — то, что выкатываем под нагрузкой | применяете на своём кластере `lab` |
-| `check.sh` | Проверка, что выкатка прошла без потери запросов | запускаете в конце лабы |
-| — | Генератор нагрузки берём из соседней лабы: `../03-scale/fortio.yaml` | |
+| `rickroll-page-v2.yaml` | La segunda versión de la página — lo que desplegamos bajo carga | lo aplicas en tu clúster `lab` |
+| `check.sh` | Una comprobación de que el despliegue transcurrió sin perder ninguna petición | lo ejecutas al final de la lab |
+| — | El generador de carga lo tomamos de la lab vecina: `../03-scale/fortio.yaml` | |
 
-## Шаг 1. Готовим площадку
+## Paso 1. Preparar el terreno
 
-📍 **Где:** на виртуалке (в терминале bastion).
+📍 **Dónde:** en el bastion (en la terminal del bastion).
 
-Перед выкаткой нужно сделать две вещи, и обе не косметические.
+Antes del despliegue hay que hacer dos cosas, y ninguna es cosmética.
 
-**Автомасштабирование снимаем**, потому что оно тоже управляет полем `replicas`. Наблюдать за
-выкаткой, когда одновременно с ней кто-то меняет количество копий, — гарантированный способ
-не понять, что произошло. Один механизм на одно поле.
+**Apagamos el autoescalado**, porque él también controla el campo `replicas`. Observar un despliegue mientras alguien cambia a la vez el número de copias es una forma garantizada de no entender qué pasó. Un mecanismo por campo.
 
-**Копий делаем три**, чтобы замену было видно поштучно. Копия здесь — это под: минимальная
-единица запуска в кластере, контейнер приложения вместе с его окружением, ближайший аналог
-одной ВМ. На одной копии выкатка тоже пройдёт без простоя, но вы увидите только «был один
-под, стал другой» и не увидите, в каком порядке кластер их меняет.
+**Ponemos tres copias**, para que el reemplazo se vea de una en una. Una copia aquí es un Pod: la unidad mínima de ejecución en el clúster, el contenedor de la aplicación junto con su entorno, la analogía más cercana a una sola VM. Con una copia el despliegue también transcurriría sin caída, pero solo verías «había un Pod, ahora hay otro» y no verías en qué orden el clúster los reemplaza.
 
 ```bash
-# KUBECONFIG — файл с адресом кластера и данными для входа в него. Пока переменная задана,
-# каждая команда kubectl идёт в кластер `lab`, а не в тот, откуда его выдали.
+# KUBECONFIG — el archivo con la dirección del clúster y las credenciales para entrar en él. Mientras
+# la variable esté definida, cada comando kubectl va al clúster `lab`, no a aquel desde el que se lanzó.
 export KUBECONFIG=~/lab.kubeconfig
 
-# hpa — автомасштабирование, заведённое в лабе про масштабирование. Удаляем его,
-# чтобы количество копий менялось только по нашей команде.
-#   --ignore-not-found  не считать ошибкой, если его в кластере уже нет
+# hpa — el autoescalador configurado en la lab de escalado. Lo eliminamos
+# para que el número de copias cambie solo por orden nuestra.
+#   --ignore-not-found  no tratarlo como error si ya no está en el clúster
 kubectl delete hpa rickroll --ignore-not-found
 
-# scale = «держи столько копий». Число уезжает в описание приложения,
-# дальше кластер сам поднимает недостающие.
+# scale = «mantén esta cantidad de copias». El número entra en la descripción de la aplicación,
+# y el clúster luego levanta por sí mismo las que faltan.
 kubectl scale deployment rickroll --replicas=3
 
-# rollout status = «дождись, пока заказанное станет фактическим». Команда держит окно
-# занятым, пока все три копии не станут готовы, и только потом вернёт приглашение.
+# rollout status = «espera hasta que lo solicitado se vuelva real». El comando mantiene la ventana
+# ocupada hasta que las tres copias estén listas, y solo entonces devuelve el prompt.
 kubectl rollout status deployment/rickroll
 ```
 
-Проверьте, что генератор нагрузки Fortio на месте:
+Comprueba que el generador de carga Fortio está en su sitio:
 
 ```bash
-# get = «покажи, что есть». Ответ `Error from server (NotFound)` означает, что его нет.
+# get = «muestra lo que hay». La respuesta `Error from server (NotFound)` significa que no está.
 kubectl get deployment fortio
 ```
 
-Если его нет — поднимите из соседней папки: `kubectl apply -f ../03-scale/fortio.yaml`.
+Si no está, levántalo desde la carpeta vecina: `kubectl apply -f ../03-scale/fortio.yaml`.
 
-## Шаг 2. Кладём в кластер вторую версию
+## Paso 2. Poner la segunda versión en el clúster
 
-📍 **Где:** на виртуалке (в терминале bastion).
+📍 **Dónde:** en el bastion (en la terminal del bastion).
 
-В папке лежит `rickroll-page-v2.yaml` — описание объекта типа ConfigMap. ConfigMap держит
-текстовый файл в кластере отдельно от приложения, а кластер потом подкладывает этот файл
-внутрь контейнера. Здесь в нём лежит страница, которую отдаёт nginx.
+En la carpeta está `rickroll-page-v2.yaml` — la descripción de un objeto de tipo ConfigMap. Un ConfigMap mantiene un archivo de texto en el clúster, aparte de la aplicación, y luego el clúster coloca ese archivo dentro del contenedor. Aquí guarda la página que sirve nginx.
 
 <details>
-<summary><b>Разбираем rickroll-page-v2.yaml</b></summary>
+<summary><b>De cerca: qué hay dentro de rickroll-page-v2.yaml</b></summary>
 
 ```yaml
 apiVersion: v1
@@ -115,73 +101,56 @@ data:
     <div class="pod">вас обслужил под<b>__POD__</b></div>
 ```
 
-Внутри одна страница: другой заголовок, другая цветовая гамма, заметная плашка «ВЕРСИЯ 2».
-Различия сделаны бросающимися в глаза намеренно — вы будете смотреть в браузер, а не в diff.
+Dentro hay una sola página: otro encabezado, otra gama de colores, una llamativa insignia «ВЕРСИЯ 2». Las diferencias se hicieron deliberadamente vistosas — estarás mirando el navegador, no un diff.
 
-Обратите внимание на две вещи.
+Fíjate en dos cosas.
 
-**`__POD__` остался на месте.** Подмена имени копии делается настройками nginx из ConfigMap
-`rickroll-conf`, а он общий для обеих версий. Мы меняем страницу, а не поведение сервера.
+**`__POD__` sigue ahí.** La sustitución del nombre de la copia la hacen los ajustes de nginx del ConfigMap `rickroll-conf`, que es compartido por ambas versiones. Estamos cambiando la página, no el comportamiento del servidor.
 
-**Имя объекта — `rickroll-page-v2`, а не `rickroll-page`.** Это и есть ключевое решение всей
-лабы, и стоит проговорить, почему так.
+**El nombre del objeto es `rickroll-page-v2`, no `rickroll-page`.** Esta es la decisión clave de toda la lab, y vale la pena explicar por qué.
 
-Напрашивается ведь другое: взять существующий `rickroll-page-v1` и переписать в нём
-содержимое. Одна команда, никаких новых объектов. Так делать не надо, и вот почему.
+La jugada obvia es otra: tomar el `rickroll-page-v1` existente y reescribir su contenido. Un comando, ningún objeto nuevo. No lo hagas, y aquí está por qué.
 
-Во-первых, вы потеряете старое. Отката не будет: прежней страницы больше нет нигде, кроме
-как в вашем файле, — а если правку сделали через `kubectl edit`, то и в файле её нет.
+Primero, perderías el viejo. No habría reversión: la página anterior ya no existe en ningún sitio salvo en tu archivo — y si hiciste la edición con `kubectl edit`, ni siquiera está en el archivo.
 
-Во-вторых, обновление получится неуправляемым. Описание приложения при правке ConfigMap не
-меняется, значит Deployment — объект, который хранит это описание (какой образ, сколько
-копий, откуда брать файлы) и следит за его исполнением, — ничего не заметит и никакой
-выкатки не начнёт. Файлы внутри
-работающих подов при этом кластер всё-таки подменит — сам, в свой момент, в течение примерно
-минуты и в произвольном порядке между копиями. Получится изменение, которого нет в истории,
-которое нельзя откатить командой и которое доехало до копий вразнобой.
+Segundo, la actualización sería incontrolada. La descripción de la aplicación no cambia cuando editas un ConfigMap, lo que significa que el Deployment — el objeto que guarda esa descripción (qué imagen, cuántas copias, de dónde tomar los archivos) y se asegura de que se cumpla — no notaría nada y no iniciaría ningún despliegue. Aun así, el clúster cambiaría los archivos dentro de los Pods en ejecución — por sí mismo, en su propio momento, a lo largo de aproximadamente un minuto y en un orden arbitrario entre las copias. Obtendrías un cambio que no está en el historial, que no puede revertirse con un comando y que llegó a las copias de forma descoordinada.
 
-Поэтому правило: **версии — это разные объекты, а переключение версии — это изменение
-описания приложения.** Именно так его увидит Deployment, так оно попадёт в историю ревизий,
-и так его можно будет отменить.
+De ahí la regla: **las versiones son objetos distintos, y cambiar de versión es un cambio en la descripción de la aplicación.** Así es exactamente como lo ve el Deployment, como aterriza en el historial de revisiones y como puede deshacerse.
 
 </details>
 
-Применяем. В кластере появится второй ConfigMap; работающее приложение он не тронет, потому
-что на него пока никто не ссылается:
+Aplícalo. Aparece un segundo ConfigMap en el clúster; no tocará la aplicación en ejecución, porque todavía nada lo referencia:
 
 ```bash
-# apply = «приведи кластер к тому, что описано в файле».
-#   -f имя.yaml   откуда брать описание; файл лежит в этой же папке
+# apply = «lleva el clúster a lo descrito en el archivo».
+#   -f name.yaml   de dónde tomar la descripción; el archivo está en esta misma carpeta
 kubectl apply -f rickroll-page-v2.yaml
 ```
 
-**Что вы должны увидеть:** `configmap/rickroll-page-v2 created`.
+**Lo que deberías ver:** `configmap/rickroll-page-v2 created`.
 
-Теперь откройте приложение и убедитесь, что **ничего не изменилось**:
+Ahora abre la aplicación y asegúrate de que **nada ha cambiado**:
 
 ```bash
-# port-forward = временный туннель с виртуалки внутрь кластера.
-#   svc/rickroll  куда ведём: в Service, то есть с раскладкой запросов по копиям
-#   8080:80       слева порт на виртуалке, справа порт сервиса внутри кластера
-# Пока туннель открыт, окно занято; закрывается по Ctrl+C.
+# port-forward = un túnel temporal desde el bastion hacia dentro del clúster.
+#   svc/rickroll  adónde lleva: al Service, es decir, con las peticiones repartidas entre las copias
+#   8080:80       a la izquierda el puerto en el bastion, a la derecha el puerto del servicio dentro del clúster
+# Mientras el túnel está abierto la ventana está ocupada; se cierra con Ctrl+C.
 kubectl port-forward svc/rickroll 8080:80
 ```
 
-<http://localhost:8080> — та же первая версия. Мы положили новую страницу в кластер, но
-приложение о ней не знает: его том по-прежнему смотрит на `rickroll-page-v1`. Закройте
-туннель (`Ctrl+C`), это ещё не выкатка.
+<http://localhost:8080> — la misma primera versión. Pusimos la nueva página en el clúster, pero la aplicación no sabe de ella: su volumen sigue apuntando a `rickroll-page-v1`. Cierra el túnel (`Ctrl+C`), esto todavía no es el despliegue.
 
-## Шаг 3. Разбираемся, как кластер будет менять копии
+## Paso 3. Entender cómo reemplazará el clúster las copias
 
-📍 **Где:** на виртуалке (в терминале bastion).
+📍 **Dónde:** en el bastion (en la terminal del bastion).
 
-Прежде чем переключать версию, посмотрим на правила, по которым пойдёт замена копий. Они
-лежат в самом описании приложения:
+Antes de cambiar la versión, veamos las reglas que seguirá el reemplazo. Viven en la propia descripción de la aplicación:
 
 ```bash
-# -o jsonpath=... — вместо таблицы напечатать одно поле объекта, указав путь к нему.
-#   {.spec.strategy}  блок правил, по которым кластер заменяет копии
-#   {"\n"}            перевод строки в конце, иначе вывод слипнется с приглашением
+# -o jsonpath=... — en lugar de una tabla, imprimir un solo campo del objeto indicando la ruta hacia él.
+#   {.spec.strategy}  el bloque de reglas por las que el clúster reemplaza las copias
+#   {"\n"}            un salto de línea al final, si no la salida se pega al prompt
 kubectl get deployment rickroll -o jsonpath='{.spec.strategy}{"\n"}'
 ```
 
@@ -189,165 +158,139 @@ kubectl get deployment rickroll -o jsonpath='{.spec.strategy}{"\n"}'
 {"rollingUpdate":{"maxSurge":"25%","maxUnavailable":"25%"},"type":"RollingUpdate"}
 ```
 
-Этого блока нет в `rickroll.yaml` — кластер подставил значения по умолчанию.
+Este bloque no está en `rickroll.yaml` — el clúster rellenó los valores por defecto.
 
 <details>
-<summary><b>Что означают эти проценты при наших трёх копиях</b></summary>
+<summary><b>Qué significan estos porcentajes con nuestras tres copias</b></summary>
 
-Оба числа считаются от `replicas`, то есть от трёх. И округляются они в разные стороны.
+Ambos números se cuentan a partir de `replicas`, es decir, a partir de tres. Y redondean en direcciones opuestas.
 
-**`maxSurge: 25%`** — сколько копий разрешено поднять **сверх** заказанного, пока идёт замена.
-25% от трёх — это 0,75, округление **вверх** даёт 1. Значит на время выкатки в кластере
-временно может быть четыре копии.
+**`maxSurge: 25%`** — cuántas copias pueden levantarse **por encima** del número solicitado mientras el reemplazo está en curso. El 25% de tres es 0,75, y redondear **hacia arriba** da 1. Así que durante el despliegue el clúster puede tener temporalmente cuatro copias.
 
-**`maxUnavailable: 25%`** — сколько копий разрешено держать **недоступными** одновременно.
-25% от трёх — те же 0,75, но округление **вниз** даёт **0**.
+**`maxUnavailable: 25%`** — cuántas copias pueden mantenerse **no disponibles** a la vez. El 25% de tres es el mismo 0,75, pero redondear **hacia abajo** da **0**.
 
-Ноль — это жёсткое ограничение. Кластер не имеет права погасить ни одну работающую копию,
-пока не появилась готовая замена. Не «постарается», а не имеет права: это ограничение, а не
-намерение.
+Cero es una restricción dura. Al clúster no se le permite apagar ni una sola copia en funcionamiento hasta que haya aparecido un reemplazo listo. No «lo intentará» — no se le permite: esto es una restricción, no una intención.
 
-Отсюда порядок действий на каждом шаге замены:
+De ahí el orden de operaciones en cada paso del reemplazo:
 
-1. поднять одну новую копию (разрешено `maxSurge`);
-2. дождаться, пока её `readinessProbe` ответит успехом;
-3. добавить её в EndpointSlice, то есть пустить на неё трафик;
-4. **только теперь** вывести из балансировки и погасить одну старую;
-5. повторить, пока старых не останется.
+1. levantar una copia nueva (permitido por `maxSurge`);
+2. esperar a que su `readinessProbe` responda con éxito;
+3. añadirla al EndpointSlice, es decir, enviarle tráfico;
+4. **solo ahora** sacar del balanceo y apagar una copia vieja;
+5. repetir hasta que no queden copias viejas.
 
-Всё держится на третьем и четвёртом пунктах, а они держатся на `readinessProbe`. Уберите
-проверку готовности из манифеста — и кластер начнёт считать копию пригодной в момент запуска
-процесса. Трафик пойдёт на nginx, который ещё не прочитал конфиг, и вы получите порцию
-пятисотых. Проверка готовности здесь не мониторинг, а **тормоз выкатки**, и это её главная
-работа.
+Todo depende del tercer y el cuarto punto, y ellos dependen del `readinessProbe`. Quita la comprobación de readiness del manifiesto y el clúster empezará a tratar una copia como utilizable en el momento en que el proceso arranca. El tráfico irá a un nginx que aún no ha leído su config, y obtendrás una tanda de 500. La comprobación de readiness aquí no es monitorización, es un **freno del despliegue**, y ese es su trabajo principal.
 
-Полезное следствие: если новая версия сломана настолько, что не проходит проверку готовности,
-выкатка **остановится**. Старые копии продолжат работать. Мы это увидим ближе к концу
-лабы, только сломаем по-другому.
+Un corolario útil: si la versión nueva está rota lo bastante como para no pasar la comprobación de readiness, el despliegue se **detendrá**. Las copias viejas siguen funcionando. Lo veremos hacia el final de la lab, solo que la romperemos de otra manera.
 
 </details>
 
-## Шаг 4. Включаем нагрузку
+## Paso 4. Encender la carga
 
-Выкатывать в тишине неинтересно — так поступали и в vSphere. Пустим трафик и будем менять
-версию под ним.
+Desplegar en silencio no tiene gracia — así se hacía también en vSphere. Enviemos tráfico y cambiemos la versión bajo él.
 
-📍 **Окно 1** — туннель до Fortio:
+📍 **Ventana 1** — un túnel a Fortio:
 
 ```bash
-# Новое окно терминала не помнит переменные предыдущего — задаём KUBECONFIG заново.
+# Una ventana de terminal nueva no recuerda las variables de la anterior — definimos KUBECONFIG de nuevo.
 export KUBECONFIG=~/lab.kubeconfig
-# Туннель до генератора нагрузки: порт 8081 на виртуалке → порт 8080 сервиса fortio.
-# Слева взят 8081, чтобы не столкнуться с туннелем до самого приложения на 8080.
+# Un túnel al generador de carga: puerto 8081 en el bastion → puerto 8080 del servicio fortio.
+# A la izquierda se eligió 8081 para no chocar con el túnel a la propia aplicación en 8080.
 kubectl port-forward svc/fortio 8081:8080
 ```
 
-📍 **В браузере** — <http://localhost:8081/fortio/>. Заполняем:
+📍 **En el navegador** — <http://localhost:8081/fortio/>. Rellena:
 
-| Поле | Значение | Почему так |
+| Campo | Valor | Por qué así |
 |---|---|---|
-| URL | `http://rickroll/` | имя Service — постоянного адреса, за которым стоят все копии; трафик пойдёт через балансировку, а не в конкретный под |
-| QPS | `300` | ровный фон; выжимать максимум сейчас не нужно |
-| Duration | `180s` | три минуты — окно, внутри которого мы успеем и выкатить, и откатить |
+| URL | `http://rickroll/` | el nombre del Service — la dirección estable detrás de la cual están todas las copias; el tráfico irá por el balanceo, no a un Pod concreto |
+| QPS | `300` | un fondo estable; no hace falta exprimir el máximo ahora mismo |
+| Duration | `180s` | tres minutos — la ventana dentro de la cual conseguiremos tanto desplegar como revertir |
 | Connections | `20` | |
 
-Нажимаем **Start** и **не трогаем браузер до конца лабы**.
+Pulsa **Start** y **no toques el navegador hasta el final de la lab**.
 
-Ту же нагрузку можно дать командой, если с формой не сложилось:
+La misma carga puede generarse con un comando, si el formulario no funcionó:
 
 ```bash
-# exec = выполнить команду внутри уже работающего пода. Нагрузку даёт не ваш виртуалку,
-# а сам Fortio изнутри кластера, поэтому туннель для этого не нужен.
-#   deploy/fortio  в любой копии приложения fortio
-#   --             всё, что правее, — команда для контейнера, а не для kubectl
-#   -qps 300       триста запросов в секунду
-#   -c 20          двадцать одновременных соединений
-#   -t 180s        держать нагрузку три минуты
+# exec = ejecutar un comando dentro de un Pod ya en ejecución. La carga la genera no tu bastion,
+# sino el propio Fortio desde dentro del clúster, así que no hace falta ningún túnel para esto.
+#   deploy/fortio  en cualquier copia de la aplicación fortio
+#   --             todo lo que va a la derecha es un comando para el contenedor, no para kubectl
+#   -qps 300       trescientas peticiones por segundo
+#   -c 20          veinte conexiones simultáneas
+#   -t 180s        mantener la carga tres minutos
 kubectl exec deploy/fortio -- fortio load -qps 300 -c 20 -t 180s http://rickroll/
 ```
 
-📍 **Окно 2** — смотрим за копиями:
+📍 **Ventana 2** — observando las copias:
 
 ```bash
 export KUBECONFIG=~/lab.kubeconfig
-# -l app=rickroll — показывать только поды с этой меткой, чужие в вывод не попадут.
-# -w = «следи и дописывай»: окно остаётся занятым и печатает новую строку каждый раз,
-# когда состояние какой-нибудь копии меняется. Выход — Ctrl+C.
+# -l app=rickroll — mostrar solo los Pods con esta etiqueta; los demás no aparecerán en la salida.
+# -w = «observa y añade»: la ventana queda ocupada e imprime una línea nueva cada vez
+# que el estado de alguna copia cambia. Salir — Ctrl+C.
 kubectl get pods -l app=rickroll -w
 ```
 
-## Шаг 5. Переключаем версию
+## Paso 5. Cambiar la versión
 
-📍 **Окно 3** — свободное окно. Первое держит туннель к Fortio, второе занято слежением
-за подами, поэтому патч выполняем в третьем. Доступ в нём нужно задать заново:
+📍 **Ventana 3** — una ventana libre. La primera tiene el túnel a Fortio, la segunda está ocupada observando los Pods, así que ejecutamos el patch en la tercera. En ella hay que configurar el acceso de nuevo:
 
 ```bash
-# Новое окно терминала не помнит переменные предыдущего — задаём KUBECONFIG заново.
+# Una ventana de terminal nueva no recuerda las variables de la anterior — definimos KUBECONFIG de nuevo.
 export KUBECONFIG=~/lab.kubeconfig
 ```
 
-Сейчас мы изменим ровно одно поле в описании приложения: том с именем `page` — папка, которая
-подкладывается внутрь контейнера, — должен брать содержимое из ConfigMap `rickroll-page-v2`.
-Команды «обнови приложение» нет и не будет: есть только новая запись о том, как должно быть.
-Расхождение с фактическим состоянием кластер заметит сам и начнёт замену копий.
+Ahora cambiaremos exactamente un campo en la descripción de la aplicación: el volumen llamado `page` — la carpeta que se coloca dentro del contenedor — debe tomar su contenido del ConfigMap `rickroll-page-v2`. No hay un comando «actualiza la aplicación», y nunca lo habrá: solo hay un nuevo registro de cómo deben ser las cosas. El clúster notará por sí mismo la discrepancia con el estado real y empezará a reemplazar las copias.
 
 ```bash
-# patch = точечно поменять поле в объекте, не переписывая объект целиком.
-#   --type=json  формат правки: «операция + путь + значение»
-#   op: replace  заменить то, что лежит по этому пути
-#   path         адрес поля внутри объекта; volumes/0 — первый том в списке (см. ниже)
-#   value        новое имя ConfigMap, откуда том возьмёт страницу
+# patch = cambiar un campo de un objeto de forma puntual, sin reescribir el objeto entero.
+#   --type=json  el formato de la edición: «operación + ruta + valor»
+#   op: replace  reemplazar lo que hay en esta ruta
+#   path         la dirección del campo dentro del objeto; volumes/0 — el primer volumen de la lista (ver abajo)
+#   value        el nuevo nombre de ConfigMap del que el volumen tomará la página
 kubectl patch deployment rickroll --type=json \
   -p='[{"op":"replace","path":"/spec/template/spec/volumes/0/configMap/name","value":"rickroll-page-v2"}]'
 ```
 
-**Что вы должны увидеть:**
+**Lo que deberías ver:**
 
 ```
 deployment.apps/rickroll patched
 ```
 
-⚠️ **Этот патч хрупкий, и об этом надо сказать прямо.** Путь
-`/spec/template/spec/volumes/0/...` адресует том **по номеру в списке**. В `rickroll.yaml`
-первым идёт том `page`, вторым `conf` — там даже стоит комментарий об этом. Но если кто-то
-поменяет их местами (а YAML это никак не запрещает), та же самая команда без единой ошибки
-перепишет имя конфига nginx, и приложение сломается непонятным образом.
+⚠️ **Este patch es frágil, y hay que decirlo sin rodeos.** La ruta `/spec/template/spec/volumes/0/...` direcciona el volumen **por su índice en la lista**. En `rickroll.yaml` el volumen `page` va primero y `conf` segundo — hay incluso un comentario al respecto ahí. Pero si alguien los intercambia (y YAML no lo prohíbe de ninguna manera), ese mismo comando, sin un solo error, sobrescribirá el nombre de la config de nginx, y la aplicación se romperá de forma desconcertante.
 
 <details>
-<summary><b>Почему мы всё-таки делаем так и как правильно</b></summary>
+<summary><b>Por qué lo hacemos así de todas formas, y cómo hacerlo bien</b></summary>
 
-JSON Patch взят потому, что он показывает механику в чистом виде: одна команда, одно поле,
-видимое следствие. Для лабы это ценно.
+Tomamos JSON Patch porque muestra la mecánica en su forma pura: un comando, un campo, una consecuencia visible. Para una lab eso es valioso.
 
-**Безопаснее** — то же самое обычным патчем-слиянием. Списки в Kubernetes умеют сливаться по
-ключу, и у `volumes` этот ключ — `name`:
+**Más seguro** — lo mismo con un merge patch corriente. Las listas en Kubernetes pueden fusionarse por una clave, y para `volumes` esa clave es `name`:
 
 ```bash
-# Без --type=json это патч-слияние: вы описываете кусок объекта в том же виде, в каком он
-# лежит в манифесте, а кластер сливает его с тем, что уже есть. Список volumes сливается
-# по ключу `name`, поэтому здесь адресуется том `page`, а не «том номер такой-то».
+# Sin --type=json esto es un merge patch: describes un trozo del objeto en la misma forma
+# que tiene en el manifiesto, y el clúster lo fusiona con lo que ya hay. La lista volumes se fusiona
+# por la clave `name`, así que aquí se direcciona el volumen `page`, no «el volumen en tal índice».
 kubectl patch deployment rickroll -p \
   '{"spec":{"template":{"spec":{"volumes":[{"name":"page","configMap":{"name":"rickroll-page-v2"}}]}}}}'
 ```
 
-Здесь адресация идёт по имени тома, порядок в списке не имеет значения, и перепутать нечего.
+Aquí el direccionamiento es por el nombre del volumen, el orden en la lista no importa, y no hay nada que confundir.
 
-**Правильно** — не патчить вообще. Патч, как и `kubectl edit`, меняет объект в кластере, но
-не меняет ваш файл. Через неделю кто-то применит `rickroll.yaml` из репозитория, и приложение
-молча уедет обратно на первую версию. Никто не поймёт, почему.
+**Bien** — no hacer patch en absoluto. Un patch, igual que `kubectl edit`, cambia el objeto en el clúster pero no cambia tu archivo. Una semana después alguien aplica `rickroll.yaml` del repositorio, y la aplicación deriva silenciosamente de vuelta a la primera versión. Nadie entenderá por qué.
 
-В нормальной работе версию меняют так: правят строку в файле, отправляют изменение на ревью,
-после слияния его применяет автоматика. Тогда состояние кластера и содержимое репозитория
-совпадают всегда. Ровно этим мы займёмся в лабе 5.
+En el trabajo normal la versión se cambia así: editas una línea en el archivo, envías el cambio a revisión, y tras el merge la automatización lo aplica. Entonces el estado del clúster y el contenido del repositorio siempre coinciden. Es exactamente lo que haremos en la lab 5.
 
 </details>
 
-Смотрим, как идёт замена:
+Observa cómo transcurre el reemplazo:
 
 ```bash
-# rollout status печатает ход замены построчно и завершается, когда обновлены все копии.
-# Если выкатка не сошлась, команда вернёт ненулевой код возврата — по нему её удобно
-# останавливать в скриптах.
+# rollout status imprime el progreso del reemplazo línea por línea y termina cuando todas las copias están actualizadas.
+# Si el despliegue no converge, el comando devuelve un código de salida distinto de cero — cómodo para
+# detenerlo en scripts.
 kubectl rollout status deployment/rickroll
 ```
 
@@ -357,16 +300,13 @@ Waiting for deployment "rickroll" rollout to finish: 2 out of 3 new replicas hav
 deployment "rickroll" successfully rolled out
 ```
 
-📍 **В окне 2** тем временем видно, как копии сменяются по одной: сначала появляется новая и
-доходит до `1/1 Running`, и только после этого одна из старых уходит в `Terminating`.
+📍 **En la ventana 2** puedes ver entretanto cómo las copias se reemplazan de una en una: primero aparece una nueva y alcanza `1/1 Running`, y solo después una de las viejas pasa a `Terminating`.
 
-Обратите внимание на хвост имён: у новых копий изменилась и средняя часть — это другой
-ReplicaSet. Deployment не переделывал старый, он создал рядом второй и переливает копии из
-одного в другой. Старый никуда не делся, в нём ноль копий, и он ждёт своего часа:
+Fíjate en la cola de los nombres: las copias nuevas tienen también la parte central cambiada — ese es un ReplicaSet distinto. El Deployment no rehízo el viejo, creó un segundo al lado y vierte las copias de uno al otro. El viejo no se ha ido a ninguna parte; tiene cero copias y espera entre bastidores:
 
 ```bash
-# rs — сокращение для ReplicaSet, набора копий одной версии описания.
-# DESIRED — сколько копий заказано в этом наборе, READY — сколько из них готовы отвечать.
+# rs — abreviatura de ReplicaSet, un conjunto de copias de una versión de la descripción.
+# DESIRED — cuántas copias se solicitan en este conjunto, READY — cuántas de ellas están listas para responder.
 kubectl get rs -l app=rickroll
 ```
 
@@ -376,53 +316,41 @@ rickroll-6f4b9c8d57   0         0         0       48m
 rickroll-7c5d4f9b21   3         3         3       40s
 ```
 
-## Шаг 6. Считаем ошибки
+## Paso 6. Contar los errores
 
-📍 **Где:** на виртуалке, в окне 3 — оно освободилось после предыдущей команды.
+📍 **Dónde:** en el bastion, en la ventana 3 — se liberó tras el comando anterior.
 
-Открываем туннель до приложения:
+Abre un túnel a la aplicación:
 
 ```bash
-# Тот же туннель, что и в начале лабы: порт 8080 на виртуалке → порт 80 сервиса rickroll.
+# El mismo túnel que al inicio de la lab: puerto 8080 en el bastion → puerto 80 del servicio rickroll.
 kubectl port-forward svc/rickroll 8080:80
 ```
 
-📍 **В браузере** <http://localhost:8080> — зелёная страница с плашкой «ВЕРСИЯ 2». Обновите
-несколько раз: имя копии внизу меняется, потому что Service раскладывает запросы по трём
-копиям.
+📍 **En el navegador** <http://localhost:8080> — la página verde con la insignia «ВЕРСИЯ 2». Refréscala unas cuantas veces: el nombre de la copia al pie cambia, porque el Service distribuye las peticiones entre las tres copias.
 
-Закройте туннель (`Ctrl+C`).
+Cierra el túnel (`Ctrl+C`).
 
-📍 **Теперь главное — вкладка Fortio.** Дождитесь конца прогона и найдите строки с кодами
-ответа:
+📍 **Ahora lo principal — la pestaña de Fortio.** Espera a que termine la ejecución y busca las líneas con los códigos de respuesta:
 
 ```
 Code 200 : 54000 (100.0 %)
 All done 54000 calls (plus 0 warmup) 0.412 ms avg, 300.0 qps
 ```
 
-**Ошибок ноль.** Приложение сменило версию целиком, под непрерывным трафиком, и ни один из
-пятидесяти четырёх тысяч запросов не пострадал.
+**Cero errores.** La aplicación cambió su versión por completo, bajo tráfico continuo, y ninguna de las cincuenta y cuatro mil peticiones sufrió daño.
 
-Заплатили за это одним блоком в манифесте — той самой `readinessProbe` из лабы 1. Без неё
-кластер выводил бы старую копию из балансировки, не убедившись, что новая готова отвечать, и
-эта строка выглядела бы иначе.
+Pagamos por esto con un solo bloque en el manifiesto — ese mismo `readinessProbe` de la lab 1. Sin él, el clúster habría sacado la copia vieja del balanceo antes de asegurarse de que la nueva estaba lista para responder, y esta línea tendría otro aspecto.
 
-⚠️ **Несколько десятков ошибок на десятки тысяч запросов вместо нуля** — это не поломка
-стенда. Удаление копии из балансировки и остановка процесса в ней происходят параллельно, и
-на быстром трафике в этот зазор успевает попасть горсть соединений.
-Лечится это паузой перед остановкой (`preStop`) и корректным завершением соединений в самом
-приложении. Мы этого в лабе не делаем намеренно: полезнее знать, что зазор существует, чем
-считать, будто он закрывается сам.
+⚠️ **Unas decenas de errores entre decenas de miles de peticiones en lugar de cero** no es un entorno de pruebas roto. Sacar una copia del balanceo y detener el proceso dentro de ella ocurren en paralelo, y bajo tráfico rápido a un puñado de conexiones les da tiempo a colarse en ese hueco. Esto se cura con una pausa antes del apagado (`preStop`) y un drenaje ordenado de las conexiones en la propia aplicación. Deliberadamente no lo hacemos en la lab: es más útil saber que el hueco existe que suponer que se cierra por sí solo.
 
-## Шаг 7. Откатываемся
+## Paso 7. Revertir
 
-Запустите нагрузку в Fortio ещё раз (те же параметры) и, пока она идёт, посмотрите историю
-изменений:
+Arranca la carga en Fortio otra vez (los mismos parámetros) y, mientras corre, mira el historial de cambios:
 
 ```bash
-# history = список сохранённых ревизий описания. Каждая строка — состояние, к которому
-# можно вернуться одной командой. CHANGE-CAUSE — необязательная подпись, зачем меняли.
+# history = la lista de revisiones guardadas de la descripción. Cada línea es un estado al que puedes
+# volver con un solo comando. CHANGE-CAUSE — una nota opcional sobre por qué se cambió.
 kubectl rollout history deployment/rickroll
 ```
 
@@ -432,72 +360,59 @@ REVISION  CHANGE-CAUSE
 2         <none>
 ```
 
-Две ревизии. Каждая — сохранённый снимок описания приложения на момент изменения. Первая с
-`rickroll-page-v1`, вторая с `v2`. Хранятся они ровно потому, что старые ReplicaSet не
-удаляются: по умолчанию кластер держит десять последних.
+Dos revisiones. Cada una es una instantánea guardada de la descripción de la aplicación en el momento del cambio. La primera con `rickroll-page-v1`, la segunda con `v2`. Se conservan precisamente porque los ReplicaSets viejos no se eliminan: por defecto el clúster guarda los diez más recientes.
 
-Откат:
+La reversión:
 
 ```bash
-# undo без дополнительных параметров = вернуться к предыдущей ревизии. Это не «отмотать
-# время назад», а обычная выкатка старого описания: копии меняются по одной, по тем же
-# правилам maxSurge и maxUnavailable.
+# undo sin parámetros adicionales = volver a la revisión anterior. Esto no es «rebobinar
+# el tiempo», es un despliegue corriente de la descripción vieja: las copias se reemplazan de una en una, por las mismas
+# reglas maxSurge y maxUnavailable.
 kubectl rollout undo deployment/rickroll
-# Ждём, пока состав копий сойдётся с описанием.
+# Esperamos hasta que la composición de las copias converja con la descripción.
 kubectl rollout status deployment/rickroll
 ```
 
-📍 **В окне 2** — та же процедура в обратную сторону: три новых копии поднимаются по одной,
-три текущих уходят. `kubectl get rs -l app=rickroll` покажет, что копии вернулись в первый
-ReplicaSet — тот, что висел с нулём.
+📍 **En la ventana 2** — el mismo procedimiento al revés: tres copias nuevas se levantan de una en una, tres actuales se marchan. `kubectl get rs -l app=rickroll` mostrará que las copias volvieron al primer ReplicaSet — el que estaba ahí colgado con cero.
 
-📍 **В браузере** приложение снова первой версии.
+📍 **En el navegador** la aplicación es de nuevo la primera versión.
 
-📍 **В Fortio** — снова `Code 200 ... (100.0 %)`.
+📍 **En Fortio** — de nuevo `Code 200 ... (100.0 %)`.
 
-**Сравните с откатом в vSphere.** Там откат — это восстановление из снапшота: машина
-выключается, файлы возвращаются, машина загружается. Минуты недоступности плюс потеря всего,
-что произошло после снятия снапшота. Здесь откат — это возврат описания к предыдущей ревизии,
-и он ничем не отличается от обычной выкатки: те же копии по одной, тот же нулевой простой.
+**Compara esto con una reversión en vSphere.** Allí una reversión significa restaurar desde una instantánea: la máquina se apaga, los archivos se reponen, la máquina arranca. Minutos de indisponibilidad más la pérdida de todo lo que ocurrió después de tomar la instantánea. Aquí una reversión significa devolver la descripción a la revisión anterior, y no se diferencia en nada de un despliegue corriente: las mismas copias de una en una, la misma cero caída.
 
-⚠️ **`CHANGE-CAUSE` пуст, и это неудобно.** История хранит, *что* поменялось, но не хранит,
-*почему*. Через месяц ревизия 2 не скажет вам ничего. Заполнить причину можно аннотацией
-`kubernetes.io/change-cause`, но настоящий ответ на этот вопрос — не аннотация, а Git, где у
-каждого изменения есть автор, дата и текст коммита.
+⚠️ **`CHANGE-CAUSE` está vacío, y eso es incómodo.** El historial guarda *qué* cambió pero no *por qué*. Dentro de un mes la revisión 2 no te dirá nada. Puedes rellenar la causa con la anotación `kubernetes.io/change-cause`, pero la verdadera respuesta a esta pregunta no es una anotación, es Git, donde cada cambio tiene un autor, una fecha y un mensaje de commit.
 
-## Шаг 8. Проверка, которая не пройдёт
+## Paso 8. Una comprobación que no va a pasar
 
-Механизм понятен. Теперь посмотрим, что бывает, когда выкатка уходит с ошибкой — а это
-случается чаще, чем хотелось бы.
+El mecanismo está claro. Ahora veamos qué pasa cuando un despliegue sale mal — y eso ocurre más a menudo de lo que uno querría.
 
-Представьте обычное утро: коллега готовит третью версию страницы, торопится и в имени
-делает опечатку. Манифест при этом валиден — кластер не обязан знать, что такого объекта
-нет. Воспроизведём ровно это:
+Imagina una mañana cualquiera: un compañero está preparando la tercera versión de la página, va con prisa y comete un error tipográfico en el nombre. El manifiesto, sin embargo, es válido — el clúster no está obligado a saber que ese objeto no existe. Reproduzcamos exactamente esto:
 
 ```bash
-# Тот же патч, что и при переключении на вторую версию, но имя ConfigMap с ошибкой:
-# объекта `rickroll-page-v3` в кластере нет. Существование ссылки при приёме не проверяется,
-# поэтому команда отработает успешно.
+# El mismo patch que al cambiar a la segunda versión, pero con un error en el nombre del ConfigMap:
+# no hay ningún objeto `rickroll-page-v3` en el clúster. La existencia de la referencia no se comprueba en la aceptación,
+# así que el comando terminará con éxito.
 kubectl patch deployment rickroll --type=json \
   -p='[{"op":"replace","path":"/spec/template/spec/volumes/0/configMap/name","value":"rickroll-page-v3"}]'
 
-# --timeout=90s — не ждать бесконечно: не дождавшись готовых копий, команда через полторы
-# минуты сдастся и вернёт ошибку. Сама выкатка при этом никуда не денется и останется висеть.
+# --timeout=90s — no esperar eternamente: al no obtener copias listas, el comando se rinde tras un
+# minuto y medio y devuelve un error. El despliegue en sí no irá a ninguna parte y quedará colgado.
 kubectl rollout status deployment/rickroll --timeout=90s
 ```
 
-**Что вы увидите:**
+**Lo que verás:**
 
 ```
 Waiting for deployment "rickroll" rollout to finish: 0 of 3 updated replicas are available...
 error: timed out waiting for the condition
 ```
 
-Смотрим на состав копий: три прежние работают, новая застряла на запуске.
+Mira la composición de las copias: tres anteriores funcionan, la nueva está atascada en el arranque.
 
 ```bash
-# Колонка READY считает готовые контейнеры внутри пода: 1/1 — готов, 0/1 — нет.
-# STATUS говорит, на чём именно остановился запуск.
+# La columna READY cuenta los contenedores listos dentro del Pod: 1/1 — listo, 0/1 — no.
+# STATUS dice exactamente dónde se atascó el arranque.
 kubectl get pods -l app=rickroll
 ```
 
@@ -509,22 +424,20 @@ rickroll-6f4b9c8d57-lm7bq   1/1     Running             0          6m
 rickroll-8b6a1e5c39-wr4tz   0/1     ContainerCreating   0          90s
 ```
 
-> **Остановитесь и подумайте, прежде чем читать дальше.**
+> **Detente y piensa antes de seguir leyendo.**
 >
-> Вопросов здесь два, и второй важнее первого. Первый: почему новая копия не запускается?
-> Второй: что сейчас происходит с сервисом — он лежит?
+> Aquí hay dos preguntas, y la segunda importa más que la primera. Primera: ¿por qué no arranca la copia nueva? Segunda: ¿qué le está pasando al servicio ahora mismo — está caído?
 
 <details>
-<summary><b>Ответ и урок шире, чем эта ошибка</b></summary>
+<summary><b>La respuesta, y una lección más amplia que este error</b></summary>
 
-**Почему копия не поднялась.** ConfigMap с именем `rickroll-page-v3` мы не создавали — его в
-кластере нет. Спросите у кластера напрямую:
+**Por qué la copia no arrancó.** Nunca creamos un ConfigMap llamado `rickroll-page-v3` — no está en el clúster. Pregúntale al clúster directamente:
 
 ```bash
-# events — журнал происшествий кластера, ближайший аналог вкладки Tasks & Events в vCenter.
-#   --field-selector reason=FailedMount  оставить только записи о неудачном подключении тома
-#   --sort-by=.lastTimestamp             отсортировать по времени, свежие окажутся внизу
-#   | tail -3                            показать три последние строки, остальное отбросить
+# events — el registro de sucesos del clúster, la analogía más cercana a la pestaña Tasks & Events de vCenter.
+#   --field-selector reason=FailedMount  quedarse solo con los registros sobre un montaje de volumen fallido
+#   --sort-by=.lastTimestamp             ordenar por tiempo, los más recientes acaban abajo
+#   | tail -3                            mostrar las tres últimas líneas, descartar el resto
 kubectl get events --field-selector reason=FailedMount --sort-by=.lastTimestamp | tail -3
 ```
 
@@ -533,129 +446,93 @@ Warning  FailedMount  kubelet  MountVolume.SetUp failed for volume "page":
          configmap "rickroll-page-v3" not found
 ```
 
-Заметьте: команда `kubectl patch` отработала успешно и напечатала `patched`. Кластер принял
-описание, в котором ссылка ведёт в никуда, и не сказал ни слова. Проверки на существование
-ConfigMap при приёме манифеста нет — она была бы возможна только в момент запуска пода, что и
-произошло.
+Fíjate: el comando `kubectl patch` terminó con éxito e imprimió `patched`. El clúster aceptó una descripción en la que la referencia no lleva a ninguna parte, y no dijo ni una palabra. No hay comprobación de que el ConfigMap exista cuando se acepta el manifiesto — solo sería posible en el momento en que arranca el Pod, que es exactamente lo que pasó.
 
-**А теперь второй вопрос, ради которого шаг и сделан.** Откройте приложение прямо посреди
-застрявшей выкатки:
+**Y ahora la segunda pregunta, aquella para la que se hizo este paso.** Abre la aplicación justo en medio del despliegue atascado:
 
 ```bash
-# Тот же туннель. Трафик пойдёт только на те копии, что прошли проверку готовности,
-# то есть на три старые: застрявшая в балансировку не попала.
+# El mismo túnel. El tráfico irá solo a las copias que pasaron la comprobación de readiness,
+# es decir, a las tres viejas: la atascada no entró en el balanceo.
 kubectl port-forward svc/rickroll 8080:80
 ```
 
-Оно работает. Первая версия, три копии, ошибок нет. Если у вас в этот момент шла нагрузка в
-Fortio — в отчёте по-прежнему сто процентов двухсотых.
+Funciona. La primera versión, tres copias, sin errores. Si tenías carga corriendo en Fortio en ese momento — el informe sigue mostrando un cien por cien de 200.
 
-**Полностью сломанная выкатка не уронила сервис.** Это прямое следствие `maxUnavailable: 0`,
-которое мы считали в начале лабы: кластер не имел права погасить ни одной работающей копии,
-пока не получил готовую замену. Замены он не получил — значит и гасить не стал. Выкатка
-остановилась ровно там, где начала ломаться, и осталась в этом состоянии.
+**Un despliegue completamente roto no tiró el servicio.** Esto es consecuencia directa de `maxUnavailable: 0`, que calculamos al inicio de la lab: al clúster no se le permitía apagar ni una sola copia en funcionamiento hasta obtener un reemplazo listo. No obtuvo reemplazo — así que tampoco apagó nada. El despliegue se detuvo exactamente donde empezó a romperse, y se quedó en ese estado.
 
-**Урок шире, чем эта ошибка.**
+**La lección es más amplia que este error.**
 
-> Неудачная выкатка в Kubernetes по умолчанию **застревает**, а не обрушивается.
+> Un despliegue fallido en Kubernetes por defecto **se atasca**, no se derrumba.
 
-Это переворачивает привычную логику обновления. В схеме «остановили, обновили, запустили»
-любая ошибка посередине означает простой, и поэтому обновление делают ночью, с людьми на
-телефоне. В схеме «подними новое, убедись, переключи» ошибка означает, что переключение
-не состоялось, — а старое как работало, так и работает.
+Esto pone patas arriba la lógica habitual de las actualizaciones. En el esquema «detén, actualiza, arranca» cualquier error a mitad de camino significa caída, y por eso las actualizaciones se hacen de noche, con gente al teléfono. En el esquema «levanta lo nuevo, asegúrate, cambia» un error significa que el cambio no ocurrió — y lo viejo sigue funcionando igual que antes.
 
-Отсюда практическое следствие для дежурного: **застрявшая выкатка — не инцидент.**
-Она не будит вас ночью. Её можно разобрать утром — или откатить одной командой и разбираться
-потом.
+De ahí la moraleja práctica para quien esté de guardia: **un despliegue atascado no es un incidente.** No te despertará de noche. Puede resolverse por la mañana — o revertir con un solo comando y resolverlo después.
 
-Именно это мы сейчас и сделаем.
+Es exactamente lo que haremos ahora.
 
 </details>
 
-Выбираемся:
+Cómo salir:
 
 ```bash
-# Возвращаем предыдущую ревизию — ту, где имя ConfigMap написано верно.
+# Devolvemos la revisión anterior — aquella donde el nombre del ConfigMap está escrito correctamente.
 kubectl rollout undo deployment/rickroll
-# Дожидаемся, пока застрявшая копия исчезнет, а состав копий сойдётся с описанием.
+# Esperamos hasta que la copia atascada desaparezca y la composición de las copias converja con la descripción.
 kubectl rollout status deployment/rickroll
 ```
 
-Зависшая копия исчезает, описание возвращается к рабочему.
+La copia atascada desaparece, y la descripción vuelve a la que funciona.
 
-## Проверка
+## Verificación
 
-📍 **Где:** на виртуалке, в том же окне терминала, где вы работали с `kubectl`.
+📍 **Dónde:** en el bastion, en la misma ventana de terminal donde trabajaste con `kubectl`.
 
 ```bash
-# Скрипт ничего не меняет в кластере: только читает состояние и печатает отчёт.
+# El script no cambia nada en el clúster: solo lee el estado e imprime un informe.
 ./check.sh
 ```
 
-⚠️ **На Windows скрипт запускается из WSL**, а не из PowerShell — как его поставить,
-написано в начале лабы 0. Без WSL лабу можно пройти, но отчёта-артефакта не будет.
+⚠️ **En Windows el script se ejecuta desde WSL**, no desde PowerShell — cómo instalarlo está escrito al inicio de la lab 0. Sin WSL puedes completar la lab, pero no habrá informe-artefacto.
 
-Скрипт смотрит на существо дела, а не на набранные команды: в истории приложения есть
-несколько ревизий (значит версию действительно меняли и возвращали), в кластере лежит
-ConfigMap второй версии, приложение отвечает по HTTP, и отданная им страница соответствует
-тому ConfigMap, на который указывает описание. Отдельно проверяется `readinessProbe` — без
-неё нулевой простой не воспроизвести.
+El script mira el fondo del asunto, no los comandos que tecleaste: el historial de la aplicación tiene varias revisiones (lo que significa que la versión realmente se cambió y se revirtió), el ConfigMap de la segunda versión está en el clúster, la aplicación responde por HTTP, y la página que sirve coincide con el ConfigMap al que apunta la descripción. Por separado comprueba el `readinessProbe` — sin él la cero caída no puede reproducirse.
 
-## Уборка
+## Limpieza
 
-Приложение `rickroll` понадобится дальше — не удаляем. Верните ему одну копию:
+La aplicación `rickroll` se necesitará más adelante — no la eliminamos. Devuélvela a una copia:
 
 ```bash
-# Две лишние копии освободят память узла — дальше по лабам нагрузки не будет.
+# Dos copias de más liberarán la memoria del nodo — en las labs siguientes no habrá carga.
 kubectl scale deployment rickroll --replicas=1
 ```
 
-Генератор нагрузки больше не нужен:
+El generador de carga ya no hace falta:
 
 ```bash
-# delete -f = удалить ровно те объекты, что перечислены в файле, и ничего кроме них.
-# Путь ведёт в соседнюю папку, потому что файл лежит там же, где лаба про масштабирование.
+# delete -f = eliminar exactamente los objetos listados en el archivo, y nada más aparte de ellos.
+# La ruta lleva a la carpeta vecina, porque el archivo está donde la lab de escalado.
 kubectl delete -f ../03-scale/fortio.yaml
 ```
 
-ConfigMap `rickroll-page-v2` можно оставить: он занимает пару килобайт и не потребляет ни
-процессора, ни памяти. Описания в Kubernetes хранятся в базе control plane и ничего не стоят,
-пока на них никто не ссылается, — в отличие от снапшота виртуальной машины, который занимает
-место на хранилище и тем сильнее замедляет машину, чем дольше живёт.
+El ConfigMap `rickroll-page-v2` puede dejarse tal cual: ocupa un par de kilobytes y no consume ni CPU ni memoria. Las descripciones en Kubernetes se guardan en la base de datos del plano de control y no cuestan nada mientras nada las referencie — a diferencia de una instantánea de máquina virtual, que ocupa espacio en el almacenamiento y ralentiza la máquina tanto más cuanto más tiempo vive.
 
-## Что мы теперь умеем
+## Qué sabemos hacer ahora
 
-- Менять версию приложения под боевым трафиком и проверять по счётчику, что ошибок не было
-- Объяснять, откуда берётся нулевой простой: `maxUnavailable`, `readinessProbe` и порядок
-  «сначала готово, потом переключаем»
-- Читать историю ревизий и откатываться одной командой
-- Понимать, почему версии делают разными объектами, а не правкой существующего
-- Знать, что сломанная выкатка застревает, а не роняет сервис, и почему это не инцидент
+- Cambiar la versión de una aplicación bajo tráfico real y confirmar por el contador que no hubo errores
+- Explicar de dónde viene la cero caída: `maxUnavailable`, `readinessProbe` y el orden «primero listo, luego cambiamos»
+- Leer el historial de revisiones y revertir con un solo comando
+- Entender por qué las versiones se hacen como objetos separados, no editando uno existente
+- Saber que un despliegue roto se atasca en vez de tirar el servicio, y por qué eso no es un incidente
 
-## А в vSphere это было бы
+## Y en vSphere esto sería
 
-Окно обслуживания, согласованное заранее. Снапшот перед началом — минуты и место на
-хранилище. Обновление на месте. Если не взлетело — восстановление из снапшота, ещё минуты
-недоступности. Всё это ночью, потому что днём нельзя.
+Una ventana de mantenimiento, acordada de antemano. Una instantánea antes de empezar — minutos y espacio de almacenamiento. Una actualización in situ. Si no despegó — una restauración desde la instantánea, más minutos de indisponibilidad. Todo ello de noche, porque de día no se puede.
 
-Здесь — одна команда днём, под трафиком, и вторая команда, если не понравилось.
+Aquí — un comando de día, bajo tráfico, y un segundo comando si no te gusta el resultado.
 
-**Где vSphere удобнее, честно.** Три вещи.
+**Dónde vSphere es más cómodo, con honestidad.** Tres cosas.
 
-Во-первых и главное: **снапшот забирает состояние целиком, а `rollout undo` — только
-описание.** Если ваше приложение за время работы новой версии успело что-то записать в базу
-или изменить схему, откат вернёт код и не вернёт данные. Вы получите старую версию поверх
-новых данных — иногда это хуже, чем оставить как было. Снапшот виртуалки от этого спасает,
-`rollout undo` — нет. Ровно поэтому миграции схемы БД пишут совместимыми в обе стороны, и это
-дисциплина, которой Kubernetes от вас потребует, а vSphere не требовал.
+Primero y ante todo: **una instantánea toma el estado entero, mientras que `rollout undo` toma solo la descripción.** Si, durante el tiempo en que la versión nueva estuvo funcionando, tu aplicación consiguió escribir algo en la base de datos o cambiar el esquema, la reversión devuelve el código y no devuelve los datos. Obtendrás la versión vieja sobre datos nuevos — a veces eso es peor que dejar las cosas como estaban. Una instantánea de VM te salva de esto, `rollout undo` no. Es precisamente por esto que las migraciones de esquema de base de datos se escriben para ser compatibles en ambos sentidos, y esa es una disciplina que Kubernetes te va a exigir allí donde vSphere no lo hacía.
 
-Во-вторых, откат в vSphere возвращает вообще всё: пакеты, которые доставили руками, правку в
-конфиге, сделанную по телефону. Здесь откатывается только то, что было описано в манифесте.
-Всё, что кто-то сделал в обход, не откатится, потому что кластер о нём не знает.
+Segundo, una reversión en vSphere devuelve absolutamente todo: paquetes instalados a mano, una edición hecha a una config por teléfono. Aquí solo se revierte lo que estaba descrito en el manifiesto. Cualquier cosa que alguien haya hecho por su cuenta no se revertirá, porque el clúster no sabe de ella.
 
-В-третьих, снапшот не требует, чтобы приложение умело работать в двух версиях одновременно. А
-`RollingUpdate` требует: во время выкатки старые и новые копии обслуживают запросы вместе, за
-одним адресом. Если они несовместимы между собой — по формату сессии, по схеме данных, по
-протоколу — нулевого простоя не будет, будет каша. Для приложений, которые к этому не готовы,
-существует стратегия `Recreate`: погасить все, потом поднять все. Она даёт простой, зато
-предсказуема, и иногда честнее выбрать её.
+Tercero, una instantánea no exige que la aplicación sepa funcionar en dos versiones a la vez. Pero `RollingUpdate` sí: durante el despliegue las copias viejas y nuevas atienden peticiones juntas, detrás de una sola dirección. Si son incompatibles entre sí — en formato de sesión, en esquema de datos, en protocolo — no habrá cero caída, habrá un desbarajuste. Para las aplicaciones que no están preparadas para esto existe la estrategia `Recreate`: apagarlas todas, luego levantarlas todas. Da caída, pero es predecible, y a veces es más honesto elegirla.

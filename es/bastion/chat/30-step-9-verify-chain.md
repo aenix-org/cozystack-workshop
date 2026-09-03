@@ -1,47 +1,48 @@
-## 30. Шаг 9: проверяем всю цепочку
+## 30. Paso 9: verificamos toda la cadena
 
-**Момент истины**
+**El momento de la verdad**
 
-⚠️ **Сначала — внутри виртуальной машины — погасите firewalld.** Мигрированный CentOS
-принёс правила из прошлой жизни и наружу отдаёт только SSH. Порт приложения закрыт,
-и снаружи это будет выглядеть как «приложение не работает».
+⚠️ **Primero — dentro de la máquina virtual — apaga firewalld.** El CentOS migrado
+arrastró reglas de su vida anterior y solo expone SSH hacia el exterior. El puerto de la
+aplicación está cerrado, y desde afuera esto parecerá que «la aplicación no funciona».
 
 ```bash
 systemctl stop firewalld
 systemctl disable firewalld
 ```
 
-Проверьте прямо там же, изнутри машины, что приложение живо:
+Comprueba allí mismo, desde dentro de la máquina, que la aplicación está viva:
 
 ```bash
 curl -s -o /dev/null -w '%{http_code}\n' localhost:8080/actuator/health
 ```
 
-`200` — приложение отвечает. `503` — вернитесь к шагу с сетью. Здесь `localhost` — это
-сама машина, в которой вы сидите: приложение проверяется само у себя.
+`200` — la aplicación responde. `503` — vuelve al paso de la red. Aquí `localhost` es la
+propia máquina en la que estás sentado: la aplicación se está comprobando a sí misma.
 
-📍 **Дальше — проверка снаружи по доменному имени.** Проброс порта на этом пути не нужен:
-ведущий заранее создал в вашем тенанте `Ingress`, и как только приложение внутри машины
-слушает `8080`, магазин публикуется по адресу `https://app.workshopXX.workshop.aenix.io`
-(`XX` — ваш номер). Откройте его в браузере на своём ноутбуке — или проверьте `curl`
-прямо на виртуалке:
+📍 **A continuación — una comprobación desde afuera, por nombre de dominio.** En este camino
+no hace falta reenvío de puertos: el instructor creó de antemano un `Ingress` en tu tenant, y
+en cuanto la aplicación dentro de la máquina escucha en `8080`, la tienda queda publicada en
+`https://app.workshopXX.workshop.aenix.io` (`XX` es tu número). Ábrela en el navegador de tu
+laptop — o compruébala con `curl` directamente en el bastion:
 
 ```bash
-# здоровье
+# salud
 curl -s https://app.workshopXX.workshop.aenix.io/actuator/health
 
-# создаём заказ
+# creamos un pedido
 curl -s -X POST https://app.workshopXX.workshop.aenix.io/api/orders \
   -H 'Content-Type: application/json' -d '{"item":"test"}'
 
-# смотрим, что он записался
+# vemos que quedó registrado
 curl -s https://app.workshopXX.workshop.aenix.io/api/orders
 ```
 
-⚠️ Пока app-VM не поднята или ещё грузится, домен отвечает `503` — это нормально:
-`Ingress` ждёт бэкенд. Появился `200` — значит, машина внутри слушает `8080`.
+⚠️ Mientras la app-VM no esté levantada o siga arrancando, el dominio responde `503` — esto
+es normal: el `Ingress` está esperando al backend. En cuanto veas `200`, significa que la
+máquina de adentro está escuchando en `8080`.
 
-Если заказ создался — вы прошли путь целиком. Приложение приехало из VMware, работает
-в кластере, пишет в управляемую базу и отправляет события в управляемую очередь.
+Si el pedido se creó — recorriste el camino completo. La aplicación llegó desde VMware,
+corre en el clúster, escribe en una base de datos gestionada y envía eventos a una cola gestionada.
 
-Полчаса назад эта система жила на ESXi.
+Hace media hora este sistema vivía en ESXi.

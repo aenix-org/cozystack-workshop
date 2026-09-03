@@ -1,12 +1,14 @@
-## 22. Фаза 3. Выбрасываем зоопарк
+## 22. Fase 3. Nos deshacemos del zoológico
 
-**Шаги 5, 7, 8, 9.** Самая ценная часть. Внутри перевезённой машины до сих пор живут свои
-Postgres и Kafka — те самые, которые кто-то поставил однажды и с тех пор никто не трогает.
+**Pasos 5, 7, 8, 9.** La parte más valiosa. Dentro de la máquina que migramos siguen vivos su
+propio Postgres y Kafka — esos mismos que alguien instaló una vez y que desde entonces nadie ha
+tocado.
 
-Мы их **не везём**. Вместо них берём готовые из каталога Cozystack и перенастраиваем
-приложение. Разница простая: за managed-сервисом стоит репликация, автоматические бэкапы
-и мониторинг, а за самодельным — надежда на то, что человек, который его ставил, ещё
-работает в компании.
+**No** nos los llevamos. En su lugar tomamos los que ya vienen listos del catálogo de Cozystack
+y reconfiguramos la aplicación. La diferencia es simple: detrás de un servicio gestionado hay
+replicación, copias de seguridad automáticas y monitorización; detrás de uno casero, la esperanza de que la
+persona que lo montó todavía trabaje en la empresa.
 
-Порядок такой: сначала заводим сервисы (шаг 5), потом переключаем на них приложение
-(шаг 7), потом создаём в базе таблицу (шаг 8) и проверяем всю цепочку (шаг 9).
+El orden es este: primero levantamos los servicios (paso 5), luego apuntamos la aplicación hacia
+ellos (paso 7), después creamos una tabla en la base de datos (paso 8) y verificamos toda la
+cadena (paso 9).

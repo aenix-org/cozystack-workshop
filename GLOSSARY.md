@@ -117,3 +117,32 @@ Pinned after review to stop drift. Use exactly these Chinese head-terms everywhe
 Punctuation in Chinese prose: use the full-width colon `：` (not `:`) and corner
 brackets `「」` for quoted/emphasized phrases — consistently across all files.
 Colons inside code fences, inline code, URLs, ports and ratios stay half-width.
+
+## Spanish (es) — resolved canonical renderings
+
+Pinned after review. Use exactly these; no raw English where a Spanish term exists:
+
+| Concept | Español (use this) | not |
+|---|---|---|
+| testbed / стенд | **entorno de pruebas** | not raw "testbed" / "banco de pruebas" mixed |
+| menagerie (the metaphor) | **zoológico** | not "menagerie" — one image everywhere, incl. index & headings |
+| the converter machine | **la máquina conversora** | one name everywhere |
+| dashboard | **el panel** | not raw "dashboard" in prose |
+| rollback (noun / verb) | **reversión / revertir** | not "rollback"/"hacer rollback" |
+| snapshot (vSphere) | **instantánea** | not raw "snapshot" |
+| timeout (in prose) | **tiempo de espera** ("se agota el tiempo") | not raw "timeout" |
+| health check | **comprobación de estado** | not "health check" / "chequeo de salud" |
+| library (code) | **biblioteca** | not "librería" (= bookstore) |
+| to parse | **analizar / interpretar** | not "parsear" |
+| gateway | **pasarela** | not raw "gateway" |
+| add-on | **complemento** | not "add-on" |
+| log (application) | **registro** | consistent with "registro de auditoría" |
+| failover | **conmutación por error** (gloss failover at 1st use) | — |
+| placeholder | **marcador** | not raw "placeholder" |
+| workshop (the event) | **taller** | not raw "workshop" (URLs/paths stay) |
+| Pod (object) | **Pod** (capitalized) | even in running prose |
+
+Register: participant-facing material uses **tú** throughout; CONVENTIONS.md must
+use tú too (not usted). Reader-facing password placeholders localized like the
+mongodb lab: e.g. `tu-contraseña-analyst`, `TuContraseñaAquí`. Credential labels
+follow the glossary targets (login: / password: / host: / database:).

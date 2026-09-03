@@ -1,44 +1,45 @@
-## 11. Карта файлов: что где лежит и где запускается
+## 11. Mapa de archivos: qué vive dónde y dónde se ejecuta
 
-**Прочитайте один раз — дальше не будете гадать**
+**Léelo una vez — después no tendrás que adivinar**
 
-Держите в голове три места, где что происходит: **bastion** (виртуалка, на которую вы
-зашли по SSH), **машина-конвертер** и **ваша app-VM** — обе создаются внутри кластера.
-В репозитории два типа файлов, и запускаются они в разных местах.
+Ten presentes tres lugares donde ocurren las cosas: el **bastion** (la máquina a la que entraste por SSH),
+la **máquina conversora** y **tu app-VM** — estas dos últimas se crean dentro del clúster.
+En el repositorio hay dos tipos de archivos, y se ejecutan en lugares distintos.
 
-**Манифесты — `manifests/*.yaml`. Применяются с bastion.**
-Это описание того, что создать в кластере. Команда всегда одна: `kubectl apply -f <файл>`.
+**Manifiestos — `manifests/*.yaml`. Se aplican desde el bastion.**
+Describen qué crear en el clúster. El comando es siempre el mismo: `kubectl apply -f <file>`.
 
-• `01-bucket.yaml` — хранилище под образ · шаг 1
-• `02-conversion-vm.yaml` — машина-конвертер · шаг 2
-• `03-app-vm.yaml` — ваша app-VM · шаг 4 (сюда руками вписывается presigned-ссылка)
-• `04-managed.yaml` — Postgres и Kafka из каталога · шаг 5
+• `01-bucket.yaml` — almacenamiento para la imagen · paso 1
+• `02-conversion-vm.yaml` — la máquina conversora · paso 2
+• `03-app-vm.yaml` — tu app-VM · paso 4 (aquí es donde pegas a mano el enlace presignado)
+• `04-managed.yaml` — Postgres y Kafka del catálogo · paso 5
 
-**Скрипты — `scripts/*`. Запускаются не на bastion, а внутри машин в кластере.**
-На самом bastion вы их не запускаете — только применяете манифесты `kubectl`-ом.
+**Scripts — `scripts/*`. No se ejecutan en el bastion, sino dentro de las máquinas del clúster.**
+En el bastion mismo no los ejecutas — solo aplicas los manifiestos con `kubectl`.
 
-• `convert.sh` — внутри машины-конвертера · шаг 3
-• `netfix-dhcp.sh` — внутри вашей app-VM · шаг 6
-• `connect-managed.sh` — внутри вашей app-VM · шаг 7
-• `orders-schema.sql` — таблица для базы, изнутри app-VM · шаг 8 (её мы наберём запросом,
-  файл — чтобы посмотреть, что именно создаётся)
+• `convert.sh` — dentro de la máquina conversora · paso 3
+• `netfix-dhcp.sh` — dentro de tu app-VM · paso 6
+• `connect-managed.sh` — dentro de tu app-VM · paso 7
+• `orders-schema.sql` — una tabla para la base de datos, desde dentro de la app-VM · paso 8 (la escribiremos
+  como una consulta; el archivo está ahí para que veas exactamente qué se crea)
 
-**Как скрипт попадает внутрь машины — и почему по-разному.**
+**Cómo llega un script dentro de una máquina — y por qué es distinto.**
 
-В **машине-конвертере** есть сеть, поэтому она скачивает файл сама. Репозиторий
-открытый, ключи не нужны:
+La **máquina conversora** tiene red, así que descarga el archivo ella misma. El repositorio es
+público, no hacen falta claves:
 ```bash
 curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/bastion/scripts/convert.sh
 ```
 
-В **вашей app-VM сети сначала нет вообще** — она и есть та поломка, которую мы чиним
-на шаге 6. Скачать туда нечего и нечем, файлы через консоль не передаются. Поэтому
-`netfix-dhcp.sh` и `connect-managed.sh` вы не качаете, а **набираете руками**: команд
-там по две-три, я дам их в чате готовыми. Сами файлы в репозитории — это то же самое,
-но подробно и с комментариями: удобно перечитать потом, когда будете повторять у себя.
+**Tu app-VM al principio no tiene red en absoluto** — ese estado roto es justo lo que arreglamos
+en el paso 6. No hay con qué descargar ni a dónde descargar, y los archivos no se pueden
+pasar por la consola. Por eso `netfix-dhcp.sh` y `connect-managed.sh` no los descargas —
+los **escribes a mano**: son solo dos o tres comandos cada uno, y te los daré ya listos en el chat.
+Los archivos mismos en el repositorio son lo mismo, pero escritos por extenso y con comentarios:
+prácticos para releer después, cuando repitas esto por tu cuenta.
 
-⚠️ **Номер тенанта в манифестах уже подставлен** — при подготовке виртуалки заглушки
-`tenant-workshopXX` заменены на ваш номер. Вписывать вручную ничего не нужно. Единственное,
-что вы заполняете сами, — это `bucketName`, `accessKey` и `secretKey` в `convert.sh`
-(он скачивается в конвертер свежим, с заглушками `ВСТАВЬТЕ_...`), и presigned-ссылку
-в `manifests/03-app-vm.yaml` на четвёртом шаге.
+⚠️ **El número de tenant en los manifiestos ya está rellenado** — mientras se preparaba el bastion,
+los marcadores `tenant-workshopXX` fueron reemplazados por tu número. No necesitas
+introducir nada a mano. Lo único que rellenas tú mismo son `bucketName`, `accessKey`
+y `secretKey` en `convert.sh` (que se descarga fresco en el conversor, con marcadores
+`ВСТАВЬТЕ_...`), y el enlace presignado en `manifests/03-app-vm.yaml` en el cuarto paso.

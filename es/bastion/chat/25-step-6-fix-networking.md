@@ -1,47 +1,39 @@
-## 25. Шаг 6: чиним сеть внутри машины
+## 25. Paso 6: arreglar la red dentro de la máquina
 
-**Сначала сеть, потом всё остальное**
+**Primero la red, todo lo demás después**
 
-📍 **Где:** внутри вашей виртуальной машины, в консоли (не на bastion).
+📍 **Dónde:** dentro de tu máquina virtual, en la consola (no en el bastion).
 
-📄 Это содержимое `scripts/netfix-dhcp.sh` из репозитория. **Скачивать его в машину
-не надо и не получится** — сети у неё пока нет, она и есть наша поломка. Команды
-набираем руками, их две. Файл в репозитории — чтобы перечитать потом.
+📄 Este es el contenido de `scripts/netfix-dhcp.sh` del repositorio. **No hace falta descargarlo en la máquina, y tampoco podrías** — la máquina todavía no tiene red, y esa red faltante es justamente nuestra avería. Escribe los comandos a mano; son dos. El archivo vive en el repositorio para que puedas releerlo más tarde.
 
-Приложение сейчас не работает, и это не поломка стенда. Внутри образа осталось прошлое:
-статический адрес из сети VMware и шлюз, которого здесь нет. Машина держится за них
-и не видит ни кластерного DNS, ни соседей.
+La aplicación está caída ahora mismo, y esto no es un fallo del entorno de pruebas. El pasado aún persiste dentro de la imagen: una dirección estática de la red de VMware y una pasarela que aquí no existe. La máquina se aferra a ellas y no ve ni el DNS del clúster ni a sus vecinos.
 
-Зайдите в машину через консоль — на виртуалке:
+Entra en la máquina a través de la consola — en el bastion:
 ```bash
 virtctl console --namespace=tenant-workshopXX vm-instance-app-1
 ```
-🖱 **Или мышкой:** в дашборде откройте свою машину и нажмите **VNC** — это та же
-консоль, только в браузере. Оба пути идут через API кластера и работают даже сейчас,
-когда сеть внутри машины сломана.
+🖱 **O con el ratón:** en el panel, abre tu máquina y haz clic en **VNC** — es la misma consola, solo que en el navegador. Ambos caminos pasan por la API del clúster y funcionan incluso ahora, cuando la red dentro de la máquina está rota.
 
-Дальше — внутри машины (это CentOS, сеть настраивается здесь, а не в netplan):
+A continuación — dentro de la máquina (esto es CentOS, la red se configura aquí, no en netplan):
 ```bash
 sed -i 's/^BOOTPROTO=.*/BOOTPROTO=dhcp/; /^IPADDR/d; /^GATEWAY/d; /^NETMASK/d; /^PREFIX/d; /^DNS/d' /etc/sysconfig/network-scripts/ifcfg-eth0
 ```
-Проверьте глазами, что получилось:
+Comprueba con tus propios ojos qué quedó:
 ```bash
 cat /etc/sysconfig/network-scripts/ifcfg-eth0
 ```
-Должна остаться строка `BOOTPROTO=dhcp`, а строк с адресом и шлюзом быть не должно.
-Если правите вручную через `nano` — результат тот же, только дольше.
+Debe quedar la línea `BOOTPROTO=dhcp`, y no debe haber líneas con una dirección ni con una pasarela. Si lo editas a mano con `nano`, el resultado es el mismo, solo que más lento.
 
-Теперь машину надо перезапустить:
+Ahora hay que reiniciar la máquina:
 ```bash
 reboot
 ```
-🖱 **Или мышкой:** в дашборде на странице машины кнопка **Restart**.
+🖱 **O con el ratón:** en el panel, en la página de la máquina, el botón **Restart**.
 
-После перезагрузки проверьте, что адрес стал кластерным:
+Después del reinicio, comprueba que la dirección se haya vuelto una del clúster:
 ```bash
 ip -4 addr show eth0
 ```
-Должно быть что-то вида `10.244.x.x`. Значит, машина в сети кластера и видит его DNS.
+Debería ser algo como `10.244.x.x`. Eso significa que la máquina está en la red del clúster y ve su DNS.
 
-⚠️ Порядок важен: пока адрес старый, имена сервисов не разрешаются, и править конфиг
-приложения бессмысленно.
+⚠️ El orden importa: mientras la dirección siga siendo la vieja, los nombres de los servicios no se resuelven, y no tiene sentido editar la configuración de la aplicación.

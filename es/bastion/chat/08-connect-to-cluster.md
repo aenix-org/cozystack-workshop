@@ -1,39 +1,39 @@
-## 8. Заходим на виртуалку
+## 8. Iniciar sesión en el bastion
 
-**Один вход — и вы уже в кластере**
+**Un solo inicio de sesión y ya estás dentro del clúster**
 
-📍 **Где:** дашборд открываем в браузере, всё остальное — по SSH на виртуалке.
+📍 **Dónde:** abre el panel (dashboard) en el navegador; todo lo demás ocurre por SSH en el bastion.
 
-**Ваши доступы** (логин и пароль одинаковы во всех трёх местах):
+**Tus credenciales** (el login y la contraseña son los mismos en los tres lugares):
 ```
-дашборд:  https://dashboard.workshop.aenix.io
-виртуалка: ssh workshopXX@<адрес-виртуалки>
-логин:    workshopXX      ← ваш номер, скажу лично
-пароль:   ...             ← скажу лично
+dashboard: https://dashboard.workshop.aenix.io
+bastion:   ssh workshopXX@<bastion-address>
+login:     workshopXX      ← tu número, te lo diré en persona
+password:  ...             ← te lo diré en persona
 ```
 
-Заходим на виртуалку — пароль тот же, что от дашборда, **SSH-ключ не нужен**:
+Inicia sesión en el bastion — la contraseña es la misma que la del panel, **no hace falta ninguna clave SSH**:
 
 ```bash
-ssh workshopXX@<адрес-виртуалки>
+ssh workshopXX@<bastion-address>
 ```
 
-Внутри доступ к кластеру уже настроен: kubeconfig лежит в `~/.kube/config`, и `kubectl`
-сразу видит ваш тенант. **Браузер при этом не открывается** — вход в кластер идёт по
-токену, без Keycloak. Проверяем:
+Una vez dentro, el acceso al clúster ya está configurado: el kubeconfig está en `~/.kube/config`, y `kubectl`
+ve tu tenant de inmediato. **Para esto no se abre ningún navegador** — el inicio de sesión en el clúster va por
+un token, sin Keycloak. Verifiquémoslo:
 
 ```bash
 kubectl config current-context
 kubectl get vminstance -n tenant-workshopXX
 ```
 
-Первая команда покажет `tenant-workshopXX`, вторая ответит `No resources found`. Это
-правильный ответ: машин пока нет, но кластер вас узнал.
+El primer comando muestra `tenant-workshopXX`; el segundo responde `No resources found`. Esa es la
+respuesta correcta: todavía no hay máquinas, pero el clúster ya te reconoce.
 
-⚠️ `kubectl get vm` и `kubectl get vmi` работать не будут — под вашей учётной записью
-доступен тип `vminstance`. Так и задумано.
+⚠️ `kubectl get vm` y `kubectl get vmi` no funcionarán — bajo tu cuenta el tipo disponible es
+`vminstance`. Así está diseñado.
 
-⚠️ Дашборд в браузере (для наглядных шагов мышкой) — по тому же логину и паролю. А вот
-kubeconfig из дашборда (`Info → Secrets → kubeconfig-tenant-workshopXX`) на виртуалке
-скачивать **не нужно**: там он рассчитан на вход через браузер, а на виртуалке уже лежит
-готовый, который работает без него.
+⚠️ El panel en el navegador (para los pasos visuales con el ratón) usa el mismo login y la misma contraseña. Pero
+el kubeconfig del panel (`Info → Secrets → kubeconfig-tenant-workshopXX`) **no** hace falta
+descargarlo en el bastion: allí está pensado para el inicio de sesión desde el navegador, mientras que el bastion ya tiene
+uno listo que funciona sin él.

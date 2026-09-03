@@ -1,57 +1,58 @@
-## 17. Разбор: что делает convert.sh
+## 17. Una mirada de cerca: qué hay dentro de convert.sh
 
-Скрипт состоит из пяти шагов, и каждый печатает, чем занят.
+El script tiene cinco pasos, y cada uno imprime en qué está trabajando.
 
-**Шаг 1 — проверка аппаратного ускорения.** Смотрит, есть ли устройство `/dev/kvm`.
-`virt-v2v` внутри себя запускает маленькую виртуальную машину, чтобы залезть в образ, —
-и если процессор пробрасывается внутрь нашей машины, эта вложенная виртуализация идёт
-быстро. Если нет — включается программный режим: медленнее, но работает. Строка
-`LIBGUESTFS_BACKEND=direct` — это как раз переключение в такой режим.
+**Paso 1 — comprobación de la aceleración por hardware.** Busca el dispositivo `/dev/kvm`.
+Internamente, `virt-v2v` levanta una pequeña máquina virtual para meterse dentro de la imagen — y si el
+procesador se pasa hacia el interior de nuestra máquina, esta virtualización anidada va rápido. Si no
+es así, se activa un modo por software: más lento, pero funciona. La línea
+`LIBGUESTFS_BACKEND=direct` es justamente ese cambio hacia ese modo.
 
-**Шаг 2 — скачивание исходного образа.**
+**Paso 2 — descarga de la imagen de origen.**
 
 ```bash
 wget -O source.ova "$OVA_URL"
 ```
 
-Тянет `app-1.ova` из общего хранилища воркшопа — того самого, что в карте выше. Ведущий
-залил туда файл заранее. **В своём проекте на этом месте была бы выгрузка из vSphere:**
-`Export OVF Template` или `ovftool`, а дальше та же самая переупаковка.
+Descarga `app-1.ova` del almacenamiento compartido del taller — el mismo que aparece en el mapa de arriba. El
+instructor subió allí el archivo con antelación. **En tu propio proyecto, aquí es donde iría una
+exportación desde vSphere:** `Export OVF Template` u `ovftool`, y luego el mismo
+reempaquetado.
 
-**Шаг 3 — сама переупаковка.**
+**Paso 3 — el reempaquetado en sí.**
 
 ```bash
 virt-v2v -i ova /root/source.ova -o local -os /root/out -of qcow2 -on app
 ```
 
-`-i ova` — что на входе: файл формата OVA. `-o local -os /root/out` — куда сложить
-результат: в локальную папку `/root/out`. `-of qcow2` — **обязательный** флаг: без него
-`virt-v2v` выберет формат по умолчанию, и платформа такой диск не примет. `-on app` —
-как назвать результат, отсюда возьмётся имя файла `app.qcow2`.
+`-i ova` — qué entra: un archivo en formato OVA. `-o local -os /root/out` — dónde poner el
+resultado: en la carpeta local `/root/out`. `-of qcow2` — un flag **obligatorio**: sin él
+`virt-v2v` elegirá un formato por defecto, y la plataforma no aceptará ese disco. `-on app` —
+cómo nombrar el resultado, y de ahí sale el nombre de archivo `app.qcow2`.
 
-Идти это будет минуты — на экране побегут строки вроде `Copying disk 1/1`. Именно
-здесь и происходит та вторая, невидимая работа с драйверами, о которой сказано выше.
+Esto tomará unos minutos — por la pantalla desfilarán líneas como `Copying disk 1/1`.
+Aquí es exactamente donde ocurre ese segundo trabajo, invisible, con los controladores mencionado antes.
 
-**Шаг 4 — выгрузка в ваш бакет.**
+**Paso 4 — subida a tu bucket.**
 
 ```bash
 mc alias set mybucket "$S3_ENDPOINT" "$ACCESS_KEY" "$SECRET_KEY"
 mc cp /root/out/app.qcow2 "mybucket/$BUCKET/app.qcow2"
 ```
 
-`mc alias set` запоминает адрес хранилища и ключи под коротким именем `mybucket`, чтобы
-дальше не повторять их в каждой команде. `mc cp` копирует файл — синтаксис нарочно
-такой же, как у обычного `cp`.
+`mc alias set` recuerda la dirección del almacenamiento y las claves bajo el nombre corto `mybucket`, para que
+después no tengas que repetirlas en cada comando. `mc cp` copia el archivo — la sintaxis es
+deliberadamente la misma que la de un `cp` común.
 
-**Шаг 5 — ссылка для платформы.**
+**Paso 5 — un enlace para la plataforma.**
 
 ```bash
 mc share download --expire 168h "mybucket/$BUCKET/app.qcow2"
 ```
 
-Создаёт временную подписанную ссылку на семь дней (168 часов). Подписанную — значит,
-внутрь адреса вшита криптографическая подпись, и по этой ссылке файл скачает кто угодно,
-но только по ней и только пока она жива. Открывать бакет всему миру не нужно, и ключи
-доступа платформе передавать тоже не нужно.
+Crea un enlace firmado temporal, válido por siete días (168 horas). Firmado — es decir, dentro de
+la dirección va incrustada una firma criptográfica, y con este enlace cualquiera puede descargar el
+archivo, pero solo con él y solo mientras siga vivo. No hace falta abrir el bucket al mundo
+entero, ni tampoco hace falta entregarle tus claves de acceso a la plataforma.
 
-Ссылку ищите в выводе после слова `Share:` — она понадобится на следующей фазе.
+Busca el enlace en la salida después de la palabra `Share:` — lo necesitarás en la siguiente fase.

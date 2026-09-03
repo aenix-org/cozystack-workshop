@@ -1,32 +1,32 @@
-## 31. Если что-то не работает
+## 31. Cuando algo no funciona
 
-**Короткий список того, обо что спотыкаются**
+**Una lista breve de las cosas con las que la gente tropieza**
 
-• **Приложение недоступно снаружи.** В мигрированном CentOS обычно виноват встроенный
-  межсетевой экран — он закрывает порт 8080:
+• **La aplicación no es accesible desde afuera.** En un CentOS migrado, el culpable habitual
+  es el firewall integrado: está bloqueando el puerto 8080:
   ```bash
   systemctl stop firewalld
   ```
 
-• **`kubectl` отвечает «forbidden».** Проверьте, что обращаетесь к своему пространству:
-  `-n tenant-workshopXX`. И помните, что доступен `vminstance`, а не `vm` или `vmi`.
+• **`kubectl` responde «forbidden».** Verifica que estés hablando con tu propio namespace:
+  `-n tenant-workshopXX`. Y recuerda que está disponible `vminstance`, no `vm` ni `vmi`.
 
-• **Заказ не создаётся, а здоровье при этом `200`.** Не создана таблица — вернитесь
-  к сообщению про схему базы.
+• **El pedido no se crea, pero la comprobación de estado sigue devolviendo `200`.** No se creó la tabla:
+  vuelve al mensaje sobre el esquema de la base de datos.
 
-• **Новая машина (app-VM) висит в `Pending`.** Не погашена машина-конвертер — она
-  держит 8Gi квоты, и на новую не хватает. Удалите её и её диск:
+• **La máquina nueva (app-VM) se queda atascada en `Pending`.** No se apagó la máquina conversora:
+  está reteniendo 8Gi de la cuota, y no queda suficiente para la nueva. Elimínala junto con su disco:
   ```bash
   kubectl delete vminstance convert --namespace tenant-workshopXX
   kubectl delete vmdisk convert-tools --namespace tenant-workshopXX
   ```
 
-• **`mc` пишет `Insufficient permissions` при заливке образа.** В `convert.sh` в поле
-  `BUCKET` вписан `my-images` вместо настоящего `bucketName` (длинный `bucket-...-...`).
-  Возьмите `bucketName` из секрета бакета в дашборде и подставьте его.
+• **`mc` reporta `Insufficient permissions` al subir la imagen.** En `convert.sh`, el campo
+  `BUCKET` contiene `my-images` en lugar del `bucketName` real (el largo `bucket-...-...`).
+  Toma el `bucketName` del secret del bucket en el panel y colócalo ahí.
 
-• **Диск завис в состоянии Terminating.** Скорее всего размер диска меньше образа.
-  Для ubuntu-20.04 нужно не меньше 25Gi.
+• **El disco se queda atascado en el estado Terminating.** Lo más probable es que el tamaño del disco sea menor que la imagen.
+  Para ubuntu-20.04 necesitas al menos 25Gi.
 
-• **Ничего не помогает.** Пишите сюда, разберём вместе. Это нормальная часть работы,
-  а не повод для неловкости — на реальной миграции будет то же самое, только в три часа ночи.
+• **Nada ayuda.** Escribe por aquí y lo resolvemos juntos. Esto es una parte normal del trabajo,
+  no algo de lo que avergonzarse: en una migración real pasa lo mismo, solo que a las tres de la madrugada.

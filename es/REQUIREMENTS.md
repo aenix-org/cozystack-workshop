@@ -1,44 +1,48 @@
-# Требования к стенду
+# Requisitos del entorno
 
-Для тех, кто разворачивает окружение под воркшоп или под самостоятельное прохождение
-лаб. Участникам этот файл не нужен.
+Para quien prepara el entorno del taller o para trabajar los laboratorios por cuenta
+propia. Los participantes no necesitan este archivo.
 
-## Квота тенанта
+## Cuota del tenant
 
-**Не меньше 40 процессоров и 48 ГБ памяти на тенанта.**
+**Al menos 40 CPU y 48 GB de memoria por tenant.**
 
-Причина в том, как считается квота на запросы: она равна десятой части от лимита.
-Тенанту с `cpu: 16` достаётся 1600m запросов — а один учебный кластер из лабы 0 занимает
-около 1435m. На управляемые сервисы из лаб 6–12 не остаётся ничего, при этом лаба 0
-прямо просит кластер не удалять.
+La razón está en cómo se calcula la cuota de requests: equivale a una décima parte del
+límite. Un tenant con `cpu: 16` obtiene 1600m de requests, mientras que un solo clúster de
+laboratorio del laboratorio 0 consume alrededor de 1435m. Eso no deja nada para los
+servicios gestionados de los laboratorios 6–12, y el laboratorio 0 pide explícitamente que
+no elimines el clúster.
 
-Симптом при нехватке: `exceeded quota: tenant-quota` в событиях и кластер, навсегда
-застрявший в статусе `Unknown`. Сам он из этого состояния не выйдет.
+El síntoma cuando te quedas corto: `exceeded quota: tenant-quota` en los eventos y un
+clúster atascado para siempre en estado `Unknown`. No saldrá de ese estado por sí solo.
 
-## Создание тенантов
+## Creación de tenants
 
-**По одному, а не пачкой.**
+**De a uno, no en lote.**
 
-Несколько одновременных созданий с включённым хранилищем и мониторингом забивают очередь
-helm-controller: релизы уходят в цикл «установка — отказ — удаление» с десятиминутными
-таймаутами. Диагностируется по `observedGeneration: -1` у зависшего HelmRelease.
+Varias creaciones simultáneas con almacenamiento y monitoreo habilitados saturan la cola
+del helm-controller: los releases entran en un ciclo de «instalación — fallo — borrado» con
+tiempos de espera de diez minutos. Se diagnostica por `observedGeneration: -1` en el HelmRelease
+atascado.
 
-То же касается удаления: тенант с кластером внутри снимается минутами, потому что
-cleanup-джоба ждёт, пока освободятся виртуальные машины воркеров.
+Lo mismo aplica a la eliminación: un tenant con un clúster dentro tarda minutos en
+desmontarse, porque el job de limpieza espera a que se liberen las máquinas virtuales de los
+workers.
 
-## Что должно быть включено в тенанте
+## Qué debe estar habilitado en el tenant
 
-| Что | Зачем | Лабы |
+| Qué | Por qué | Laboratorios |
 |---|---|---|
-| etcd | Без него не поднимется кластер из лабы 0 | все |
-| Хранилище (SeaweedFS) | Бакеты и Harbor | 6, 11 |
-| Мониторинг | Метрики и дашборды | 3, 14 |
+| etcd | Sin él no arranca el clúster del laboratorio 0 | todos |
+| Almacenamiento (SeaweedFS) | Buckets y Harbor | 6, 11 |
+| Monitoreo | Métricas y paneles | 3, 14 |
 
-`metrics-server` ставится автоматически, если у тенанта есть etcd, — отдельно включать
-его не нужно. Живёт он в namespace `cozy-monitoring`, но частью аддона мониторинга
-не является.
+`metrics-server` se instala automáticamente si el tenant tiene etcd; no hace falta
+habilitarlo por separado. Vive en el namespace `cozy-monitoring`, pero no forma parte del
+complemento de monitoreo.
 
-## Версия платформы
+## Versión de la plataforma
 
-Лабы писались и проверялись на **Cozystack v1.6.1**. На более ранних версиях часть
-позиций каталога называется иначе или имеет другой набор полей.
+Los laboratorios se escribieron y verificaron sobre **Cozystack v1.6.1**. En versiones
+anteriores, algunas entradas del catálogo tienen otro nombre o un conjunto de campos
+distinto.

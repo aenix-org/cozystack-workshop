@@ -1,53 +1,53 @@
-# Лаба 10 · заказ базы MongoDB под пропуска разной формы.
-# Описание того, что вы хотите получить; собирает и настраивает сервис платформа.
-# То же самое, что вы закажете мышкой в дашборде — только текстом.
-# Применяется НЕ в лабораторный кластер, а в тенант на управляющем кластере:
+# Lab 10 · pedido de una base MongoDB para pases de distinta forma.
+# Descripción de lo que quieres obtener; la plataforma monta y configura el servicio.
+# Lo mismo que pedirías con el ratón en el panel, pero en texto.
+# Se aplica NO en el clúster de laboratorio, sino en el tenant del clúster de gestión:
 #   kubectl --kubeconfig="$HOME/.kube/config" apply -f mongodb.yaml
 #
-# ПЕРЕД ПРИМЕНЕНИЕМ: замените tenant-workshopXX на свой namespace,
-# а ЗдесьВашПароль — на пароль, который вы придумаете.
+# ANTES DE APLICAR: reemplaza tenant-workshopXX por tu namespace,
+# y TuContraseñaAquí por la contraseña que elijas.
 apiVersion: apps.cozystack.io/v1alpha1
 kind: MongoDB
 metadata:
   name: passes
   namespace: tenant-workshopXX
 spec:
-  # Одна копия. MongoDB рассчитана на набор реплик из трёх: они голосуют, кто
-  # главный, и переживают потерю одной. С одной копией голосовать не с кем,
-  # и чарт включает для этого отдельный «небезопасный» режим. Для лабы годится,
-  # для прода — нет.
+  # Una sola copia. MongoDB está pensada para un conjunto de réplicas de tres: votan
+  # cuál es la principal y sobreviven a la pérdida de una. Con una sola copia no hay
+  # con quién votar, y el chart activa para ello un modo «inseguro» aparte. Para el
+  # laboratorio sirve; para producción, no.
   replicas: 1
-  # Диск под данные. Четырём учебным документам хватит и мегабайта, но том потом
-  # проще взять с запасом, чем расширять.
+  # Disco para los datos. A cuatro documentos de ejemplo les basta un megabyte, pero
+  # luego es más fácil coger el volumen con holgura que ampliarlo.
   size: 5Gi
-  # replicated — тома, у которых есть копия на другом узле кластера: узел выпал,
-  # данные остались.
+  # replicated — volúmenes que tienen una copia en otro nodo del clúster: si un nodo
+  # se cae, los datos permanecen.
   storageClass: replicated
-  # Процессор и память, выделенные поду базы. Для четырёх документов с избытком.
+  # Procesador y memoria asignados al Pod de la base. Para cuatro documentos, de sobra.
   resourcesPreset: s1.small
-  # Ветка MongoDB. Менять её задним числом на живой базе нельзя без обновления.
+  # Rama de MongoDB. No se puede cambiar a posteriori en una base viva sin una actualización.
   version: v8
-  # false — база доступна только изнутри кластера, наружу порт не выставляется.
-  # Ходить в неё вы будете из рабочего пода, запущенного рядом.
+  # false — la base solo es accesible desde dentro del clúster; el puerto no se expone
+  # hacia fuera. Accederás a ella desde un Pod de trabajo levantado al lado.
   external: false
-  # Шардирование разрезает данные между несколькими наборами серверов. Нужно, когда
-  # данные не помещаются на один сервер; четыре пропуска помещаются.
+  # El sharding reparte los datos entre varios conjuntos de servidores. Hace falta
+  # cuando los datos no caben en un solo servidor; cuatro pases sí caben.
   sharding: false
-  # Пользователь базы и его пароль. Пароль придумайте свой и запомните: он нужен
-  # рабочему поду (в строке подключения MONGO_URI) и скрипту проверки
-  # (переменная MONGO_PASSWORD). Учётная запись заводится в служебной базе admin —
-  # поэтому в строке подключения обязателен authSource=admin.
+  # Usuario de la base y su contraseña. Elige la tuya y recuérdala: la necesitan el
+  # Pod de trabajo (en la cadena de conexión MONGO_URI) y el script de comprobación
+  # (variable MONGO_PASSWORD). La cuenta se crea en la base de servicio admin, por eso
+  # en la cadena de conexión es obligatorio authSource=admin.
   users:
     passapp:
-      password: ЗдесьВашПароль
-  # База passes и права в ней: пользователю passapp выдана роль admin этой базы,
-  # то есть он может читать, писать, строить индексы и менять настройки коллекций.
-  # Права на другие базы это не даёт.
+      password: TuContraseñaAquí
+  # La base passes y los permisos en ella: al usuario passapp se le concede el rol admin
+  # de esta base, es decir, puede leer, escribir, construir índices y cambiar la
+  # configuración de las colecciones. Esto no otorga permisos sobre otras bases.
   databases:
     passes:
       roles:
         admin:
           - passapp
-  # Резервные копии в объектное хранилище. На учебном стенде выключены.
+  # Copias de seguridad en almacenamiento de objetos. En el entorno de pruebas, desactivadas.
   backup:
     enabled: false

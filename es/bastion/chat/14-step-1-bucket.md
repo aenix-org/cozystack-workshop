@@ -1,52 +1,37 @@
-## 14. Шаг 1: своё хранилище
+## 14. Paso 1: tu propio almacenamiento
 
-**Создаём бакет под образ**
+**Crear un bucket para la imagen**
 
-📍 **Где:** на виртуалке, в папке `~/workshop`.
+📍 **Dónde:** en el bastion, en el directorio `~/workshop`.
 
-Образ диска весит несколько гигабайт. Его надо куда-то положить, чтобы кластер потом
-забрал файл по ссылке. Для этого — объектное хранилище, тот же принцип, что у S3.
+La imagen de disco pesa varios gigabytes. Tiene que vivir en algún lugar para que luego el clúster pueda descargar el archivo mediante un enlace. Para eso sirve el almacenamiento de objetos: el mismo principio que S3.
 
 ```bash
 kubectl apply -f manifests/01-bucket.yaml
 kubectl get buckets.apps.cozystack.io -n tenant-workshopXX
 ```
 
-Дождитесь, пока бакет перейдёт в рабочее состояние.
+Espera a que el bucket pase a un estado funcional.
 
-Манифест создаёт бакет с именем **`my-images`** и одним пользователем — `app`.
-В дашборде он появится в разделе **Bucket**.
+El manifiesto crea un bucket llamado **`my-images`** con un único usuario: `app`. En el panel aparece en la sección **Bucket**.
 
-🖱 **Через дашборд:** **Bucket → Deploy new**, имя `my-images`. Только обязательно
-**сразу добавьте пользователя `app` в секцию `users`**, ещё до создания. Если создать
-пустой бакет и дописать пользователя потом через Edit, бакет останется в половинчатом
-состоянии и заливка образа упадёт. В манифесте это уже учтено.
+🖱 **A través del panel:** **Bucket → Deploy new**, nombre `my-images`. Eso sí, asegúrate de **agregar el usuario `app` a la sección `users` de inmediato**, antes de crearlo. Si creas un bucket vacío y agregas el usuario después mediante Edit, el bucket queda a medio terminar y la subida de la imagen fallará. El manifiesto ya se encarga de esto.
 
-**Теперь забираем ключи от бакета — они понадобятся через два шага.**
+**Ahora toma las claves del bucket: las vas a necesitar dentro de dos pasos.**
 
-Бакет закрыт, и чтобы что-то в него положить, нужны его собственные ключи доступа.
-Они в дашборде: **Bucket → `my-images` → вкладка Secrets → секрет
-`bucket-my-images-app-credentials`**. Разверните его — увидите четыре значения,
-у каждого кнопки *Reveal* (показать) и *Copy* (скопировать).
+El bucket está cerrado y, para poner algo en él, necesitas sus propias claves de acceso. Están en el panel: **Bucket → `my-images` → pestaña Secrets → el secret `bucket-my-images-app-credentials`**. Despliégalo y verás cuatro valores, cada uno con un botón *Reveal* y otro *Copy*.
 
-**Что с ними делать прямо сейчас: скопируйте три из них в блокнот** — в любой, хоть
-в заметки, хоть в черновик сообщения самому себе:
+**Qué hacer con ellos ahora mismo: copia tres de ellos en un bloc de notas** — en cualquiera, ya sea en las notas o en un borrador de mensaje para ti mismo:
 
 • `bucketName`
 • `accessKey`
 • `secretKey`
 
-⚠️ **`bucketName` — это НЕ `my-images`.** `my-images` — имя, которое вы дали заказу;
-настоящее имя ведра в S3 платформа сгенерировала своё, длинное, вида
-`bucket-a9209f83-4ac1-463e-8477-d8365bef787b`. В скрипт идёт именно оно, из поля
-`bucketName`. Впишете `my-images` — заливка уйдёт в несуществующее ведро и упадёт
-с `Insufficient permissions`. На прошлых воркшопах на этом спотыкались.
+⚠️ **`bucketName` NO es `my-images`.** `my-images` es el nombre que le diste al pedido; el nombre real del bucket en S3 lo generó la propia plataforma, largo, del tipo `bucket-a9209f83-4ac1-463e-8477-d8365bef787b`. Eso es exactamente lo que va al script, del campo `bucketName`. Si pones `my-images`, la subida irá a un bucket inexistente y fallará con `Insufficient permissions`. En talleres anteriores la gente se ha tropezado con esto.
 
-Четвёртое, `endpoint`, записывать не нужно — оно у всех одинаковое и уже вписано
-в скрипт.
+El cuarto, `endpoint`, no hace falta que lo anotes: es el mismo para todos y ya está escrito en el script.
 
-**Куда они пойдут.** На шаге 3 вы откроете в машине-конвертере файл `convert.sh`,
-а в нём — блок «ВСТАВЬТЕ СВОИ ЗНАЧЕНИЯ» из трёх строк:
+**A dónde van.** En el paso 3 abrirás el archivo `convert.sh` en la máquina conversora, y dentro de él un bloque «PEGA TUS VALORES» de tres líneas:
 
 ```
 BUCKET="ВСТАВЬТЕ_bucketName"
@@ -54,12 +39,8 @@ ACCESS_KEY="ВСТАВЬТЕ_accessKey"
 SECRET_KEY="ВСТАВЬТЕ_secretKey"
 ```
 
-Ровно эти три значения туда и вставите, каждое в свои кавычки. Больше они нигде
-не понадобятся: скрипт сам зальёт готовый образ в ваш бакет и сам сделает ссылку на него.
+Esos son exactamente los tres valores que pegarás ahí, cada uno entre sus propias comillas. No los necesitarás en ningún otro lado: el propio script subirá la imagen terminada a tu bucket y creará él mismo un enlace hacia ella.
 
-⚠️ Секретный ключ — это пароль от вашего хранилища. В общий чат его не присылайте,
-даже когда просите помощи. Если что-то не сходится, напишите мне лично.
+⚠️ La clave secreta es la contraseña de tu almacenamiento. No la envíes al chat común, ni siquiera cuando pidas ayuda. Si algo no cuadra, escríbeme en privado.
 
-⚠️ Если решите поменять `endpoint` на свой: в дашборде он показан без схемы
-(`s3.workshop.aenix.io`), а в скрипт вписывается **с** `https://` в начале.
-Не поставите — заливка молча не пройдёт.
+⚠️ Si decides cambiar `endpoint` por el tuyo: en el panel se muestra sin esquema (`s3.workshop.aenix.io`), pero en el script se escribe **con** `https://` al inicio. Si no lo pones, la subida fallará en silencio.
