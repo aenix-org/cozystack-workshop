@@ -1,7 +1,7 @@
-## 12. Фаза 1. Вывозим образ из vSphere
+## 12. Phase 1. Exporting the image out of vSphere
 
-**Шаги 1–3.** Диск виртуальной машины лежит в формате, который понимает VMware, и никуда
-сам не поедет. Нам нужно превратить его в формат для KVM и положить туда, откуда кластер
-сможет его забрать.
+**Steps 1–3.** The virtual machine's disk sits in a format that VMware understands, and it won't
+travel anywhere on its own. We need to turn it into a format for KVM and put it somewhere the cluster
+can pick it up from.
 
-Три шага: заводим хранилище, поднимаем временную машину с инструментами, конвертируем.
+Three steps: set up storage, bring up a temporary machine with the tools, convert.

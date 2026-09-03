@@ -1,38 +1,33 @@
-## 10. Материалы уже на виртуалке
+## 10. The materials are already on the bastion
 
-**Ничего клонировать не нужно**
+**Nothing to clone**
 
-📍 **Где:** на виртуалке, куда вы только что зашли по SSH.
+📍 **Where:** on the bastion you just logged into over SSH.
 
-Папка с материалами уже лежит в вашей домашней директории, и **ваш номер тенанта в ней
-уже подставлен**. Заглушки `tenant-workshopXX` заменены на ваш `tenant-workshopNN` при
-подготовке виртуалки — искать и заменять ничего не надо, сразу применяйте файлы как есть.
+The materials folder already sits in your home directory, and **your tenant number is already filled in**. The `tenant-workshopXX` placeholders were replaced with your `tenant-workshopNN` when the bastion was prepared — there is nothing to find and replace, just apply the files as they are.
 
-Заходим в папку и смотрим, что внутри:
+Go into the folder and see what's inside:
 
 ```bash
 cd ~/workshop
 ls manifests scripts
 ```
 
-Должны увидеть четыре манифеста и четыре скрипта — те самые, из карты файлов. Убедиться,
-что номер подставлен именно ваш:
+You should see four manifests and four scripts — the very ones from the file map. Confirm that the number filled in is yours:
 
 ```bash
 grep -m1 namespace manifests/01-bucket.yaml
 ```
 
-В строке `namespace:` будет ваш `tenant-workshopNN`, а не `tenant-workshopXX`.
+The `namespace:` line will hold your `tenant-workshopNN`, not `tenant-workshopXX`.
 
-**Если потерялись** — вернуться всегда одинаково:
+**If you get lost**, the way back is always the same:
 ```bash
 cd ~/workshop
 ```
 
-**Чем открывать файлы для правки.** Понадобится ровно один раз — вписать presigned-ссылку
-в `manifests/03-app-vm.yaml` на третьей фазе. Годится `nano`:
-`nano manifests/03-app-vm.yaml` (сохранить: `Ctrl+O`, `Enter`, выйти: `Ctrl+X`).
+**What to open files with for editing.** You'll need this exactly once — to paste the presigned URL into `manifests/03-app-vm.yaml` in the third phase. `nano` will do:
+`nano manifests/03-app-vm.yaml` (save: `Ctrl+O`, `Enter`, exit: `Ctrl+X`).
 
-Единственная заглушка, которая осталась намеренно, — в `manifests/03-app-vm.yaml` строка
-`url: "ВСТАВЬТЕ_PRESIGNED_URL"`. Эту ссылку вы получите, когда сконвертируете образ. Пока
-просто знайте, что она вас там ждёт.
+The only placeholder deliberately left in is in `manifests/03-app-vm.yaml`, the line
+`url: "ВСТАВЬТЕ_PRESIGNED_URL"`. You'll get that URL once you convert the image. For now, just know it's waiting for you there.

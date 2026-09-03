@@ -1,4 +1,4 @@
-## 13. Разбор: что внутри 01-bucket.yaml
+## 13. A closer look: what's inside 01-bucket.yaml
 
 ```yaml
 apiVersion: apps.cozystack.io/v1alpha1
@@ -11,30 +11,29 @@ spec:
     app: {}
 ```
 
-`apiVersion: apps.cozystack.io/v1alpha1` — из какого набора типов взят этот объект.
-`apps.cozystack.io` — это и есть каталог Cozystack: всё, что там перечислено, вы можете
-заказать. Не «Kubernetes сам по себе умеет бакеты» — их добавила платформа.
+`apiVersion: apps.cozystack.io/v1alpha1` — which set of types this object is drawn from.
+`apps.cozystack.io` is the Cozystack catalog itself: everything listed there is something you can
+order. It's not "Kubernetes knows how to do buckets on its own" — the platform added them.
 
-`kind: Bucket` — что именно заказываем. Файл не описывает, *как* поднять хранилище: он
-говорит «хочу бакет», а всё остальное платформа делает сама. Так работает весь каталог —
-вы пишете, что вам нужно, а не последовательность действий.
+`kind: Bucket` — what exactly you're ordering. The file doesn't describe *how* to stand up the
+storage: it says "I want a bucket," and the platform does everything else itself. The whole catalog
+works this way — you write down what you need, not a sequence of steps.
 
-`metadata.name: my-images` — имя заказа. По нему вы будете находить его в дашборде и в
-командах. Имя внутреннее; настоящее имя ведра в S3 платформа сгенерирует своё, длинное
-и уникальное, — его вы увидите позже в параметре `bucketName`.
+`metadata.name: my-images` — the name of the order. You'll use it to find the order in the dashboard
+and in commands. This name is internal; the platform will generate its own real bucket name in S3,
+long and unique — you'll see it later in the `bucketName` parameter.
 
-`namespace: tenant-workshopXX` — ваш участок платформы. В файле на виртуалке здесь **уже
-стоит ваш номер** — его подставили при подготовке стенда, менять ничего не нужно (`XX`
-показан только для примера). Namespace («пространство имён») — это перегородка внутри
-кластера: объекты с одинаковыми именами в разных namespace друг другу не мешают и друг
-друга не видят. Ближайший аналог — отдельный Resource Pool со своими правами доступа,
-только строже.
+`namespace: tenant-workshopXX` — your slice of the platform. In the file on the bastion, **your number is
+already set here** — it was filled in when the testbed was prepared, so there's nothing to change (`XX`
+is shown only as an example). A namespace is a partition inside the cluster: objects with the same
+name in different namespaces don't interfere with each other and don't see each other. The closest
+analogy is a separate Resource Pool with its own access rights, only stricter.
 
-`users: app: {}` — заводит пользователя S3 с именем `app`. Пустые фигурные скобки
-означают «настройки по умолчанию»: платформа сама придумает ему ключ доступа и
-секретный ключ и положит их в отдельный объект-секрет, который вы откроете в дашборде.
-Никаких паролей вы не придумываете и никуда не вписываете.
+`users: app: {}` — creates an S3 user named `app`. The empty curly braces mean "default settings":
+the platform will come up with an access key and a secret key for it on its own and put them into a
+separate Secret object, which you'll open in the dashboard. You don't invent any passwords or type
+them in anywhere.
 
-Обратите внимание, чего в файле **нет**: размера, адреса, портов, сертификата, узлов,
-на которых всё это разместится. Всё это платформа определяет сама. В этом и разница
-между «заказать в каталоге» и «поставить руками».
+Notice what's **not** in the file: size, address, ports, certificate, the nodes it will all be placed
+on. The platform determines all of that itself. That's exactly the difference between "ordering from
+the catalog" and "setting it up by hand."

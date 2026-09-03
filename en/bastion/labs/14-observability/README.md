@@ -1,196 +1,193 @@
-# Лаба 14 · Наблюдаемость: найти свой всплеск в графиках
+# Lab 14 · Observability: find your own spike in the graphs
 
 | | |
 |---|---|
-| **Время** | 30 минут |
-| **Что доказывает** | Метрики собираются сами, постоянно и задним числом. Отдельной системы мониторинга покупать не надо |
-| **Что понадобится** | Кластер из лабы 0, приложение из лабы 1, выполненная лаба 3 (нагрузка и HPA), доступ в дашборд тенанта |
+| **Time** | 30 minutes |
+| **What it proves** | Metrics collect themselves, continuously and retroactively. You don't need to buy a separate monitoring system |
+| **What you'll need** | The cluster from lab 0, the app from lab 1, lab 3 completed (load and HPA), access to the tenant dashboard |
 
-## Зачем это
+## Why this matters
 
-Вчера в 16:40 «Пропуск» пятнадцать минут отвечал медленно. Жалоба пришла сегодня в 11:00,
-как это всегда и бывает. Вопрос от руководства: что это было и повторится ли.
+Yesterday at 16:40, "Propusk" was slow to respond for fifteen minutes. The complaint arrived today at 11:00,
+as it always does. The question from management: what was that, and will it happen again.
 
-Вариант «сейчас воспроизведём и посмотрим» не работает: воспроизвести чужую нагрузку
-вчерашнего дня нельзя. Единственный способ ответить — иметь **записи за вчера**, снятые
-до того, как кто-то спросил.
+The "let's reproduce it now and take a look" approach doesn't work: you can't reproduce someone else's load
+from yesterday. The only way to answer is to have **records from yesterday**, taken before anyone asked.
 
-В этой лабе мы найдём в графиках следы собственной нагрузки из лабы 3: всплеск процессора,
-когда пошёл трафик, и ступеньку, когда автомасштабирование добавило копии. Никаких
-специальных приготовлений мы для этого не делали — записи уже есть.
+In this lab we'll find, in the graphs, the traces of our own load from lab 3: the CPU spike when the traffic
+started, and the step up when autoscaling added copies. We made no special preparations for this — the records
+are already there.
 
-## Словарик
+## Mini-glossary
 
-| Термин | Что это | Похоже на… но |
+| Term | What it is | Like… but |
 |---|---|---|
-| **Метрика** | Число, снимаемое регулярно: сколько процессора, памяти, запросов | **Счётчик в графиках vCenter**, но хранится историей, а не последним значением |
-| **Метка (label)** | Пара «имя=значение» на метрике: под, namespace, кластер | **Объект, к которому привязан счётчик**, но меток много, и по любой из них можно резать и группировать |
-| **Временной ряд** | Одна метрика с одним набором меток, в динамике | **Один график в vCenter**, но каждое сочетание меток — отдельный ряд, их тысячи |
-| **Скрейп (scrape)** | Сбор: агент раз в N секунд опрашивает источники | **Сбор счётчиков vCenter**, но тянет агент, а не отдаёт приложение |
-| **PromQL** | Язык запросов к метрикам | прямого аналога нет: в vCenter вы выбираете счётчик, здесь пишете выражение |
-| **VictoriaMetrics** | Хранилище, в которое складываются собранные метрики | **База статистики vCenter**, но понимает язык запросов Prometheus, хотя сама не Prometheus |
-| **Grafana** | Интерфейс к метрикам и логам | **Вкладка Performance**, но отдельный продукт, дашборды пишутся руками или берутся готовыми |
-| **Retention** | Сколько хранить историю | **Уровни статистики в vCenter**, но задаётся параметром, по умолчанию 3 дня и 14 дней двумя хранилищами |
-| **Логи** | Строки, которые пишет приложение | **Логи в гостевой ОС**, но собираются централизованно, свой язык запросов, не PromQL |
-| **Под (pod)** | Наименьшая единица запуска: контейнер или несколько, всегда на одном узле | **Виртуальная машина**, но одноразовая: вместо перезагрузки её пересоздают под новым именем |
-| **Namespace** | Перегородка внутри кластера: одинаковые имена в разных namespace не сталкиваются | **Папка в инвентаре vCenter**, но делит ещё и права, квоты и сетевые политики |
-| **Тенант** | Ваш участок платформы: там стоит Grafana и туда стекаются метрики кластера | **Resource Pool со своими правами**, но выдаёт ещё и готовые сервисы, а не только ресурсы |
+| **Metric** | A number taken regularly: how much CPU, memory, how many requests | **a counter in the vCenter graphs**, but stored as history rather than as the last value |
+| **Label** | A "name=value" pair on a metric: pod, namespace, cluster | **the object a counter is attached to**, but there are many labels, and you can slice and group by any of them |
+| **Time series** | A single metric with a single set of labels, over time | **a single graph in vCenter**, but every combination of labels is its own series, and there are thousands of them |
+| **Scrape** | Collection: an agent polls the sources every N seconds | **vCenter counter collection**, but an agent pulls the data rather than the application pushing it |
+| **PromQL** | The query language for metrics | there's no direct analogue: in vCenter you pick a counter, here you write an expression |
+| **VictoriaMetrics** | The store where the collected metrics are kept | **the vCenter statistics database**, but it understands the Prometheus query language, even though it isn't Prometheus itself |
+| **Grafana** | The interface to metrics and logs | **the Performance tab**, but a separate product; dashboards are written by hand or taken ready-made |
+| **Retention** | How long to keep the history | **the statistics levels in vCenter**, but set by a parameter; by default 3 days and 14 days across two separate stores |
+| **Logs** | The lines an application writes | **logs in the guest OS**, but collected centrally, with their own query language, not PromQL |
+| **Pod** | The smallest unit of execution: one container or several, always on a single node | **a virtual machine**, but disposable: instead of rebooting it, it's recreated under a new name |
+| **Namespace** | A partition inside the cluster: identical names in different namespaces don't collide | **a folder in the vCenter inventory**, but it also divides up permissions, quotas, and network policies |
+| **Tenant** | Your slice of the platform: Grafana lives there, and the cluster's metrics flow into it | **a Resource Pool with its own permissions**, but it also hands out ready-made services, not just resources |
 
-### Метрики и логи — почему это разные вещи
+### Metrics and logs — why they're different things
 
-Их постоянно валят в одну кучу, и потом ищут в логах то, что бывает только в метриках.
+They're constantly lumped together, and then people go looking in the logs for something that only exists in the metrics.
 
-| | Метрики | Логи |
+| | Metrics | Logs |
 |---|---|---|
-| Что это | числа через равные промежутки | строки в момент события |
-| Пример | «в 16:41:30 под потратил 240 миллиядра» | «16:41:31 ERROR connection refused» |
-| Сколько занимают | мало, объём предсказуем | много, объём зависит от болтливости приложения |
-| Сколько хранят | недели и месяцы | дни |
-| Отвечают на вопрос | «сколько и когда» | «что именно случилось» |
-| Язык запросов | PromQL | LogsQL (в Grafana это отдельный источник данных) |
+| What they are | numbers at regular intervals | lines at the moment of an event |
+| Example | "at 16:41:30 the Pod used 240 millicores" | "16:41:31 ERROR connection refused" |
+| How much space | little, and the volume is predictable | a lot, and the volume depends on how talkative the application is |
+| How long they're kept | weeks and months | days |
+| The question they answer | "how much and when" | "what exactly happened" |
+| Query language | PromQL | LogsQL (in Grafana this is a separate data source) |
 
-Работают они в паре: **по метрикам вы находите момент, по логам — причину.** График
-показал всплеск в 16:41 — идёте в логи за эту минуту. Наоборот не выходит: по логам
-искать «когда было плохо» можно бесконечно.
+They work as a pair: **the metrics find you the moment, the logs find you the cause.** The graph
+showed a spike at 16:41 — you go to the logs for that minute. It doesn't work the other way round: searching
+the logs for "when things went bad" can take forever.
 
-### Почему метрики снимают постоянно, а не по запросу
+### Why metrics are taken continuously, not on demand
 
-Это главное, что отличает мониторинг от диагностики, и это стоит проговорить прямо.
+This is the main thing that separates monitoring from diagnostics, and it's worth stating plainly.
 
-Собирать по запросу невозможно **физически**: к моменту вопроса событие уже прошло.
-Никакая система не покажет нагрузку вчерашнего вечера, если вчера вечером её никто не
-записывал.
+Collecting on demand is **physically** impossible: by the time the question is asked, the event is already over.
+No system will show you last night's load if no one was recording it last night.
 
-Поэтому агент опрашивает всё подряд каждые 30 секунд и складывает в хранилище. Да,
-99% этих чисел никто никогда не посмотрит. Цена этих 99% — несколько гигабайт диска.
-Цена отсутствующего одного процента — «мы не знаем, что было, и не узнаем».
+So the agent polls everything, indiscriminately, every 30 seconds and puts it into storage. Yes,
+99% of these numbers will never be looked at by anyone. The price of that 99% is a few gigabytes of disk.
+The price of the missing one percent is "we don't know what happened, and we never will."
 
-⚠️ **Обратная сторона, о которой стоит знать заранее.** Постоянный сбор — это постоянный
-расход: агент занимает процессор и память, хранилище растёт. На большом кластере метрики
-становятся заметной статьёй потребления, и их приходится прореживать: сокращать retention,
-выбрасывать ненужные метки, отключать сбор редких метрик. Это штатная эксплуатационная
-работа, и появляется она не в первый месяц, но появляется.
+⚠️ **The downside, worth knowing about in advance.** Continuous collection means continuous
+cost: the agent takes up CPU and memory, and storage grows. On a large cluster, metrics become
+a noticeable line item in consumption, and you have to thin them out: reduce retention,
+drop unneeded labels, turn off collection of rarely-used metrics. This is routine operational
+work, and it doesn't appear in the first month, but it does appear.
 
-## Что лежит в папке лабы
+## What's in the lab folder
 
-Все файлы уже у вас — вы забрали их вместе с репозиторием. Создавать и печатать заново
-ничего не нужно: там, где ниже написано `kubectl apply -f имя.yaml`, файл берётся отсюда.
+You already have all the files — you got them along with the repository. There's nothing to create or type
+out again: wherever it says `kubectl apply -f name.yaml` below, the file is taken from here.
 
 ```bash
-# переходим в папку этой лабы: все относительные пути ниже отсчитываются от неё
+# switch to this lab's folder: all the relative paths below are counted from here
 cd labs/14-observability
 ```
 
-| Файл | Что это | Когда пригодится |
+| File | What it is | When it comes in handy |
 |---|---|---|
-| `check.sh` | Проверка, что метрики собираются и графики отвечают | запускаете в конце лабы |
-| — | Своих манифестов у лабы нет: нагрузку и автомасштабирование берём из лабы 3 — `../03-scale/` | |
+| `check.sh` | Checks that metrics are being collected and the graphs respond | you run it at the end of the lab |
+| — | This lab has no manifests of its own: we take the load and autoscaling from lab 3 — `../03-scale/` | |
 
-## Шаг 1. Убеждаемся, что метрики вообще собираются
+## Step 1. Make sure metrics are being collected at all
 
-📍 **Где:** на виртуалке (в терминале bastion).
+📍 **Where:** on the bastion (in the bastion terminal).
 
-Кластер `lab` отдаёт свои метрики наружу не сам по себе, а через дополнение
-`Monitoring agents`. Проверьте, включено ли оно:
+The `lab` cluster doesn't expose its metrics on its own, but through the `Monitoring agents`
+add-on. Check whether it's enabled:
 
 ```bash
-# KUBECONFIG — переменная, из которой kubectl узнаёт адрес кластера и то, под кем
-# логиниться. Файл ~/lab.kubeconfig вы сохранили, когда создавали кластер `lab`.
-# Задавать её нужно заново в каждом новом окне терминала.
+# KUBECONFIG — the variable kubectl reads to learn the cluster's address and who to
+# log in as. You saved the file ~/lab.kubeconfig when you created the `lab` cluster.
+# It has to be set again in every new terminal window.
 export KUBECONFIG=~/lab.kubeconfig
 
-# get pods = «покажи, какие поды есть».
-#   -n cozy-monitoring   искать не по всему кластеру, а в этом namespace: именно туда
-#                        дополнение кладёт свои сборщики.
+# get pods = "show me which pods exist".
+#   -n cozy-monitoring   look not across the whole cluster, but in this namespace: that's
+#                        exactly where the add-on puts its collectors.
 kubectl get pods -n cozy-monitoring
 ```
 
-**Если вы видите в списке `vmagent` и `fluent-bit`** — всё на месте, идите дальше.
+**If you see `vmagent` and `fluent-bit` in the list** — everything's in place, move on.
 
-⚠️ **Смотрите на имена, а не на то, пустой ли список.** Namespace `cozy-monitoring`
-существует всегда: туда же платформа кладёт `metrics-server`, а он ставится любому
-кластеру с собственным etcd и от дополнения не зависит. То есть увидеть строку с
-`metrics-server` и решить, что сбор метрик включён, — типичная ошибка, и она вскроется
-только в Grafana, где будет пусто.
+⚠️ **Look at the names, not at whether the list is empty.** The `cozy-monitoring` namespace
+always exists: the platform also puts `metrics-server` there, and that gets installed on any
+cluster with its own etcd and doesn't depend on the add-on. In other words, seeing a
+`metrics-server` line and concluding that metrics collection is on is a classic mistake, and it surfaces
+only in Grafana, where everything will be empty.
 
-**Если в списке есть `metrics-server`, но нет ни `vmagent`, ни `fluent-bit`:**
+**If the list has `metrics-server` but neither `vmagent` nor `fluent-bit`:**
 
 ```
 NAME                              READY   STATUS    RESTARTS   AGE
 metrics-server-7d4b8c9f5-x2klm    1/1     Running   0          3d
 ```
 
-Значит, дополнение выключено, и записей за прошлое у вас нет. Это, кстати, точная
-иллюстрация к предыдущему разделу: включить сбор задним числом нельзя.
+That means the add-on is off, and you have no records of the past. This, by the way, is a precise
+illustration of the previous section: you can't enable collection retroactively.
 
-Включается оно в дашборде: `Kubernetes` → `lab` → изменить → в разделе Addons поставить
-`Monitoring agents`. Дополнение поднимется за пару минут, но **метрики начнут копиться
-только с этого момента** — всплеск из лабы 3 вы уже не найдёте.
+You enable it in the dashboard: `Kubernetes` → `lab` → edit → in the Addons section, check
+`Monitoring agents`. The add-on comes up in a couple of minutes, but **metrics only start accumulating
+from that moment on** — you won't find the spike from lab 3 anymore.
 
-Значит, всплеск придётся создать заново. Учтите, что уборка лабы 3 удалила
-автомасштабирование, а уборка лабы 4 — генератор нагрузки, поэтому вернуть нужно оба:
+So you'll have to create the spike again. Bear in mind that the cleanup in lab 3 removed
+autoscaling, and the cleanup in lab 4 removed the load generator, so you need to bring back both:
 
 ```bash
-export KUBECONFIG=~/lab.kubeconfig          # тот же файл доступа, что и выше
+export KUBECONFIG=~/lab.kubeconfig          # the same access file as above
 
-# apply = «приведи кластер к тому, что описано в файле». Оба файла лежат в папке
-# соседней лабы, поэтому путь начинается с `../` — печатать их заново не нужно.
-kubectl apply -f ../03-scale/hpa.yaml       # правило автомасштабирования для rickroll
-kubectl apply -f ../03-scale/fortio.yaml    # генератор нагрузки
+# apply = "bring the cluster to what's described in the file". Both files live in the
+# neighboring lab's folder, so the path starts with `../` — no need to type them again.
+kubectl apply -f ../03-scale/hpa.yaml       # the autoscaling rule for rickroll
+kubectl apply -f ../03-scale/fortio.yaml    # the load generator
 
-# rollout status = «держи терминал и скажи, когда выкатка закончится».
-# deployment/fortio — тип объекта и его имя. Команда вернёт приглашение
-# со строкой `successfully rolled out`, когда генератор поднимется.
+# rollout status = "hold the terminal and tell me when the rollout is done".
+# deployment/fortio — the object type and its name. The command returns the prompt
+# with the line `successfully rolled out` once the generator comes up.
 kubectl rollout status deployment/fortio
 ```
 
-Дождитесь, пока в `kubectl get hpa rickroll` вместо `<unknown>` появится процент; `hpa` —
-сокращение от `HorizontalPodAutoscaler`, объекта автомасштабирования. Занимает это пару
-минут. Затем пробросьте порт генератора и дайте ту же нагрузку, что в лабе 3, иначе
-ступенька автомасштабирования не появится:
+Wait until `kubectl get hpa rickroll` shows a percentage instead of `<unknown>`; `hpa` is
+short for `HorizontalPodAutoscaler`, the autoscaling object. This takes a couple of
+minutes. Then forward the generator's port and apply the same load as in lab 3, otherwise the
+autoscaling step won't appear:
 
 ```bash
-# port-forward = прорыть туннель с виртуалки внутрь кластера. Пока команда работает,
-# обращение на localhost:8081 попадает в генератор нагрузки.
-#   svc/fortio    цель: сервис (не под) с именем fortio
-#   8081:8080     слева порт на вашем виртуалке, справа порт внутри сервиса
-# Окно не закрывайте: туннель живёт ровно столько, сколько работает команда.
+# port-forward = dig a tunnel from the bastion into the cluster. While the command runs,
+# a request to localhost:8081 lands in the load generator.
+#   svc/fortio    the target: the service (not the pod) named fortio
+#   8081:8080     on the left, the port on your bastion; on the right, the port inside the service
+# Don't close the window: the tunnel lives exactly as long as the command runs.
 kubectl port-forward svc/fortio 8081:8080
 ```
 
-На <http://localhost:8081/fortio/>: **URL** `http://rickroll/`, **QPS** `1200`,
-**Duration** `90s`, **Connections** `80`. Через пару минут после окончания возвращайтесь
-сюда — данные будут.
+At <http://localhost:8081/fortio/>: **URL** `http://rickroll/`, **QPS** `1200`,
+**Duration** `90s`, **Connections** `80`. Come back here a couple of minutes after it finishes — the
+data will be there.
 
-⚠️ Чтобы не попасть в эту ситуацию, включайте `Monitoring agents` сразу при создании
-кластера — в лабе 0 это отдельная строка в таблице параметров.
+⚠️ To avoid ending up in this situation, enable `Monitoring agents` right when you create the
+cluster — in lab 0 it's a separate line in the parameters table.
 
 <details>
-<summary><b>Что именно там работает и куда уходит собранное</b></summary>
+<summary><b>What exactly runs there and where the collected data goes</b></summary>
 
-В namespace `cozy-monitoring` вашего кластера работают:
+In your cluster's `cozy-monitoring` namespace, the following run:
 
-| Кто | Что делает |
+| Who | What it does |
 |---|---|
-| `vmagent` | раз в 30 секунд опрашивает источники метрик и отправляет собранное в тенант |
-| `kube-state-metrics` | превращает состояние объектов кластера в метрики: сколько реплик, в каком состоянии поды |
-| `node-exporter` | метрики самого узла: процессор, память, диск, сеть |
-| `fluent-bit` | собирает логи контейнеров и отправляет их в тенант |
-| `metrics-server` | **не часть мониторинга**: ставится вместе с кластером и поставляет текущие числа для `kubectl top` и автомасштабирования. Ничего не хранит и в сборе метрик не участвует |
+| `vmagent` | polls the metric sources every 30 seconds and sends what it collects to the tenant |
+| `kube-state-metrics` | turns the state of cluster objects into metrics: how many replicas, what state the Pods are in |
+| `node-exporter` | metrics of the node itself: CPU, memory, disk, network |
+| `fluent-bit` | collects container logs and sends them to the tenant |
+| `metrics-server` | **not part of monitoring**: installed together with the cluster and supplies the current numbers for `kubectl top` and autoscaling. It stores nothing and takes no part in metrics collection |
 
-Обратите внимание: **хранилища здесь нет**. Всё собранное сразу отправляется по сети в
-тенант, в общее хранилище метрик рядом с Grafana. Так сделано намеренно: кластер `lab` —
-вещь одноразовая, вы его удалите, а записи о том, как он себя вёл, должны пережить
-удаление.
+Note: **there's no storage here**. Everything collected is sent immediately over the network to the
+tenant, into the shared metrics store next to Grafana. This is deliberate: the `lab` cluster is a
+disposable thing — you'll delete it, but the records of how it behaved have to outlive that deletion.
 
-Посмотреть, по какому адресу сборщик отправляет собранное:
+To see the address the collector sends its data to:
 
 ```bash
-# get vmagent = «покажи объект-сборщик». Вместо обычной таблицы просим одно поле
-# из его описания — синтаксис -o jsonpath работает с любым объектом кластера:
-#   .items[0]                  первый (и единственный здесь) найденный сборщик
-#   .spec.remoteWrite[0].url   адрес, по которому он отдаёт метрики
-#   {"\n"}                     перевод строки, иначе вывод слипнется с приглашением
+# get vmagent = "show me the collector object". Instead of the usual table we ask for a single
+# field from its description — the -o jsonpath syntax works with any cluster object:
+#   .items[0]                  the first (and here only) collector found
+#   .spec.remoteWrite[0].url   the address it hands the metrics to
+#   {"\n"}                     a newline, otherwise the output runs into the prompt
 kubectl get vmagent -n cozy-monitoring \
   -o jsonpath='{.items[0].spec.remoteWrite[0].url}{"\n"}'
 ```
@@ -199,297 +196,294 @@ kubectl get vmagent -n cozy-monitoring \
 http://vminsert-shortterm.tenant-workshopXX.svc.cozy.local:8480/insert/0/prometheus
 ```
 
-Адрес указывает в ваш тенант. Это тот же механизм, каким виртуалка из лабы 12
-разговаривала с приложением: обычная сеть между обычными адресами.
+The address points into your tenant. It's the same mechanism the bastion from lab 12 used to talk to the
+application: an ordinary network between ordinary addresses.
 
 </details>
 
-## Шаг 2. Открываем Grafana тенанта
+## Step 2. Open the tenant's Grafana
 
-📍 **Где:** в браузере.
+📍 **Where:** in the browser.
 
-Адрес — поддомен `grafana` вашего тенантного хоста:
+The address is the `grafana` subdomain of your tenant host:
 
 ```
-https://grafana.<хост вашего тенанта>
+https://grafana.<your tenant host>
 ```
 
-Точный адрес записан в дашборде: ваш тенант → приложение `Monitoring` → вкладка
-`Ingress`. Ingress — правило публикации сервиса наружу под доменным именем; ближайший
-аналог — запись на балансировщике, только описанная в том же кластере. Там адрес лежит
-целиком, вместе с именем хоста.
+The exact address is written down in the dashboard: your tenant → the `Monitoring` app → the
+`Ingress` tab. An Ingress is a rule for publishing a service to the outside under a domain name; the
+closest analogue is an entry on a load balancer, only described inside the same cluster. The address is
+there in full, host name and all.
 
-Второе место — вывод `check.sh` из этой же лабы: строка «Grafana для ваших метрик».
-Скрипт вытаскивает адрес из того же самого ingress, так что печатать его руками не нужно.
+A second place is the output of `check.sh` from this same lab: the line "Grafana for your metrics".
+The script pulls the address out of that same ingress, so there's no need to type it by hand.
 
-⚠️ **Если приложения `Monitoring` в вашем тенанте нет** — своей Grafana у вас тоже нет, и
-метрики уходят в мониторинг родительского тенанта. Надёжный путь — развернуть `Monitoring`
-из каталога (раздел `Administration`): адрес появится на вкладке `Ingress` уже вашего
-приложения, и все запросы ниже заработают. Чужой мониторинг `check.sh` тоже найдёт и
-назовёт namespace, в котором тот работает, но открыть его получится только при наличии
-доступа в этот namespace.
+⚠️ **If there's no `Monitoring` app in your tenant** — then you have no Grafana of your own either, and
+the metrics go to the parent tenant's monitoring. The reliable path is to deploy `Monitoring` from the
+catalog (the `Administration` section): the address will appear on the `Ingress` tab of your own
+app, and all the queries below will work. `check.sh` will also find someone else's monitoring and
+name the namespace it runs in, but you'll only be able to open it if you have access to that namespace.
 
-**Чем входить.** Логин — `admin`. Пароль лежит в секрете `grafana-admin-password`:
-дашборд → приложение `Monitoring` → вкладка `Secrets` → ключ `password` → `Reveal`.
+**How to log in.** The login is `admin`. The password is in the `grafana-admin-password` Secret:
+dashboard → the `Monitoring` app → the `Secrets` tab → the `password` key → `Reveal`.
 
-Под тенантом `kubectl` к этому секрету доступа не даст (core-секреты вам не видны), поэтому идите через дашборд.
+As the tenant, `kubectl` won't give you access to this Secret (core Secrets aren't visible to you), so go through the dashboard.
 
-Если мониторинг у вас родительский, этот секрет вам недоступен — тогда либо разворачивайте
-своё приложение `Monitoring`, как сказано выше, либо спрашивайте доступ у того, кто держит
-стенд.
+If your monitoring is the parent's, this Secret is out of your reach — then either deploy your own
+`Monitoring` app, as described above, or ask for access from whoever runs the testbed.
 
-Войдя, откройте **Explore** — это раздел для разовых запросов, без сохранения дашбордов.
-В выпадающем списке источников выберите **`vm-shortterm`** (он же выбран по умолчанию).
+Once you're in, open **Explore** — this is the section for one-off queries, without saving dashboards.
+In the data source dropdown, select **`vm-shortterm`** (which is also the default).
 
-⚠️ **Переключите поле запроса в режим `Code`.** Grafana открывает Explore в конструкторе
-(`Builder`) — форме с выпадающими списками, куда текст запроса вписать некуда.
-Переключатель `Builder | Code` находится справа над полем ввода. Все запросы ниже
-набираются в `Code`.
+⚠️ **Switch the query field to `Code` mode.** Grafana opens Explore in the builder
+(`Builder`) — a form with dropdowns where there's nowhere to type the query text.
+The `Builder | Code` toggle is above the input field, on the right. All the queries below are
+typed in `Code`.
 
 <details>
-<summary><b>Что за источники данных в списке</b></summary>
+<summary><b>What the data sources in the list are</b></summary>
 
-| Источник | Что внутри | Хранит |
+| Source | What's inside | Keeps |
 |---|---|---|
-| `vm-shortterm` | метрики с высокой детализацией | 3 дня |
-| `vm-longterm` | те же метрики, прорежённые | 14 дней |
-| `vlogs-generic` | логи контейнеров | 1 день |
+| `vm-shortterm` | high-resolution metrics | 3 days |
+| `vm-longterm` | the same metrics, thinned out | 14 days |
+| `vlogs-generic` | container logs | 1 day |
 
-Два хранилища метрик вместо одного — это компромисс между детализацией и объёмом.
-Разбираться в инциденте вы будете по `shortterm`, где видно каждые 30 секунд. Отвечать
-на вопрос «а как оно вело себя две недели назад» — по `longterm`, где детализация
-грубее, зато глубина больше.
+Two metrics stores instead of one is a compromise between resolution and volume.
+You'll investigate an incident with `shortterm`, where you can see every 30 seconds. You'll answer
+the question "how did it behave two weeks ago" with `longterm`, where the resolution
+is coarser but the depth is greater.
 
-Ровно та же логика, что в уровнях статистики vCenter, где данные с интервалом 20 секунд
-живут день, а часовые — год.
+Exactly the same logic as in the vCenter statistics levels, where 20-second-interval data
+lives for a day and hourly data for a year.
 
-⚠️ **`vlogs-generic` — это логи, и язык запросов там другой.** PromQL в нём не работает,
-и это не поломка: у логов своя грамматика. Не тратьте время, переключая источник и
-подставляя тот же запрос.
+⚠️ **`vlogs-generic` is logs, and the query language there is different.** PromQL doesn't work in it,
+and that's not a bug: logs have their own grammar. Don't waste time switching the source and
+pasting in the same query.
 
 </details>
 
-⚠️ **Готовых дашбордов по подам в тенантной Grafana нет.** В списке будут дашборды по
-базам данных, ingress и очередям — то, что относится к managed-сервисам. Дашборды уровня
-«поды и узлы» в тенантный набор не входят. Поэтому дальше мы работаем в Explore и пишем
-запросы руками. Это менее удобно, чем готовая вкладка Performance в vCenter, и делать
-вид, что это не так, незачем.
+⚠️ **There are no ready-made Pod dashboards in the tenant Grafana.** The list will have dashboards for
+databases, ingress, and queues — the things that belong to managed services. Dashboards at the
+"Pods and nodes" level aren't part of the tenant set. So from here on we work in Explore and write
+queries by hand. This is less convenient than the ready-made Performance tab in vCenter, and there's
+no point pretending otherwise.
 
-## Шаг 3. Находим свои поды
+## Step 3. Find your Pods
 
-📍 **Где:** в Grafana, Explore, источник `vm-shortterm`.
+📍 **Where:** in Grafana, Explore, the `vm-shortterm` source.
 
-Начнём с самого грубого вопроса: какие вообще поды видны в кластере. Запрос короткий, но
-в нём три незнакомые части — раскройте разбор до того, как вводить.
+Let's start with the crudest question: what Pods are visible in the cluster at all. The query is short, but
+it has three unfamiliar parts — expand the breakdown before you type it in.
 
 <details>
-<summary><b>Разбираем запрос по частям</b></summary>
+<summary><b>Breaking the query down part by part</b></summary>
 
 ```promql
 container_cpu_usage_seconds_total
 ```
 
-Имя метрики. Это счётчик: сколько секунд процессорного времени контейнер израсходовал
-с момента запуска. Он только растёт — до перезапуска контейнера, после которого
-начинается с нуля.
+The metric name. It's a counter: how many seconds of CPU time the container has spent
+since it started. It only goes up — until the container restarts, after which
+it starts from zero.
 
-Сам по себе он бесполезен: «под потратил 4718 секунд процессора» ни о чём не говорит.
-Полезной эта метрика становится после `rate()`, до которого мы дойдём на следующем шаге.
+On its own it's useless: "the Pod spent 4718 seconds of CPU" tells you nothing.
+This metric becomes useful after `rate()`, which we'll get to in the next step.
 
 ```promql
 {cluster="kubernetes-lab", namespace="default"}
 ```
 
-Фильтр по меткам. Обе метки здесь важны.
+A filter by labels. Both labels here matter.
 
-`cluster` — имя вашего кластера, каким его знает платформа. Оно **не равно** `lab`:
-приложение называется `lab`, а релиз, которым оно развёрнуто, — `kubernetes-lab`, и в
-метки попадает имя релиза. Это первая грабля, о которую спотыкаются все. Проверить, как
-называется ваш, можно так: сотрите значение и посмотрите, что предложит автодополнение
-Grafana.
+`cluster` — the name of your cluster as the platform knows it. It is **not equal** to `lab`:
+the application is called `lab`, but the release it's deployed by is `kubernetes-lab`, and it's
+the release name that ends up in the labels. This is the first pitfall everyone trips over. To check what
+yours is called: clear the value and see what Grafana's autocomplete suggests.
 
-Метка нужна, потому что в одном хранилище лежат метрики **всех** ваших кластеров и
-managed-сервисов. Без фильтра вы получите смесь из всего тенанта.
+The label is needed because a single store holds the metrics of **all** your clusters and
+managed services. Without the filter you'll get a mix of everything in the tenant.
 
-`namespace` — namespace **внутри** кластера `lab`. Приложение из первой лабы разворачивалось
-в `default`, поэтому здесь `default`. Не путайте с namespace тенанта
-(`tenant-workshopXX`) — это разные вещи в разных кластерах. Namespace тенанта лежит в
-метке `tenant`.
+`namespace` — the namespace **inside** the `lab` cluster. The app from the first lab was deployed
+into `default`, so here it's `default`. Don't confuse it with the tenant namespace
+(`tenant-workshopXX`) — these are different things in different clusters. The tenant namespace lives in the
+`tenant` label.
 
 ```promql
 count by (pod) ( ... )
 ```
 
-Сгруппировать по метке `pod` и посчитать, сколько рядов попало в каждую группу. Нас
-интересуют не сами числа, а список получившихся значений `pod`.
+Group by the `pod` label and count how many series fell into each group. We're
+interested not in the numbers themselves, but in the list of resulting `pod` values.
 
 </details>
 
 ```promql
-# count by (pod) — разложить найденные ряды по метке pod и посчитать, сколько рядов
-# в каждой группе. Сами числа не важны: нужен список имён подов, который получится.
+# count by (pod) — break the matched series out by the pod label and count how many series
+# are in each group. The numbers themselves don't matter: what we want is the list of pod names that results.
 count by (pod) (
-  # имя метрики — счётчик процессорного времени контейнеров
+  # the metric name — the container CPU-time counter
   container_cpu_usage_seconds_total{
-    cluster="kubernetes-lab",   # ваш кластер: здесь имя релиза, а не имя приложения lab
-    namespace="default"         # namespace внутри кластера lab, где развёрнут rickroll
+    cluster="kubernetes-lab",   # your cluster: the release name here, not the app name lab
+    namespace="default"         # the namespace inside the lab cluster where rickroll is deployed
   }
 )
 ```
 
-**Что вы должны увидеть:** переключите вид с Graph на **Table** — так список читается
-лучше. В таблице будут `rickroll-...`, `fortio-...` и, если делали лабу 11,
+**What you should see:** switch the view from Graph to **Table** — the list reads
+better that way. The table will have `rickroll-...`, `fortio-...` and, if you did lab 11,
 `propusk-build-...`.
 
-## Шаг 4. Находим всплеск процессора
+## Step 4. Find the CPU spike
 
-Счётчик из предыдущего шага в сыром виде не читается. Превратим его в величину, которую
-можно сравнить с заявкой пода и с показаниями `kubectl top`, — в потребляемые ядра.
-Что при этом делает `rate()` и откуда в запросе ещё два условия — в разборе ниже;
-раскройте его до того, как вводить.
+The counter from the previous step can't be read in its raw form. Let's turn it into a quantity you
+can compare against the Pod's request and against what `kubectl top` shows — into consumed cores.
+What `rate()` does in the process, and where the two extra conditions in the query come from, is in the breakdown below;
+expand it before you type.
 
 <details>
-<summary><b>Разбираем запрос по частям</b></summary>
+<summary><b>Breaking the query down part by part</b></summary>
 
 ```promql
 rate( ... [2m])
 ```
 
-`rate` берёт счётчик и считает **скорость его роста в секунду**, усредняя за окно в две
-минуты. Для метрики процессорного времени это даёт очень удобную величину: «сколько
-секунд процессора в секунду», то есть сколько ядер потреблялось. `0.24` означает 24%
-одного ядра, то есть `240m` в пересчёте на милликоры.
+`rate` takes a counter and computes **its rate of growth per second**, averaging over a two-minute
+window. For a CPU-time metric this gives a very convenient quantity: "how many
+seconds of CPU per second", that is, how many cores were being consumed. `0.24` means 24% of
+one core, that is `240m` in millicores.
 
-Окно `[2m]` — компромисс. Меньше окно (`[30s]`) — график дёрганый и на редких данных
-рвётся. Больше (`[5m]`) — всплеск размазывается и невысокий пик может пропасть совсем.
-Начинайте с `[2m]` и подбирайте.
+The `[2m]` window is a compromise. A smaller window (`[30s]`) — the graph is jumpy and breaks up on
+sparse data. A larger one (`[5m]`) — the spike gets smeared out and a low peak can disappear entirely.
+Start with `[2m]` and tune from there.
 
-⚠️ **Окно должно быть больше интервала сбора минимум вдвое.** Собирается раз в 30 секунд,
-значит меньше `[1m]` ставить нельзя — в окно попадёт одна точка, а по одной точке
-скорость не считается, и график станет пустым. Это самая частая причина «у меня ничего
-не рисуется».
+⚠️ **The window must be at least twice the collection interval.** Collection happens every 30 seconds,
+so you can't set anything below `[1m]` — only one point would fall inside the window, and a rate can't
+be computed from a single point, so the graph goes empty. This is the most common cause of "nothing
+is drawing for me".
 
 ```promql
 pod=~"rickroll-.*"
 ```
 
-`=~` — сравнение по регулярному выражению вместо точного совпадения. Точное здесь не
-годится: имена подов содержат случайный хвост и меняются при каждом пересоздании.
+`=~` — a comparison by regular expression instead of an exact match. An exact match won't
+do here: Pod names contain a random tail and change on every recreation.
 
 ```promql
 container!=""
 ```
 
-Отбросить ряды без имени контейнера. Такие ряды есть: это агрегат по всему поду целиком,
-и если их не отбросить, каждый под посчитается дважды и график покажет ровно вдвое
-больше правды. Ещё одна классическая ловушка.
+Discard series with no container name. Such series exist: they're an aggregate over the whole Pod,
+and if you don't discard them, every Pod gets counted twice and the graph shows exactly twice
+the truth. Another classic trap.
 
 ```promql
 sum by (pod) ( ... )
 ```
 
-Сложить всё, что осталось, по подам. В поде может быть несколько контейнеров; нас
-интересует под целиком.
+Sum up everything that's left, by Pod. A Pod can have several containers; we're
+interested in the Pod as a whole.
 
 </details>
 
 ```promql
-# rate(...[2m]) — скорость роста счётчика в секунду, усреднённая по окну в 2 минуты.
-# Для процессорного времени читается как «сколько ядер потреблялось»:
-# 0.24 — двадцать четыре процента одного ядра, то есть 240m.
-sum by (pod) (     # сложить контейнеры пода: одна линия на под, а не на каждый контейнер
+# rate(...[2m]) — the counter's growth rate per second, averaged over a 2-minute window.
+# For CPU time it reads as "how many cores were being consumed":
+# 0.24 — twenty-four percent of one core, that is 240m.
+sum by (pod) (     # sum the pod's containers: one line per pod, not per container
   rate(container_cpu_usage_seconds_total{
     cluster="kubernetes-lab", namespace="default",
-    pod=~"rickroll-.*",  # =~ сравнение по регулярному выражению: хвост имени пода случаен
-    container!=""        # выбросить ряды-итоги по поду целиком, иначе всё удвоится
+    pod=~"rickroll-.*",  # =~ comparison by regular expression: the pod name's tail is random
+    container!=""        # drop the whole-pod total series, otherwise everything doubles
   }[2m])
 )
 ```
 
-Поставьте диапазон времени, в который вы делали лабу 3 — например, последние 3 часа.
+Set the time range to when you were doing lab 3 — for example, the last 3 hours.
 
-**Что вы должны увидеть:** ровную линию у самого нуля, потом резкий подъём на время
-нагрузки, потом возврат вниз. Если реплик стало несколько, линий будет несколько, и
-появляться они будут не одновременно, а по мере создания подов.
+**What you should see:** a flat line right at zero, then a sharp rise for the duration of the
+load, then a return downward. If there came to be several replicas, there will be several lines, and
+they'll appear not all at once but as the Pods are created.
 
-## Шаг 5. Находим ступеньку автомасштабирования
+## Step 5. Find the autoscaling step
 
-Всплеск нашли. Теперь посмотрим, что на него ответил кластер: сколько копий приложения
-он держал запущенными в каждый момент и сколько хотел держать. Это два разных числа, и
-разница между ними — самое интересное на этом шаге. Откуда они берутся — в разборе ниже.
+We've found the spike. Now let's look at how the cluster responded to it: how many copies of the application
+it kept running at each moment and how many it wanted to keep. These are two different numbers, and
+the difference between them is the most interesting thing in this step. Where they come from is in the breakdown below.
 
 <details>
-<summary><b>Откуда берутся эти метрики и чем desired отличается от current</b></summary>
+<summary><b>Where these metrics come from and how desired differs from current</b></summary>
 
-Эти метрики приходят не от приложения, а от `kube-state-metrics` — он читает объекты
-кластера через API и превращает их поля в числа. Метка `horizontalpodautoscaler` — имя
-объекта HPA (`HorizontalPodAutoscaler`, то самое правило автомасштабирования из лабы 3),
-метка `deployment` — имя Deployment, то есть описания «держи столько-то копий
-приложения», и так далее по всем типам объектов.
+These metrics come not from the application but from `kube-state-metrics` — it reads cluster objects
+through the API and turns their fields into numbers. The `horizontalpodautoscaler` label is the name of
+the HPA object (`HorizontalPodAutoscaler`, that same autoscaling rule from lab 3), the
+`deployment` label is the name of the Deployment, that is, of the description "keep such-and-such many
+copies of the application", and so on for every object type.
 
-`desired` — сколько копий автомасштабирование **хочет** прямо сейчас, посчитав по
-загрузке. `current` — сколько их **фактически** запущено. Между ними всегда есть зазор:
-поды создаются не мгновенно.
+`desired` — how many copies autoscaling **wants** right now, having calculated from the
+load. `current` — how many are **actually** running. There's always a gap between them:
+Pods aren't created instantly.
 
-Если `desired` держится выше `current` долго — значит, копии не создаются. Причина почти
-всегда одна: не хватает места на узлах, и новые поды висят в `Pending`. Ровно та ситуация,
-в которую вы упирались в лабе 11.
+If `desired` stays above `current` for a long time, it means the copies aren't being created. The cause is
+almost always the same: there isn't enough room on the nodes, and the new Pods hang in `Pending`. Exactly the situation
+you ran into in lab 11.
 
-Полезно рядом:
+Useful alongside:
 
 ```promql
-# сколько копий rickroll создано всего
+# how many rickroll copies have been created in total
 kube_deployment_status_replicas{cluster="kubernetes-lab", deployment="rickroll"}
-# сколько из них прошли проверку готовности и уже принимают трафик
+# how many of them have passed the readiness check and are already taking traffic
 kube_deployment_status_replicas_available{cluster="kubernetes-lab", deployment="rickroll"}
 ```
 
-Расхождение между ними во время выкатки новой версии — это и есть та самая пауза, пока
-новая копия проходит проверку готовности.
+The divergence between them during a rollout of a new version is exactly that pause while the
+new copy passes its readiness check.
 
 </details>
 
 ```promql
-# ..._status_current_replicas — сколько копий rickroll запущено прямо сейчас.
-# Число берётся не из приложения, а из объекта HPA, прочитанного kube-state-metrics.
+# ..._status_current_replicas — how many rickroll copies are running right now.
+# The number comes not from the application but from the HPA object, read by kube-state-metrics.
 kube_horizontalpodautoscaler_status_current_replicas{
-  cluster="kubernetes-lab",             # только ваш учебный кластер
-  horizontalpodautoscaler="rickroll"    # имя объекта автомасштабирования из лабы 3
+  cluster="kubernetes-lab",             # only your lab cluster
+  horizontalpodautoscaler="rickroll"    # the name of the autoscaling object from lab 3
 }
 ```
 
-и рядом, вторым запросом:
+and alongside, as a second query:
 
 ```promql
-# ..._status_desired_replicas — сколько копий автомасштабирование хочет иметь сейчас,
-# исходя из загрузки. Отставание current от desired и есть время создания подов.
+# ..._status_desired_replicas — how many copies autoscaling wants to have now,
+# based on the load. current lagging behind desired is exactly the pod creation time.
 kube_horizontalpodautoscaler_status_desired_replicas{
   cluster="kubernetes-lab",
   horizontalpodautoscaler="rickroll"
 }
 ```
 
-**Что вы должны увидеть:** ступенчатую линию. Была единица, потом три, потом пять или
-шесть, потом — с задержкой около минуты после спада нагрузки — обратно вниз.
+**What you should see:** a stepped line. It was one, then three, then five or
+six, then — with a delay of about a minute after the load subsides — back down.
 
-Наложите её на график потребления процессора из предыдущего шага: в Explore второй
-запрос добавляется кнопкой `+ Add query`. Видно, что ступенька идёт **за** всплеском с
-отставанием в несколько десятков секунд: сначала процессор вырос, потом
-автомасштабирование это заметило и среагировало. Это и есть ответ на вопрос «почему
-пользователи всё-таки успели заметить замедление».
+Overlay it on the CPU consumption graph from the previous step: in Explore a second
+query is added with the `+ Add query` button. You can see the step follows **behind** the spike with
+a lag of several tens of seconds: first the CPU rose, then autoscaling noticed it and
+reacted. This is the answer to the question "why did the users manage to notice the slowdown
+after all".
 
-## Шаг 6. Смотрим на то же глазами автомасштабирования
+## Step 6. Look at the same thing through autoscaling's eyes
 
-Автомасштабирование смотрит не на абсолютное потребление, а на **долю от `requests`**.
-`requests` — заявка пода на ресурсы: сколько процессора и памяти планировщик резервирует
-под него на узле, независимо от того, использует под эти ресурсы или нет.
-Ближайший аналог — reservation в vSphere.
+Autoscaling looks not at absolute consumption but at the **fraction of `requests`**.
+`requests` is a Pod's request for resources: how much CPU and memory the scheduler reserves
+for it on a node, regardless of whether the Pod uses those resources or not.
+The closest analogue is a reservation in vSphere.
 
-Посмотрим ровно на ту величину, по которой принимается решение. Запрос состоит из двух
-частей, разделённых знаком деления: сверху фактическое потребление, снизу заявка.
+Let's look at exactly the quantity the decision is made on. The query consists of two
+parts separated by a division sign: on top, the actual consumption; on the bottom, the request.
 
 ```promql
-# Верхняя часть — фактическое потребление процессора подом. Тот же запрос, что выше.
+# The top part — the pod's actual CPU consumption. The same query as above.
 sum by (pod) (
   rate(container_cpu_usage_seconds_total{
     cluster="kubernetes-lab", namespace="default",
@@ -497,41 +491,41 @@ sum by (pod) (
   }[2m])
 )
 /
-# Нижняя часть — сколько под запросил. Результат деления — доля от заявки: 1 означает
-# «потребляет ровно столько, сколько запросил», 0.5 — половину запрошенного.
+# The bottom part — how much the pod requested. The result of the division is the fraction of the request: 1 means
+# "consuming exactly as much as it requested", 0.5 — half of what was requested.
 sum by (pod) (
   kube_pod_container_resource_requests{
     cluster="kubernetes-lab", namespace="default",
     pod=~"rickroll-.*",
-    resource="cpu"     # у метрики есть ряды и по памяти — оставляем только процессор
+    resource="cpu"     # the metric also has memory series — we keep only CPU
   }
 )
 ```
 
-**Что вы должны увидеть:** линию, которая почти всё время идёт низко и поднимается на
-время нагрузки. Единица на этом графике означает «под потребляет ровно столько, сколько
-запросил».
+**What you should see:** a line that runs low almost all the time and rises for the
+duration of the load. A value of one on this graph means "the Pod consumes exactly as much as it
+requested".
 
-В `hpa.yaml` из лабы 3 стоит `averageUtilization: 50`, а в `rickroll.yaml` —
-`requests.cpu: 20m`. То есть порог срабатывания — 10 миллиядра на под, а на графике это
-отметка `0.5`. Найдите момент, когда линия её пересекла, и сверьте со ступенькой из
-предыдущего шага: между ними будет те самые десятки секунд.
+In `hpa.yaml` from lab 3 there's `averageUtilization: 50`, and in `rickroll.yaml` —
+`requests.cpu: 20m`. That is, the trigger threshold is 10 millicores per Pod, which on the graph is the
+`0.5` mark. Find the moment the line crossed it, and check it against the step from the
+previous step: between them will be those same tens of seconds.
 
-⚠️ Деление двух выражений в PromQL работает по совпадению **всех** меток. Здесь оно
-сходится, потому что обе части сгруппированы `by (pod)` и других меток после группировки
-не остаётся. Если бы наборы меток различались, результат оказался бы пустым — без ошибки
-и без предупреждения, пустой график. Это самая коварная особенность языка.
+⚠️ Dividing two expressions in PromQL works by matching on **all** labels. Here it lines up,
+because both parts are grouped `by (pod)` and no other labels remain after grouping.
+If the sets of labels differed, the result would come out empty — no error and no warning, an empty
+graph. This is the language's most treacherous feature.
 
-## Шаг 7. Три запроса на каждый день
+## Step 7. Three queries for everyday use
 
-Их стоит сохранить себе — они закрывают большую часть повседневных вопросов.
+It's worth saving these — they cover most day-to-day questions.
 
-**Кто в кластере потребляет больше всего процессора, топ-10:**
+**Who in the cluster consumes the most CPU, top 10:**
 
 ```promql
-# topk(10, ...) — оставить только десять рядов с самыми большими значениями.
-# Группировка by (namespace, pod) добавляет в ответ namespace: видно, чей это под.
-# Окно [5m] шире, чем на прошлых шагах: нужна не форма всплеска, а средний уровень.
+# topk(10, ...) — keep only the ten series with the largest values.
+# Grouping by (namespace, pod) adds the namespace to the answer: you can see whose pod it is.
+# The [5m] window is wider than in the previous steps: we want not the shape of the spike, but the average level.
 topk(10,
   sum by (namespace, pod) (
     rate(container_cpu_usage_seconds_total{cluster="kubernetes-lab", container!=""}[5m])
@@ -539,11 +533,11 @@ topk(10,
 )
 ```
 
-**Память по подам (не счётчик, поэтому без `rate`):**
+**Memory by Pod (not a counter, so no `rate`):**
 
 ```promql
-# container_memory_working_set_bytes — не счётчик, а мгновенное значение: столько байт
-# занято в этот момент. rate() здесь дал бы бессмыслицу — «байты в секунду».
+# container_memory_working_set_bytes — not a counter but an instantaneous value: this many bytes
+# are occupied at this moment. rate() here would give nonsense — "bytes per second".
 sum by (pod) (
   container_memory_working_set_bytes{
     cluster="kubernetes-lab", namespace="default", container!=""
@@ -551,123 +545,122 @@ sum by (pod) (
 )
 ```
 
-⚠️ Именно `working_set`, а не `container_memory_usage_bytes`. Второй включает файловый
-кэш, который ядро отдаст под давлением, и поэтому регулярно пугает людей цифрами, никак
-не связанными с реальной потребностью приложения. Решение об убийстве пода по памяти
-принимается тоже по `working_set`.
+⚠️ Specifically `working_set`, not `container_memory_usage_bytes`. The latter includes the file
+cache, which the kernel will give up under pressure, and so it regularly scares people with figures that have nothing
+to do with the application's real needs. The decision to kill a Pod for memory
+is also made on `working_set`.
 
-**Сколько ресурсов зарезервировано против того, сколько реально используется:**
+**How much resource is reserved versus how much is actually used:**
 
 ```promql
-# sum без by — сложить всё в одно число: сколько процессора зарезервировано под все
-# поды кластера. Это заявка, а не потребление: зарезервированное и простаивающее тоже
-# попадает в сумму.
+# sum without by — add everything into a single number: how much CPU is reserved for all
+# the cluster's pods. This is the request, not the consumption: what's reserved and sitting idle
+# goes into the sum too.
 sum(kube_pod_container_resource_requests{cluster="kubernetes-lab", resource="cpu"})
 ```
 
-Сравните это число с суммой из первого запроса. Разница между «зарезервировано» и
-«используется» — это то, за что вы платите, ничего не получая. Тот же разговор, что про
-reservation в vSphere, только здесь его видно графиком.
+Compare this number with the sum from the first query. The difference between "reserved" and
+"used" is what you pay for and get nothing in return. The same conversation as about
+reservations in vSphere, only here you can see it on a graph.
 
-Если делали лабу 11, посмотрите заодно на сборку Android — она хорошо видна:
+If you did lab 11, take a look at the Android build while you're at it — it's clearly visible:
 
 ```promql
-# Тот же rate, но фильтр по подам сборки. sum без by (pod) — одна линия на всю сборку,
-# сколько бы подов она ни подняла.
+# The same rate, but a filter on the build pods. sum without by (pod) — one line for the whole build,
+# however many pods it brings up.
 sum(rate(container_cpu_usage_seconds_total{
   cluster="kubernetes-lab", pod=~"propusk-build-.*", container!=""
 }[2m]))
 ```
 
-Двадцать минут ровного плато на полтора-два ядра, потом обрыв в ноль. Так на графике
-выглядит Job — разовая задача, которая доводит работу до конца и завершается. В отличие
-от приложения, которое держат запущенным постоянно, у её линии есть конец.
+Twenty minutes of a flat plateau at a core and a half to two cores, then a drop to zero. That's how a
+Job looks on a graph — a one-off task that carries the work through to the end and finishes. Unlike
+an application, which is kept running permanently, its line has an end.
 
-## Шаг 8. Заглядываем в логи
+## Step 8. Take a look into the logs
 
-Переключите источник данных на **`vlogs-generic`**. Язык запросов здесь другой: в PromQL
-вы описывали числовые ряды, в LogsQL — отбираете строки по значениям их полей.
+Switch the data source to **`vlogs-generic`**. The query language here is different: in PromQL
+you described numeric series, in LogsQL you select lines by the values of their fields.
 
-Запрос ниже читается так: «покажи строки, у которых поле `kubernetes_namespace_name`
-равно `default` и при этом поле `kubernetes_pod_name` начинается на `rickroll`».
-Звёздочка на конце — тот же случайный хвост в имени пода, из-за которого в PromQL
-приходилось писать `=~`.
+The query below reads like this: "show the lines whose `kubernetes_namespace_name` field equals
+`default` and whose `kubernetes_pod_name` field starts with `rickroll`".
+The asterisk at the end is that same random tail in the Pod name, the one that forced you to write
+`=~` in PromQL.
 
 ```logsql
 kubernetes_namespace_name:default AND kubernetes_pod_name:rickroll*
 ```
 
-Сопоставьте время: возьмите минуту всплеска, найденного на графике потребления
-процессора, и посмотрите логи за неё. У nginx в эту минуту будет всплеск записей о
-запросах.
+Match the time: take the minute of the spike you found on the CPU consumption
+graph, and look at the logs for it. In that minute nginx will have a spike of request records.
 
-**Вот ради чего мы разделяли метрики и логи.** По графику вы за секунду нашли момент
-среди трёх часов. По логам за эту минуту — что именно происходило. В обратную сторону
-это не работает: искать «когда стало плохо», листая логи, можно очень долго.
+**This is what we separated metrics and logs for.** With the graph you found the moment among three
+hours in a second. With the logs for that minute — what exactly was happening. It doesn't work the
+other way round: searching for "when things went bad" by scrolling through logs can take a very long time.
 
-## Проверка
+## Check
 
-📍 **Где:** на виртуалке, в том же окне терминала, где вы работали с `kubectl`.
+📍 **Where:** on the bastion, in the same terminal window where you worked with `kubectl`.
 
 ```bash
-export KUBECONFIG=~/lab.kubeconfig          # доступ в учебный кластер `lab`
+export KUBECONFIG=~/lab.kubeconfig          # access to the lab cluster `lab`
 
-# Две переменные ниже дают скрипту доступ ещё и в тенант. С ними он дополнительно
-# проверит, что метрики туда доехали, и напечатает адрес вашей Grafana. Без них
-# проверка пройдёт, но отчёт будет короче.
-export COZY_TENANT=workshopXX               # ваш номер вместо XX
-export COZY_KUBECONFIG=~/.kube/config     # файл доступа в тенант
+# The two variables below give the script access to the tenant as well. With them it will
+# additionally check that the metrics made it there, and print the address of your Grafana. Without them
+# the check will pass, but the report will be shorter.
+export COZY_TENANT=workshopXX               # your number instead of XX
+export COZY_KUBECONFIG=~/.kube/config     # the tenant access file
 
-./check.sh                                  # ./ = «запусти файл из текущей папки»
+./check.sh                                  # ./ = "run the file from the current folder"
 ```
 
-⚠️ **На Windows скрипт запускается из WSL**, а не из PowerShell — как его поставить,
-написано в начале лабы 0. Без WSL лабу можно пройти, но отчёта-артефакта не будет.
+⚠️ **On Windows the script is run from WSL**, not from PowerShell — how to set it up is
+written at the start of lab 0. You can complete the lab without WSL, but there'll be no artifact report.
 
-Скрипт проверяет не «вы посмотрели график» — этого проверить нельзя, — а то, что
-проверить можно и нужно: сбор метрик действительно работает, отправка настроена в ваш
-тенант, сбор логов работает, и в кластере есть след нагрузки из лабы 3, который в этих
-графиках можно найти.
+The script checks not "you looked at the graph" — that can't be checked — but what
+can and should be checked: that metrics collection really works, that sending is configured to your
+tenant, that log collection works, and that the cluster has a trace of the load from lab 3 that can be found in these
+graphs.
 
-## Уборка
+## Cleanup
 
-Убирать нечего. Дополнение `Monitoring agents` потребляет немного и пригодится до конца
-воркшопа — оставьте включённым.
+There's nothing to clean up. The `Monitoring agents` add-on consumes little and will be useful until the end of the
+workshop — leave it enabled.
 
-Метрики сотрутся сами: по умолчанию `shortterm` держит 3 дня, `longterm` — 14, логи —
-сутки. Это тот редкий случай, когда уборка сделана за вас и её нельзя забыть.
+The metrics will erase themselves: by default `shortterm` keeps 3 days, `longterm` 14, logs
+a day. This is that rare case where the cleanup is done for you and can't be forgotten.
 
-## Что мы теперь умеем
+## What we can do now
 
-- Объяснять, почему метрики собирают постоянно, и чем они отличаются от логов
-- Проверять, что сбор в кластере включён и куда именно он отправляет
-- Писать запросы, находящие свои поды и их потребление, и не попадаться на `container!=""`
-- Находить в графиках всплеск нагрузки и реакцию автомасштабирования на него
-- Читать расхождение `desired` и `current` как признак нехватки места
+- Explain why metrics are collected continuously, and how they differ from logs
+- Check that collection in the cluster is enabled and exactly where it sends to
+- Write queries that find your Pods and their consumption, and not fall for `container!=""`
+- Find the load spike in the graphs and autoscaling's reaction to it
+- Read the divergence of `desired` and `current` as a sign of insufficient room
 
-## А в vSphere это было бы
+## And in vSphere this would be
 
-vCenter показывает счётчики хостов и виртуальных машин — этого хватает, пока вопросы
-задают про виртуальные машины. Как только вопрос звучит «что было с сервисом», нужен
-vRealize Operations: отдельный продукт, отдельная лицензия, отдельная установка,
-отдельные виртуальные машины под него и отдельный человек, который умеет его настраивать.
+vCenter shows counters for hosts and virtual machines — that's enough as long as the questions
+are asked about virtual machines. The moment the question becomes "what happened to the service", you need
+vRealize Operations: a separate product, a separate license, a separate installation,
+separate virtual machines to run it on, and a separate person who knows how to configure it.
 
-Здесь сбор метрик и логов — дополнение, которое включается галочкой в приложении, а
-Grafana с хранилищем поднимается пунктом каталога. Ни лицензии, ни проекта внедрения.
+Here, metrics and log collection is an add-on you enable with a checkbox in the application, and
+Grafana with its storage comes up as a catalog item. No license, no implementation project.
 
-**Где vSphere удобнее, честно.** По части того, что работает сразу после установки,
-vCenter выигрывает безоговорочно, и мы это увидели прямо в лабе:
+**Where vSphere is more convenient, honestly.** When it comes to what works right after installation,
+vCenter wins hands down, and we saw it right here in the lab:
 
 | | vSphere | Cozystack |
 |---|---|---|
-| Графики сразу после установки | вкладка Performance у каждого объекта | нужно включить дополнение и открыть Grafana |
-| Готовые виды | есть у любой VM и хоста | в тенанте — только по managed-сервисам |
-| Поиск нужного счётчика | выбрать из списка мышью | написать запрос на PromQL |
-| Порог входа | час | несколько дней, PromQL надо учить |
-| Глубина, когда разобрался | ограничена набором счётчиков | ограничена тем, какие метрики и метки собираются |
+| Graphs right after installation | the Performance tab on every object | you need to enable the add-on and open Grafana |
+| Ready-made views | present for any VM and host | in the tenant — only for managed services |
+| Finding the counter you need | pick it from a list with the mouse | write a query in PromQL |
+| Barrier to entry | an hour | several days, PromQL has to be learned |
+| Depth once you've got the hang of it | limited by the set of counters | limited by which metrics and labels are collected |
 
-PromQL — это язык, и его действительно нужно учить. Первые две недели вы будете
-копировать чужие запросы и не понимать, почему график пустой. Взамен вы получаете то,
-чего в vCenter нет вовсе: возможность спросить произвольный вопрос — «покажи потребление
-подов этого приложения относительно их резерва, сгруппированное по узлам, за прошлый
-вторник» — и получить ответ, а не «такого счётчика нет».
+PromQL is a language, and it really does have to be learned. For the first two weeks you'll be
+copying other people's queries and not understanding why the graph is empty. In return you get what
+vCenter doesn't have at all: the ability to ask an arbitrary question — "show the consumption of this
+application's Pods relative to their reservation, grouped by node, for last Tuesday" — and get an
+answer, rather than "there's no such counter".

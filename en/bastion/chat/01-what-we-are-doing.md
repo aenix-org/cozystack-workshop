@@ -1,63 +1,65 @@
-## 1. Что мы вообще делаем
+## 1. What we're actually doing
 
-**Прочитайте это до первой команды. Дальше всё будет понятнее.**
+**Read this before your first command. Everything afterwards will make more sense.**
 
-### Что у вас есть сейчас
+### What you have right now
 
-Внутренний сервис «Заказы». В vSphere под него отведены **три виртуальные машины** —
-ровно так, как это обычно и выглядит:
+An internal "Orders" service. In vSphere it's given **three virtual machines** —
+exactly the way this usually looks:
 
-| Машина | Что на ней | Адрес |
+| Machine | What's on it | Address |
 |---|---|---|
-| `app` | приложение `orders-api` на Java, CentOS 7 | — |
-| `db` | PostgreSQL, поставлен вручную | `192.168.10.30` |
-| `mq` | Kafka, поставлена вручную | `192.168.10.40` |
+| `app` | the `orders-api` application in Java, CentOS 7 | — |
+| `db` | PostgreSQL, installed by hand | `192.168.10.30` |
+| `mq` | Kafka, installed by hand | `192.168.10.40` |
 
-Приложение написано на Spring Boot, работает как обычная служба systemd, настройки лежат
-в `/etc/orders/application.properties`. И вот там — самое интересное:
+The application is written in Spring Boot, runs as an ordinary systemd service, and its
+settings live in `/etc/orders/application.properties`. And that's where it gets interesting:
 
 ```properties
 spring.datasource.url=jdbc:postgresql://192.168.10.30:5432/orders
 spring.kafka.bootstrap-servers=192.168.10.40:9092
 ```
 
-**Адреса прописаны намертво.** Не имена — цифры. Кто-то однажды поднял три машины,
-вписал IP в конфиг, и с тех пор эти три числа держат всю инсталляцию. Поменяется подсеть —
-приложение встанет. Переедет база на другой хост — надо лезть в файл руками и
-перезапускать службу.
+**The addresses are hard-wired.** Not names — numbers. Someone once stood up three machines,
+typed the IPs into the config, and ever since those three numbers have held the whole
+installation together. Change the subnet and the application falls over. Move the database to
+another host and you have to open the file by hand and restart the service.
 
-Если вы сейчас узнали свою инфраструктуру — да, так у всех.
+If you just recognized your own infrastructure — yes, it's like that for everyone.
 
-### Что мы будем с этим делать
+### What we're going to do about it
 
-Везём **только `app`**. Две остальные машины не едут никуда — вместо них берём готовые
-Postgres и Kafka из каталога Cozystack.
+We move **only `app`**. The other two machines don't go anywhere — in their place we take
+ready-made Postgres and Kafka from the Cozystack catalog.
 
-Разница принципиальная. Перевезти все три виртуалки вы могли бы и без нас — получили бы
-тот же самый зоопарк, только на новом железе. Тот же Postgres, который поставили в 2019-м,
-который никто не обновляет и который никто не бэкапит, потому что «там же скрипт был».
-Управляемый сервис приезжает с репликацией, бэкапами и мониторингом, и вы про него больше
-не думаете.
+The difference is fundamental. You could move all three VMs without us — and you'd end up with
+the same menagerie, just on new hardware. The same Postgres you installed back in 2019, that
+nobody updates and nobody backs up, because "there was a script for that, wasn't there." A
+managed service arrives with replication, backups and monitoring, and you stop thinking about
+it altogether.
 
-**Данные при этом теряться не должны** — заказы за все годы нужно перенести в новую базу.
-Это отдельный шаг, и он в реальной миграции самый нервный.
+**And no data may be lost in the process** — the orders from all these years have to be moved
+into the new database. That's a separate step, and in a real migration it's the most
+nerve-wracking one.
 
-Вот эта разница — «перевезли зоопарк» против «перевезли приложение, а зоопарк выбросили» —
-и есть содержание воркшопа.
+That difference — "moved the menagerie" versus "moved the application and threw the menagerie
+out" — is what this workshop is about.
 
-Дорога состоит из трёх фаз.
+The road has three phases.
 
-**Фаза 1 — вывозим образ.** Диск виртуальной машины из vSphere нужно превратить в формат,
-который понимает Cozystack, и положить куда-то, откуда кластер его заберёт. Это шаги 1–3.
+**Phase 1 — get the image out.** The virtual machine's disk from vSphere needs to be turned
+into a format Cozystack understands, and put somewhere the cluster can pull it from. These are
+steps 1–3.
 
-**Фаза 2 — заводим машину на новом месте.** Из вывезенного образа поднимаем виртуалку уже
-в Cozystack и приводим её в чувство: у неё не будет сети, потому что железо вокруг стало
-другим. Это шаги 4 и 6.
+**Phase 2 — bring the machine up in its new home.** From the exported image we stand up a VM,
+now in Cozystack, and bring it back to its senses: it won't have a network, because the
+hardware around it has changed. These are steps 4 and 6.
 
-**Фаза 3 — выбрасываем зоопарк.** Заводим Postgres и Kafka из каталога, **переносим данные
-из старой базы**, перенастраиваем приложение с прибитых IP на нормальные имена. Это шаги
-5, 7, 8, 9.
+**Phase 3 — throw the menagerie out.** We stand up Postgres and Kafka from the catalog, **move
+the data out of the old database**, and reconfigure the application away from nailed-down IPs
+onto proper names. These are steps 5, 7, 8, 9.
 
-> **Если вы не работали с Kubernetes — это нормально, так и задумано.** Все термины
-> объясняются по ходу, а следующим сообщением идёт словарик, где всё это переведено на
-> язык vSphere.
+> **If you've never worked with Kubernetes — that's fine, it's by design.** Every term is
+> explained as we go, and the next message is a little glossary where all of it is translated
+> into the language of vSphere.

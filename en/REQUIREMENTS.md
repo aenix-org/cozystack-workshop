@@ -1,44 +1,44 @@
-# Требования к стенду
+# Environment requirements
 
-Для тех, кто разворачивает окружение под воркшоп или под самостоятельное прохождение
-лаб. Участникам этот файл не нужен.
+For anyone setting up the environment for the workshop, or for working through the
+labs on their own. Participants don't need this file.
 
-## Квота тенанта
+## Tenant quota
 
-**Не меньше 40 процессоров и 48 ГБ памяти на тенанта.**
+**At least 40 CPUs and 48 GB of memory per tenant.**
 
-Причина в том, как считается квота на запросы: она равна десятой части от лимита.
-Тенанту с `cpu: 16` достаётся 1600m запросов — а один учебный кластер из лабы 0 занимает
-около 1435m. На управляемые сервисы из лаб 6–12 не остаётся ничего, при этом лаба 0
-прямо просит кластер не удалять.
+The reason is how the request quota is calculated: it equals one tenth of the limit.
+A tenant with `cpu: 16` gets 1600m of requests — while a single lab cluster from lab 0
+takes up about 1435m. That leaves nothing for the managed services in labs 6–12, and
+lab 0 explicitly asks you not to delete the cluster.
 
-Симптом при нехватке: `exceeded quota: tenant-quota` в событиях и кластер, навсегда
-застрявший в статусе `Unknown`. Сам он из этого состояния не выйдет.
+The symptom when you run short: `exceeded quota: tenant-quota` in the events, and a
+cluster stuck forever in status `Unknown`. It will not come out of that state on its own.
 
-## Создание тенантов
+## Creating tenants
 
-**По одному, а не пачкой.**
+**One at a time, not in a batch.**
 
-Несколько одновременных созданий с включённым хранилищем и мониторингом забивают очередь
-helm-controller: релизы уходят в цикл «установка — отказ — удаление» с десятиминутными
-таймаутами. Диагностируется по `observedGeneration: -1` у зависшего HelmRelease.
+Several simultaneous creations with storage and monitoring enabled clog the helm-controller
+queue: releases fall into an install–fail–delete cycle with ten-minute timeouts. You
+diagnose it by `observedGeneration: -1` on the stuck HelmRelease.
 
-То же касается удаления: тенант с кластером внутри снимается минутами, потому что
-cleanup-джоба ждёт, пока освободятся виртуальные машины воркеров.
+The same goes for deletion: a tenant with a cluster inside takes minutes to tear down,
+because the cleanup job waits for the worker virtual machines to be released.
 
-## Что должно быть включено в тенанте
+## What must be enabled in the tenant
 
-| Что | Зачем | Лабы |
+| What | Why | Labs |
 |---|---|---|
-| etcd | Без него не поднимется кластер из лабы 0 | все |
-| Хранилище (SeaweedFS) | Бакеты и Harbor | 6, 11 |
-| Мониторинг | Метрики и дашборды | 3, 14 |
+| etcd | Without it the cluster from lab 0 won't come up | all |
+| Storage (SeaweedFS) | Buckets and Harbor | 6, 11 |
+| Monitoring | Metrics and dashboards | 3, 14 |
 
-`metrics-server` ставится автоматически, если у тенанта есть etcd, — отдельно включать
-его не нужно. Живёт он в namespace `cozy-monitoring`, но частью аддона мониторинга
-не является.
+`metrics-server` is installed automatically if the tenant has etcd — you don't need to
+enable it separately. It lives in the `cozy-monitoring` namespace, but it isn't part of
+the monitoring add-on.
 
-## Версия платформы
+## Platform version
 
-Лабы писались и проверялись на **Cozystack v1.6.1**. На более ранних версиях часть
-позиций каталога называется иначе или имеет другой набор полей.
+The labs were written and verified on **Cozystack v1.6.1**. On earlier versions some
+catalog entries have a different name or a different set of fields.

@@ -1,130 +1,129 @@
-# Лаба 9 · Аналитика на миллионе строк
+# Lab 9 · Analytics over a million rows
 
 | | |
 |---|---|
-| **Время** | 45 минут |
-| **Что доказывает** | Отчёт по миллиону записей считается за миллисекунды, и заводится это за десять минут |
-| **Что понадобится** | Кластер из лабы 0 и `~/lab.kubeconfig`; доступ в дашборд своего тенанта; номер тенанта вида `workshopXX`, умение читать SQL |
+| **Time** | 45 minutes |
+| **What it proves** | A report over a million records is computed in milliseconds, and setting it up takes ten minutes |
+| **What you'll need** | The cluster from lab 0 and `~/lab.kubeconfig`; access to your tenant's dashboard; a tenant number of the form `workshopXX`; the ability to read SQL |
 
-> ⚠️ **Плотная лаба и требует чтения SQL. Не ставьте её сразу после лабы 8.**
+> ⚠️ **A dense lab that requires reading SQL. Don't schedule it right after lab 8.**
 
-## Зачем это
+## Why this matters
 
-Сервис «Пропуск» работает уже полгода. Пришло руководство с вопросом, который звучит
-безобидно:
+The "Pass" service has been running for six months now. Management shows up with a question
+that sounds harmless:
 
-> Сколько гостей у нас бывает в месяц, растёт это или падает, и в какие часы очередь на
-> проходной? Хотим смотреть раз в месяц, а лучше каждый день.
+> How many guests do we get a month, is it going up or down, and what hours is there a queue at
+> the entrance? We'd like to look once a month, ideally every day.
 
-В базе, где живут сами пропуска, таких данных нет — там текущие заявки, а не история за
-годы. История есть в журнале проходов: каждая отметка турникета за всё время работы. Это
-уже миллион строк, и будет расти.
+The database where the passes themselves live doesn't hold that — it has current requests, not
+years of history. The history lives in the entry log: every turnstile swipe over the whole time
+the service has run. That's already a million rows, and it will keep growing.
 
-Дальше начинается знакомое. Кто-то пишет запрос с `GROUP BY` к рабочей базе, запрос
-идёт две минуты и кладёт сервис пропусков на эти две минуты. Кто-то предлагает выгружать
-в Excel — и упирается в лимит строк. Кто-то заводит ночную выгрузку в отдельную базу,
-и через полгода никто не помнит, почему цифры в отчёте расходятся с реальностью.
+Then the familiar begins. Someone writes a `GROUP BY` query against the production database; it
+runs for two minutes and takes the pass service down for those two minutes. Someone suggests
+exporting to Excel — and hits the row limit. Someone sets up a nightly export into a separate
+database, and six months later no one remembers why the numbers in the report disagree with reality.
 
-Правильный ответ — **отдельная база под аналитику, устроенная иначе**. Не «такая же, но
-на другом сервере», а другая по внутреннему устройству. В этой лабе мы заведём
-ClickHouse, положим в него миллион записей о проходах и посмотрим, за сколько считается
-отчёт.
+The right answer is **a separate database for analytics, built differently**. Not "the same one,
+but on another server," but different on the inside. In this lab we'll spin up ClickHouse, load a
+million entry records into it, and see how long the report takes to compute.
 
-Заодно разберёмся, **почему колоночная база быстра на аналитике и медленна на точечных
-операциях** — потому что второе так же важно, как первое, и незнание про второе приводит
-к тому, что ClickHouse ставят туда, где он не нужен.
+Along the way we'll work out **why a columnar database is fast at analytics and slow at pinpoint
+operations** — because the second half matters as much as the first, and not knowing it is exactly
+what leads people to put ClickHouse where it isn't needed.
 
-Каждый термин этой лабы расшифровывается при первом появлении, а следующий раздел —
-словарик уже введённых.
+Every term in this lab is explained the first time it appears, and the next section is a glossary
+of the ones already introduced.
 
-## Словарик
+## Glossary
 
-| Термин | Что это | Похоже на… но |
+| Term | What it is | Like… but |
 |---|---|---|
-| **OLAP** | Нагрузка «мало запросов, но каждый читает миллионы строк» | **Отчёт из vRealize за квартал**, но разрез придумывают в момент вопроса, а не закладывают заранее |
-| **Колоночная СУБД** | Хранит каждое поле отдельным потоком | **Прямого аналога нет**, но читает только запрошенные поля. Точечное изменение при этом дорогое |
-| **ClickHouse** | Колоночная СУБД, здесь — управляемый сервис из каталога | это не замена PostgreSQL, а дополнение к нему |
-| **MergeTree** | Основной способ хранения таблиц в ClickHouse | данные лежат кусками, куски периодически сливаются в большие |
-| **Сортировочный ключ (`ORDER BY`)** | По какому порядку разложены данные внутри кусков | **Порядок файлов на диске**, но это единственный настоящий «индекс». Он один на таблицу, и его выбирают заранее |
-| **HTTP-интерфейс** | Способ разговаривать с ClickHouse обычным HTTP-запросом | запрос уходит текстом в теле POST, ответ приходит таблицей |
+| **OLAP** | A workload of "few queries, but each one reads millions of rows" | **A quarterly vRealize report**, but the breakdown is invented at the moment the question is asked, not planned in advance |
+| **Columnar DBMS** | Stores each field as a separate stream | **No direct analog**, but it reads only the fields you ask for. Changing a single value, though, is expensive |
+| **ClickHouse** | A columnar DBMS; here, a managed service from the catalog | not a replacement for PostgreSQL but a complement to it |
+| **MergeTree** | The main way tables are stored in ClickHouse | data sits in parts, and parts are periodically merged into larger ones |
+| **Sorting key (`ORDER BY`)** | The order in which data is laid out within parts | **The order of files on disk**, but it's the only real "index." There's one per table, and you choose it in advance |
+| **HTTP interface** | A way to talk to ClickHouse with an ordinary HTTP request | the query goes out as text in the body of a POST, the answer comes back as a table |
 
-Остальные слова этой лабы — OLTP, Строчная СУБД, Кусок (part), Мутация, Шард, Реплика, Keeper —
-вводятся по ходу, в том шаге, где впервые понадобятся. Заучивать их сейчас не нужно: в отрыве от
-действия они не запомнятся.
+The rest of this lab's terms — OLTP, row-based DBMS, part, mutation, shard, replica, Keeper —
+are introduced as we go, in the step where they're first needed. There's no need to memorize them
+now: divorced from the action they won't stick.
 
 <details>
-<summary><b>Если хотите увидеть весь список сразу</b></summary>
+<summary><b>If you'd rather see the whole list at once</b></summary>
 
-| Термин | Что это | Похоже на… но |
+| Term | What it is | Like… but |
 |---|---|---|
-| **OLTP** | Нагрузка «много мелких операций»: создать заявку, поменять статус | **Работа vCenter со своей базой**, но каждая операция трогает единицы строк, зато их много |
-| **Строчная СУБД** | Хранит записи целиком, строка за строкой | **Файлы на датасторе: каждый лежит целиком**, но именно поэтому строку легко поменять и трудно быстро просуммировать колонку |
-| **Кусок (part)** | Порция данных на диске, получившаяся из одной вставки | их не трогают руками, но их количество и размер объясняют поведение |
-| **Мутация** | Отложенное изменение или удаление строк | не выполняется на месте: переписывает куски целиком, в фоне |
-| **Шард** | Часть данных на отдельном наборе серверов | про объём, а не про надёжность |
-| **Реплика** | Полная копия данных | **Реплика датастора**, но про надёжность, а не про объём |
-| **Keeper** | Служба, через которую копии договариваются между собой | **Кворумный диск**, но нужен только когда копий больше одной |
+| **OLTP** | A workload of "many small operations": create a request, change a status | **vCenter working with its own database**, but each operation touches a handful of rows — there are just a lot of them |
+| **Row-based DBMS** | Stores records whole, row after row | **Files on a datastore: each one sits whole**, but that's exactly why a row is easy to change and a column is hard to sum quickly |
+| **Part** | A chunk of data on disk produced by a single insert | you don't touch them by hand, but their number and size explain the behavior |
+| **Mutation** | A deferred change or deletion of rows | it isn't done in place: it rewrites whole parts, in the background |
+| **Shard** | A portion of the data on a separate set of servers | about volume, not about reliability |
+| **Replica** | A full copy of the data | **A datastore replica**, but about reliability, not volume |
+| **Keeper** | The service through which copies coordinate among themselves | **A quorum disk**, but needed only when there's more than one copy |
 
 </details>
 
-## Что лежит в папке лабы
+## What's in the lab folder
 
-Все файлы уже у вас — вы забрали их вместе с репозиторием. Создавать и печатать заново
-ничего не нужно: там, где ниже написано `kubectl apply -f имя.yaml`, файл берётся отсюда.
+You already have all the files — you got them with the repository. There's nothing to create or
+retype: wherever it says `kubectl apply -f name.yaml` below, the file comes from here.
 
 ```bash
 cd labs/09-clickhouse
 ```
 
-| Файл | Что это | Когда пригодится |
+| File | What it is | When you'll use it |
 |---|---|---|
-| `clickhouse.yaml` | Заказ аналитической базы — то же, что кнопка в дашборде | применяете **в тенанте**, не в кластере `lab` |
-| `01-schema.sql` | Таблица под события прохода | выполняете в базе |
-| `02-generate.sql` | Генерация миллиона строк, чтобы было что считать | выполняете следом |
-| `03-report.sql` | Тот самый отчёт «сколько гостей и когда пики» | выполняете последним |
-| `check.sh` | Проверка, что отчёт считается по-настоящему и за разумное время | запускаете в конце лабы |
+| `clickhouse.yaml` | The order for an analytics database — the same as the button in the dashboard | you apply it **in the tenant**, not in the `lab` cluster |
+| `01-schema.sql` | The table for entry events | you run it in the database |
+| `02-generate.sql` | Generation of a million rows, so there's something to compute | you run it next |
+| `03-report.sql` | The report itself — "how many guests and when the peaks are" | you run it last |
+| `check.sh` | A check that the report really computes, and in a reasonable time | you run it at the end of the lab |
 
-## Шаг 1. Заказываем ClickHouse
+## Step 1. Order ClickHouse
 
-📍 **Где:** в браузере, в дашборде Cozystack, в своём тенанте.
+📍 **Where:** in the browser, in the Cozystack dashboard, in your tenant.
 
-Тенант → **Создать приложение** → `ClickHouse`.
+Tenant → **Create application** → `ClickHouse`.
 
-| Поле | Значение | Почему так |
+| Field | Value | Why |
 |---|---|---|
-| Имя | `analytics` | коротко, дальше его придётся набирать в адресах |
-| Replicas | **1** | учебный стенд. Это копии **сервера**, а не данных — см. предупреждение ниже |
-| Shards | **1** | миллион строк — это мало. Шардируют, когда данные не помещаются на один сервер |
-| Size | `5Gi` | миллион строк займёт единицы мегабайт, остальное — запас |
-| Log storage size | `2Gi` | том под текстовые логи самого сервера, `/var/log/clickhouse-server` |
-| Log TTL | `15` | журнал запросов старше пятнадцати дней выбрасывается |
-| Storage class | `replicated` | данные лягут в трёх копиях на разные узлы |
-| Resources preset | `u1.small` | 1 процессор, 4 ГБ. Группировки считаются в памяти |
-| Users | пользователь `analyst`, пароль придумайте | под этим пользователем будем работать |
-| ClickHouse Keeper → enabled | **выключить** | Keeper согласовывает копии между собой. Копия одна — согласовывать не с кем |
+| Name | `analytics` | short — you'll be typing it into addresses later |
+| Replicas | **1** | a training testbed. These are copies of the **server**, not of the data — see the warning below |
+| Shards | **1** | a million rows is little. You shard when the data won't fit on one server |
+| Size | `5Gi` | a million rows takes a few megabytes; the rest is headroom |
+| Log storage size | `2Gi` | the volume for the server's own text logs, `/var/log/clickhouse-server` |
+| Log TTL | `15` | the query log older than fifteen days is discarded |
+| Storage class | `replicated` | the data will land in three copies on different nodes |
+| Resources preset | `u1.small` | 1 processor, 4 GB. Groupings are computed in memory |
+| Users | user `analyst`, make up a password | this is the user we'll work as |
+| ClickHouse Keeper → enabled | **turn off** | Keeper coordinates copies among themselves. There's one copy — nothing to coordinate |
 
-> ⚠️ **Копия сервера — это не копия данных.** Поле `Replicas` поднимает несколько
-> серверов ClickHouse, но сами таблицы при этом не реплицируются: обычный `MergeTree`,
-> который мы создадим на следующем шаге, живёт на том сервере, где его создали. Поставите
-> две реплики с такой таблицей — вставки уйдут на один сервер, а запросы будут попадать
-> то на него, то на пустой соседний.
+> ⚠️ **A server copy is not a data copy.** The `Replicas` field brings up several ClickHouse
+> servers, but the tables themselves are not replicated: an ordinary `MergeTree`, which we'll
+> create in the next step, lives on the server where it was created. Set two replicas with such a
+> table and the inserts will go to one server, while queries will land now on it, now on its empty
+> neighbor.
 >
-> Чтобы данные действительно дублировались, таблицу создают как `ReplicatedMergeTree`,
-> а для координации нужен включённый Keeper. Это отдельная тема, и в учебном стенде она
-> ни к чему — но знать про эту разницу надо до того, как выставите двойку в проде.
+> For the data to actually be duplicated, you create the table as `ReplicatedMergeTree`, and
+> coordination needs Keeper turned on. That's a separate topic, and it's pointless in a training
+> testbed — but you need to know about this difference before you set a two in production.
 
-⚠️ **Пароль придумайте нормальный и запишите.** Дальше он понадобится и в командах, и в
-скрипте проверки. Посмотреть его потом можно в дашборде: приложение `analytics` →
-вкладка **Secrets** → `clickhouse-analytics-credentials`.
+⚠️ **Make up a proper password and write it down.** You'll need it later, both in commands and in
+the check script. You can look it up afterward in the dashboard: application `analytics` →
+the **Secrets** tab → `clickhouse-analytics-credentials`.
 
-⚠️ **Keeper по умолчанию включён, и это правильное умолчание.** Как только копий больше
-одной, им нужно место, где договариваться, кто что записал. У нас копия одна, а три
-копии Keeper заняли бы ресурсы стенда впустую. Если в вашей форме этой галочки не видно —
-раскройте раздел с дополнительными параметрами.
+⚠️ **Keeper is on by default, and that's the right default.** As soon as there's more than one
+copy, they need a place to agree on who wrote what. We have one copy, and three Keeper copies would
+waste the testbed's resources for nothing. If you don't see this checkbox in your form, expand the
+section with the additional parameters.
 
-### То же самое текстом — и разбор полей
+### A closer look: what's inside clickhouse.yaml
 
-В папке лабы лежит `clickhouse.yaml`:
+The lab folder contains `clickhouse.yaml`:
 
 ```yaml
 apiVersion: apps.cozystack.io/v1alpha1
@@ -142,176 +141,175 @@ spec:
   resourcesPreset: u1.small
   users:
     analyst:
-      password: ЗдесьВашПароль
+      password: YourPasswordHere
   backup:
     enabled: false
   clickhouseKeeper:
     enabled: false
 ```
 
-`apiVersion: apps.cozystack.io/v1alpha1` — каталог Cozystack с той стороны, откуда его
-видно как API. Дашборд при нажатии кнопки собирает ровно такой объект.
+`apiVersion: apps.cozystack.io/v1alpha1` — the Cozystack catalog seen from the side where it looks
+like an API. When you click the button, the dashboard assembles exactly this object.
 
-`namespace: tenant-workshopXX` — **управляемые сервисы живут в вашем тенанте на
-управляющем кластере, а не в лабораторном кластере из лабы 0.** Это два разных кластера,
-и об этом придётся помнить весь остаток лабы.
+`namespace: tenant-workshopXX` — **managed services live in your tenant on the management cluster,
+not in the lab cluster from lab 0.** These are two different clusters, and you'll have to keep that
+in mind for the rest of the lab.
 
-`shards` и `replicas` — две разные вещи, которые постоянно путают. **Шарды про объём:**
-данные делятся между наборами серверов, каждый хранит свою часть. **Реплики про
-надёжность:** каждая хранит всё целиком. Миллион строк — это единицы мегабайт, шардировать
-нечего.
+`shards` and `replicas` are two different things people constantly confuse. **Shards are about
+volume:** the data is split among sets of servers, each holding its own part. **Replicas are about
+reliability:** each holds everything in full. A million rows is a few megabytes — there's nothing
+to shard.
 
-`users` — карта пользователей. ClickHouse заведёт `analyst` с указанным паролем и
-положит его в секрет `clickhouse-analytics-credentials`, который видно в дашборде.
+`users` — a map of users. ClickHouse will create `analyst` with the given password and put it in
+the Secret `clickhouse-analytics-credentials`, which is visible in the dashboard.
 
-⚠️ Рядом с вашим пользователем в этом секрете появится ещё один — `backup`. Его чарт
-заводит сам, под механизм резервных копий. Трогать его не нужно.
+⚠️ Alongside your user, another one will appear in this Secret — `backup`. The chart creates it
+itself, for the backup mechanism. You don't need to touch it.
 
-`backup.enabled: false` — резервные копии в лабе не нужны. В проде это первое, что
-включают.
+`backup.enabled: false` — backups aren't needed in the lab. In production it's the first thing you
+turn on.
 
-`clickhouseKeeper.enabled: false` — см. выше про одну копию.
+`clickhouseKeeper.enabled: false` — see above, about the single copy.
 
-Применяется этот файл **не в лабораторный кластер**, а в тенант:
+This file is applied **not to the lab cluster** but to the tenant:
 
 ```bash
-# --kubeconfig указывает файл доступа явно и перекрывает переменную KUBECONFIG.
-# Поэтому заказ уходит в тенант на управляющем кластере, а не в учебный кластер.
+# --kubeconfig names the access file explicitly and overrides the KUBECONFIG variable.
+# So the order goes to the tenant on the management cluster, not to the lab cluster.
 kubectl --kubeconfig ~/.kube/config apply -f clickhouse.yaml
 ```
 
-Управляющий доступ к тенанту на этой виртуалке уже настроен — файл `~/.kube/config`
-(токеновый, браузер не открывается). Доставать и сохранять ничего не нужно.
+Management access to the tenant is already set up on this bastion — the file `~/.kube/config`
+(token-based, no browser opens). There's nothing to fetch or save.
 
-Дождитесь готовности. Это две-четыре минуты: поднимается сервер, создаётся том,
-заводится пользователь.
+Wait until it's ready. That's two to four minutes: the server comes up, the volume is created, the
+user is set up.
 
-## Шаг 2. Заводим рабочий под
+## Step 2. Set up a working Pod
 
-📍 **Где:** на виртуалке, в лабораторном кластере.
+📍 **Where:** on the bastion, in the lab cluster.
 
-Здесь надо остановиться и понять расстановку.
+Here we need to stop and understand the layout.
 
-**Под** — наименьшая единица запуска в Kubernetes: один или несколько контейнеров,
-которые всегда живут и умирают вместе. Ближайший аналог из vSphere — виртуальная машина,
-только без своей операционной системы и без своего диска. Дальше это слово встречается
-постоянно.
+**A Pod** is the smallest unit of execution in Kubernetes: one or more containers that always live
+and die together. The closest analog from vSphere is a virtual machine, only without its own
+operating system and without its own disk. From here on this word comes up constantly.
 
-**ClickHouse живёт в вашем тенанте на управляющем кластере.** Ваша роль в тенанте
-позволяет заказывать и удалять сервисы, но не запускать там свои поды и не пробрасывать
-порты. Это не поломка, а граница.
+**ClickHouse lives in your tenant on the management cluster.** Your role in the tenant lets you
+order and delete services, but not run your own Pods there or forward ports. This isn't a breakage
+but a boundary.
 
-**Ваша рабочая площадка — лабораторный кластер из лабы 0.** Оттуда мы и будем ходить в
-ClickHouse по внутреннему адресу:
+**Your work area is the lab cluster from lab 0.** That's where we'll reach ClickHouse from, over
+its internal address:
 
 ```
 chendpoint-clickhouse-analytics.tenant-workshopXX.svc.cozy.local:8123
 ```
 
-Разберём имя по частям:
+Let's break the name down into parts:
 
-| Часть | Что означает |
+| Part | What it means |
 |---|---|
-| `chendpoint-` | приставка, которую добавляет оператор ClickHouse к своему сервису |
-| `clickhouse-` | приставка, которую каталог Cozystack добавляет к имени приложения |
-| `analytics` | имя, которое вы задали в дашборде |
-| `tenant-workshopXX` | ваш тенант. Подставьте свой номер |
-| `svc.cozy.local` | зона внутренних имён управляющего кластера |
-| `8123` | порт HTTP-интерфейса. Есть ещё 9000 — для родного протокола |
+| `chendpoint-` | a prefix the ClickHouse operator adds to its service |
+| `clickhouse-` | a prefix the Cozystack catalog adds to the application name |
+| `analytics` | the name you set in the dashboard |
+| `tenant-workshopXX` | your tenant. Substitute your own number |
+| `svc.cozy.local` | the internal-name zone of the management cluster |
+| `8123` | the HTTP interface port. There's also 9000 — for the native protocol |
 
-Поднимаем рабочий под. Подставьте свой номер тенанта и свой пароль:
+Bring up the working Pod. Substitute your tenant number and your password:
 
 ```bash
-# Дальше всё происходит в учебном кластере, поэтому переключаем на него kubectl.
+# Everything from here happens in the lab cluster, so we switch kubectl to it.
 export KUBECONFIG=~/lab.kubeconfig
-# run создаёт один под из указанного образа — одноразовую машинку внутри кластера.
-# В образе лежит curl, и этого хватит: отдельный клиент ClickHouse не понадобится.
-#   --restart=Never  не поднимать заново, когда команда внутри завершится
-#   --env=CH_URL     адрес HTTP-интерфейса хранилища; слеш на конце обязателен
-#   --env=CH_AUTH    пара «пользователь:пароль» для обычной HTTP-аутентификации
-#   --command --     всё, что после двух дефисов, — команда, которую под выполнит
-# sleep 86400 = «ничего не делай сутки»: под нужен только как рабочее место.
+# run creates a single Pod from the given image — a disposable little machine inside the cluster.
+# The image ships curl, and that's enough: a separate ClickHouse client won't be needed.
+#   --restart=Never  don't bring it up again when the command inside finishes
+#   --env=CH_URL     the address of the storage's HTTP interface; the trailing slash is required
+#   --env=CH_AUTH    the "user:password" pair for ordinary HTTP authentication
+#   --command --     everything after the two dashes is the command the Pod will run
+# sleep 86400 = "do nothing for a day": the Pod is needed only as a workspace.
 kubectl run ch-workbench \
   --image=curlimages/curl:8.11.1 \
   --restart=Never \
   --env=CH_URL="http://chendpoint-clickhouse-analytics.tenant-workshopXX.svc.cozy.local:8123/" \
-  --env=CH_AUTH="analyst:ЗдесьВашПароль" \
+  --env=CH_AUTH="analyst:YourPasswordHere" \
   --command -- sleep 86400
-# wait держит терминал, пока под не запустится, но не дольше двух минут.
+# wait holds the terminal until the Pod starts, but no longer than two minutes.
 kubectl wait --for=condition=Ready pod/ch-workbench --timeout=120s
 ```
 
-**Почему адрес и пароль переменными пода, а не прямо в команде.** Всё, что вы наберёте в
-`kubectl exec`, попадёт в историю вашей оболочки и в список процессов на узле. Переменные
-пода задаются один раз, и дальше пароль в командах не появляется.
+**Why the address and password are Pod variables rather than inline in the command.** Everything
+you type into `kubectl exec` ends up in your shell's history and in the process list on the node.
+The Pod's variables are set once, and after that the password never appears in commands.
 
-⚠️ **Полностью проблему это не решает, и честнее сказать сразу.** Значение, переданное
-через `--env`, остаётся в описании пода: его видит любой, у кого есть право читать поды в
-вашем пространстве имён, оно лежит в базе кластера и попадает в журнал аудита. Для
-учебного стенда это приемлемо, для боевого — нет: там пароль кладут в отдельный объект
-кластера (`Secret` — объект, предназначенный для чувствительных значений) и подключают
-ссылкой на него, а сам объект наполняют из хранилища секретов. Этим занята лаба про
-секреты.
+⚠️ **This doesn't solve the problem completely, and it's more honest to say so up front.** A value
+passed through `--env` stays in the Pod's description: it's visible to anyone with the right to
+read Pods in your namespace, it sits in the cluster's database, and it lands in the audit log. For
+a training testbed that's acceptable; for a production one it isn't: there the password goes into a
+separate cluster object (`Secret` — an object meant for sensitive values) and is attached by a
+reference to it, while the object itself is filled from a secrets store. That's what the lab on
+secrets is about.
 
-Теперь заведём короткую команду, чтобы не набирать `curl` каждый раз. Сначала разберём,
-из чего она состоит.
+Now let's set up a short command so we don't have to type `curl` every time. First let's take apart
+what it's made of.
 
 <details>
-<summary><b>Разбираем эту команду по частям</b></summary>
+<summary><b>Taking this command apart, piece by piece</b></summary>
 
-`kubectl exec -i ch-workbench` — выполнить что-то внутри рабочего пода. Флаг `-i`
-пробрасывает внутрь стандартный ввод: без него запрос до ClickHouse не доедет.
+`kubectl exec -i ch-workbench` — run something inside the working Pod. The `-i` flag forwards
+standard input inside: without it the query won't make it to ClickHouse.
 
-`sh -c '…'` в одинарных кавычках — строка передаётся внутрь как есть, и `$CH_AUTH`
-раскрывается **внутри пода**, из переменной пода. Ваш виртуалку этих значений не видит и в
-историю команд их не пишет.
+`sh -c '…'` in single quotes — the string is passed inside as is, and `$CH_AUTH` is expanded
+**inside the Pod**, from the Pod's variable. Your bastion doesn't see these values and doesn't
+write them into command history.
 
-`curl -sS` — тихо, но об ошибках сообщать. `-s` убирает индикатор загрузки, `-S`
-возвращает сообщения об ошибках, которые `-s` иначе съел бы.
+`curl -sS` — quietly, but do report errors. `-s` removes the progress indicator, `-S` brings back
+the error messages that `-s` would otherwise swallow.
 
-`-u "$CH_AUTH"` — имя пользователя и пароль. ClickHouse принимает обычную HTTP-аутентификацию.
+`-u "$CH_AUTH"` — the username and password. ClickHouse accepts ordinary HTTP authentication.
 
-`--data-binary @-` — «возьми тело запроса со стандартного ввода как есть». Именно так
-SQL попадает в ClickHouse: **запрос — это тело обычного POST-запроса**, а не какой-то
-особый протокол. Отсюда следствие: чтобы сходить в ClickHouse, не нужен драйвер. Хватит
-`curl`, и это часто выручает при разборе проблем.
+`--data-binary @-` — "take the request body from standard input as is." This is exactly how SQL
+gets into ClickHouse: **the query is the body of an ordinary POST request**, not some special
+protocol. Hence a corollary: to reach ClickHouse you don't need a driver. `curl` is enough, and
+that often helps when you're troubleshooting.
 
-`?default_format=PrettyCompact` — в каком виде вернуть ответ. `PrettyCompact` — таблица
-для человека. Форматов больше тридцати; ниже нам понадобится `JSON`.
+`?default_format=PrettyCompact` — the form in which to return the answer. `PrettyCompact` is a
+table for a human. There are more than thirty formats; below we'll need `JSON`.
 
 </details>
 
 ```bash
-# Задаём ch — короткое имя для длинной команды. Дальше «ch» означает: отправь в
-# ClickHouse тот SQL, который придёт на стандартный ввод, и покажи ответ таблицей.
-# Имя живёт до закрытия этого окна терминала; в новом окне задайте его заново.
+# We define ch — a short name for a long command. From here "ch" means: send to
+# ClickHouse the SQL that arrives on standard input, and show the answer as a table.
+# The name lives until you close this terminal window; in a new window define it again.
 ch() {
   kubectl exec -i ch-workbench -- sh -c \
     'curl -sS -u "$CH_AUTH" --data-binary @- "$CH_URL?default_format=PrettyCompact"'
 }
 ```
 
-Проверяем связь:
+Let's check the connection:
 
 ```bash
-# echo печатает строку, | передаёт её на вход ch. SELECT version() — самый дешёвый
-# запрос из возможных: сервер ничего не читает с диска, а только называет свою версию.
+# echo prints a string, | passes it to ch's input. SELECT version() is the cheapest
+# query possible: the server reads nothing from disk, it just names its version.
 echo 'SELECT version()' | ch
 ```
 
-**Что вы должны увидеть** — номер версии ClickHouse в рамочке.
+**What you should see** — the ClickHouse version number in a little frame.
 
-⚠️ **Если команда молчит или падает с `Could not resolve host` / `Connection refused`** —
-дальше идти бессмысленно. Частые причины по убыванию вероятности: не подставили свой
-номер вместо `workshopXX`; приложение в дашборде ещё не готово; опечатка в имени сервиса.
-Если ответ `Authentication failed` — связь есть, а пароль не тот: пересоздайте под с
-правильным `CH_AUTH`.
+⚠️ **If the command is silent or fails with `Could not resolve host` / `Connection refused`** —
+there's no point going further. Common causes, in decreasing order of likelihood: you didn't
+substitute your own number for `workshopXX`; the application in the dashboard isn't ready yet; a
+typo in the service name. If the answer is `Authentication failed`, the connection is there but the
+password is wrong: recreate the Pod with the right `CH_AUTH`.
 
-Пользователи Windows PowerShell, ваш вариант:
+Windows PowerShell users, your version:
 
 ```powershell
-# $input — то, что пришло в функцию по конвейеру слева.
-# Обратный апостроф в конце строки переносит команду на следующую строку.
+# $input — what came into the function through the pipeline on the left.
+# The backtick at the end of a line continues the command onto the next line.
 function ch {
   $input | kubectl exec -i ch-workbench -- sh -c `
     'curl -sS -u "$CH_AUTH" --data-binary @- "$CH_URL?default_format=PrettyCompact"'
@@ -319,91 +317,89 @@ function ch {
 "SELECT version()" | ch
 ```
 
-## Шаг 3. Создаём таблицу журнала проходов
+## Step 3. Create the entry-log table
 
-📍 **Где:** на виртуалке, в лабораторном кластере.
+📍 **Where:** on the bastion, in the lab cluster.
 
-Заводим таблицу под журнал проходов: по строке на каждую отметку турникета. Файл
-`01-schema.sql` лежит в папке лабы, и прочитать его стоит до применения — две строки
-в нём определяют, какие запросы потом окажутся быстрыми, а какие нет.
+We set up a table for the entry log: one row per turnstile swipe. The file `01-schema.sql` is in
+the lab folder, and it's worth reading before you apply it — two lines in it determine which
+queries will turn out fast later and which won't.
 
 <details>
-<summary><b>Разбираем схему построчно</b></summary>
+<summary><b>Walking through the schema line by line</b></summary>
 
 ```sql
--- IF NOT EXISTS — не ругаться, если таблица уже создана. Файл можно применить дважды.
+-- IF NOT EXISTS — don't complain if the table already exists. The file can be applied twice.
 CREATE TABLE IF NOT EXISTS passes
 (
-    pass_id      UInt64,                 -- номер пропуска
-    created_at   DateTime,               -- когда человек прошёл турникет
-    guest_name   String,                 -- имя гостя: у каждого своё
-    host_dept    LowCardinality(String), -- отдел принимающего: значений мало
-    entrance     LowCardinality(String), -- проходная: их три
-    pass_type    LowCardinality(String), -- разовый, на неделю, на автомобиль
-    duration_min UInt16                  -- сколько минут гость пробыл внутри
+    pass_id      UInt64,                 -- the pass number
+    created_at   DateTime,               -- when the person went through the turnstile
+    guest_name   String,                 -- the guest's name: everyone's is their own
+    host_dept    LowCardinality(String), -- the host's department: few values
+    entrance     LowCardinality(String), -- the entrance: there are three
+    pass_type    LowCardinality(String), -- one-time, weekly, vehicle
+    duration_min UInt16                  -- how many minutes the guest stayed inside
 )
-ENGINE = MergeTree               -- как хранить: куски на диске, слияние в фоне
-ORDER BY (created_at, entrance)  -- в каком порядке класть данные; он же индекс
+ENGINE = MergeTree               -- how to store: parts on disk, merging in the background
+ORDER BY (created_at, entrance)  -- what order to put the data in; also the index
 ```
 
-`UInt64`, `UInt16` — беззнаковые целые на 8 и на 2 байта. В ClickHouse размер типа
-выбирают осознанно: миллиард строк на четыре лишних байта — это четыре гигабайта. Для
-длительности в минутах двух байт хватает с запасом.
+`UInt64`, `UInt16` — unsigned integers of 8 and 2 bytes. In ClickHouse you choose the size of a
+type deliberately: a billion rows times four extra bytes is four gigabytes. For a duration in
+minutes, two bytes is more than enough.
 
-`LowCardinality(String)` — строка, у которой мало разных значений. Названий входов у нас
-три, отделов пять. ClickHouse хранит такие поля словарём: на диске лежат номера, а не
-повторённые миллион раз слова. Экономия огромная, и мы увидим её цифрами.
+`LowCardinality(String)` — a string with few distinct values. We have three entrance names and
+five departments. ClickHouse stores such fields as a dictionary: on disk there are numbers, not
+words repeated a million times. The saving is enormous, and we'll see it in figures.
 
-⚠️ **Правило такое:** до нескольких тысяч разных значений — `LowCardinality`, больше —
-обычный `String`. Обернуть в `LowCardinality` имя гостя, которое уникально почти всегда,
-означает сделать хуже: словарь станет больше самих данных.
+⚠️ **The rule is this:** up to a few thousand distinct values — `LowCardinality`; more than that —
+a plain `String`. Wrapping a guest's name, which is almost always unique, in `LowCardinality` means
+making things worse: the dictionary would grow larger than the data itself.
 
-`ENGINE = MergeTree` — основной способ хранения. Каждая вставка кладёт на диск новый
-**кусок**, куски в фоне сливаются в большие. Отсюда, кстати, важное практическое правило:
-вставлять надо **пачками по многу строк**, а не по одной. Миллион вставок по строке
-создадут миллион кусков и уложат сервер.
+`ENGINE = MergeTree` — the main way of storing. Each insert puts a new **part** on disk, and parts
+are merged into larger ones in the background. Hence, by the way, an important practical rule: you
+should insert **in batches of many rows**, not one at a time. A million single-row inserts would
+create a million parts and take the server down.
 
 ```sql
 ORDER BY (created_at, entrance)
 ```
 
-Вот это — самая важная строка в файле, и её выбирают до того, как начнут писать данные.
+This is the most important line in the file, and you choose it before you start writing data.
 
-`ORDER BY` задаёт **порядок, в котором данные физически лежат на диске**. Он же работает
-как единственный настоящий индекс: ClickHouse хранит отметки через каждые несколько тысяч
-строк и по ним понимает, какие куски файла можно вообще не читать.
+`ORDER BY` sets **the order in which the data physically sits on disk**. It also works as the only
+real index: ClickHouse keeps marks every few thousand rows and uses them to figure out which parts
+of the file it can skip reading entirely.
 
-Запрос «сколько проходов было в марте» превращается в «прочитать вот этот отрезок файла».
-Запрос «найти проход с номером 424242» — не превращается ни во что: `pass_id` в
-сортировочном ключе нет, значит придётся прочитать всю колонку. Мы это увидим отдельным
-шагом, и это не недостаток реализации, а прямое следствие устройства.
+The query "how many entries were there in March" turns into "read this stretch of the file." The
+query "find the entry with number 424242" turns into nothing: `pass_id` isn't in the sorting key,
+so it will have to read the whole column. We'll see this in a separate step, and it isn't a flaw in
+the implementation but a direct consequence of the design.
 
-**Аналогия из знакомого мира.** Сортировочный ключ — это как решение, в каком порядке
-раскладывать бумажные пропуска в архиве: по датам или по фамилиям. Разложили по датам —
-подшивка за март достаётся мгновенно, а конкретный Иванов ищется перебором. И
-перекладывать миллион бумажек задним числом никто не будет.
+**An analogy from a familiar world.** The sorting key is like deciding what order to file paper
+passes in the archive: by date or by surname. File them by date and the March folder is pulled out
+instantly, while a particular Ivanov is found by going through them one by one. And no one is going
+to refile a million sheets after the fact.
 
 </details>
 
-**Применяем.**
+**Apply it.**
 
 ```bash
-cd labs/09-clickhouse
-# < читает файл и подаёт его на вход ch, то есть отправляет содержимое файла
-# в ClickHouse одним запросом. У CREATE TABLE ответ пустой — это и есть успех.
+# < reads the file and feeds it to ch's input, that is, sends the file's contents
+# to ClickHouse in a single query. CREATE TABLE returns an empty answer — that is success.
 ch < 01-schema.sql
 ```
 
-## Шаг 4. Генерируем миллион записей
+## Step 4. Generate a million records
 
-📍 **Где:** на виртуалке, в лабораторном кластере.
+📍 **Where:** on the bastion, in the lab cluster.
 
-Данных о проходах у нас нет, а нужен миллион. Сгенерируем их прямо внутри ClickHouse —
-без выгрузок, скриптов и промежуточных файлов. Сначала посмотрим, из чего состоит
-генератор.
+We have no entry data, and we need a million. We'll generate it right inside ClickHouse — no
+exports, scripts, or intermediate files. First let's look at what the generator is made of.
 
 <details>
-<summary><b>Разбираем генератор построчно</b></summary>
+<summary><b>Walking through the generator line by line</b></summary>
 
 ```sql
 INSERT INTO passes
@@ -411,15 +407,15 @@ SELECT …
 FROM numbers(1000000)
 ```
 
-`numbers(1000000)` — встроенная таблица-генератор: миллион строк с единственной колонкой
-`number` от 0 до 999999. Она ничего не читает с диска, её нет в природе, она вычисляется
-на лету. Это стандартный приём: любые тестовые данные в ClickHouse делают так.
+`numbers(1000000)` — a built-in generator table: a million rows with a single column `number` from
+0 to 999999. It reads nothing from disk, it doesn't exist in nature, it's computed on the fly. This
+is a standard trick: any test data in ClickHouse is made this way.
 
 ```sql
     number AS pass_id,
 ```
 
-Номер пропуска. Уникальный, потому что `number` уникален.
+The pass number. Unique, because `number` is unique.
 
 ```sql
     addDays(
@@ -428,138 +424,136 @@ FROM numbers(1000000)
     )
 ```
 
-`cityHash64(number, 'day')` — быстрая хеш-функция. Из номера строки она делает
-псевдослучайное число, и от одного и того же входа всегда получается одно и то же.
-Второй аргумент, `'day'`, — «соль»: с другой солью из того же номера получится другое
-число. Так из одного `number` мы делаем сколько угодно независимых случайных величин.
+`cityHash64(number, 'day')` — a fast hash function. From a row's number it makes a pseudo-random
+number, and the same input always yields the same result. The second argument, `'day'`, is the
+"salt": with a different salt the same number yields a different result. That's how, from a single
+`number`, we make as many independent random values as we like.
 
-`% 57600` даёт число от 0 до 57599, а `sqrt` от него — от 0 до 239, то есть день внутри
-восьми месяцев. Квадратный корень здесь не для красоты: он **сгущает данные к концу
-периода**. Гостей со временем становится больше — как в жизни, и как раз это руководство и
-хочет увидеть в отчёте.
+`% 57600` gives a number from 0 to 57599, and `sqrt` of it gives 0 to 239, that is, a day within
+eight months. The square root here isn't for looks: it **concentrates the data toward the end of
+the period**. Guests grow more numerous over time — as in life, and that's exactly what management
+wants to see in the report.
 
 ```sql
             [8, 9, 9, 10, 10, 10, 11, 11, 12,
              13, 14, 14, 15, 15, 15, 16, 17, 18][1 + cityHash64(number, 'hour') % 18]
 ```
 
-Час прихода. Вместо равномерного «от 8 до 18» берём значение из массива, где часы
-повторяются с разной частотой: десять встречается трижды, пятнадцать трижды, восемь — раз.
-Получаются **два выраженных пика** — перед обедом и после. Именно их руководство и просило
-найти, и хорошо, когда в тестовых данных есть то, что мы собираемся искать.
+The hour of arrival. Instead of a uniform "8 to 18" we take a value from an array where the hours
+repeat with different frequencies: ten appears three times, fifteen three times, eight just once.
+This produces **two pronounced peaks** — before lunch and after. Those are exactly what management
+asked us to find, and it's good when the test data contains what we're about to look for.
 
-⚠️ Нумерация массивов в ClickHouse начинается с единицы, а не с нуля. Отсюда `1 + …`.
+⚠️ Array indexing in ClickHouse starts at one, not zero. Hence the `1 + …`.
 
 ```sql
     ['Северная', 'Северная', 'Северная',
      'Южная', 'Южная', 'Западная'][1 + cityHash64(number, 'entrance') % 6] AS entrance
 ```
 
-Тот же приём для неравномерного распределения: северная проходная получает половину
-потока, южная треть, западная — остаток. Равномерные данные в отчётах выглядят
-неправдоподобно и ничего не показывают.
+The same trick for an uneven distribution: the north entrance gets half the flow, the south a
+third, the west the remainder. Uniform data looks implausible in reports and shows nothing.
 
 ```sql
     toUInt16(30 + cityHash64(number, 'duration') % 300) AS duration_min
 ```
 
-Длительность визита от 30 до 329 минут. `toUInt16` нужен, потому что тип колонки объявлен
-явно, а результат арифметики шире.
+Visit duration from 30 to 329 minutes. `toUInt16` is needed because the column's type is declared
+explicitly, while the result of the arithmetic is wider.
 
-**Сколько это заняло.** Миллион строк сгенерировался и записался за секунды, полностью
-внутри сервера. Данные не ходили по сети, не проходили через ваш виртуалку и не лежали в
-промежуточном файле. Сравните с привычным способом делать тестовые данные — скриптом,
-который вставляет по строке.
+**How long it took.** A million rows were generated and written in seconds, entirely inside the
+server. The data didn't travel over the network, didn't pass through your bastion, and didn't sit
+in an intermediate file. Compare that with the usual way of making test data — a script that
+inserts one row at a time.
 
 </details>
 
-**Применяем.**
+**Apply it.**
 
 ```bash
-# В файле один INSERT … SELECT: ClickHouse сам придумает миллион строк и запишет их,
-# ни разу не выйдя за пределы сервера.
+# The file holds a single INSERT … SELECT: ClickHouse will invent a million rows itself and write them,
+# without ever leaving the server.
 ch < 02-generate.sql
 ```
 
-**Что вы должны увидеть** — пустой ответ и возврат приглашения через несколько секунд.
-Пустой ответ у `INSERT` — это успех.
+**What you should see** — an empty answer and the prompt returning after a few seconds. An empty
+answer from `INSERT` is success.
 
-Проверим, что получилось:
+Let's check what we got:
 
 ```bash
-# count() без условий отвечает на вопрос «сколько всего строк в таблице».
+# count() with no conditions answers the question "how many rows are in the table in total."
 echo 'SELECT count() FROM passes' | ch
 ```
 
-**Что вы должны увидеть** — `1000000`.
+**What you should see** — `1000000`.
 
-## Шаг 5. Отчёт, за которым пришло руководство
+## Step 5. The report management came for
 
-📍 **Где:** на виртуалке, в лабораторном кластере.
+📍 **Where:** on the bastion, in the lab cluster.
 
-Тот самый отчёт, за которым пришло руководство: сколько гостей в каждом месяце, сколько
-в среднем длится визит, в какой час приходят чаще всего и какая проходная загружена
-больше. Файл `03-report.sql` — один запрос; разбираем его до запуска.
+The very report management came for: how many guests in each month, how long a visit lasts on
+average, which hour people arrive at most often, and which entrance is busier. The file
+`03-report.sql` is a single query; we take it apart before running it.
 
 <details>
-<summary><b>Разбираем отчёт построчно</b></summary>
+<summary><b>Walking through the report line by line</b></summary>
 
 ```sql
--- Одна строка отчёта на каждый месяц, который встретился в данных.
+-- One report row for each month that occurs in the data.
 SELECT
-    toStartOfMonth(created_at)          AS month,        -- к какому месяцу отнести
-    count()                             AS guests,       -- сколько проходов в нём
-    round(avg(duration_min))            AS avg_minutes,  -- средняя длительность визита
-    topK(1)(toHour(created_at))[1]      AS peak_hour,    -- самый частый час прихода
-    topK(1)(entrance)[1]                AS busiest_entrance  -- самая частая проходная
+    toStartOfMonth(created_at)          AS month,        -- which month to assign it to
+    count()                             AS guests,       -- how many entries in it
+    round(avg(duration_min))            AS avg_minutes,  -- average visit duration
+    topK(1)(toHour(created_at))[1]      AS peak_hour,    -- the most frequent hour of arrival
+    topK(1)(entrance)[1]                AS busiest_entrance  -- the most frequent entrance
 FROM passes
-GROUP BY month   -- схлопнуть все строки одного месяца в одну строку ответа
-ORDER BY month   -- вывести месяцы по возрастанию
+GROUP BY month   -- collapse all rows of one month into a single answer row
+ORDER BY month   -- output the months in ascending order
 ```
 
-`toStartOfMonth` превращает точное время в первое число месяца. Классический приём
-группировки по периоду: вместо «сгруппируй по году и месяцу» — одно значение, по которому
-и группируем, и сортируем.
+`toStartOfMonth` turns an exact time into the first day of the month. A classic trick for grouping
+by period: instead of "group by year and month" — a single value that we both group and sort by.
 
-`count()` — сколько строк попало в группу. Это и есть «сколько гостей за месяц».
+`count()` — how many rows fell into the group. That's exactly "how many guests per month."
 
-`topK(1)(x)[1]` — самое частое значение `x` в группе. `topK(1)` возвращает массив из
-одного элемента, `[1]` достаёт его оттуда. Так в одну строку отчёта попадает и час пик,
-и самая нагруженная проходная.
+`topK(1)(x)[1]` — the most frequent value of `x` in the group. `topK(1)` returns an array of one
+element, `[1]` pulls it out. That's how both the peak hour and the busiest entrance end up in a
+single report row.
 
-Отдельно стоит заметить, чего в запросе нет: подзапросов, временных таблиц и join'ов.
-Всё считается за один проход по данным.
+It's worth noting separately what the query doesn't have: subqueries, temporary tables, or joins.
+Everything is computed in a single pass over the data.
 
 </details>
 
-**Применяем.**
+**Apply it.**
 
 ```bash
-# Одна группировка по всей таблице. В ответе будет столько строк, сколько месяцев
-# встретилось в данных.
+# One grouping over the whole table. The answer will have as many rows as there are months
+# that occur in the data.
 ch < 03-report.sql
 ```
 
-**Что вы должны увидеть** — восемь строк, по одной на месяц, с растущим числом гостей.
+**What you should see** — eight rows, one per month, with a growing number of guests.
 
-Теперь главное — **за сколько это посчиталось**. Формат `JSON` в конце запроса добавляет
-к ответу блок статистики:
+Now the main thing — **how long it took to compute**. The `JSON` format at the end of the query
+adds a statistics block to the answer:
 
 ```bash
-# <<'SQL' … SQL — способ передать многострочный текст на вход команде, без файла.
-# Кавычки вокруг SQL означают «содержимое не трогай»: иначе оболочка попыталась бы
-# истолковать знаки внутри запроса как свои.
+# <<'SQL' … SQL — a way to pass multi-line text to a command's input, without a file.
+# The quotes around SQL mean "leave the contents alone": otherwise the shell would try
+# to interpret the characters inside the query as its own.
 ch <<'SQL'
--- Тот же отчёт, урезанный до двух колонок: месяц и число гостей.
+-- The same report, trimmed to two columns: month and guest count.
 SELECT toStartOfMonth(created_at) AS month, count() AS guests
 FROM passes
 GROUP BY month
 ORDER BY month
-FORMAT JSON  -- вернуть ответ не таблицей, а как JSON: в нём есть блок статистики
+FORMAT JSON  -- return the answer not as a table but as JSON: it contains a statistics block
 SQL
 ```
 
-Пролистайте вывод до конца:
+Scroll the output to the end:
 
 ```json
     "statistics": {
@@ -569,69 +563,69 @@ SQL
     }
 ```
 
-**Миллион строк, около девяти миллисекунд.** Цифра у вас будет своя, но порядок тот же —
-единицы или десятки миллисекунд.
+**A million rows, about nine milliseconds.** Your figure will be your own, but the order is the
+same — single or tens of milliseconds.
 
 <details>
-<summary><b>Как этот же отчёт делали бы на обычной базе</b></summary>
+<summary><b>How this same report would be done on an ordinary database</b></summary>
 
-Возьмём привычный сценарий: журнал проходов лежит в PostgreSQL или MS SQL, рядом с самим
-сервисом пропусков.
+Take the familiar scenario: the entry log sits in PostgreSQL or MS SQL, right next to the pass
+service itself.
 
-**Что произойдёт с запросом.** Строчная база хранит запись целиком: номер, время, имя
-гостя, отдел, вход, тип, длительность — всё подряд, строка за строкой. Чтобы посчитать
-`count()` по месяцам, ей надо пройти по всем строкам, а значит **прочитать с диска все
-поля**, включая имена гостей, которые в отчёте не участвуют. На миллионе строк это
-десятки секунд, на десяти миллионах — минуты.
+**What happens to the query.** A row-based database stores a record whole: number, time, guest
+name, department, entrance, type, duration — all in a row, one after another. To compute `count()`
+by month it has to go through every row, which means **reading all the fields from disk**,
+including the guest names that don't figure in the report. On a million rows that's tens of
+seconds; on ten million, minutes.
 
-Обойти это можно индексом по `created_at`, покрывающим индексом, материализованным
-представлением или предагрегированной таблицей. Каждое из решений работает, и каждое
-означает: кто-то должен был **заранее знать, какой отчёт спросят**. Спросят другой разрез —
-всё сначала.
+You can get around this with an index on `created_at`, a covering index, a materialized view, or a
+pre-aggregated table. Each of these solutions works, and each one means: someone had to **know in
+advance which report would be asked for**. Ask for a different breakdown and it's back to square
+one.
 
-**Что произойдёт с сервисом.** Тяжёлый запрос конкурирует за диск и память с рабочей
-нагрузкой. Пока считается отчёт, охрана на проходной видит крутящийся индикатор. Отсюда
-и берётся правило «отчёты только ночью», а из него — реплика для чтения, ночная выгрузка,
-расхождение цифр и вопрос «почему в отчёте вчерашние данные».
+**What happens to the service.** A heavy query competes for disk and memory with the production
+workload. While the report is computing, the guards at the entrance see a spinning indicator.
+That's where the rule "reports only at night" comes from, and from it — a read replica, a nightly
+export, mismatched numbers, and the question "why does the report show yesterday's data."
 
-**Что делают в жизни.** Ставят рядом вторую базу, устроенную под аналитику, и льют туда
-данные. Ровно это мы сейчас и сделали, только вторая база завелась за десять минут из
-каталога, а не за квартал с проектом внедрения.
+**What people do in practice.** They stand up a second database next to it, built for analytics,
+and pour the data into it. That's exactly what we just did, except the second database came up in
+ten minutes from a catalog rather than over a quarter with a rollout project.
 
-| | Строчная (PostgreSQL) | Колоночная (ClickHouse) |
+| | Row-based (PostgreSQL) | Columnar (ClickHouse) |
 |---|---|---|
-| Найти пропуск по номеру | микросекунды, по индексу | читает всю колонку |
-| Изменить статус одного пропуска | микросекунды | переписывает куски в фоне |
-| Посчитать гостей по месяцам | секунды или минуты | миллисекунды |
-| Добавить строку | обычное дело | лучше пачкой, по одной — плохо |
-| Транзакции | полноценные | их нет в привычном виде |
+| Find a pass by number | microseconds, via the index | reads the whole column |
+| Change the status of one pass | microseconds | rewrites parts in the background |
+| Count guests by month | seconds or minutes | milliseconds |
+| Add a row | routine | better in a batch; one at a time is bad |
+| Transactions | full-fledged | none in the usual sense |
 
-Ни одна из колонок не «лучше». Это инструменты под разную работу, и правильный ответ
-почти всегда — обе, каждая на своём месте.
+Neither column is "better." These are tools for different work, and the right answer is almost
+always both, each in its place.
 
 </details>
 
-## Шаг 6. Почему это быстро: смотрим на колонки
+## Step 6. Why it's fast: a look at the columns
 
-📍 **Где:** на виртуалке, в лабораторном кластере.
+📍 **Where:** on the bastion, in the lab cluster.
 
-Слово «колоночная» звучит абстрактно, пока не увидишь цифры.
+The word "columnar" sounds abstract until you see the figures.
 
 ```bash
 ch <<'SQL'
--- Спрашиваем у самого ClickHouse, сколько места занимает каждая колонка таблицы.
+-- We ask ClickHouse itself how much space each column of the table takes.
 SELECT
-    name,                                                    -- имя колонки
-    formatReadableSize(data_compressed_bytes)   AS on_disk,  -- сколько лежит на диске
-    formatReadableSize(data_uncompressed_bytes) AS raw,      -- сколько было бы без сжатия
-    round(data_uncompressed_bytes / data_compressed_bytes, 1) AS ratio  -- во сколько раз сжалось
-FROM system.columns   -- служебная таблица: в ней ClickHouse описывает сам себя
-WHERE database = currentDatabase() AND table = 'passes'   -- только наша таблица
-ORDER BY data_compressed_bytes DESC   -- самые тяжёлые колонки сверху
+    name,                                                    -- the column's name
+    formatReadableSize(data_compressed_bytes)   AS on_disk,  -- how much sits on disk
+    formatReadableSize(data_uncompressed_bytes) AS raw,      -- how much it would be without compression
+    round(data_uncompressed_bytes / data_compressed_bytes, 1) AS ratio  -- how many times it compressed
+FROM system.columns   -- a system table: in it ClickHouse describes itself
+WHERE database = currentDatabase() AND table = 'passes'   -- only our table
+ORDER BY data_compressed_bytes DESC   -- the heaviest columns on top
 SQL
 ```
 
-**Что вы должны увидеть** — примерно такую картину:
+**What you should see** — roughly this picture:
 
 ```
 name          on_disk    raw       ratio
@@ -644,248 +638,250 @@ pass_type     41.0 KiB   1.05 MiB  26.1
 host_dept     52.3 KiB   1.10 MiB  21.4
 ```
 
-Цифры у вас будут свои, но соотношение то же.
+Your figures will be your own, but the ratios are the same.
 
 <details>
-<summary><b>Что здесь видно и почему это объясняет скорость</b></summary>
+<summary><b>What you can see here and why it explains the speed</b></summary>
 
-**Первое: каждое поле лежит отдельно.** Это и есть «колоночная». В строчной базе на диске
-идёт «строка 1 целиком, строка 2 целиком, строка 3 целиком». Здесь — «весь `created_at`
-подряд, весь `entrance` подряд, весь `guest_name` подряд».
+**First: each field sits separately.** That's what "columnar" means. In a row-based database, the
+disk goes "row 1 whole, row 2 whole, row 3 whole." Here it's "all of `created_at` in a run, all of
+`entrance` in a run, all of `guest_name` in a run."
 
-Отсюда следствие, ради которого всё и затевалось: **запрос читает только те поля, которые
-в нём упомянуты.** Отчёту по месяцам нужны `created_at` и счётчик строк. Он прочитает
-чуть больше мегабайта и не тронет имена гостей, которые занимают в пять раз больше.
+Hence the consequence the whole thing was undertaken for: **a query reads only the fields it
+mentions.** The monthly report needs `created_at` and a row counter. It will read a little over a
+megabyte and won't touch the guest names, which take five times as much.
 
-Строчная база на том же запросе прочитает всё. Не потому что плохо написана, а потому что
-поля лежат вперемешку: чтобы добраться до времени в строке 500001, надо прочитать блок, в
-котором вместе с временем лежит и всё остальное.
+A row-based database will read everything for the same query. Not because it's poorly written, but
+because the fields sit intermixed: to get to the time in row 500001, you have to read the block
+that holds the time together with everything else.
 
-**Второе: посмотрите на `ratio` у `entrance`.** Двадцать девять раз. Миллион значений из
-трёх вариантов сжались почти в ничто.
+**Second: look at the `ratio` for `entrance`.** Twenty-nine times. A million values drawn from
+three options compressed to almost nothing.
 
-Так работает `LowCardinality`: на диске лежит словарь из трёх строк и миллион маленьких
-номеров, а рядом ещё и общее сжатие, которому одинаковые подряд идущие номера — подарок.
-У `guest_name`, где все значения разные, сжатие всего в два с половиной раза.
+That's how `LowCardinality` works: on disk there's a dictionary of three strings and a million
+small numbers, and alongside that the general compression, for which identical numbers in a row are
+a gift. For `guest_name`, where every value is different, the compression is only two and a half
+times.
 
-**Третье, и это ломает интуицию: сжатие ускоряет, а не замедляет.** Кажется, что
-распаковка — лишняя работа. На практике узкое место — диск, а не процессор: прочитать 35
-килобайт и
-распаковать их быстрее, чем прочитать мегабайт. Поэтому колоночные базы сжимают агрессивно
-и выигрывают дважды — местом и временем.
+**Third, and this breaks intuition: compression speeds things up, it doesn't slow them down.** It
+seems that decompression is extra work. In practice the bottleneck is the disk, not the processor:
+reading 35 kilobytes and
+decompressing them is faster than reading a megabyte. That's why columnar databases compress
+aggressively and win twice — on space and on time.
 
 </details>
 
-Убедимся, что запрос действительно читает мало. Посчитаем по одной маленькой колонке:
+Let's confirm that the query really does read little. We'll count over a single small column:
 
 ```bash
 ch <<'SQL'
--- Считаем визиты длиннее ста минут. Запрос называет одну колонку из семи — значит
--- и прочитать должен малую часть таблицы. Проверим это по bytes_read.
+-- We count visits longer than a hundred minutes. The query names one column out of seven — so
+-- it should read only a small part of the table. We'll check that by bytes_read.
 SELECT count() FROM passes WHERE duration_min > 100 FORMAT JSON
 SQL
 ```
 
-Посмотрите на `bytes_read` в конце вывода и сравните с объёмом данных таблицы:
+Look at `bytes_read` at the end of the output and compare it with the table's data volume:
 
 ```bash
 ch <<'SQL'
--- Складываем несжатый объём всех колонок. Это и есть «сколько данных всего» —
--- та величина, с которой надо сравнивать bytes_read из предыдущего вывода.
+-- We sum the uncompressed volume of all columns. That's exactly "how much data there is in total" —
+-- the figure that bytes_read from the previous output should be compared against.
 SELECT formatReadableSize(sum(data_uncompressed_bytes)) AS total
 FROM system.columns
 WHERE database = currentDatabase() AND table = 'passes'
 SQL
 ```
 
-⚠️ **Сравнивать нужно с несжатым объёмом, а не с размером на диске.** `bytes_read` в
-статистике запроса — это то, что база распаковала и прочитала, то есть величина несжатая.
-Если поделить её на `bytes_on_disk`, получится доля от сжатых данных, и на таблице с
-хорошим сжатием такая «доля» легко перевалит за сотню процентов. Величины должны быть
-сопоставимы, иначе число красивое, но бессмысленное.
+⚠️ **You must compare against the uncompressed volume, not the size on disk.** `bytes_read` in the
+query statistics is what the database decompressed and read — an uncompressed figure. Divide it by
+`bytes_on_disk` and you get a fraction of the compressed data, and on a table with good compression
+such a "fraction" easily runs past a hundred percent. The figures have to be comparable, otherwise
+the number is pretty but meaningless.
 
-Запрос прошёл по миллиону строк, прочитав считанные проценты данных: `duration_min`
-он читал, а `guest_name` не трогал.
+The query passed over a million rows while reading a mere few percent of the data: it read
+`duration_min` and didn't touch `guest_name`.
 
-## Шаг 7. Ищем пики
+## Step 7. Finding the peaks
 
-📍 **Где:** на виртуалке, в лабораторном кластере.
+📍 **Where:** on the bastion, in the lab cluster.
 
-Вторая половина вопроса руководства — про очередь на проходной. Посчитаем, сколько
-проходов пришлось на каждый час суток, и сразу нарисуем это столбиками прямо в
-терминале. Запрос состоит из двух частей — разбираем до запуска.
+The second half of management's question is about the queue at the entrance. We'll count how many
+entries fell on each hour of the day and draw it as bars right in the terminal. The query has two
+parts — we take it apart before running it.
 
 <details>
-<summary><b>Разбираем запрос</b></summary>
+<summary><b>Taking the query apart</b></summary>
 
-Внутренний запрос — обычная группировка: сколько проходов пришлось на каждый час суток.
-Одиннадцать строк на выходе.
+The inner query is an ordinary grouping: how many entries fell on each hour of the day. Eleven rows
+come out.
 
-Внешний добавляет к ним картинку. `bar(значение, от, до, ширина)` рисует полоску из
-псевдографики — встроенная функция ClickHouse, сделанная ровно для того, чтобы смотреть
-результат в терминале и не открывать Excel.
+The outer one adds a picture to them. `bar(value, from, to, width)` draws a bar of
+pseudo-graphics — a built-in ClickHouse function made precisely so you can look at the result in
+the terminal without opening Excel.
 
-`max(guests) OVER ()` — оконная функция: максимум по **всему результату**, а не по группе.
-Пустые скобки после `OVER` означают «окно — это весь набор строк». Нужна она затем, чтобы
-самая длинная полоска была ровно в пятьдесят символов, а остальные — пропорционально.
+`max(guests) OVER ()` — a window function: the maximum over the **whole result**, not over a group.
+The empty parentheses after `OVER` mean "the window is the entire set of rows." It's needed so that
+the longest bar is exactly fifty characters, and the rest are proportional.
 
-Почему нельзя было написать `max(guests)` без `OVER ()`: это была бы агрегатная функция,
-она схлопнула бы одиннадцать строк в одну. Оконная считает то же самое, но строки
-оставляет на месте.
+Why you couldn't just write `max(guests)` without `OVER ()`: it would be an aggregate function, and
+it would collapse the eleven rows into one. The window function computes the same thing but leaves
+the rows in place.
 
 </details>
 
 ```bash
 ch <<'SQL'
 SELECT
-    hour,                                     -- час суток
-    guests,                                   -- сколько проходов пришлось на этот час
-    bar(guests, 0, max(guests) OVER (), 50) AS chart  -- столбик из псевдографики
+    hour,                                     -- the hour of the day
+    guests,                                   -- how many entries fell on this hour
+    bar(guests, 0, max(guests) OVER (), 50) AS chart  -- a bar of pseudo-graphics
 FROM
 (
-    -- Внутренний запрос: обычная группировка по часу
+    -- The inner query: an ordinary grouping by hour
     SELECT toHour(created_at) AS hour, count() AS guests
     FROM passes
     GROUP BY hour
 )
-ORDER BY hour   -- часы по возрастанию, чтобы картинка читалась сверху вниз
+ORDER BY hour   -- hours ascending, so the picture reads top to bottom
 SQL
 ```
 
-**Что вы должны увидеть** — два горба: около десяти утра и около трёх дня.
+**What you should see** — two humps: around ten in the morning and around three in the afternoon.
 
-Ответ руководству готов: пики в 10 и в 15, и именно на эти часы имеет смысл ставить
-второго человека на проходную.
+The answer for management is ready: peaks at 10 and at 15, and it's exactly these hours where it
+makes sense to put a second person on the entrance.
 
-Между делом посмотрите в журнал запросов — ClickHouse записывает туда каждый:
+While you're at it, look at the query log — ClickHouse records every query there:
 
 ```bash
 ch <<'SQL'
--- Каждый выполненный запрос ClickHouse записывает в служебную system.query_log.
+-- ClickHouse records every executed query in the system table system.query_log.
 SELECT
-    event_time,                                       -- когда запрос завершился
-    query_duration_ms,                                -- сколько миллисекунд он занял
-    formatReadableQuantity(read_rows) AS rows_read,   -- сколько строк прочитал
-    formatReadableSize(read_bytes)    AS bytes_read,  -- сколько байт при этом поднял
-    -- Текст запроса: схлопываем в нём переносы и берём первые 50 символов,
-    -- иначе вывод не поместится на экран
+    event_time,                                       -- when the query finished
+    query_duration_ms,                                -- how many milliseconds it took
+    formatReadableQuantity(read_rows) AS rows_read,   -- how many rows it read
+    formatReadableSize(read_bytes)    AS bytes_read,  -- how many bytes it pulled up in doing so
+    -- The query text: we collapse line breaks in it and take the first 50 characters,
+    -- otherwise the output won't fit on the screen
     substring(replaceRegexpAll(query, '\\s+', ' '), 1, 50) AS query
 FROM system.query_log
-WHERE type = 'QueryFinish'  -- только завершившиеся: на старт есть отдельная запись
-  AND user = 'analyst'      -- только ваши, без служебных запросов самого сервера
-ORDER BY event_time DESC    -- свежие сверху
-LIMIT 10                    -- и хватит десяти
+WHERE type = 'QueryFinish'  -- only finished ones: there's a separate record for the start
+  AND user = 'analyst'      -- only yours, without the server's own service queries
+ORDER BY event_time DESC    -- the recent ones on top
+LIMIT 10                    -- and ten is enough
 SQL
 ```
 
-Вся история ваших запросов с длительностью и объёмом прочитанного. Это обычная таблица,
-и живёт она в томе данных, а не в томе логов: `Log storage size` из формы заказа — про
-текстовые логи сервера, а не про этот журнал. Срок хранения журнала задаёт `Log TTL`.
-В проде именно эта таблица отвечает на вопрос «почему вчера в семь вечера всё тормозило».
+The whole history of your queries, with duration and volume read. It's an ordinary table, and it
+lives in the data volume, not the log volume: `Log storage size` from the order form is about the
+server's text logs, not this log. The log's retention period is set by `Log TTL`. In production
+it's this very table that answers the question "why was everything slow yesterday at seven in the
+evening."
 
-⚠️ Журнал сбрасывается на диск раз в несколько секунд, поэтому самого последнего запроса
-в нём может ещё не быть. Повторите команду.
+⚠️ The log is flushed to disk once every few seconds, so the very latest query may not be in it
+yet. Repeat the command.
 
-## Предсказуемая неудача · Найдите один пропуск по номеру
+## A predictable failure · Find a single pass by number
 
-Отчёты готовы. Приходит охрана с обычной просьбой: **найдите проход с номером 424242.**
+The reports are ready. Security comes with an everyday request: **find the entry with number
+424242.**
 
-Запрос напрашивается сам:
+The query suggests itself:
 
 ```bash
 ch <<'SQL'
--- Ищем одну строку по номеру пропуска. SELECT * означает «верни все колонки».
+-- We look for a single row by pass number. SELECT * means "return all columns."
 SELECT * FROM passes WHERE pass_id = 424242 FORMAT JSON
 SQL
 ```
 
-Строка найдётся. Но посмотрите не на неё, а на статистику в конце вывода — на
+The row will be found. But look not at it but at the statistics at the end of the output — at
 `rows_read`.
 
-> **Остановитесь и подумайте, прежде чем читать дальше.**
+> **Stop and think before you read on.**
 >
-> Сколько строк база прочитала, чтобы вернуть одну? Сколько прочитал бы PostgreSQL
-> с индексом по `pass_id`? И почему разница именно такая?
+> How many rows did the database read to return one? How many would PostgreSQL read with an index
+> on `pass_id`? And why is the difference exactly that large?
 
 <details>
-<summary><b>Ответ и урок шире, чем эта ошибка</b></summary>
+<summary><b>The answer, and a lesson broader than this error</b></summary>
 
-`rows_read` будет около **1 000 000**. Чтобы вернуть одну строку, ClickHouse прочитал всю
-колонку `pass_id`.
+`rows_read` will be about **1 000 000**. To return a single row, ClickHouse read the entire
+`pass_id` column.
 
-Причина в том, что мы разобрали чуть раньше по лабе: **единственный настоящий индекс в ClickHouse —
-это сортировочный ключ**, и он у нас `(created_at, entrance)`. По `pass_id` данные не
-упорядочены, пропускать куски не по чему, остаётся перебор.
+The reason is the one we worked through a little earlier in the lab: **the only real index in
+ClickHouse is the sorting key**, and ours is `(created_at, entrance)`. The data isn't ordered by
+`pass_id`, there's nothing to skip parts by, and all that's left is a full scan.
 
-PostgreSQL с индексом по `pass_id` прочитал бы несколько страниц дерева и одну строку.
-Разница на пять порядков — и не в пользу ClickHouse.
+PostgreSQL with an index on `pass_id` would read a few tree pages and one row. A difference of five
+orders of magnitude — and not in ClickHouse's favor.
 
-Теперь то же самое, но по-правильному. Охрана обычно знает не только номер, но и **когда
-это было**:
+Now the same thing, but done right. Security usually knows not just the number but also **when it
+happened**:
 
 ```sql
--- Тот же поиск, но с рамкой по времени. Условие по created_at попадает
--- в сортировочный ключ, и ClickHouse отбрасывает всё, что лежит вне этих суток.
+-- The same search, but with a time frame. The condition on created_at lands
+-- in the sorting key, and ClickHouse discards everything outside that day.
 SELECT * FROM passes
 WHERE created_at >= '2026-03-01' AND created_at < '2026-03-02'
   AND pass_id = 424242
 FORMAT JSON
 ```
 
-Посмотрите на `rows_read` теперь — вместо миллиона несколько тысяч. Условие по
-`created_at` попало в сортировочный ключ, и ClickHouse отбросил все куски, кроме нужного
-отрезка. Пропуск может не найтись, если он был в другой день, — важно не найденное, а
-число прочитанных строк.
+Look at `rows_read` now — a few thousand instead of a million. The condition on `created_at` landed
+in the sorting key, and ClickHouse discarded every part except the needed stretch. The pass may not
+be found if it was on a different day — what matters isn't the find but the number of rows read.
 
-**Урок шире, чем эта ошибка.** ClickHouse не «быстрая база». Он база, устроенная под один тип
-работы: прочитать много строк в немногих колонках и что-нибудь посчитать. На этой работе
-он обгоняет строчные базы на порядки. На противоположной — найти одну строку, поменять
-одно поле, откатить транзакцию — он от них так же на порядки отстаёт.
+**A lesson broader than this error.** ClickHouse isn't a "fast database." It's a database built
+for one kind of work: read many rows across a few columns and compute something. At that work it
+outruns row-based databases by orders of magnitude. At the opposite — find one row, change one
+field, roll back a transaction — it falls behind them by just as many orders of magnitude.
 
-Отсюда практическое правило, которое стоит унести с собой:
+Hence a practical rule worth taking with you:
 
-| Задача | Куда |
+| Task | Where |
 |---|---|
-| Заказать пропуск, изменить, отменить | Обычная база рядом с сервисом |
-| Найти конкретный пропуск по номеру | Туда же |
-| Отчёт за год, воронки, пики, тренды | ClickHouse |
-| Журнал событий, метрики, логи | ClickHouse |
+| Order a pass, change it, cancel it | An ordinary database next to the service |
+| Find a specific pass by number | The same place |
+| A yearly report, funnels, peaks, trends | ClickHouse |
+| An event log, metrics, logs | ClickHouse |
 
-Обе базы в одном тенанте, обе из каталога, обе заводятся за минуты. Выбирать «одну на
-всё» больше не нужно — и в этом, пожалуй, основная перемена по сравнению с миром, где
-каждая новая база означала новую виртуалку и новую заявку.
+Both databases in one tenant, both from the catalog, both spun up in minutes. There's no longer any
+need to choose "one for everything" — and that, perhaps, is the main change compared with a world
+where each new database meant a new VM and a new ticket.
 
 </details>
 
-## Шаг 8. Честно про то, что здесь неудобно
+## Step 8. Honestly about what's awkward here
 
-📍 **Где:** на виртуалке, в лабораторном кластере.
+📍 **Where:** on the bastion, in the lab cluster.
 
-Гость сменил фамилию, надо поправить одну запись. В обычной базе это `UPDATE` и
-микросекунды.
+A guest changed their surname; one record needs fixing. In an ordinary database that's an `UPDATE`
+and microseconds.
 
-Обратите внимание на синтаксис заранее: не `UPDATE passes SET …`, а
-`ALTER TABLE … UPDATE`. Это не каприз авторов, а честное предупреждение: **то, что вы
-запускаете, — не обновление строки, а изменение таблицы.**
+Note the syntax in advance: not `UPDATE passes SET …` but `ALTER TABLE … UPDATE`. This isn't a whim
+of the authors but an honest warning: **what you're running is not a row update but a change to the
+table.**
 
 ```bash
 ch <<'SQL'
--- Меняем имя гостя в одной строке. Команда вернёт управление сразу, но работа на этом
--- не закончится: ClickHouse поставит её в очередь и выполнит в фоне.
+-- We change a guest's name in one row. The command returns control immediately, but the work
+-- doesn't end there: ClickHouse will queue it and carry it out in the background.
 ALTER TABLE passes UPDATE guest_name = 'Иванов И. И.' WHERE pass_id = 424242
 SQL
 ```
 
-Посмотрим, что происходит:
+Let's see what's happening:
 
 ```bash
 ch <<'SQL'
--- Очередь отложенных изменений таблицы — ещё одна служебная таблица ClickHouse.
+-- The queue of deferred changes to the table — another ClickHouse system table.
 SELECT
-    command,       -- что именно поручено сделать
-    is_done,       -- 1, если работа доделана
-    parts_to_do,   -- сколько кусков осталось переписать
-    create_time    -- когда поручение поставлено в очередь
+    command,       -- what exactly it's been told to do
+    is_done,       -- 1 if the work is finished
+    parts_to_do,   -- how many parts remain to be rewritten
+    create_time    -- when the task was put in the queue
 FROM system.mutations
 WHERE table = 'passes'
 ORDER BY create_time DESC
@@ -893,110 +889,111 @@ SQL
 ```
 
 <details>
-<summary><b>Что такое мутация и почему это дорого</b></summary>
+<summary><b>What a mutation is and why it's expensive</b></summary>
 
-Команда вернула управление сразу, а работа поставлена в очередь. Такая отложенная работа
-называется **мутацией**, и её видно в `system.mutations`: `is_done` показывает,
-доделана ли она, `parts_to_do` — сколько кусков осталось переписать.
+The command returned control immediately, while the work has been queued. Such deferred work is
+called a **mutation**, and it's visible in `system.mutations`: `is_done` shows whether it's
+finished, `parts_to_do` — how many parts remain to be rewritten.
 
-Почему переписать. Данные лежат колонками в сжатых кусках. Изменить одно значение внутри
-сжатого блока нельзя — блок надо распаковать, поменять, упаковать и записать заново. На
-практике ClickHouse переписывает **весь кусок целиком**, со всеми колонками.
+Why rewritten. The data sits in columns in compressed parts. You can't change a single value inside
+a compressed block — the block has to be decompressed, changed, compressed, and written anew. In
+practice ClickHouse rewrites **the entire part**, with all its columns.
 
-На нашем миллионе строк это доли секунды, и `is_done` скорее всего уже `1`. На таблице в
-миллиард строк та же операция — это часы дисковой работы и удвоенный расход места на
-время перезаписи.
+On our million rows that's fractions of a second, and `is_done` is most likely already `1`. On a
+table of a billion rows the same operation is hours of disk work and double the space usage for the
+duration of the rewrite.
 
-Отсюда правила, которые в мире ClickHouse считаются само собой разумеющимися:
+Hence the rules that in the ClickHouse world are taken for granted:
 
-- **Данные не меняют.** Их дописывают. Журнал проходов и не должен меняться: проход либо
-  был, либо нет
-- Если запись всё-таки надо поправить, пишут новую версию строки, а при чтении берут
-  свежую. Для этого есть отдельный вид таблиц (`ReplacingMergeTree`)
-- Удаление старого делают не запросом, а сроком хранения (`TTL`): «строки старше трёх лет
-  выбрасывать». Тогда удаляются целые куски, а не отдельные строки
-- Массовые правки собирают в одну редкую операцию вместо сотни мелких
+- **You don't change data.** You append to it. The entry log shouldn't change anyway: an entry
+  either happened or it didn't
+- If a record does need fixing, you write a new version of the row and take the fresh one when
+  reading. There's a separate kind of table for this (`ReplacingMergeTree`)
+- Deleting old data is done not with a query but with a retention period (`TTL`): "discard rows
+  older than three years." Then whole parts are deleted, not individual rows
+- Bulk edits are gathered into a single rare operation instead of a hundred small ones
 
-**И то, чего здесь нет совсем: транзакций в привычном виде.** Перевести деньги со счёта
-на счёт так, чтобы обе операции применились или ни одна, в ClickHouse нельзя. Это не
-пробел в реализации — это осознанный отказ ради скорости чтения. Именно поэтому ClickHouse
-не ставят под сервис пропусков, а ставят рядом с ним.
+**And what's missing here entirely: transactions in the usual sense.** Transferring money from one
+account to another so that both operations apply or neither does can't be done in ClickHouse. This
+isn't a gap in the implementation — it's a deliberate renunciation for the sake of read speed.
+That's exactly why ClickHouse isn't placed under the pass service but alongside it.
 
 </details>
 
-## Проверка
+## Verification
 
-📍 **Где:** на виртуалке, в том же окне терминала, где вы работали с `kubectl`.
+📍 **Where:** on the bastion, in the same terminal window where you worked with `kubectl`.
 
 ```bash
 cd labs/09-clickhouse
-# Скрипт читает эти три переменные окружения, поэтому задать их надо до запуска
-# и в том же окне терминала.
-export KUBECONFIG=~/lab.kubeconfig       # какой кластер проверять
-export COZY_TENANT=workshop03            # ваш номер тенанта
-export CH_PASSWORD='ваш-пароль-analyst'  # тот, что вы задали при заказе ClickHouse
+# The script reads these three environment variables, so you must set them before running it
+# and in the same terminal window.
+export KUBECONFIG=~/lab.kubeconfig       # which cluster to check
+export COZY_TENANT=workshop03            # your tenant number
+export CH_PASSWORD='your-analyst-password'  # the one you set when ordering ClickHouse
 ./check.sh
 ```
 
-⚠️ **На Windows скрипт запускается из WSL**, а не из PowerShell — как его поставить,
-написано в начале лабы 0. Без WSL лабу можно пройти, но отчёта-артефакта не будет.
+⚠️ **On Windows the script is run from WSL**, not from PowerShell — how to install it is described
+at the start of lab 0. You can complete the lab without WSL, but there'll be no artifact report.
 
-Скрипт проверит не факт создания сервиса, а работу по существу: таблица есть, строк не
-меньше миллиона, в данных есть выраженные пики, отчёт по месяцам считается за
-миллисекунды, а запрос по одной колонке читает малую долю таблицы.
+The script checks not the fact that the service was created but the work on its merits: the table
+exists, there are no fewer than a million rows, the data has pronounced peaks, the monthly report
+computes in milliseconds, and a query over a single column reads a small fraction of the table.
 
-Пароль в отчёт не попадает.
+The password doesn't make it into the report.
 
-## Уборка
+## Cleanup
 
 ```bash
-# Рабочий под ничего не хранит: вся работа шла внутри ClickHouse, а под только
-# передавал запросы. Удаляем без сожаления.
+# The working Pod stores nothing: all the work happened inside ClickHouse, and the Pod only
+# passed queries along. Delete it without regret.
 kubectl delete pod ch-workbench
 ```
 
-Сам ClickHouse удаляется в дашборде: приложение `analytics` → удалить.
+ClickHouse itself is deleted in the dashboard: application `analytics` → delete.
 
-Почему это дёшево. Аналитическая база в классической инфраструктуре — это виртуалка (а
-скорее три), диски, установка, настройка, мониторинг и человек, который за всё это
-отвечает. Отдать её обратно нельзя: место уже выделено, лицензия куплена, а «вдруг
-понадобится». Здесь вы взяли сервис на час и вернули за десять секунд, а занятое им место
-освободилось.
+Why this is cheap. An analytics database in classic infrastructure is a VM (more likely three),
+disks, installation, configuration, monitoring, and a person responsible for all of it. You can't
+give it back: the space is already allocated, the license is bought, and "what if we need it." Here
+you took a service for an hour and returned it in ten seconds, and the space it occupied was freed.
 
-⚠️ **С удалением исчезнет и таблица.** Миллион строк генерируется заново за секунды, так
-что в лабе это не потеря. Если положите туда что-то настоящее — сначала включите
-резервные копии, они в форме заказа отдельным разделом.
+⚠️ **Deleting it also removes the table.** A million rows regenerate in seconds, so in the lab it's
+no loss. If you put something real in there, turn on backups first — they're a separate section in
+the order form.
 
-## Что мы теперь умеем
+## What we can do now
 
-- Объяснять разницу между строчной и колоночной базой не словами, а цифрами сжатия и
-  прочитанных байт
-- Заводить ClickHouse из каталога и понимать, зачем в форме шарды, реплики и Keeper
-- Выбирать сортировочный ключ осознанно и предсказывать, какие запросы будут быстрыми
-- Генерировать правдоподобные тестовые данные внутри базы, без скриптов и выгрузок
-- Отвечать на вопрос «когда пики» запросом, а не выгрузкой в Excel
-- Понимать, где ClickHouse проигрывает, и не ставить его туда, где нужна обычная база
+- Explain the difference between a row-based and a columnar database not in words but in figures of
+  compression and bytes read
+- Spin up ClickHouse from the catalog and understand why the form has shards, replicas, and Keeper
+- Choose a sorting key deliberately and predict which queries will be fast
+- Generate plausible test data inside the database, without scripts or exports
+- Answer the question "when are the peaks" with a query rather than an export to Excel
+- Understand where ClickHouse loses, and not put it where an ordinary database is needed
 
-## А в vSphere это было бы
+## And in vSphere this would be
 
-Отдельная машина под аналитическую базу — и почти сразу выясняется, что одной мало: нужна
-вторая под реплику и место под ежедневные выгрузки. Отчёт «сколько гостей в месяц»
-превращается в инфраструктурный проект со своим железом, своим мониторингом и своим
-владельцем.
+A separate machine for the analytics database — and it turns out almost at once that one isn't
+enough: you need a second for the replica and space for the daily exports. The report "how many
+guests a month" turns into an infrastructure project with its own hardware, its own monitoring, and
+its own owner.
 
-Здесь — позиция в каталоге и десять минут, включая генерацию миллиона строк.
+Here — a catalog entry and ten minutes, including generating a million rows.
 
-**Где vSphere удобнее, честно.** Виртуалка с базой — это машина, к которой вы можете
-подойти. Зайти по SSH, посмотреть top, поправить конфиг, положить рядом скрипт, снять
-снимок перед рискованной операцией и откатиться, если не получилось. Управляемый сервис
-этого не даёт **намеренно**: в тенант вас не пустят ни `exec` в под, ни в логи. Вы
-управляете сервисом через форму заказа, а не через машину под ним.
+**Where vSphere is more convenient, honestly.** A VM with a database is a machine you can walk up
+to. Log in over SSH, look at top, tweak a config, drop a script next to it, take a snapshot before
+a risky operation and roll back if it didn't work. A managed service doesn't give you this **on
+purpose**: in the tenant you won't be allowed either to `exec` into a Pod or into the logs. You
+manage the service through the order form, not through the machine underneath it.
 
-Пока всё работает, это преимущество — меньше способов сломать. Когда что-то ведёт себя
-странно, это ограничение чувствуется остро: привычный набор действий администратора
-недоступен, и остаётся обращаться к тому, кто эксплуатирует платформу. Часть этой боли
-закрывают журнал запросов и метрики, но не всю, и делать вид, что всю, нечестно.
+As long as everything works, this is an advantage — fewer ways to break things. When something
+behaves strangely, this limitation is felt keenly: the administrator's usual set of actions is
+unavailable, and all that's left is to turn to whoever operates the platform. The query log and
+metrics cover part of this pain, but not all of it, and pretending they cover all of it would be
+dishonest.
 
-И второе, о чём вспоминают позже. Управляемый сервис — это чужие умолчания. Версия ClickHouse,
-параметры слияния кусков, настройки памяти выбраны за вас. Обычно разумно, иногда не под
-вашу нагрузку, и поменять их так же свободно, как на своей машине, вы не сможете.
+And a second thing people remember later. A managed service means someone else's defaults. The
+ClickHouse version, the part-merge parameters, the memory settings are chosen for you. Usually
+sensibly, sometimes not for your workload, and you won't be able to change them as freely as on
+your own machine.

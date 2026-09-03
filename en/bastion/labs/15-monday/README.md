@@ -1,139 +1,139 @@
-# Лаба 15 · Что делать в понедельник
+# Lab 15 · What to do on Monday
 
 | | |
 |---|---|
-| **Время** | 20 минут, и ни одной команды |
-| **Что доказывает** | Пройденное можно применить к своему парку, начав с малого |
-| **Что понадобится** | Только вы и список ваших систем |
+| **Time** | 20 minutes, and not a single command |
+| **What it proves** | What you've learned can be applied to your own fleet, starting small |
+| **What you'll need** | Just you and a list of your systems |
 
-Здесь нет ни команд, ни `check.sh`: проверить эту лабу может только понедельник.
-Разговор о том, что делать дальше, когда стенд выключен, а на работе всё как было.
+There are no commands here, and no `check.sh`: only Monday can check this lab.
+A conversation about what to do next, once the testbed is switched off and everything at work is just as it was.
 
-## Что у нас получилось
+## What we ended up with
 
-За четырнадцать лаб вы собрали работающий внутренний сервис — «Пропуск», по которому
-сотрудник заказывает пропуск гостю, охрана видит список на проходной, а руководство раз
-в месяц смотрит отчёт. Каждая часть появилась не по очереди, а из-за конкретной боли:
+Over fourteen labs you've built a working internal service — "Pass," through which an
+employee requests a pass for a guest, security sees the list at the checkpoint, and management
+looks at a report once a month. Each part appeared not in sequence, but out of a specific pain:
 
-| Что появилось | Из-за чего |
+| What appeared | Why |
 |---|---|
-| Свой реестр образов | ИБ запретила тянуть образы из интернета |
-| Кеш | справочник сотрудников из легаси отвечал 800 мс |
-| Документное хранилище | у пропусков разные поля: разовый, на неделю, на автомобиль, групповой |
-| Хранилище секретов | аудит нашёл пароль от базы в манифесте |
-| Аналитическая база | руководство захотело знать, сколько гостей и когда пики |
-| Бакет | мобильной команде некуда было класть собранные APK |
-| Инфраструктура в Git | вас трое, кто-то поменял руками — и всё легло |
-| Своя позиция в каталоге | дочерние компании захотели такой же сервис себе |
+| Your own image registry | The security team forbade pulling images from the internet |
+| A cache | the legacy employee directory took 800 ms to respond |
+| Document storage | passes have different fields: single-use, weekly, vehicle, group |
+| Secret storage | an audit found the database password in a manifest |
+| An analytics database | management wanted to know how many guests there are and when the peaks are |
+| A bucket | the mobile team had nowhere to put the APKs they built |
+| Infrastructure in Git | there are three of you, someone made a change by hand — and everything went down |
+| Your own entry in the catalog | subsidiaries wanted the same service for themselves |
 
-Ни один из этих сервисов вы не устанавливали и не обновляли: это позиции каталога,
-за которые отвечает платформа. Ставили и чинили вы только своё приложение.
+You didn't install or update a single one of these services: they're catalog entries that the
+platform is responsible for. The only thing you installed and fixed was your own application.
 
-Дальше — о том, как повторить это не на стенде.
+Next — about how to repeat this off the testbed.
 
-## Зачем это
+## Why this matters
 
-Самая частая судьба такого обучения — «интересно, но у нас так не получится». Не потому,
-что не получится, а потому, что после четырнадцати лаб непонятно, с чего начинать в своей
-инфраструктуре, где триста виртуалок и никто не помнит, что делает половина из них.
+The most common fate of training like this is "interesting, but it won't work for us." Not because
+it won't, but because after fourteen labs it's unclear where to start in your own infrastructure,
+where there are three hundred VMs and no one remembers what half of them do.
 
-Разберём это по порядку: с чего начать, чего не трогать и как объяснить смысл тем, кто
-подписывает бюджет.
+Let's work through it in order: where to start, what not to touch, and how to explain the point to
+the people who sign off on the budget.
 
-## С чего начать: три кандидата на первый переезд
+## Where to start: three candidates for the first move
 
-Не с самого важного приложения. И не с самого запущенного. Начинают с того, где ошибка
-дешева, а результат виден.
+Not with the most important application. And not with the most neglected one. You start with the
+one where a mistake is cheap and the result is visible.
 
-### Кандидат первый: то, что вы и так собирались переставлять
+### Candidate one: the thing you were going to reinstall anyway
 
-У каждого есть система, про которую давно решено «надо бы перенести на новую ОС» или
-«пора обновить версию». Это идеальный первый переезд: вы всё равно собирались её трогать,
-значит риск уже заложен в план, а согласований нужно ровно столько же.
+Everyone has a system about which it was long ago decided "we really should move it to a new OS" or
+"it's time to update the version." That's the ideal first move: you were going to touch it anyway,
+so the risk is already built into the plan, and you need exactly the same number of approvals.
 
-### Кандидат второй: тестовый или демонстрационный контур
+### Candidate two: a test or demo environment
 
-Копия боевого приложения, которую не жалко. Здесь вы проверите свою способность повторить
-миграцию, а не платформу — платформу вы уже проверили на воркшопе. Отличие в том, что
-теперь это ваши образы, ваши сети и ваши политики безопасности.
+A copy of the production application that you won't miss. Here you'll test your own ability to repeat
+the migration, not the platform — the platform you already tested at the workshop. The difference is
+that now it's your images, your networks, and your security policies.
 
-### Кандидат третий: то, что просит новых ресурсов
+### Candidate three: the thing that's asking for new resources
 
-Команда, которая пришла за парой виртуалок под новый сервис, — самый удобный случай.
-Ничего не мигрирует, всё создаётся с нуля, и вы сразу показываете им дашборд вместо формы
-заявки. Разницу в скорости увидят обе стороны.
+A team that's come for a couple of VMs for a new service is the most convenient case. Nothing is
+being migrated, everything is created from scratch, and you show them a dashboard right away instead
+of a request form. Both sides will see the difference in speed.
 
-## Чего не стоит трогать первым
+## What not to touch first
 
-**Систему с лицензией, привязанной к железу.** Проверьте условия до того, как что-то
-перенесёте. Есть продукты, которые считают лицензии по физическим ядрам гипервизора, и
-переезд может выйти дороже, чем экономия от него.
+**A system with a license tied to hardware.** Check the terms before you move anything. There are
+products that count licenses by the hypervisor's physical cores, and the move can end up costing more
+than it saves.
 
-**То, что вы не понимаете.** Если приложение поставил подрядчик семь лет назад и внутри
-никто не был — миграция превратится в расследование. Это выполнимая работа, но не первая.
+**Anything you don't understand.** If a contractor installed the application seven years ago and no
+one has been inside it since, the migration turns into an investigation. It's doable work, but not
+the first job.
 
-**Кластерные системы со своей отказоустойчивостью.** Базы с репликацией, кластеры
-приложений, всё, что само следит за своими копиями. Здесь нужно решать, кто теперь
-отвечает за отказоустойчивость — приложение или платформа — и это отдельный разговор с
-владельцем системы.
+**Clustered systems with their own fault tolerance.** Databases with replication, application
+clusters, anything that keeps an eye on its own copies. Here you have to decide who's now responsible
+for fault tolerance — the application or the platform — and that's a separate conversation with the
+system's owner.
 
-## Порядок, который работает
+## An order that works
 
-1. **Поднять стенд.** Не под миграцию — чтобы было где проверить любую догадку в тот же
-   час, не заводя заявку. Один сервер, одна установка, ноль обязательств.
-2. **Перевезти одну систему из тех, что выше.** Целиком, с данными, до состояния «работает
-   и на неё смотрят пользователи».
-3. **Пожить с ней месяц.** Здесь вы узнаете то, чего не даст ни один воркшоп: как оно
-   ведёт себя в три часа ночи, что ломается при обновлении, чего не хватает в мониторинге.
-4. **Только теперь строить план на остальное.** С цифрами, полученными на своём железе, а
-   не из презентации.
+1. **Stand up a testbed.** Not for a migration — so you have somewhere to check any hunch within the
+   same hour, without filing a request. One server, one install, zero commitments.
+2. **Move one system from those above.** In full, with its data, to the point of "it works and users
+   are looking at it."
+3. **Live with it for a month.** Here you'll learn what no workshop can give you: how it behaves at
+   three in the morning, what breaks during an update, what's missing from the monitoring.
+4. **Only now build a plan for the rest.** With numbers obtained on your own hardware, not from a
+   presentation.
 
-Между пунктами 2 и 3 обычно хочется ускориться. Не стоит: месяц эксплуатации одной системы
-даёт больше, чем десять перевезённых за ту же неделю.
+Between steps 2 and 3 you'll usually want to speed up. Don't: a month of running one system in
+production teaches you more than ten systems moved in the same week.
 
-## Как объяснить это руководству
+## How to explain this to management
 
-Разговор пойдёт не про технологии. Три вещи, которые обычно решают.
+The conversation won't be about technology. Three things usually decide it.
 
-**Стоимость лицензий** — самый частый, но и самый скользкий аргумент. Считайте честно:
-в экономию входит не только вычеркнутая строка, но и стоимость вашего времени на переезд,
-и обучение команды, и период, когда работают обе платформы сразу.
+**License cost** — the most common argument, but also the most slippery. Count honestly: the savings
+include not just the line you cross out, but also the cost of your time on the move, training the
+team, and the period when both platforms are running at once.
 
-**Скорость выдачи ресурсов.** Здесь у вас есть личный опыт: вы своими руками завели кластер
-за десять минут и базу за пять. Сравните с тем, сколько занимает та же заявка у вас.
-Это цифра, которую бизнес понимает без перевода.
+**Speed of provisioning resources.** Here you have first-hand experience: with your own hands you
+brought up a cluster in ten minutes and a database in five. Compare that with how long the same
+request takes at your company. That's a number the business understands without translation.
 
-**Независимость от одного поставщика.** Аргумент, который стал весомее за последние годы.
-Работает не сам по себе, а в связке с первым: способность сменить платформу — это и есть
-то, что даёт переговорную позицию по цене.
+**Independence from a single vendor.** An argument that has grown weightier in recent years. It works
+not on its own, but in tandem with the first: the ability to switch platforms is exactly what gives
+you a negotiating position on price.
 
-Чего лучше не обещать: что будет проще. Не будет — по крайней мере первый год. Будет
-дешевле, быстрее по выдаче ресурсов и без привязки к одному вендору, но проще не будет.
-Обещание простоты — самый быстрый способ потерять доверие через полгода.
+What's better not to promise: that it will be simpler. It won't be — at least not the first year.
+It'll be cheaper, faster at provisioning resources, and free of lock-in to a single vendor, but it
+won't be simpler. Promising simplicity is the fastest way to lose trust six months later.
 
-## Куда идти с вопросами
+## Where to go with questions
 
-- **Сообщество в Telegram** — тот же чат, в котором шёл воркшоп. Вопрос «а как правильно
-  сделать вот это» уместен всегда.
-- **Документация** — [cozystack.io/docs](https://cozystack.io/docs/).
-- **Исходники** — [github.com/cozystack/cozystack](https://github.com/cozystack/cozystack).
-  Если что-то ведёт себя не так, как написано, чаще всего быстрее посмотреть в чарт, чем
-  гадать. Вы это уже делали в лабе про свой реестр.
+- **The community on Telegram** — the same chat the workshop ran in. The question "how do I do this
+  properly" is always welcome.
+- **Documentation** — [cozystack.io/docs](https://cozystack.io/docs/).
+- **Source code** — [github.com/cozystack/cozystack](https://github.com/cozystack/cozystack).
+  If something behaves differently from what's written, it's usually faster to look in the chart than
+  to guess. You've already done this in the lab about your own registry.
 
-## Что мы теперь умеем
+## What we can do now
 
-- Выбирать первую систему для переезда по критерию «дёшево ошибиться», а не «важнее всего»
-- Отличать случаи, которые стоит отложить, от тех, что стоит взять сейчас
-- Не обещать руководству простоты, которой не будет
-- Знать, где спросить, когда никто рядом не знает ответа
+- Choose the first system to move by the criterion "cheap to get wrong," not "most important"
+- Tell the cases worth deferring from the ones worth taking on now
+- Not promise management a simplicity that won't be there
+- Know where to ask when no one nearby knows the answer
 
-## А в vSphere это было бы
+## And in vSphere this would be
 
-Разговор был бы короче: вы уже знаете, что делать в понедельник, потому что делаете это
-десять лет. В этом и разница — не в технологии, а в том, что здесь вам придётся заново
-собирать привычки.
+The conversation would be shorter: you already know what to do on Monday, because you've been doing
+it for ten years. That's the difference — not in the technology, but in the fact that here you'll
+have to build your habits again from scratch.
 
-Хорошая новость в том, что набирать их можно постепенно, на одной системе за раз. Плохая —
-что первые месяцы вы будете работать медленнее, чем привыкли. Скорость возвращается по
-мере того, как новых привычек становится больше, — но закладывать это отставание в сроки
-придётся заранее.
+The good news is that you can build them up gradually, one system at a time. The bad news is that for
+the first few months you'll work more slowly than you're used to. Speed comes back as the new habits
+accumulate — but you'll have to factor that lag into your timelines in advance.

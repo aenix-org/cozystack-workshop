@@ -1,134 +1,135 @@
-# Лаба 11 · Сборка мобильного приложения в кластере
+# Lab 11 · Building a mobile app in the cluster
 
 | | |
 |---|---|
-| **Время** | 40 минут, из них до 15 — ожидание первой сборки |
-| **Что доказывает** | Билд-сервер — это не сервер, а задача, которая занимает узел на время сборки и отпускает |
-| **Что понадобится** | Кластер из лабы 0, `kubectl`, `~/lab.kubeconfig`, доступ в дашборд тенанта |
+| **Time** | 40 minutes, of which up to 15 are spent waiting for the first build |
+| **What it proves** | A build server isn't a server — it's a task that occupies a node for the duration of the build and then releases it |
+| **What you'll need** | The cluster from Lab 0, `kubectl`, `~/lab.kubeconfig`, access to the tenant dashboard |
 
-## Зачем это
+## Why this matters
 
-Мобильная команда пишет клиент к «Пропуску» — тот самый экран, с которого сотрудник
-заказывает пропуск для гостя. Собирают они его пока на виртуалке одного из разработчиков.
-Когда он в отпуске, релиза нет.
+The mobile team is writing a client for Propusk — the very screen an employee uses to
+request a guest pass. For now they build it on one developer's VM. When he's on vacation,
+there's no release.
 
-Своего билд-сервера у них нет и не будет: заявку на выделенную машину под Android SDK
-отклонили дважды — «нагрузка неравномерная, машина будет простаивать». Что, вообще-то,
-правда. Сборка идёт двадцать минут в день, а машина под неё нужна с четырьмя ядрами и
-шестнадцатью гигабайтами.
+They don't have a build server of their own, and they won't: their request for a dedicated
+machine for the Android SDK was turned down twice — "the load is uneven, the machine will
+sit idle." Which, frankly, is true. The build runs for twenty minutes a day, but the machine
+it needs has four cores and sixteen gigabytes.
 
-Здесь мы сделаем ровно то, чего от нас хотят: возьмём эти четыре ядра **на двадцать
-минут**, соберём APK и вернём их. А готовый файл положим туда, откуда его заберёт кто
-угодно, включая тестировщика с телефоном, — в бакет.
+Here we'll do exactly what's being asked of us: we'll take those four cores **for twenty
+minutes**, build the APK, and hand them back. And we'll put the finished file where anyone
+can pick it up, including a tester with a phone — in a bucket.
 
-Это первый раз за все лабы, когда нагрузка **заканчивается**. Всё, что мы разворачивали
-до сих пор, было рассчитано работать вечно.
+This is the first time in all the labs that a workload **ends**. Everything we've deployed
+until now was meant to run forever.
 
-## Словарик
+## Mini-glossary
 
-| Термин | Что это | Похоже на… но |
+| Term | What it is | Like… but |
 |---|---|---|
-| **Job** | Задача: запустить и дождаться, пока успешно завершится | **Запланированная задача в гостевой ОС**, но job сам создаёт себе машину под запуск и сам её убирает |
-| **Deployment** | Описание вечно работающего приложения | **vApp**, но никогда не «завершается успешно» — исчезнувшую копию создают заново |
-| **Объектное хранилище** | Хранилище, где нет файлов и каталогов, есть ключ и содержимое | **Датастор**, но не монтируется. Кладут и забирают целиком, по HTTP |
-| **Бакет** | Именованная область в объектном хранилище | **Папка на датасторе**, но не вложенная: бакет — верхний уровень, «папки» внутри него часть имени объекта |
-| **S3** | Протокол доступа к объектному хранилищу поверх HTTP | прямого аналога нет; ближе всего к REST API, чем к NFS |
-| **Ключи доступа** | Пара «access key / secret key» вместо логина и пароля | **Сервисная учётка**, но ключи выдаются на бакет, а не на человека |
-| **Secret** | Объект кластера, куда кладут пароли и ключи | **Учётка в credential store**, но внутри кластера это base64, а не шифрование. Прячет от глаз, не от админа |
-| **emptyDir** | Временный диск, живущий ровно столько, сколько под | **Временный vmdk**, но исчезает вместе с подом, без вариантов восстановления |
+| **Job** | A task: run something and wait until it finishes successfully | **A scheduled task in the guest OS**, but a job creates its own machine to run on and cleans it up itself |
+| **Deployment** | A description of an application that runs forever | **A vApp**, but it never "finishes successfully" — a copy that disappears is recreated |
+| **Object storage** | Storage with no files or directories — just a key and its contents | **A datastore**, but it isn't mounted. You put and fetch whole objects, over HTTP |
+| **Bucket** | A named area within object storage | **A folder on a datastore**, but not nested: a bucket is the top level, and the "folders" inside it are part of the object's name |
+| **S3** | A protocol for accessing object storage over HTTP | no direct analog; closer to a REST API than to NFS |
+| **Access keys** | An "access key / secret key" pair instead of a login and password | **A service account**, but the keys are issued per bucket, not per person |
+| **Secret** | A cluster object where you put passwords and keys | **An entry in a credential store**, but inside the cluster it's base64, not encryption. It hides things from view, not from an admin |
+| **emptyDir** | A temporary disk that lives exactly as long as the Pod | **A temporary vmdk**, but it vanishes together with the Pod, with no way to recover it |
 
-### Job против Deployment — в одной таблице
+### Job versus Deployment — in one table
 
-Это главное различие лабы, и его стоит закрепить до того, как мы что-то применим.
+This is the key distinction of the lab, and it's worth nailing down before we apply anything.
 
-В обеих строках ниже встретится слово **под**. Под — наименьшая единица запуска в
-кластере: контейнер (или несколько), поднятый на конкретном узле. Ближайший аналог —
-виртуальная машина под одну задачу, только создаётся за секунды и не переживает узел.
-Ни Job, ни Deployment сами ничего не выполняют: они создают поды и решают, что делать,
-когда под исчез.
+The word **Pod** appears in both rows below. A Pod is the smallest unit of execution in a
+cluster: a container (or several) brought up on a specific node. The closest analog is a
+virtual machine dedicated to a single task, except it's created in seconds and doesn't
+outlive its node. Neither a Job nor a Deployment runs anything itself: they create Pods and
+decide what to do when a Pod disappears.
 
 | | Deployment | Job |
 |---|---|---|
-| Что значит «всё хорошо» | копии запущены прямо сейчас | процесс завершился с кодом 0 |
-| Под завершился успешно | кластер считает это сбоем и создаёт новый | кластер считает, что дело сделано |
-| Сколько живёт | пока не удалите | пока не досчитает |
-| Сколько раз выполняется | нисколько — он не «выполняется», он работает | один раз (или столько, сколько сказано) |
-| Что остаётся после | работающее приложение | результат работы и логи |
+| What "all good" means | the copies are running right now | the process exited with code 0 |
+| A Pod finished successfully | the cluster treats it as a failure and creates a new one | the cluster considers the work done |
+| How long it lives | until you delete it | until it runs to completion |
+| How many times it executes | never — it doesn't "execute," it runs | once (or as many times as specified) |
+| What's left afterward | a running application | the results of the work and logs |
 
-Отсюда практическое следствие, о которое спотыкаются все: **если запустить сборку как
-Deployment, кластер будет запускать её снова и снова**. Сборка успешно завершилась —
-значит, копия исчезла — значит, надо создать новую. Бесконечный цикл, и виноват не
-кластер: ему так сказали.
+Hence a practical consequence everyone trips over: **if you run a build as a Deployment, the
+cluster will run it again and again**. The build finished successfully — so the copy is
+gone — so a new one must be created. An infinite loop, and it's not the cluster's fault:
+that's what it was told to do.
 
-## Что лежит в папке лабы
+## What's in the lab folder
 
-Все файлы уже у вас — вы забрали их вместе с репозиторием. Создавать и печатать заново
-ничего не нужно: там, где ниже написано `kubectl apply -f имя.yaml`, файл берётся отсюда.
+All the files are already yours — you got them with the repository. There's nothing to
+create or retype: wherever it says `kubectl apply -f name.yaml` below, the file comes from here.
 
 ```bash
 cd labs/11-android
 ```
 
-| Файл | Что это | Когда пригодится |
+| File | What it is | When you'll need it |
 |---|---|---|
-| `bucket.yaml` | Хранилище под собранные APK | применяете **в тенанте** |
-| `propusk-src.yaml` | Исходники мобильного приложения «Пропуск» | применяете на своём кластере `lab` |
-| `android-build.yaml` | Сама сборка. Скрипт вынесен в ConfigMap, а не вписан в задание | применяете туда же |
-| `check.sh` | Проверка, что сборка прошла и APK лёг в хранилище | запускаете в конце лабы |
+| `bucket.yaml` | Storage for the built APKs | you apply it **in the tenant** |
+| `propusk-src.yaml` | The source code of the Propusk mobile app | you apply it on your `lab` cluster |
+| `android-build.yaml` | The build itself. The script is pulled out into a ConfigMap rather than inlined in the job | you apply it there too |
+| `check.sh` | A check that the build succeeded and the APK landed in storage | you run it at the end of the lab |
 
-## Шаг 1. Заводим бакет
+## Step 1. Create the bucket
 
-📍 **Где:** в браузере, в дашборде тенанта.
+📍 **Where:** in the browser, in the tenant dashboard.
 
-**Тенант** — ваш участок платформы: то, что вы видите в дашборде и чем распоряжаетесь.
-Кластер `lab` из лабы 0 вы заказали внутри него, и бакет закажете там же.
+**A tenant** is your slice of the platform: what you see in the dashboard and what you
+control. You ordered the `lab` cluster from Lab 0 inside it, and you'll order the bucket
+there too.
 
-Бакет — **managed-сервис**, то есть готовая позиция каталога: вы говорите, что вам нужно,
-а поднимает, обновляет и чинит это платформа. Живёт он **не в кластере `lab`**, а рядом
-с ним, в тенанте. Так и должно быть: артефакты сборки переживают кластер, в котором
-собирались.
+A bucket is a **managed service** — a ready-made catalog item: you say what you need, and
+the platform brings it up, updates it, and fixes it. It lives **not in the `lab` cluster**
+but alongside it, in the tenant. And that's how it should be: build artifacts outlive the
+cluster they were built in.
 
-Файл доступа к тенанту на этой виртуалке уже настроен — `~/.kube/config`, тот же путь,
-что и во всех лабах (доступ токеновый, браузер не открывается).
+The tenant access file on this bastion is already set up — `~/.kube/config`, the same path as in
+all the labs (token-based access, no browser opens).
 
-Тенант → **Создать приложение** → `Bucket`.
+Tenant → **Create application** → `Bucket`.
 
-| Поле | Значение | Почему так |
+| Field | Value | Why |
 |---|---|---|
-| Имя | `builds` | коротко и понятно, что внутри |
-| Users | добавить пользователя `ci` | под этими ключами будет писать сборка |
-| Locking | выключено | защита от удаления объектов; для сборок избыточна |
-| Storage pool | оставить пустым | подойдёт пул по умолчанию |
+| Name | `builds` | short and it's clear what's inside |
+| Users | add the user `ci` | the build will write using these keys |
+| Locking | off | protection against object deletion; overkill for builds |
+| Storage pool | leave empty | the default pool is fine |
 
-**Тот же бакет текстом**, если вам ближе так. Обратите внимание: `namespace` (перегородка
-внутри кластера; ваш тенант — это отдельный namespace) здесь тенантный, и файл доступа
-нужен тенантный, а не от кластера `lab`.
+**The same bucket as text**, if you prefer. Note: the `namespace` (a partition inside the
+cluster; your tenant is a separate namespace) here is the tenant's, and you need the tenant
+access file, not the one for the `lab` cluster.
 
 ```bash
-# KUBECONFIG — каким файлом доступа пользуется kubectl. Здесь тенантный: бакет
-# заказывается на управляющем кластере, а не в кластере lab
+# KUBECONFIG — which access file kubectl uses. Here it's the tenant's: the bucket
+# is ordered on the management cluster, not in the lab cluster
 export KUBECONFIG=~/.kube/config
 
-# apply = «приведи кластер к тому, что описано в файле». Команда не создаёт хранилище
-# сама — она передаёт заказ платформе.
-#   -f bucket.yaml   какой файл применить. Перед этим замените в нём
-#                    tenant-workshopXX на свой namespace, иначе заказ уедет не туда
+# apply = "bring the cluster to what's described in the file." The command doesn't create
+# the storage itself — it hands the order to the platform.
+#   -f bucket.yaml   which file to apply. Before this, replace
+#                    tenant-workshopXX in it with your namespace, or the order goes elsewhere
 kubectl apply -f bucket.yaml
 ```
 
-**Что вы должны увидеть** — `bucket.apps.cozystack.io/builds created`.
+**What you should see** — `bucket.apps.cozystack.io/builds created`.
 
 <details>
-<summary><b>Разбираем bucket.yaml</b></summary>
+<summary><b>A closer look: what's inside bucket.yaml</b></summary>
 
 ```yaml
 apiVersion: apps.cozystack.io/v1alpha1
 kind: Bucket
 ```
 
-`apps.cozystack.io` — группа API, в которой живут managed-сервисы платформы. Тот же
-префикс будет у виртуальных машин, баз и очередей. Это не «расширение поверх
-Kubernetes» — это обычные объекты Kubernetes, описанные платформой.
+`apps.cozystack.io` is the API group where the platform's managed services live. Virtual
+machines, databases, and queues will have the same prefix. This isn't an "add-on on top of
+Kubernetes" — these are ordinary Kubernetes objects, described by the platform.
 
 ```yaml
 spec:
@@ -136,11 +137,11 @@ spec:
     ci: {}
 ```
 
-Карта пользователей. Каждый ключ — отдельный пользователь S3, и на каждого платформа
-выпустит **свою** пару ключей доступа. Пустой объект `{}` означает полный доступ.
+A map of users. Each key is a separate S3 user, and for each one the platform will issue
+**its own** pair of access keys. An empty object `{}` means full access.
 
-Зачем несколько пользователей на один бакет: сборке нужна запись, мобильной команде и
-тестировщикам — только чтение. Разные ключи, разные права, отзывается по отдельности:
+Why several users on one bucket: the build needs write access, while the mobile team and
+testers need read-only. Different keys, different rights, revoked separately:
 
 ```yaml
   users:
@@ -149,72 +150,73 @@ spec:
       readonly: true
 ```
 
-Мы обойдёмся одним, чтобы не тратить время лабы, но знать про это стоит.
+We'll make do with one to save lab time, but it's worth knowing about.
 
 </details>
 
-Бакет готовится несколько секунд. Дождитесь, пока в дашборде он покажется рабочим.
+The bucket takes a few seconds to provision. Wait until it shows as ready in the dashboard.
 
-## Шаг 2. Забираем ключи
+## Step 2. Fetch the keys
 
-📍 **Где:** в дашборде, в карточке бакета, вкладка **Secrets**.
+📍 **Where:** in the dashboard, on the bucket's card, the **Secrets** tab.
 
-Найдите секрет `bucket-builds-ci-credentials`. В нём четыре значения:
+Find the secret `bucket-builds-ci-credentials`. It holds four values:
 
-| Поле | Что это |
+| Field | What it is |
 |---|---|
-| `endpoint` | адрес хранилища, **без** `https://` — приставку придётся дописать самому |
-| `bucketName` | настоящее имя бакета: длинное, с идентификатором, не `builds` |
-| `accessKey` | «логин» |
-| `secretKey` | «пароль» |
+| `endpoint` | the storage address, **without** `https://` — you'll have to add the prefix yourself |
+| `bucketName` | the real bucket name: long, with an identifier, not `builds` |
+| `accessKey` | the "login" |
+| `secretKey` | the "password" |
 
-⚠️ **`bucketName` не равен имени, которое вы вводили.** Имя `builds` — это имя объекта
-Cozystack. Настоящее имя бакета в хранилище платформа выдаёт сама, оно выглядит как
-`bucket-a9209f83-...`. Подставлять надо именно его, иначе получите отказ в доступе к
-несуществующему бакету и потратите десять минут на поиски опечатки.
+⚠️ **`bucketName` is not the name you typed in.** The name `builds` is the name of the
+Cozystack object. The real bucket name in storage is issued by the platform itself, and it
+looks like `bucket-a9209f83-...`. That's exactly what you must substitute, otherwise you'll
+get access denied to a nonexistent bucket and spend ten minutes hunting for a typo.
 
-Эти же четыре значения доступны командой — платформа выдаёт права на реквизиты каждого
-созданного вами приложения. Команда ниже достаёт одно значение из четырёх, `accessKey`;
-остальные берутся так же, меняется только имя поля.
+These same four values are available via the command line — the platform grants access to
+the credentials of every application you've created. The command below extracts one of the
+four values, `accessKey`; the rest are fetched the same way, only the field name changes.
 
 ```bash
-# Работаем тем же тенантным доступом, что и на прошлом шаге: секрет лежит в тенанте.
-# get secret = «покажи объект с паролями и ключами». Значения внутри секрета лежат
-# в кодировке base64 — это не шифрование, а способ записи двоичных данных текстом.
-#   -n tenant-workshopXX   в каком namespace искать
-#   -o jsonpath='...'      отдать не всю карточку объекта, а одно поле из неё:
-#                          .data.accessKey — ключ accessKey внутри раздела data
-#   base64 -d              раскодировать обратно в читаемый вид (d = decode)
-#   ; echo                 добавить перевод строки: без него значение слипнется
-#                          со следующим приглашением терминала
+# We work with the same tenant access as in the previous step: the secret lives in the tenant.
+# get secret = "show the object with passwords and keys." The values inside the secret are
+# base64-encoded — this isn't encryption, just a way of writing binary data as text.
+#   -n tenant-workshopXX   which namespace to look in
+#   -o jsonpath='...'      return not the whole object, but a single field from it:
+#                          .data.accessKey — the accessKey field inside the data section
+#   base64 -d              decode it back into readable form (d = decode)
+#   ; echo                 add a line break: without it the value would run into
+#                          the next terminal prompt
 kubectl -n tenant-workshopXX get secret bucket-builds-ci-credentials \
   -o jsonpath='{.data.accessKey}' | base64 -d; echo
 ```
 
-Читать все секреты подряд тенанту при этом нельзя: `kubectl auth can-i get secrets`
-ответит `no`. Права выданы точечно, на конкретные имена — и на кубконфиг вашего кластера
-из лабы 0 тоже.
+Reading all secrets wholesale isn't allowed for the tenant, though: `kubectl auth can-i get
+secrets` will answer `no`. Rights are granted narrowly, to specific names — and to the
+kubeconfig of your cluster from Lab 0 as well.
 
-## Шаг 3. Кладём ключи в свой кластер
+## Step 3. Put the keys into your own cluster
 
-Сборка пойдёт в кластере `lab`, а ключи лежат в тенанте. Кластеры — разные, автоматически
-ничего не переедет. Перенесём руками.
+The build will run in the `lab` cluster, but the keys live in the tenant. The clusters are
+different; nothing moves across automatically. We'll transfer them by hand.
 
-📍 **Где:** на виртуалке (в терминале bastion).
+📍 **Where:** on the bastion (in the bastion terminal).
 
-Соберём в кластере `lab` собственный секрет с четырьмя значениями из предыдущего шага.
-Имена полей менять нельзя: скрипт сборки ищет переменные ровно с этими именами.
+We'll assemble our own secret in the `lab` cluster with the four values from the previous
+step. Don't change the field names: the build script looks for variables with exactly these
+names.
 
 ```bash
-# Здесь и до конца лабы работаем с кластером lab, а не с тенантом
+# From here to the end of the lab we work with the lab cluster, not the tenant
 export KUBECONFIG=~/lab.kubeconfig
 
-# create secret generic = «создай секрет из значений, которые я перечислю».
-# generic означает «произвольный набор пар имя-значение», а не готовый тип
-# для пароля к реестру образов или для TLS-сертификата.
-#   bucket-creds        имя секрета. По нему на него сошлётся Job
-#   --from-literal=имя='значение'   одна пара. Вместо ВСТАВЬТЕ_... подставьте
-#                       значения из карточки бакета в дашборде
+# create secret generic = "create a secret from the values I'm about to list."
+# generic means "an arbitrary set of name-value pairs," not a ready-made type
+# for an image-registry password or a TLS certificate.
+#   bucket-creds        the secret's name. The Job will reference it by this name
+#   --from-literal=name='value'   one pair. In place of ВСТАВЬТЕ_..., substitute
+#                       the values from the bucket's card in the dashboard
 kubectl create secret generic bucket-creds \
   --from-literal=endpoint='ВСТАВЬТЕ_endpoint' \
   --from-literal=bucketName='ВСТАВЬТЕ_bucketName' \
@@ -222,47 +224,48 @@ kubectl create secret generic bucket-creds \
   --from-literal=secretKey='ВСТАВЬТЕ_secretKey'
 ```
 
-**Что вы должны увидеть:**
+**What you should see:**
 
 ```
 secret/bucket-creds created
 ```
 
-⚠️ **Кавычки — одинарные.** В секретных ключах регулярно попадаются `$`, `!` и `&`.
-В двойных кавычках оболочка их истолкует по-своему, и вы получите не тот ключ, который
-скопировали.
+⚠️ **Use single quotes.** Secret keys regularly contain `$`, `!`, and `&`. Inside double
+quotes the shell would interpret them its own way, and you'd get a different key than the one
+you copied.
 
-**Почему эта команда набирается руками, а не лежит в репозитории файлом.** Всё остальное
-в этих лабах — текст, который можно положить в Git. Секрет — нет. Объект `Secret` внутри
-кластера хранит значения в base64, а base64 это не шифрование, а способ записи: любой,
-кто дотянулся до файла, читает ключи. Файл с секретом в Git — это ключи в Git навсегда,
-включая всю историю. Это ровно та находка аудита, из-за которой в сценарии «Пропуска»
-появляется OpenBao.
+**Why this command is typed by hand instead of living in the repository as a file.**
+Everything else in these labs is text that can go into Git. A secret can't. The `Secret`
+object inside the cluster stores its values in base64, and base64 isn't encryption but a way
+of writing: anyone who gets to the file reads the keys. A secret file in Git means keys in
+Git forever, including the entire history. This is exactly the kind of audit finding that
+brings OpenBao into the Propusk scenario.
 
-## Шаг 4. Смотрим, что будем собирать
+## Step 4. Look at what we're going to build
 
-В папке лежит `propusk-src.yaml` — исходники приложения в виде ConfigMap. **ConfigMap** —
-объект кластера, внутри которого лежат текстовые файлы: кластер потом подкладывает их
-внутрь контейнера как обычные файлы на диске. Ближайший аналог — общая папка с конфигами,
-только хранится она в самом кластере и приезжает вместе с описанием задачи.
+The folder contains `propusk-src.yaml` — the app's source code as a ConfigMap. **A
+ConfigMap** is a cluster object that holds text files inside it: the cluster then places them
+inside the container as ordinary files on disk. The closest analog is a shared folder of
+configs, except it's stored in the cluster itself and arrives together with the task's
+description.
 
-Исходники лежат там же по той же причине: сборке нужны файлы, а заводить ради шести
-текстовых файлов сетевой диск незачем.
+The source code lives there for the same reason: the build needs files, and there's no point
+setting up a network disk for six text files.
 
-Приложение делает одно: показывает строчку «Заказать пропуск для гостя». Этого достаточно,
-потому что лаба не про Android, а про то, где он собирается.
+The app does one thing: it displays the line «Заказать пропуск для гостя». That's enough,
+because the lab isn't about Android but about where it gets built.
 
-**APK** — то, что получится на выходе. Это архив, внутри которого лежит скомпилированное
-приложение, картинки, тексты и описание того, какой экран запускать; телефон устанавливает
-именно его. По роли это то же, что `.msi` для Windows: один файл, который отдают
-пользователю.
+**An APK** is what comes out at the end. It's an archive containing the compiled application,
+images, texts, and a description of which screen to launch; this is exactly what the phone
+installs. In its role it's the same as an `.msi` for Windows: a single file you hand to the
+user.
 
 <details>
-<summary><b>Разбираем исходники</b></summary>
+<summary><b>A closer look: what's inside the source code</b></summary>
 
-Шесть файлов, разложенных по ключам ConfigMap.
+Six files, spread across the keys of the ConfigMap.
 
-### `settings.gradle.kts` — где Gradle ищет зависимости
+### `settings.gradle.kts` — where Gradle looks for dependencies
 
 ```kotlin
 pluginManagement {
@@ -270,15 +273,15 @@ pluginManagement {
 }
 ```
 
-Три публичных репозитория, из которых будут скачиваться плагин сборки Android, плагин
-Kotlin и всё, за что они цепляются. Именно этот список объясняет, почему первая сборка
-долгая: из пустого контейнера тянется всё.
+Three public repositories from which the Android build plugin, the Kotlin plugin, and
+everything they pull in will be downloaded. This list is exactly what explains why the first
+build is slow: from an empty container, everything has to be pulled down.
 
-⚠️ Это же место — то, что вы поменяете первым, когда ИБ запретит ходить в интернет за
-зависимостями. Тогда сюда пропишется ваш прокси-репозиторий, ровно как Harbor стал
-заменой Docker Hub.
+⚠️ This same spot is the first thing you'll change when security forbids going to the
+internet for dependencies. Then your proxy repository gets written in here, exactly as Harbor
+became the replacement for Docker Hub.
 
-### `build.gradle.kts` — версии инструментов
+### `build.gradle.kts` — tool versions
 
 ```kotlin
 plugins {
@@ -287,11 +290,12 @@ plugins {
 }
 ```
 
-`apply false` означает «объяви версию, но в корневом проекте не включай» — включит их
-модуль `app`. Версии зафиксированы намеренно: сборка, которая тянет «последнее», через
-месяц собирается иначе, чем сегодня, и разбираться в этом будете вы.
+`apply false` means "declare the version but don't enable it in the root project" — the
+`app` module will enable them. The versions are pinned deliberately: a build that pulls "the
+latest" will, a month from now, build differently than it does today, and you're the one
+who'll be figuring out why.
 
-### `app-build.gradle.kts` — сам модуль
+### `app-build.gradle.kts` — the module itself
 
 ```kotlin
 android {
@@ -301,19 +305,20 @@ android {
 }
 ```
 
-`compileSdk 34` — версия Android SDK, которой компилируем. Она же определяет, что именно
-придётся скачать на шаге установки SDK, и это примерно полтора гигабайта.
+`compileSdk 34` is the version of the Android SDK we compile against. It also determines
+exactly what has to be downloaded at the SDK-install step, and that's about a gigabyte and a
+half.
 
-`minSdk 24` — самый старый Android, на котором приложение запустится. Здесь это Android 7.
+`minSdk 24` is the oldest Android the app will run on. Here that's Android 7.
 
 ```kotlin
   kotlinOptions { jvmTarget = "17" }
 ```
 
-Kotlin компилируется в байт-код JVM, отсюда требование к версии Java. Образ, который мы
-берём, — с JDK 17, и эти два числа обязаны совпадать.
+Kotlin compiles to JVM bytecode, hence the requirement on the Java version. The image we use
+ships JDK 17, and these two numbers must match.
 
-### `MainActivity.kt` — приложение
+### `MainActivity.kt` — the application
 
 ```kotlin
 class MainActivity : Activity() {
@@ -322,96 +327,98 @@ class MainActivity : Activity() {
     view.text = getString(R.string.greeting)
 ```
 
-Одна активность, один `TextView`, текст из ресурсов. Взят голый `android.app.Activity`,
-а не библиотека совместимости: у приложения ноль внешних зависимостей, и это экономит
-пару минут скачивания на каждой сборке.
+One activity, one `TextView`, text from resources. It uses bare `android.app.Activity` rather
+than a compatibility library: the app has zero external dependencies, and that saves a couple
+of minutes of downloading on every build.
 
-`R.string.greeting` — ссылка на строку из `strings.xml`. Класс `R` генерируется во время
-сборки, в исходниках его нет. Если увидите ошибку «unresolved reference: R» — значит,
-упал шаг генерации ресурсов, а не ваш код.
+`R.string.greeting` is a reference to a string from `strings.xml`. The `R` class is generated
+at build time; it isn't in the source. If you see the error "unresolved reference: R," it
+means the resource-generation step failed, not your code.
 
-### `AndroidManifest.xml` и `strings.xml`
+### `AndroidManifest.xml` and `strings.xml`
 
-Манифест объявляет, какая активность запускается с иконки. `strings.xml` держит тексты
-отдельно от кода — так их переводят, не трогая программиста.
+The manifest declares which activity launches from the icon. `strings.xml` keeps texts
+separate from code — that way they can be translated without involving the programmer.
 
 </details>
 
-Кладём исходники в кластер. Ничего пока не запускается: это только файлы, которые
-понадобятся сборке на следующем шаге.
+We put the source code into the cluster. Nothing runs yet: these are just files the build
+will need at the next step.
 
 ```bash
-# Создаёт ConfigMap с шестью файлами внутри. Проверить, что он на месте:
+# Creates a ConfigMap with six files inside. To check it's in place:
 # kubectl get configmap propusk-src
 kubectl apply -f propusk-src.yaml
 ```
 
-**Что вы должны увидеть** — `configmap/propusk-src created`.
+**What you should see** — `configmap/propusk-src created`.
 
-## Шаг 5. Разбираем Job
+## Step 5. Break down the Job
 
-Прежде чем запускать — прочитайте, что именно вы запускаете. Сборка займёт узел целиком,
-и стоит понимать, за что.
+Before you run it, read what exactly you're running. The build will occupy the entire node,
+and it's worth understanding what for.
 
 <details>
-<summary><b>Разбираем android-build.yaml построчно</b></summary>
+<summary><b>A closer look: what's inside android-build.yaml</b></summary>
 
-В файле два объекта: ConfigMap со скриптом сборки и сам Job.
+The file has two objects: a ConfigMap with the build script and the Job itself.
 
-### Скрипт сборки
+### The build script
 
-Он в ConfigMap по той же причине, по которой страница nginx лежала отдельно от
-Deployment: сорок строк shell внутри поля `command` невозможно читать.
+It's in a ConfigMap for the same reason the nginx page lived separately from the Deployment:
+forty lines of shell inside a `command` field are impossible to read.
 
-Пять шагов, и все пять — обычные команды, которые вы бы набрали руками на билд-сервере.
-Контейнер стартует пустым: в нём есть Java и Gradle из образа, но нет ни Android SDK,
-ни ключей, ни исходников — SDK и ключи подтягивают команды сборки, а исходники приносит с собой ConfigMap, смонтированный в контейнер.
+Five steps, and all five are ordinary commands you'd type by hand on a build server. The
+container starts empty: it has Java and Gradle from the image, but no Android SDK, no keys, no
+source — the SDK and keys are pulled in by the build commands, and the source is brought along
+by the ConfigMap mounted into the container.
 
-| Шаг | Что делает | Сколько идёт |
+| Step | What it does | How long it takes |
 |---|---|---|
-| 1 | скачивает Android command-line tools — набор утилит, которым ставят сам SDK | 1–2 минуты |
-| 2 | принимает лицензии и ставит SDK, платформу 34, build-tools | 5–15 минут |
-| 3 | `gradle :app:assembleDebug` — компиляция исходников в APK | 3–8 минут |
-| 4 | ставит `mc`, консольный клиент к хранилищу S3 | секунды |
-| 5 | кладёт APK в бакет двумя именами | секунды |
+| 1 | downloads the Android command-line tools — the set of utilities used to install the SDK itself | 1–2 minutes |
+| 2 | accepts the licenses and installs the SDK, platform 34, build-tools | 5–15 minutes |
+| 3 | `gradle :app:assembleDebug` — compiling the source into an APK | 3–8 minutes |
+| 4 | installs `mc`, a command-line client for S3 storage | seconds |
+| 5 | puts the APK into the bucket under two names | seconds |
 
-Три строчки заслуживают отдельного взгляда.
+Three lines deserve a closer look.
 
 ```bash
-# yes — команда, которая бесконечно печатает «y»: так пачка вопросов «принимаете
-# лицензию? [y/n]» отвечается без человека.
-#   >/dev/null 2>&1   выбросить и обычный вывод, и вывод ошибок: он тут не нужен
-#   || true           «даже если команда вернула ошибку, считай, что всё хорошо»
+# yes — a command that prints "y" endlessly: this way a batch of "accept the
+# license? [y/n]" questions gets answered without a human.
+#   >/dev/null 2>&1   discard both normal output and error output: it's not needed here
+#   || true           "even if the command returned an error, treat it as fine"
 yes | sdkmanager --sdk_root="$ANDROID_SDK_ROOT" --licenses >/dev/null 2>&1 || true
 ```
 
-`|| true` здесь не халтура, а необходимость: `yes` получает SIGPIPE, когда `sdkmanager`
-закрывает ввод, и возвращает ненулевой код. При `set -o pipefail` это уронило бы сборку
-на пустом месте. Если лицензии на самом деле не приняты — следующая же команда откажется
-ставить SDK, так что ошибку мы не спрячем.
+`|| true` here isn't a shortcut but a necessity: `yes` gets a SIGPIPE when `sdkmanager`
+closes its input, and it returns a non-zero code. Under `set -o pipefail` this would fail the
+build for no reason. If the licenses really weren't accepted, the very next command will
+refuse to install the SDK, so we're not hiding the error.
 
 ```bash
-# alias set = «запомни адрес хранилища и ключи под коротким именем builds», чтобы
-# дальше не повторять их в каждой команде копирования.
-#   "https://${endpoint}"   адрес: приставку https:// дописываем сами, в секрете её нет
-#   ${accessKey} ${secretKey}   логин и пароль на языке S3, приезжают из секрета
-#   >/dev/null              погасить вывод
+# alias set = "remember the storage address and keys under the short name builds," so
+# we don't repeat them in every copy command that follows.
+#   "https://${endpoint}"   the address: we add the https:// prefix ourselves, it's not in the secret
+#   ${accessKey} ${secretKey}   the login and password in S3 terms, they come from the secret
+#   >/dev/null              suppress the output
 mc alias set builds "https://${endpoint}" "${accessKey}" "${secretKey}" >/dev/null
 ```
 
-Вывод погашен намеренно, и по той же причине в скрипте нет `set -x`: логи Job видит
-каждый, у кого есть доступ к кластеру, и ключи туда попадать не должны.
+The output is suppressed deliberately, and for the same reason the script has no `set -x`:
+the Job's logs are visible to everyone with access to the cluster, and keys must not end up
+there.
 
 ```bash
-# echo печатает строку в лог задачи. Никакой работы она не делает — это отметка
-# о том, что предыдущая команда копирования дошла до конца
+# echo prints a line to the task's log. It does no work — it's a marker
+# that the previous copy command ran to completion
 echo "APK-UPLOADED ${bucketName}/propusk/propusk-${STAMP}.apk"
 ```
 
-Строчка-маркер. По ней `check.sh` отличает «Job отработал» от «APK действительно доехал
-до бакета» — это разные утверждения, и второе сильнее.
+A marker line. By it `check.sh` distinguishes "the Job ran" from "the APK actually made it to
+the bucket" — these are different claims, and the second is stronger.
 
-### Job
+### The Job
 
 ```yaml
 kind: Job
@@ -419,31 +426,32 @@ spec:
   backoffLimit: 1
 ```
 
-Сколько раз пересоздать под, если сборка упала. Ноль был бы честнее, но сеть иногда
-моргает на скачивании полутора гигабайт SDK, и вторая попытка дешевле, чем разбор
-«почему у меня упало».
+How many times to recreate the Pod if the build fails. Zero would be more honest, but the
+network sometimes drops out while downloading the gigabyte and a half of SDK, and a second
+attempt is cheaper than investigating "why did mine fail."
 
 ```yaml
   activeDeadlineSeconds: 7200
 ```
 
-Потолок на всю задачу, два часа. Без него зависшая сборка держала бы узел до вечера, и вы
-бы об этом узнали от соседа, у которого ничего не разворачивается.
+A ceiling on the whole task, two hours. Without it, a hung build would hold the node until
+evening, and you'd hear about it from a neighbor whose things won't deploy.
 
-Отсчёт идёт от создания Job, а не от запуска контейнера: время в `Pending` и пересоздание
-узла чуть дальше по лабе расходуют тот же лимит. Часа на это не хватало — сборка умирала
-с `DeadlineExceeded` уже после того, как человек её дождался.
+The countdown starts from the Job's creation, not from the container's start: time spent in
+`Pending` and the node recreation a bit further along in the lab draw down the same limit. An
+hour wasn't enough for this — the build would die with `DeadlineExceeded` right after a person
+had already waited it out.
 
 ```yaml
       restartPolicy: Never
 ```
 
-Для Job это поле обязательно, и допустимых значений всего два. `Never` означает: упавший
-процесс не перезапускать внутри того же пода, а отдать решение Job — он создаст новый.
-Так у каждой попытки свои логи, и видно, какая по счёту упала.
+For a Job this field is required, and there are only two valid values. `Never` means: don't
+restart a failed process inside the same Pod, but hand the decision to the Job — it'll create
+a new one. That way each attempt has its own logs, and you can see which one failed.
 
-Значения `Always`, привычного по Deployment, здесь нет: «всегда перезапускать» и
-«дождаться завершения» противоречат друг другу.
+The value `Always`, familiar from Deployment, isn't available here: "always restart" and
+"wait until it finishes" contradict each other.
 
 ```yaml
           envFrom:
@@ -451,12 +459,12 @@ spec:
                 name: bucket-creds
 ```
 
-Все четыре ключа секрета становятся переменными окружения с теми же именами. Альтернатива
-— перечислять каждую переменную отдельно; для четырёх однотипных ключей это лишний шум.
+All four keys of the secret become environment variables with the same names. The alternative
+is to list each variable separately; for four keys of the same kind, that's extra noise.
 
-⚠️ Побочный эффект, который стоит знать: `envFrom` затащит в окружение **все** ключи
-секрета, включая те, что добавят туда потом. Для секрета, который вы завели сами и под
-одну задачу, это допустимо. Для общего секрета на весь namespace — уже нет.
+⚠️ A side effect worth knowing: `envFrom` will drag **all** the secret's keys into the
+environment, including ones added later. For a secret you created yourself and for a single
+task, that's acceptable. For a shared secret spanning the whole namespace, it isn't.
 
 ```yaml
           resources:
@@ -464,14 +472,14 @@ spec:
             limits:   {cpu: "2", memory: 6Gi}
 ```
 
-Вот та самая честная цена сборки Android. `requests` — что зарезервировать: одно ядро и
-четыре гигабайта. Меньше не имеет смысла, компилятор Kotlin съест их и попросит ещё.
-`limits` — потолок: два ядра и шесть гигабайт.
+Here's that honest price of an Android build. `requests` is what to reserve: one core and
+four gigabytes. Less makes no sense — the Kotlin compiler will eat them up and ask for more.
+`limits` is the ceiling: two cores and six gigabytes.
 
-Сравните с приложением из первой лабы: `20m` процессора и `32Mi` памяти. Разница в
-пятьдесят раз по процессору и в сто тридцать по памяти. Это к вопросу «зачем вообще
-указывать `requests`»: без них планировщик считал бы сборку такой же невесомой, как
-nginx, и поставил бы её на узел, где она не помещается.
+Compare it to the app from the first lab: `20m` of CPU and `32Mi` of memory. A fiftyfold
+difference in CPU and a hundred-and-thirtyfold difference in memory. This bears on the
+question "why specify `requests` at all": without them the scheduler would consider the build
+as weightless as nginx and place it on a node where it doesn't fit.
 
 ```yaml
         - name: work
@@ -479,15 +487,15 @@ nginx, и поставил бы её на узел, где она не поме�
             sizeLimit: 12Gi
 ```
 
-Временный диск на узле. Сюда лягут SDK, кэш Gradle и результат сборки — суммарно
-шесть-восемь гигабайт. Живёт ровно столько же, сколько под: Job закончился — диск
-исчез.
+A temporary disk on the node. The SDK, the Gradle cache, and the build result will land
+here — six to eight gigabytes in total. It lives exactly as long as the Pod: the Job
+finished, the disk is gone.
 
-**Отсюда прямо следует, почему каждая сборка долгая.** Мы каждый раз качаем SDK и
-зависимости заново. На настоящем билд-сервере вместо `emptyDir` был бы постоянный том,
-и он бы пережил задачу: первая сборка дольше, вторая заметно быстрее. Мы не делаем
-этого в лабе намеренно, чтобы не заводить лишнюю сущность, но в жизни это первое, что
-нужно добавить.
+**From this it follows directly why every build is slow.** We download the SDK and
+dependencies from scratch every time. On a real build server, instead of `emptyDir` there'd
+be a persistent volume, and it would outlive the task: the first build slower, the second
+noticeably faster. We deliberately don't do this in the lab, to avoid introducing an extra
+entity, but in real life it's the first thing you'd add.
 
 ```yaml
             items:
@@ -495,169 +503,170 @@ nginx, и поставил бы её на узел, где она не поме�
                 path: app/build.gradle.kts
 ```
 
-Ключ ConfigMap не может содержать слэш, а путь при монтировании — может. Так плоская
-карта из шести ключей разворачивается в дерево каталогов, которого ждёт Gradle.
+A ConfigMap key can't contain a slash, but a mount path can. That's how a flat map of six keys
+unfolds into the directory tree Gradle expects.
 
 </details>
 
-## Шаг 6. Запускаем — и упираемся
+## Step 6. Run it — and hit a wall
 
-📍 **Где:** на виртуалке, в кластере `lab`.
+📍 **Where:** on the bastion, in the `lab` cluster.
 
-Применяем задание и сразу смотрим на под, который оно создало.
+We apply the job and immediately look at the Pod it created.
 
 ```bash
-# Создаёт из файла два объекта: ConfigMap со скриптом и сам Job.
-# С этого момента кластер обязан найти узел под сборку и запустить её
+# Creates two objects from the file: a ConfigMap with the script and the Job itself.
+# From this moment the cluster is obliged to find a node for the build and start it
 kubectl apply -f android-build.yaml
 
-# get pods = «покажи поды». Своего имени у пода задачи нет — Job придумывает его
-# сам, дописывая к своему имени случайный хвост. Поэтому ищем не по имени, а по метке:
-#   -l job-name=propusk-build   отобрать поды с меткой job-name, равной имени задания.
-#                               Метку Job вешает на свои поды сам
+# get pods = "show the Pods." The task's Pod has no name of its own — the Job invents it
+# itself, appending a random tail to its own name. So we search not by name but by label:
+#   -l job-name=propusk-build   select Pods with the job-name label equal to the job's name.
+#                               The Job attaches this label to its Pods itself
 kubectl get pods -l job-name=propusk-build
 ```
 
-**Что вы, скорее всего, увидите:**
+**What you'll most likely see:**
 
 ```
 NAME                   READY   STATUS    RESTARTS   AGE
 propusk-build-x7k2p    0/1     Pending   0          40s
 ```
 
-`Pending` — это не «запускается». Это «не запустился и не запустится». Причину кластер
-пишет в события пода — это его журнал: кто и что с ним пытался сделать.
+`Pending` doesn't mean "starting up." It means "didn't start and won't." The cluster writes
+the reason into the Pod's events — its log of who tried to do what with it.
 
 ```bash
-# describe = «покажи всё, что известно про объект»: настройки, состояние, события.
-# Вывод длинный, поэтому оставляем от него только конец:
-#   sed -n '/Events:/,$p'   напечатать строки от той, где встретилось «Events:»,
-#                           и до конца вывода ($ — конец)
+# describe = "show everything known about the object": settings, state, events.
+# The output is long, so we keep only its tail:
+#   sed -n '/Events:/,$p'   print lines from the one where "Events:" appears,
+#                           through the end of the output ($ — end)
 kubectl describe pod -l job-name=propusk-build | sed -n '/Events:/,$p'
 ```
 
-**Что вы должны увидеть** — строку с причиной, по которой под не размещён:
+**What you should see** — the line with the reason the Pod wasn't placed:
 
 ```
 Warning  FailedScheduling  0/1 nodes are available: 1 Insufficient cpu, 1 Insufficient memory.
 ```
 
-> **Остановитесь и подумайте, прежде чем читать дальше.**
+> **Stop and think before reading on.**
 >
-> Что именно не сошлось? Вспомните, какой узел вы заказали в лабе 0 и сколько памяти
-> запросил Job.
+> What exactly didn't add up? Recall which node you ordered in Lab 0 and how much memory the
+> Job requested.
 
 <details>
-<summary><b>Ответ и урок шире, чем эта ошибка</b></summary>
+<summary><b>The answer, and a lesson broader than this error</b></summary>
 
-В лабе 0 мы взяли узел `u1.medium` — одно ядро и четыре гигабайта. Job просит `requests:
-memory 4Gi` и `cpu 1`. Ровно столько на узле и есть, но часть уже занята: kubelet
-резервирует память под себя, плюс на узле работают системные поды сети и мониторинга,
-плюс приложение из первой лабы.
+In Lab 0 we took the node `u1.medium` — one core and four gigabytes. The Job asks for
+`requests: memory 4Gi` and `cpu 1`. That's exactly what the node has, but part of it is
+already taken: kubelet reserves memory for itself, plus the node runs system Pods for
+networking and monitoring, plus the app from the first lab.
 
-Обратите внимание: не хватает **и того и другого** — процессора тоже. Узел `u1.medium`
-даёт одно ядро, сборка просит целое, и часть ядра уже занята системными подами. Поэтому
-в сообщении две причины, а не одна: планировщику достаточно любой из них.
+Note that **both** fall short — CPU too. The `u1.medium` node gives one core, the build asks
+for a whole one, and part of the core is already taken by system Pods. That's why the message
+has two reasons, not one: any one of them is enough for the scheduler.
 
-Планировщик складывает `requests` всех подов на узле и сравнивает с тем, что узел
-реально готов отдать. Свободного места не набирается, и под остаётся ждать вечно.
+The scheduler adds up the `requests` of all Pods on the node and compares that with what the
+node is actually willing to give. There's not enough free room, and the Pod is left waiting
+forever.
 
-**Урок шире, чем эта ошибка.** Планировщик Kubernetes считает не фактическое потребление,
-а **заявленное**. Узел, где все поды дремлют и загрузка процессора три процента, для
-планировщика может быть полностью занят — если сумма `requests` уже равна ёмкости. И
-наоборот: узел, задыхающийся от нагрузки, будет принимать новые поды, пока сумма
-`requests` не упрётся в потолок.
+**A lesson broader than this error.** The Kubernetes scheduler counts not actual consumption
+but what's **declared**. A node where all the Pods are dozing and CPU usage is three percent
+can be fully occupied as far as the scheduler is concerned — if the sum of `requests` already
+equals capacity. And the reverse: a node gasping under load will keep accepting new Pods until
+the sum of `requests` hits the ceiling.
 
-Это же объясняет странную на первый взгляд пару `Insufficient cpu, Insufficient memory`
-на пустом с виду кластере — она встретится вам ещё не раз.
+This also explains the at-first-glance odd pair `Insufficient cpu, Insufficient memory` on a
+seemingly empty cluster — you'll run into it more than once.
 
-В vSphere вам знакомо и то и другое: reservation, которую DRS учитывает при размещении,
-и фактическая нагрузка, которую он смотрит отдельно. Здесь размещение считается **только**
-по reservation, без второй половины.
+In vSphere you're familiar with both: the reservation that DRS accounts for during placement,
+and actual load, which it looks at separately. Here placement is computed **only** from the
+reservation, without the second half.
 
 </details>
 
-## Шаг 7. Увеличиваем узел
+## Step 7. Grow the node
 
-📍 **Где:** в дашборде, в приложении `lab`.
+📍 **Where:** in the dashboard, in the `lab` application.
 
-Откройте `Kubernetes` → `lab` → изменить. В node group поменяйте:
+Open `Kubernetes` → `lab` → edit. In the node group, change:
 
-| Поле | Было | Стало | Почему |
+| Field | Before | After | Why |
 |---|---|---|---|
-| Instance type | `u1.medium` (1 ядро, 4 ГБ) | `u1.large` (2 ядра, 8 ГБ) | минимум, куда сборка помещается |
-| Disk | `20Gi` | `40Gi` | SDK, кэш Gradle и слои образа не влезут в двадцать |
+| Instance type | `u1.medium` (1 core, 4 GB) | `u1.large` (2 cores, 8 GB) | the minimum the build fits into |
+| Disk | `20Gi` | `40Gi` | the SDK, Gradle cache, and image layers won't fit in twenty |
 
-Если квота вашего тенанта позволяет — берите `u1.xlarge` (4 ядра, 16 ГБ). Сборка пойдёт
-заметно быстрее, а лишние ресурсы вы вернёте сразу после лабы. Не позволяет — форма
-откажет при сохранении, и тогда остаётся `u1.large`.
+If your tenant's quota allows, take `u1.xlarge` (4 cores, 16 GB). The build will go
+noticeably faster, and you'll hand the extra resources back right after the lab. If it doesn't
+allow it, the form will refuse on save, and then `u1.large` is what's left.
 
-⚠️ **Смена типа узла пересоздаёт виртуальную машину узла.** Старый узел уедет, новый
-поднимется, поды переедут. Это займёт несколько минут, и всё, что жило на локальном диске
-узла, исчезнет. Для наших лаб это безболезненно — данные лежат в managed-сервисах, а не
-на узлах, — но на рабочем кластере это операция, которую планируют.
+⚠️ **Changing the node type recreates the node's virtual machine.** The old node departs, a
+new one comes up, the Pods move over. This takes a few minutes, and everything that lived on
+the node's local disk disappears. For our labs this is painless — the data lives in managed
+services, not on the nodes — but on a production cluster this is an operation you plan.
 
-Дождитесь нового узла. Графической консоли у кластера `lab` нет, смотрим командой:
+Wait for the new node. The `lab` cluster has no graphical console, so we watch with a command:
 
 ```bash
-# get nodes = «покажи узлы кластера» — те самые виртуальные машины, на которых
-# работают поды.
-#   -w   watch, «не выходи и дописывай строки при каждом изменении». Старый узел
-#        уйдёт из списка, новый появится и дойдёт до STATUS=Ready.
-#        Выйти из слежения — Ctrl+C, на кластер это никак не влияет
+# get nodes = "show the cluster's nodes" — those very virtual machines on which
+# the Pods run.
+#   -w   watch, "don't exit; append lines on every change." The old node
+#        will drop from the list, a new one will appear and reach STATUS=Ready.
+#        To leave the watch — Ctrl+C, which has no effect on the cluster
 kubectl get nodes -w
 ```
 
-Как только узел `Ready`, подвисший под сборки поедет сам — планировщик пересматривает
-`Pending`-поды постоянно, просить его не нужно. Проверяем, что тронулся:
+As soon as the node is `Ready`, the stuck build Pod will move on its own — the scheduler
+reviews `Pending` Pods constantly, there's no need to ask it. We check that it's moving:
 
 ```bash
-# Тот же запрос, что и до правки узла. Теперь в колонке STATUS ожидается
-# ContainerCreating, а через минуту-две Running
+# The same query as before the node edit. Now the STATUS column should show
+# ContainerCreating, and in a minute or two Running
 kubectl get pods -l job-name=propusk-build
 ```
 
-## Шаг 8. Ждём сборку
+## Step 8. Wait for the build
 
-📍 **Где:** на виртуалке, в кластере `lab`.
+📍 **Where:** on the bastion, in the `lab` cluster.
 
-Смотреть за сборкой мы будем в её логе — то есть в том, что скрипт печатает на экран
-внутри контейнера.
+We'll watch the build in its log — that is, in what the script prints to the screen inside the
+container.
 
 ```bash
-# logs = «покажи, что напечатала задача».
-#   -f                  follow: не выходить, а дописывать строки по мере появления.
-#                       Выйти — Ctrl+C, сборка при этом продолжится
-#   job/propusk-build   можно указать сам Job, а не под: kubectl найдёт его под сам
+# logs = "show what the task printed."
+#   -f                  follow: don't exit, but append lines as they appear.
+#                       Exit — Ctrl+C, the build keeps going regardless
+#   job/propusk-build   you can point at the Job itself, not the Pod: kubectl will find its Pod on its own
 kubectl logs -f job/propusk-build
 ```
 
-**Что вы должны увидеть** — пять шагов скрипта по очереди. Ориентиры по времени:
+**What you should see** — the script's five steps in sequence. Timing guideposts:
 
-| Отметка в логе | Когда примерно |
+| Log marker | Roughly when |
 |---|---|
-| `== 1/5 ставлю Android command-line tools ==` | сразу |
-| `== 2/5 принимаю лицензии и качаю SDK (самый долгий шаг) ==` | +1–2 минуты, и висит дольше всего |
-| `== 3/5 собираю APK ==` | +5–15 минут от старта |
-| `BUILD SUCCESSFUL in ...` | +10–25 минут от старта |
-| `APK-UPLOADED bucket-.../propusk/propusk-...apk` | сразу за ним |
+| `== 1/5 ставлю Android command-line tools ==` | immediately |
+| `== 2/5 принимаю лицензии и качаю SDK (самый долгий шаг) ==` | +1–2 minutes, and hangs the longest |
+| `== 3/5 собираю APK ==` | +5–15 minutes from the start |
+| `BUILD SUCCESSFUL in ...` | +10–25 minutes from the start |
+| `APK-UPLOADED bucket-.../propusk/propusk-...apk` | right after it |
 
-⚠️ **Двадцать минут тишины на отметке `2/5` — это норма, а не зависание.** `sdkmanager` не
-показывает прогресс скачивания в неинтерактивном режиме: он молчит, а потом печатает
-`done`. Убедиться, что процесс жив, можно в другом окне терминала — посмотреть, ест ли
-под процессор и память:
+⚠️ **Twenty minutes of silence at the `2/5` marker is normal, not a freeze.** `sdkmanager`
+doesn't show download progress in non-interactive mode: it stays quiet and then prints `done`.
+You can confirm the process is alive in another terminal window — check whether the Pod is
+eating CPU and memory:
 
 ```bash
-# top = «сколько сейчас потребляет». Не заявка requests, а фактический расход
-# прямо в эту секунду. Ненулевой процессор означает, что внутри идёт работа
+# top = "how much it's consuming right now." Not the requests claim, but actual usage
+# this very second. Non-zero CPU means work is happening inside
 kubectl top pod -l job-name=propusk-build
 ```
 
-Job считается выполненным, когда под завершился с кодом 0 (нулевой код возврата —
-общепринятое «отработал без ошибок»):
+The Job is considered complete when the Pod exited with code 0 (a zero return code is the
+widely accepted "ran without errors"):
 
 ```bash
-# Смотрим не на под, а на само задание: у него есть колонки, которых у пода нет
+# We look not at the Pod but at the job itself: it has columns the Pod doesn't
 kubectl get job propusk-build
 ```
 
@@ -666,110 +675,112 @@ NAME             STATUS     COMPLETIONS   DURATION   AGE
 propusk-build    Complete   1/1           18m32s     19m
 ```
 
-Колонка `DURATION` — это и есть ответ мобильной команде на вопрос «сколько занимает
-сборка». Второй раз тот же Job, если удалить и создать заново, займёт столько же: кэша
-у нас нет, и мы знаем почему.
+The `DURATION` column is precisely the answer to the mobile team's question "how long does
+the build take." Run the same Job a second time, by deleting and recreating it, and it'll take
+just as long: we have no cache, and we know why.
 
-## Шаг 9. Забираем APK
+## Step 9. Retrieve the APK
 
-📍 **Где:** в дашборде тенанта, в карточке бакета.
+📍 **Where:** in the tenant dashboard, on the bucket's card.
 
-У бакета есть веб-интерфейс — откройте его из карточки бакета и войдите теми же
-`accessKey` и `secretKey`. Внутри увидите:
+The bucket has a web interface — open it from the bucket's card and log in with the same
+`accessKey` and `secretKey`. Inside you'll see:
 
 ```
 propusk/propusk-20260821-141207.apk
 propusk/propusk-latest.apk
 ```
 
-Два имени на один файл — обычная практика: по датированному имени видно историю сборок,
-по `latest` тестировщик всегда забирает свежее, не спрашивая, какая сегодня дата.
+Two names for one file is common practice: the dated name shows the build history, and by
+`latest` a tester always grabs the freshest one without asking what today's date is.
 
-Обратите внимание, что «папки» `propusk` на самом деле нет. В объектном хранилище нет
-каталогов: `propusk/propusk-latest.apk` — это целиком имя объекта, а слэш внутри него
-интерфейс рисует деревом для нашего удобства.
+Note that the `propusk` "folder" doesn't actually exist. There are no directories in object
+storage: `propusk/propusk-latest.apk` is the object's name in full, and the slash inside it is
+drawn as a tree by the interface for our convenience.
 
-**Чем это отличается от файловой шары**, к которой вы привыкли:
+**How this differs from the file share** you're used to:
 
-| | Файловая шара (NFS, SMB) | Объектное хранилище (S3) |
+| | File share (NFS, SMB) | Object storage (S3) |
 |---|---|---|
-| Как подключается | монтируется как диск | не монтируется, запросы по HTTP |
-| Частичная запись | можно дописать в середину файла | нельзя, объект кладут целиком |
-| Каталоги | настоящие | их нет, слэш — часть имени |
-| Блокировки | есть | нет |
-| Кто дотянется | тот, кто в той же сети | кто угодно с ключом и HTTPS |
-| Сколько влезет | сколько на томе | практически без потолка |
+| How it's connected | mounted as a disk | not mounted, requests over HTTP |
+| Partial writes | you can write into the middle of a file | not allowed, an object is put whole |
+| Directories | real | none, the slash is part of the name |
+| Locks | yes | no |
+| Who can reach it | whoever is on the same network | anyone with a key and HTTPS |
+| How much fits | as much as the volume holds | practically no ceiling |
 
-Отсюда правило, по которому выбирают: **база данных или общий каталог с документами —
-файловая шара, артефакты и бэкапы — объектное хранилище**. Пытаться положить базу на S3
-так же больно, как раздавать APK по SMB через интернет.
+Hence the rule for choosing: **a database or a shared folder of documents — a file share;
+artifacts and backups — object storage**. Trying to put a database on S3 is as painful as
+handing out APKs over SMB across the internet.
 
-## Проверка
+## The check
 
-📍 **Где:** на виртуалке, в том же окне терминала, где вы работали с `kubectl`.
+📍 **Where:** on the bastion, in the same terminal window where you worked with `kubectl`.
 
 ```bash
-# Скрипт ходит в кластер lab тем же файлом доступа, что и вы. Реквизиты бакета
-# он берёт из секрета bucket-creds — отдельно вводить ничего не нужно
+# The script reaches the lab cluster with the same access file as you. The bucket
+# credentials it takes from the bucket-creds secret — you don't need to enter anything separately
 export KUBECONFIG=~/lab.kubeconfig
 ./check.sh
 ```
 
-⚠️ **На Windows скрипт запускается из WSL**, а не из PowerShell — как его поставить,
-написано в начале лабы 0. Без WSL лабу можно пройти, но отчёта-артефакта не будет.
+⚠️ **On Windows the script runs from WSL**, not from PowerShell — how to install it is
+described at the start of Lab 0. You can complete the lab without WSL, but there'll be no
+artifact report.
 
-Скрипт проверяет не то, что вы применили манифест, а то, что сборка дошла до конца:
-Job завершился успешно, в логах есть `BUILD SUCCESSFUL`, APK доехал до бакета, и хранилище
-из секрета действительно отвечает изнутри кластера.
+The script checks not that you applied the manifest, but that the build ran to the end: the
+Job finished successfully, the logs contain `BUILD SUCCESSFUL`, the APK made it to the bucket,
+and the storage from the secret really does respond from inside the cluster.
 
-## Уборка
+## Cleanup
 
-Job после завершения ничего не потребляет: под завершился, а его ядра и гигабайты
-вернулись в свободную ёмкость узла ещё в момент `Complete` — их сразу может занять
-кто-то другой. Остаётся только запись в кластере и логи — несколько килобайт.
+Once finished, the Job consumes nothing: the Pod terminated, and its cores and gigabytes
+returned to the node's free capacity at the moment of `Complete` — someone else can take them
+right away. All that remains is a record in the cluster and the logs — a few kilobytes.
 
-Удалять его сразу не нужно, логи ещё пригодятся. Когда закончите:
+There's no need to delete it right away; the logs will still be useful. When you're done:
 
 ```bash
-# delete -f = «убери из кластера то, что описано в этом файле». Вместе с Job
-# исчезнут и его логи, поэтому команда идёт последней по времени, а не первой
+# delete -f = "remove from the cluster what's described in this file." Along with the Job
+# its logs will disappear too, so this command comes last in time, not first
 kubectl delete -f android-build.yaml
 kubectl delete -f propusk-src.yaml
-# Секрет удаляем отдельно: файла с ним нет, вы создавали его командой
+# We delete the secret separately: there's no file for it, you created it with a command
 kubectl delete secret bucket-creds
 ```
 
-⚠️ **Узел верните обратно на `u1.medium`, если он вам больше не нужен** — иначе он будет
-занимать четыре ядра до конца воркшопа. Бакет и его содержимое оставьте: он маленький и
-пригодится, если захотите пересобрать.
+⚠️ **Return the node to `u1.medium` if you no longer need it** — otherwise it'll occupy four
+cores until the end of the workshop. Leave the bucket and its contents: it's small and will
+come in handy if you want to rebuild.
 
-Именно эта дешевизна уборки и есть аргумент против выделенного билд-сервера. Мы взяли
-узел побольше на время сборки и вернули прежний одной правкой поля.
+It's precisely this cheapness of cleanup that is the argument against a dedicated build server.
+We took a bigger node for the duration of the build and returned the previous one with a single
+field edit.
 
-## Что мы теперь умеем
+## What we can now do
 
-- Отличать Job от Deployment и понимать, почему сборку нельзя запускать вторым
-- Запускать тяжёлую разовую задачу в кластере, не заводя под неё машину
-- Класть артефакты в объектное хранилище и объяснять, чем оно не файловая шара
-- Читать `Pending` как «не поместился по `requests`», а не как «загружается»
-- Называть реальную цену сборки Android в ядрах, гигабайтах и минутах
+- Tell a Job from a Deployment and understand why a build must not be run as the latter
+- Run a heavy one-off task in the cluster without setting up a machine for it
+- Put artifacts into object storage and explain how it isn't a file share
+- Read `Pending` as "didn't fit by `requests`," not as "loading"
+- State the real price of an Android build in cores, gigabytes, and minutes
 
-## А в vSphere это было бы
+## And in vSphere this would have been
 
-Заявка на виртуалку под билд-агент. Обоснование, почему ей нужно шестнадцать гигабайт,
-если она работает двадцать минут в сутки. Отказ. Второй заход через квартал. Потом машина,
-которая простаивает 98% времени и на которой через год стоит SDK трёх поколений, потому
-что удалять страшно.
+A request for a VM to serve as the build agent. A justification for why it needs sixteen
+gigabytes if it works twenty minutes a day. A rejection. A second attempt a quarter later.
+Then a machine that sits idle 98% of the time and, a year on, has three generations of the SDK
+installed because deleting them is scary.
 
-Здесь ресурсы берутся на время задачи и возвращаются сами.
+Here resources are taken for the duration of the task and returned by themselves.
 
-**Где vSphere удобнее, честно.** Сборочная машина, которая живёт постоянно, имеет одно
-неоспоримое преимущество: на ней уже всё скачано. Наше время сборки — это в основном
-скачивание SDK и зависимостей, которого на постоянном агенте не было бы. Лечится это
-постоянным томом под кэш, но том надо завести, следить за его размером и чистить —
-то есть частично вернуть себе ту самую работу, от которой мы уходили. Разница в том, что
-том стоит копейки и не требует заявки, а машина требовала.
+**Where vSphere is more convenient, honestly.** A build machine that lives permanently has one
+undeniable advantage: everything is already downloaded on it. Our build time is mostly the
+downloading of the SDK and dependencies, which a permanent agent wouldn't have. This is cured
+by a persistent volume for the cache, but the volume has to be set up, its size watched, and it
+cleaned — that is, taking back part of the very work we were escaping. The difference is that a
+volume costs pennies and requires no request, whereas a machine did.
 
-И второе: живая машина, на которую можно зайти по SSH и посмотреть, почему сборка ведёт
-себя странно, — это удобно. Под Job вы можете смотреть только логи, а после завершения
-и того меньше. Отладка сборки в кластере первое время идёт медленнее.
+And second: a live machine you can SSH into to see why a build is behaving strangely is
+convenient. With a Job's Pod you can only look at the logs, and after completion even less.
+Debugging a build in the cluster is slower at first.

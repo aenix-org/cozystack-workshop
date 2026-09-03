@@ -1,110 +1,110 @@
-# Лаба 8 · Секреты не в манифесте
+# Lab 8 · Secrets out of the manifest
 
 | | |
 |---|---|
-| **Время** | 50 минут, из них часть — ожидание, пока хранилище поднимается и вы его распечатываете |
-| **Что доказывает** | Пароль можно убрать из Git насовсем и менять его, не трогая ни один файл |
-| **Что понадобится** | Кластер из лабы 0 и `~/lab.kubeconfig`; доступ в дашборд своего тенанта; номер тенанта вида `workshopXX` |
+| **Time** | 50 minutes, part of it spent waiting while the store comes up and you unseal it |
+| **What it proves** | A password can be removed from Git for good and changed without touching a single file |
+| **What you'll need** | The cluster from Lab 0 and `~/lab.kubeconfig`; access to your tenant's dashboard; a tenant number of the form `workshopXX` |
 
-> ⚠️ **`workshopXX` — это заглушка, а не имя.** Подставьте свой номер тенанта, иначе
-> команда уйдёт в чужой тенант и вы получите отказ в доступе либо, что хуже, чужие
-> данные. Свой номер вы получили вместе с паролем.
+> ⚠️ **`workshopXX` is a placeholder, not a name.** Substitute your own tenant number,
+> otherwise the command will go to someone else's tenant and you'll get an access-denied
+> error — or worse, someone else's data. You were given your number together with your password.
 
-> ⚠️ **Плотная лаба: одиннадцать шагов и незнакомая модель доступа.**
-> Планируйте её на отдельный вечер.
+> ⚠️ **A dense lab: eleven steps and an unfamiliar access model.**
+> Plan it for an evening of its own.
 
-## Зачем это
+## Why this matters
 
-Сервис «Пропуск» работает: сотрудник заказывает пропуск для гостя, охрана видит список.
-Пришла служба ИБ с плановым аудитом и принесла одну строчку из вашего репозитория:
+The Passes service works: an employee requests a pass for a guest, security sees the list.
+The security team showed up for a routine audit and brought along a single line from your repository:
 
 ```yaml
 - name: DB_PASSWORD
   value: "Propusk2019!"
 ```
 
-Пароль от базы пропусков лежит в манифесте. Манифест лежит в Git. Git видят двенадцать
-человек из трёх команд, ещё четверо уволились, а полная копия репозитория есть на виртуалке
-подрядчика, который делал интеграцию в прошлом году.
+The password for the passes database sits in a manifest. The manifest sits in Git. Git is visible
+to twelve people across three teams, four more have left the company, and a full copy of the
+repository lives on the VM of a contractor who did an integration last year.
 
-Вопрос от аудитора звучит буднично: **«поменяйте этот пароль и покажите, кто его читал за
-последний месяц»**. Ответить нечего. Поменять пароль — значит найти все места, где он
-захардкожен; кто читал — неизвестно, потому что чтение файла из Git нигде не отмечается.
+The auditor's question sounds routine: **"change this password and show me who has read it over
+the past month."** There's nothing to answer. Changing the password means finding every place it's
+hardcoded; who has read it is unknown, because reading a file from Git is recorded nowhere.
 
-В этой лабе мы вынесем пароль в OpenBao, научим приложение забирать его оттуда, поменяем
-пароль одной командой и посмотрим, что об этом знает система.
+In this lab we'll move the password into OpenBao, teach the application to fetch it from there,
+change the password with a single command, and see what the system knows about it.
 
-По дороге разберёмся с вопросом, на котором спотыкаются почти все: **чем Secret в
-Kubernetes отличается от настоящего хранилища секретов.**
+Along the way we'll settle a question almost everyone trips over: **how a Secret in Kubernetes
+differs from a real secrets store.**
 
-Каждый термин этой лабы расшифровывается при первом появлении, а следующий раздел —
-словарик уже введённых.
+Every term in this lab is spelled out the first time it appears, and the next section is a glossary
+of the ones already introduced.
 
-## Словарик
+## Glossary
 
-| Термин | Что это | Похоже на… но |
+| Term | What it is | Like… but |
 |---|---|---|
-| **Secret (Kubernetes)** | Объект кластера с данными, записанными в base64 | **Файл с паролем на диске VM**, но выглядит защищённым и не защищён — разбираем это ниже |
-| **base64** | Способ записать любые байты печатными символами | **uuencode, MIME-вложение**, но это не шифрование. Ключа нет, обратное преобразование делает кто угодно |
-| **Хранилище секретов** | Отдельная служба: хранит секреты зашифрованными и выдаёт их по правилам | **Прямого аналога нет**, но это не «сетевая папка с паролями», а сервис с политиками, сроками и журналом |
-| **OpenBao** | Такое хранилище. Форк HashiCorp Vault, живёт под лицензией MPL | команды и API совпадают с Vault, только утилита называется `bao` |
-| **Root-токен** | Учётка с полным доступом ко всему | **root**, но им пользуются один раз при настройке, дальше выпускают узкие токены |
+| **Secret (Kubernetes)** | A cluster object holding data written in base64 | **A password file on a VM's disk**, but it looks protected and isn't — we take this apart below |
+| **base64** | A way to write arbitrary bytes as printable characters | **uuencode, a MIME attachment**, but it isn't encryption. There's no key, and anyone can reverse it |
+| **Secrets store** | A separate service: keeps secrets encrypted and hands them out by rule | **No direct analogue**, but it's not a "network folder full of passwords" — it's a service with policies, expiry, and a log |
+| **OpenBao** | One such store. A fork of HashiCorp Vault, released under the MPL license | the commands and API match Vault; only the utility is named `bao` |
+| **Root token** | An account with full access to everything | **root**, but you use it once during setup and then issue narrow tokens |
 
-Остальные слова этой лабы — `sealed`, unseal-ключ, политика, токен, KV v2, ротация, аудит-лог,
-init-контейнер — вводятся по ходу, в том шаге, где впервые понадобятся. Заучивать их сейчас не
-нужно: в отрыве от действия они всё равно не запомнятся.
+The rest of this lab's vocabulary — `sealed`, unseal key, policy, token, KV v2, rotation, audit log,
+init container — is introduced as you go, in the step where each is first needed. There's no need to
+memorize them now: divorced from the action, they won't stick anyway.
 
 <details>
-<summary><b>Если хотите увидеть весь список сразу</b></summary>
+<summary><b>If you'd like the whole list up front</b></summary>
 
-| Термин | Что это | Похоже на… но |
+| Term | What it is | Like… but |
 |---|---|---|
-| **Запечатан (sealed)** | Служба запущена, но мастер-ключ не в памяти: данные лежат зашифрованными, API отвечает отказом | **«Служба поднялась, но том не примонтирован»**, но после каждого перезапуска распечатывать надо заново, руками |
-| **Unseal-ключ** | Доля мастер-ключа, которой хранилище распечатывают | **Ключ от сейфа**, но долей несколько, и по умолчанию нужно предъявить не одну |
-| **Политика (policy)** | Список путей и того, что с ними разрешено | **ACL на папку**, но путь — это адрес в API, а не файл на диске |
-| **Токен** | Временный пропуск к хранилищу | **Сессия**, но у токена есть срок жизни, он протухает сам и его можно отозвать |
-| **KV v2** | Движок «ключ-значение» с историей версий | **Папка с файлами и историей изменений**, но хранит все версии и время каждой записи, старое значение не пропадает |
-| **Ротация** | Плановая замена секрета на новый | **Смена пароля по регламенту**, но здесь это одна команда, приложение подхватывает при следующем запуске |
-| **Аудит-лог** | Журнал «кто, когда, что запрашивал» | **Лог доступа к файловому ресурсу**, но пишется на каждый запрос к API, включая неудачные и отказы |
-| **Секрет нулевого уровня** | Тот единственный секрет, которым приложение доказывает право на все остальные | его нельзя убрать совсем. Можно сделать коротким, узким и одноразовым |
-| **Init-контейнер** | Контейнер, который отрабатывает и завершается до запуска основного | **Скрипт в автозагрузке до старта службы**, но если он упал — основной не стартует вообще, и это как раз то, что нужно |
+| **Sealed** | The service is running, but the master key isn't in memory: the data sits encrypted and the API refuses requests | **"The service came up, but the volume isn't mounted"**, but after every restart you have to unseal it again, by hand |
+| **Unseal key** | A share of the master key that the store is unsealed with | **A key to a safe**, but there are several shares, and by default you must present more than one |
+| **Policy** | A list of paths and what is allowed on them | **An ACL on a folder**, but the path is an address in the API, not a file on disk |
+| **Token** | A temporary pass to the store | **A session**, but a token has a lifetime, expires on its own, and can be revoked |
+| **KV v2** | A "key-value" engine with version history | **A folder of files with change history**, but it keeps every version and the timestamp of each write; the old value never disappears |
+| **Rotation** | A scheduled replacement of a secret with a new one | **Changing a password on a schedule**, but here it's a single command, and the application picks it up on its next start |
+| **Audit log** | A record of "who requested what, and when" | **An access log for a file share**, but a line is written for every API request, including failed ones and denials |
+| **Secret zero** | The one secret an application uses to prove its right to all the others | it can't be removed entirely. It can be made short-lived, narrow, and single-use |
+| **Init container** | A container that runs and finishes before the main one starts | **A startup script that runs before a service comes up**, but if it fails the main container doesn't start at all — which is exactly what you want |
 
 </details>
 
-## Что лежит в папке лабы
+## What's in the lab folder
 
-Все файлы уже у вас — вы забрали их вместе с репозиторием. Создавать и печатать заново
-ничего не нужно: там, где ниже написано `kubectl apply -f имя.yaml`, файл берётся отсюда.
+You already have all the files — you got them with the repository. There's nothing to create or
+retype: wherever the text below says `kubectl apply -f name.yaml`, the file comes from here.
 
 ```bash
 cd labs/08-openbao
 ```
 
-| Файл | Что это | Когда пригодится |
+| File | What it is | When you'll use it |
 |---|---|---|
-| `openbao.yaml` | Заказ хранилища секретов — то же, что кнопка в дашборде | применяете **в тенанте**, не в кластере `lab` |
-| `secrets-demo-naive.yaml` | Как сервис выглядит сегодня: пароль прямо в файле. Это и нашёл аудит | применяете на своём кластере `lab` |
-| `secrets-demo-secret.yaml` | «Наивная починка»: пароль вынесен в Secret — и почему этого мало | применяете туда же |
-| `secrets-demo.yaml` | Финальный вариант: пароля нет ни в открытом виде, ни в base64 | применяете туда же |
-| `check.sh` | Проверка, что приложение получает пароль из хранилища | запускаете в конце лабы |
+| `openbao.yaml` | An order for a secrets store — the same as the button in the dashboard | you apply it **in the tenant**, not in the `lab` cluster |
+| `secrets-demo-naive.yaml` | How the service looks today: the password right in the file. This is what the audit found | you apply it on your own `lab` cluster |
+| `secrets-demo-secret.yaml` | The "naive fix": the password moved into a Secret — and why that isn't enough | you apply it to the same place |
+| `secrets-demo.yaml` | The final version: the password is nowhere — not in plaintext, not in base64 | you apply it to the same place |
+| `check.sh` | A check that the application gets its password from the store | you run it at the end of the lab |
 
-## Шаг 1. Смотрим на проблему своими глазами
+## Step 1. See the problem with your own eyes
 
-📍 **Где:** на виртуалке, в лабораторном кластере.
+📍 **Where:** on the bastion, in the lab cluster.
 
-Воспроизведём находку аудита у себя: поднимем в учебном кластере маленький сервис
-`secrets-demo`, которому пароль передан прямо из описания. Сначала разбираем файл,
-потом применяем.
+Let's reproduce the audit's finding on our own turf: we'll bring up a small `secrets-demo` service
+in the lab cluster with the password handed to it straight from its description. First we go through
+the file, then we apply it.
 
 <details>
-<summary><b>Разбираем манифест построчно</b></summary>
+<summary><b>A closer look: what's inside secrets-demo-naive.yaml</b></summary>
 
-Это обычный `Deployment` — описание приложения: какой образ взять и сколько копий держать
-запущенными. **Образ** — готовый слепок файловой системы с программой внутри; ближайший
-аналог из vSphere — шаблон виртуальной машины, только без операционной системы.
-**Контейнер** — запущенный экземпляр образа. **Под** — наименьшая единица запуска
-в Kubernetes: один или несколько контейнеров, которые всегда живут и умирают вместе.
-Deployment следит, чтобы подов было запущено столько, сколько заказано.
+This is an ordinary `Deployment` — a description of an application: which image to take and how many
+copies to keep running. **An image** is a ready-made snapshot of a filesystem with a program inside;
+the closest analogue in vSphere is a VM template, only without the operating system.
+**A container** is a running instance of an image. **A Pod** is the smallest unit of execution
+in Kubernetes: one or more containers that always live and die together.
+The Deployment makes sure the number of Pods running matches the number ordered.
 
 ```yaml
       containers:
@@ -112,12 +112,12 @@ Deployment следит, чтобы подов было запущено сто�
           image: busybox:1.36
 ```
 
-Настоящий «Пропуск», который вы собрали на Go в лабе про свой реестр, мы здесь не трогаем:
-он работает, и ломать его ради упражнения незачем. Поэтому поднимаем рядом отдельный
-маленький сервис `secrets-demo` — нас интересует не приложение, а путь,
-которым в него попадает пароль. Поэтому вместо него крошечный контейнер, который делает
-единственную осмысленную вещь — раз в десять секунд пишет в лог, с каким паролем он
-работает.
+We won't touch the real Passes app that you built in Go in the lab about your own registry:
+it works, and there's no reason to break it for the sake of an exercise. So we bring up a separate
+small `secrets-demo` service alongside it — what interests us isn't the application but the path
+by which the password reaches it. That's why in its place there's a tiny container that does the
+single meaningful thing — once every ten seconds it writes to the log which password it's
+working with.
 
 ```yaml
           env:
@@ -125,67 +125,67 @@ Deployment следит, чтобы подов было запущено сто�
               value: "Propusk2019!"
 ```
 
-Вот эта строка и есть предмет разговора. Переменные окружения — самый обычный способ
-передать приложению настройку: `env` в манифесте превращается в переменную внутри
-контейнера. Способ хороший, а вот **значение прямо в файле** — плохое.
+This line is the whole point of the conversation. Environment variables are the most ordinary way
+to pass configuration to an application: `env` in the manifest becomes a variable inside the
+container. The mechanism is good; it's the **value sitting right in the file** that's bad.
 
 ```yaml
                   "$(printf %s "$DB_PASSWORD" | sha256sum | cut -c1-12)"
 ```
 
-Приложение печатает не пароль, а его **отпечаток** — первые двенадцать символов от
-sha256. По отпечатку видно, что пароль сменился, но восстановить сам пароль нельзя.
-Так и надо писать логи; мы будем пользоваться этим до конца лабы.
+The application prints not the password but its **fingerprint** — the first twelve characters of
+the sha256. The fingerprint shows that the password has changed, yet the password itself can't be
+recovered from it. This is how logs should be written; we'll use it for the rest of the lab.
 
-`resources.requests` — сколько ресурсов зарезервировать гарантированно (аналог
-reservation в vSphere), `resources.limits` — выше чего не давать подняться (аналог
-limit). Значения крошечные намеренно: приложение ничего не делает.
+`resources.requests` is how much resource to reserve as a guarantee (the analogue of a reservation
+in vSphere), `resources.limits` is the ceiling it isn't allowed to rise above (the analogue of a
+limit). The values are deliberately tiny: the application does nothing.
 
 </details>
 
-**Применяем.**
+**Apply it.**
 
 ```bash
-# KUBECONFIG говорит kubectl, к какому кластеру обращаться. Здесь — учебный кластер
-# из лабы 0; тенант понадобится позже, на шаге с заказом хранилища.
+# KUBECONFIG tells kubectl which cluster to talk to. Here it's the lab cluster
+# from Lab 0; the tenant will be needed later, at the step where we order the store.
 export KUBECONFIG=~/lab.kubeconfig
 cd labs/08-openbao
-# apply = «приведи кластер к тому, что описано в файле». -f — взять описание из файла.
-# Объекта с таким именем ещё нет, поэтому он будет создан.
+# apply = "bring the cluster to what's described in the file". -f = take the description from the file.
+# No object with this name exists yet, so it will be created.
 kubectl apply -f secrets-demo-naive.yaml
 ```
 
-**Что вы должны увидеть** — строку, оканчивающуюся словом `created`.
+**What you should see** — a line ending in the word `created`.
 
-Смотрим, что получилось:
+Let's look at what we got:
 
 ```bash
-# logs = показать, что приложение напечатало в свой вывод. Отдельного файла лога нет.
-#   deploy/secrets-demo  взять вывод у пода, поднятого по этому описанию
-#   --tail=2             только две последние строки, а не всё с момента запуска
+# logs = show what the application printed to its output. There's no separate log file.
+#   deploy/secrets-demo  take the output from the Pod brought up by this description
+#   --tail=2             only the last two lines, not everything since startup
 kubectl logs deploy/secrets-demo --tail=2
 ```
 
-**Что вы должны увидеть** — примерно такое:
+**What you should see** — something like this:
 
 ```
-08:14:31 подключаюсь к passes-db.internal как passes_app, отпечаток пароля sha256:a609df223d57
+08:14:31 connecting to passes-db.internal as passes_app, password fingerprint sha256:a609df223d57
 ```
 
-Приложение работает. Пароль — в файле, файл — в Git. Это ровно та ситуация, которую нашёл
-аудит.
+The application works. The password is in a file, the file is in Git. This is exactly the situation
+the audit found.
 
-## Шаг 2. Наивная починка: выносим пароль в Secret
+## Step 2. The naive fix: moving the password into a Secret
 
-📍 **Где:** на виртуалке, в лабораторном кластере.
+📍 **Where:** on the bastion, in the lab cluster.
 
-Первое, что предлагает любой поиск по интернету: «в Kubernetes для этого есть Secret».
-Сделаем как советуют — и сначала посмотрим, что меняется в файле.
+The first thing any internet search suggests: "Kubernetes has a Secret for that." Let's do as
+advised — and first look at what changes in the file.
 
 <details>
-<summary><b>Что изменилось в манифесте</b></summary>
+<summary><b>What changed in the manifest</b></summary>
 
-Появился отдельный объект:
+A separate object has appeared:
 
 ```yaml
 apiVersion: v1
@@ -197,11 +197,10 @@ data:
   password: UHJvcHVzazIwMTkh
 ```
 
-`Secret` — объект кластера, предназначенный для чувствительных данных. Значения в поле
-`data` записываются в base64, поэтому в файле вместо `Propusk2019!` теперь стоит
-`UHJvcHVzazIwMTkh`.
+A `Secret` is a cluster object meant for sensitive data. Values in the `data` field are written in
+base64, so in the file, in place of `Propusk2019!`, there now stands `UHJvcHVzazIwMTkh`.
 
-А в Deployment вместо значения появилась ссылка:
+And in the Deployment, in place of the value, a reference has appeared:
 
 ```yaml
             - name: DB_PASSWORD
@@ -211,122 +210,123 @@ data:
                   key: password
 ```
 
-`valueFrom` вместо `value` означает: «возьми значение не отсюда, а вон из того объекта».
-Kubernetes подставит содержимое ключа `password` из секрета `passes-db` в переменную
-`DB_PASSWORD` при запуске контейнера.
+`valueFrom` instead of `value` means: "take the value not from here, but from that object over
+there." Kubernetes will substitute the contents of the `password` key from the `passes-db` secret
+into the `DB_PASSWORD` variable when the container starts.
 
-Само по себе это правильный приём — ссылаться на секрет, а не вписывать значение.
-Вопрос в том, что лежит по ссылке.
+This is the right technique in itself — to reference a secret rather than write the value in.
+The question is what lies at the other end of the reference.
 
 </details>
 
-**Применяем.**
+**Apply it.**
 
 ```bash
-# Тот же apply. В файле два объекта — Secret и изменённый Deployment; кластер сравнит
-# описанное с тем, что у него уже есть, и доведёт до совпадения.
+# The same apply. The file holds two objects — a Secret and the changed Deployment; the cluster will
+# compare what's described against what it already has and bring the two into line.
 kubectl apply -f secrets-demo-secret.yaml
 ```
 
-Убедимся, что приложение по-прежнему работает:
+Let's confirm the application still works:
 
 ```bash
-# rollout status ждёт, пока новая версия приложения полностью сменит старую, и только
-# потом возвращает управление. Без него логи можно успеть прочитать у старого пода.
+# rollout status waits until the new version of the application has fully replaced the old one, and only
+# then returns control. Without it you might read the logs of the old Pod.
 kubectl rollout status deploy/secrets-demo
 kubectl logs deploy/secrets-demo --tail=2
 ```
 
-Отпечаток тот же — `sha256:a609df223d57`. Приложение получило тот же пароль другим путём.
+The fingerprint is the same — `sha256:a609df223d57`. The application got the same password by a
+different path.
 
-**Задача закрыта?** Пароль больше не написан в Deployment. В файле стоит непонятная
-строка. Проверим.
+**Problem solved?** The password is no longer written in the Deployment. An unintelligible string
+sits in the file. Let's check.
 
-## Предсказуемая неудача · «Secret» — это не «зашифровано»
+## A predictable failure · "Secret" doesn't mean "encrypted"
 
-Попробуйте убедиться, что теперь всё хорошо. Спросите у кластера, что лежит в секрете:
+Try to satisfy yourself that all is well now. Ask the cluster what's inside the secret:
 
 ```bash
-# get … -o yaml = «покажи объект целиком, в том виде, в каком его хранит кластер».
-# Смотреть надо на поле data — это и есть содержимое секрета.
+# get … -o yaml = "show the object in full, exactly as the cluster stores it".
+# Look at the data field — that's the secret's contents.
 kubectl get secret passes-db -o yaml
 ```
 
-Вы увидите ту же строку `UHJvcHVzazIwMTkh`. Выглядит непонятно, а значит безопасно.
+You'll see the same string `UHJvcHVzazIwMTkh`. It looks unintelligible, and therefore safe.
 
-Теперь одна команда:
+Now one command:
 
 ```bash
-#   -o jsonpath='{.data.password}'  достать из объекта ровно одно поле, без обёртки
-#   | base64 -d                     передать его дальше и раскодировать: d = decode
-#   ; echo                          допечатать перевод строки, иначе результат слипнётся
-#                                   со следующим приглашением терминала
+#   -o jsonpath='{.data.password}'  pull exactly one field out of the object, without the wrapper
+#   | base64 -d                     pass it along and decode it: d = decode
+#   ; echo                          print a trailing newline, otherwise the result runs into
+#                                   the next terminal prompt
 kubectl get secret passes-db -o jsonpath='{.data.password}' | base64 -d; echo
 ```
 
-> **Остановитесь и подумайте, прежде чем читать дальше.**
+> **Stop and think before reading on.**
 >
-> Что именно вы сейчас сделали, чтобы получить пароль? Какой ключ вам понадобился? У кого
-> ещё есть возможность выполнить эту команду?
+> What exactly did you just do to get the password? What key did you need? Who else is able to run
+> this command?
 
 <details>
-<summary><b>Ответ и урок шире, чем эта ошибка</b></summary>
+<summary><b>The answer, and a lesson broader than this error</b></summary>
 
-Вывод — `Propusk2019!`. Открытым текстом.
+The output is `Propusk2019!`. In plaintext.
 
-**base64 — это не шифрование, а кодирование.** Его придумали, чтобы передавать
-произвольные байты по каналам, рассчитанным на текст: вложения в почте, данные в JSON,
-бинарники в конфигах. Ключа в нём нет, потому что и защиты в нём нет. Обратное
-преобразование делает любой человек, любой браузер и любой сайт-декодер.
+**base64 is not encryption, it's encoding.** It was invented to carry arbitrary bytes over channels
+built for text: email attachments, data in JSON, binaries in config files. There's no key in it,
+because there's no protection in it either. Anyone can reverse it — any person, any browser, any
+decoder website.
 
-Kubernetes использует base64 в Secret ровно по этой причине: в YAML нельзя положить
-произвольные байты (например, сертификат или ключ), а в base64 — можно. Слово «Secret»
-в названии объекта означает «сюда кладут чувствительное», а не «здесь оно защищено».
+Kubernetes uses base64 in a Secret for exactly this reason: you can't put arbitrary bytes
+(a certificate or a key, say) into YAML, but you can put them in base64. The word "Secret" in the
+object's name means "sensitive things go here," not "they're protected here."
 
-Что из этого следует практически:
+What this means in practice:
 
-| Утверждение | Правда? |
+| Claim | True? |
 |---|---|
-| Secret зашифрован в кластере | Нет. В хранилище кластера он лежит почти открытым текстом, если администратор отдельно не включил шифрование хранилища |
-| Secret можно положить в Git | Нет. Это то же самое, что положить туда пароль |
-| Кто прочитал Secret — видно | Нет. Обычное чтение объекта нигде не отмечается |
-| Secret нельзя прочитать без прав | Правда, и это единственная реальная защита. Права в кластере доступ ограничивают |
-| Secret меняется сам по расписанию | Нет. Меняете вы, руками, во всех местах сразу |
+| A Secret is encrypted in the cluster | No. In the cluster's data store it sits in near-plaintext, unless an administrator has separately turned on encryption at rest |
+| A Secret can be committed to Git | No. That's the same as putting the password there |
+| You can see who has read a Secret | No. An ordinary read of the object is recorded nowhere |
+| A Secret can't be read without permissions | True, and this is the only real protection. Permissions in the cluster do limit access |
+| A Secret changes itself on a schedule | No. You change it, by hand, in every place at once |
 
-**Урок шире, чем эта ошибка.** И главное. Даже если бы всё это было решено, остаётся вопрос аудитора: **покажите, кто
-читал пароль за месяц.** Kubernetes на него не отвечает в принципе — не потому что плохо
-сделан, а потому что это не его задача. Хранение секретов — отдельная работа, и для неё
-есть отдельная служба.
+**A lesson broader than this error.** And the main point. Even if all of this were solved, the
+auditor's question remains: **show me who has read the password over the past month.** Kubernetes
+has no answer to it at all — not because it's poorly built, but because it isn't its job. Storing
+secrets is a separate task, and there's a separate service for it.
 
-Кстати, ваша роль в тенанте Cozystack секреты через `kubectl` читать **не даёт** —
-попробуете и получите отказ. Но лабораторный кластер из лабы 0 ваш целиком, и там вы
-администратор. Именно поэтому команда выше и сработала.
+By the way, your role in the Cozystack tenant does **not** let you read secrets via `kubectl` —
+try it and you'll be denied. But the lab cluster from Lab 0 is entirely yours, and there you're the
+administrator. That's precisely why the command above worked.
 
 </details>
 
-## Шаг 3. Заказываем OpenBao
+## Step 3. Order OpenBao
 
-📍 **Где:** в браузере, в дашборде Cozystack, в своём тенанте.
+📍 **Where:** in the browser, in the Cozystack dashboard, in your tenant.
 
-Тенант → **Создать приложение** → `OpenBAO`.
+Tenant → **Create application** → `OpenBAO`.
 
-| Поле | Значение | Почему так |
+| Field | Value | Why |
 |---|---|---|
-| Имя | `secrets` | коротко, дальше его придётся набирать в адресах |
-| Replicas | **1** | учебный стенд. При двух и более чарт включает Raft-репликацию, и это уже другой режим хранения |
-| Size | `2Gi` | секреты занимают килобайты, место нужно под служебные данные |
-| Storage class | `replicated` | данные лягут в трёх копиях на разные узлы |
-| Resources preset | `t1.small` | 1 процессор, 512 МБ |
-| UI | включено | веб-интерфейс внутри кластера |
-| External | выключено | наружу не выставляем |
+| Name | `secrets` | short, and you'll have to type it into addresses later |
+| Replicas | **1** | a training testbed. At two or more the chart enables Raft replication, and that's already a different storage mode |
+| Size | `2Gi` | secrets take up kilobytes; the space is for internal data |
+| Storage class | `replicated` | the data will be placed in three copies across different nodes |
+| Resources preset | `t1.small` | 1 CPU, 512 MB |
+| UI | enabled | the web interface inside the cluster |
+| External | disabled | we don't expose it outward |
 
-⚠️ **Переключение между одной копией и несколькими — не галочка.** Одна копия хранит
-данные в файле, несколько — в Raft. Смена режима требует переноса данных, поэтому в
-проде решение принимают до установки, а не после.
+⚠️ **Switching between one copy and several is not a checkbox.** One copy stores data in a file,
+several store it in Raft. Changing the mode requires migrating the data, so in production the
+decision is made before installation, not after.
 
-### То же самое текстом — и разбор полей
+### The same thing as text — and a walk through the fields
 
-В папке лабы лежит `openbao.yaml`:
+The lab folder contains `openbao.yaml`:
 
 ```yaml
 apiVersion: apps.cozystack.io/v1alpha1
@@ -343,103 +343,103 @@ spec:
   external: false
 ```
 
-`apiVersion: apps.cozystack.io/v1alpha1` — это и есть каталог Cozystack, только с той
-стороны, откуда его видно как API. Дашборд при нажатии кнопки собирает ровно такой
-объект и отправляет его в кластер. Кнопка — надстройка над текстом, а не альтернатива.
+`apiVersion: apps.cozystack.io/v1alpha1` is the Cozystack catalog itself, just seen from the side
+where it looks like an API. When you press the button, the dashboard assembles exactly this object
+and sends it to the cluster. The button is a layer on top of the text, not an alternative to it.
 
-`kind: OpenBAO` — позиция в каталоге. Обратите внимание на регистр: `OpenBAO`, а не
-`OpenBao`. Кластер к регистру придирчив.
+`kind: OpenBAO` is the position in the catalog. Mind the case: `OpenBAO`, not `OpenBao`. The cluster
+is fussy about case.
 
-`namespace: tenant-workshopXX` — **управляемые сервисы живут в вашем тенанте на
-управляющем кластере, а не в лабораторном кластере из лабы 0.** Это два разных кластера,
-и это важно помнить весь остаток лабы: приложение будет в одном, хранилище — в другом.
+`namespace: tenant-workshopXX` — **managed services live in your tenant on the management cluster,
+not in the lab cluster from Lab 0.** These are two different clusters, and it's important to keep
+this in mind for the rest of the lab: the application will be in one, the store in the other.
 
-`replicas`, `size`, `storageClass`, `resourcesPreset` — то же, что вы заполняли мышкой.
+`replicas`, `size`, `storageClass`, `resourcesPreset` — the same things you filled in with the mouse.
 
-`ui: true` — поднять веб-интерфейс. `external: false` — не выдавать сервису внешний
-адрес; изнутри кластера он и так доступен.
+`ui: true` — bring up the web interface. `external: false` — don't give the service an external
+address; from inside the cluster it's reachable anyway.
 
-Применяется этот файл **не в лабораторный кластер**, а в тенант:
+This file is applied **not to the lab cluster** but to the tenant:
 
 ```bash
-# --kubeconfig указывает файл доступа явно и перекрывает переменную KUBECONFIG.
-# Поэтому заказ уходит в тенант на управляющем кластере, а не в учебный кластер.
+# --kubeconfig names the access file explicitly and overrides the KUBECONFIG variable.
+# So the order goes to the tenant on the management cluster, not to the lab cluster.
 kubectl --kubeconfig ~/.kube/config apply -f openbao.yaml
 ```
 
-Управляющий доступ к тенанту на этой виртуалке уже настроен — файл `~/.kube/config`
-(токеновый, браузер не открывается). Доставать и сохранять ничего не нужно.
+Management access to the tenant is already set up on this bastion — the file `~/.kube/config`
+(token-based, no browser opens). There's nothing to fetch or save.
 
-Дальше по тексту мы этим файлом почти не пользуемся: заказ сервисов идёт мышкой, а
-работа с самим OpenBao — по его собственному API.
+For the rest of the text we barely use this file: services are ordered with the mouse, and working
+with OpenBao itself goes through its own API.
 
-Дождитесь, пока приложение перейдёт в готовое состояние. Это одна-две минуты.
+Wait until the application reaches a ready state. That's a minute or two.
 
-## Шаг 4. Заводим рабочий под и проверяем связь
+## Step 4. Set up a working Pod and check connectivity
 
-📍 **Где:** на виртуалке, в лабораторном кластере.
+📍 **Where:** on the bastion, in the lab cluster.
 
-Здесь надо остановиться и понять расстановку.
+Here we need to stop and understand the layout.
 
-**OpenBao живёт в вашем тенанте на управляющем кластере.** Ваша роль в тенанте позволяет
-заказывать и удалять сервисы, но не запускать там свои поды и не подключаться к сервисам
-пробросом порта. Это не поломка, а граница: тенант — место для управляемых сервисов, а не
-рабочая площадка.
+**OpenBao lives in your tenant on the management cluster.** Your role in the tenant lets you order
+and delete services, but not run your own Pods there or connect to services by port-forwarding.
+This isn't a defect, it's a boundary: the tenant is a place for managed services, not a workbench.
 
-**Ваша рабочая площадка — лабораторный кластер из лабы 0.** Там вы администратор. Оттуда
-мы и будем ходить в OpenBao — по внутреннему адресу, который есть у любого сервиса:
+**Your workbench is the lab cluster from Lab 0.** There you're the administrator. From there we'll
+reach OpenBao — over the internal address that every service has:
 
 ```
 openbao-secrets.tenant-workshopXX.svc.cozy.local:8200
 ```
 
-Разберём имя по частям:
+Let's break the name into parts:
 
-| Часть | Что означает |
+| Part | What it means |
 |---|---|
-| `openbao-` | приставка, которую каталог добавляет к имени. Вы назвали приложение `secrets`, объекты получили имена `openbao-secrets…` |
-| `secrets` | имя, которое вы задали в дашборде |
-| `tenant-workshopXX` | ваш тенант. Подставьте свой номер |
-| `svc.cozy.local` | зона внутренних имён управляющего кластера |
-| `8200` | порт API OpenBao |
+| `openbao-` | a prefix the catalog adds to the name. You named the application `secrets`; the objects got names like `openbao-secrets…` |
+| `secrets` | the name you gave in the dashboard |
+| `tenant-workshopXX` | your tenant. Substitute your own number |
+| `svc.cozy.local` | the internal name zone of the management cluster |
+| `8200` | the OpenBao API port |
 
-Поднимаем рабочий под. Внутри него будет утилита `bao` — ею и станем командовать
-хранилищем, а на виртуалку ставить её не придётся. Подставьте свой номер тенанта:
+Let's bring up a working Pod. Inside it will be the `bao` utility — that's what we'll command the
+store with, and you won't have to install it on the bastion. Substitute your own tenant number:
 
 ```bash
-# run создаёт один под из указанного образа — одноразовую машинку внутри кластера.
-#   --image          откуда взять содержимое: официальный образ OpenBao с утилитой bao
-#   --restart=Never  не поднимать заново, когда команда внутри завершится
-#   --env            переменная окружения пода: её увидит любая команда внутри него
-#   --command --     всё, что после двух дефисов, — команда, которую под выполнит
-# sleep 86400 = «ничего не делай сутки»: под нужен нам только как рабочее место.
+# run creates a single Pod from the given image — a disposable little machine inside the cluster.
+#   --image          where to take the contents from: the official OpenBao image with the bao utility
+#   --restart=Never  don't bring it up again once the command inside finishes
+#   --env            the Pod's environment variable: any command inside it will see it
+#   --command --     everything after the two dashes is the command the Pod will run
+# sleep 86400 = "do nothing for a day": we need the Pod only as a workspace.
 kubectl run bao-workbench \
   --image=openbao/openbao:2.5.1 \
   --restart=Never \
   --env=BAO_ADDR=http://openbao-secrets.tenant-workshopXX.svc.cozy.local:8200 \
   --command -- sleep 86400
-# wait держит терминал, пока условие не выполнится.
-#   --for=condition=Ready  под запустился и готов принимать команды
-#   --timeout=120s         через две минуты сдаться и вернуть ошибку
+# wait holds the terminal until the condition is met.
+#   --for=condition=Ready  the Pod has started and is ready to accept commands
+#   --timeout=120s         give up after two minutes and return an error
 kubectl wait --for=condition=Ready pod/bao-workbench --timeout=120s
 ```
 
-`BAO_ADDR` — переменная, из которой утилита `bao` берёт адрес хранилища. Заданная один
-раз при создании пода, она избавляет нас от `-address=…` в каждой команде.
+`BAO_ADDR` is the variable the `bao` utility takes the store's address from. Set once when the Pod
+is created, it spares us `-address=…` in every command.
 
-Под — одноразовая рабочая площадка, её не жалко: в конце лабы удалим одной командой.
+The Pod is a disposable workbench, nothing to feel sorry for: at the end of the lab we'll delete it
+with one command.
 
-Проверяем, что из лабораторного кластера видно тенант:
+Let's check that the tenant is visible from the lab cluster:
 
 ```bash
-# exec = выполнить команду внутри уже запущенного пода; после -- идёт сама команда.
-# bao status спрашивает хранилище о состоянии: запечатано ли оно, инициализировано ли.
-# Здесь это заодно проверка связи: ответ вообще пришёл — значит тенант виден.
+# exec = run a command inside an already-running Pod; the command itself comes after --.
+# bao status asks the store about its state: whether it's sealed, whether it's initialized.
+# Here it doubles as a connectivity check: a reply arrived at all — so the tenant is visible.
 kubectl exec bao-workbench -- bao status
 ```
 
-**Что вы должны увидеть** — таблицу состояния. Значения `Initialized false` и
-`Sealed true` здесь правильные: хранилище работает, но ещё не заведено и закрыто:
+**What you should see** — a status table. The values `Initialized false` and
+`Sealed true` are correct here: the store is running, but not yet set up and closed:
 
 ```
 Key                Value
@@ -453,29 +453,29 @@ Version            2.5.0
 Storage Type       file
 ```
 
-⚠️ **Команда вернёт ненулевой код возврата — 2, и это не ошибка.** У `bao status`
-код возврата означает состояние хранилища, а не успех команды: 0 — распечатано,
-2 — запечатано. Если ваша оболочка подсвечивает ненулевой код или вы увидите приписку
-`command terminated with exit code 2` — не пугайтесь, всё идёт как надо.
+⚠️ **The command will return a non-zero exit code — 2, and that isn't an error.** For `bao status`
+the exit code means the store's state, not the command's success: 0 — unsealed,
+2 — sealed. If your shell highlights a non-zero code or you see the note
+`command terminated with exit code 2` — don't be alarmed, everything is going as it should.
 
-⚠️ **Если команда падает с `connection refused`, `no such host` или `i/o timeout` —**
-дальше идти бессмысленно, сначала связь. Частые причины по убыванию вероятности:
-не подставили свой номер вместо `workshopXX`; приложение в дашборде ещё не готово;
-опечатка в имени. Имя собирается по правилу `openbao-<имя приложения>`: приложение вы
-назвали `secrets`, значит в адресе стоит `openbao-secrets`, а не `secrets`.
+⚠️ **If the command fails with `connection refused`, `no such host`, or `i/o timeout` —**
+there's no point going further; connectivity first. Common causes, in decreasing order of likelihood:
+you didn't substitute your own number for `workshopXX`; the application in the dashboard isn't ready
+yet; a typo in the name. The name is built by the rule `openbao-<application name>`: you named the
+application `secrets`, so the address contains `openbao-secrets`, not `secrets`.
 
-## Предсказуемая неудача · Хранилище отвечает отказом
+## A predictable failure · The store refuses to serve
 
-Связь есть, значит можно класть пароль. Попробуйте:
+There's connectivity, so we can store the password. Try it:
 
 ```bash
-# bao kv put = положить запись в хранилище.
-#   secret/passes/db  путь, по которому она будет лежать
-#   password=…        содержимое записи: пара «имя поля = значение»
+# bao kv put = place a record in the store.
+#   secret/passes/db  the path where it will live
+#   password=…        the record's contents: a "field name = value" pair
 kubectl exec bao-workbench -- bao kv put secret/passes/db password=Propusk2026
 ```
 
-**Что вы увидите** — вместо подтверждения записи отказ:
+**What you'll see** — instead of a write confirmation, a refusal:
 
 ```
 Error making API request.
@@ -483,204 +483,198 @@ Code: 503. Errors:
 * Vault is sealed
 ```
 
-> **Остановитесь и подумайте, прежде чем читать дальше.**
+> **Stop and think before reading on.**
 >
-> Сервис запущен, порт отвечает, а хранилище работать отказывается. Почему запущенная
-> служба может сознательно не обслуживать запросы? И почему это, скорее всего,
-> правильно?
+> The service is running, the port answers, yet the store refuses to work. Why might a running
+> service deliberately not serve requests? And why is that most likely the right thing?
 
 <details>
-<summary><b>Ответ и урок шире, чем эта ошибка</b></summary>
+<summary><b>The answer, and a lesson broader than this error</b></summary>
 
-Посмотрите на вывод `bao status` из предыдущего шага внимательнее:
+Look more closely at the `bao status` output from the previous step:
 
 ```
 Sealed             true
 Initialized        false
 ```
 
-**Запечатанное хранилище — штатное состояние только что установленного OpenBao.** Данные
-на диске зашифрованы мастер-ключом, а мастер-ключа в памяти процесса нет. Пока его туда
-не положат, служба не может ни прочитать, ни записать ничего и честно отвечает отказом
-на всё.
+**A sealed store is the normal state of a freshly installed OpenBao.** The data on disk is encrypted
+with the master key, and the master key isn't in the process's memory. Until it's placed there, the
+service can neither read nor write anything, and it honestly refuses everything.
 
-Дальше по лабе «распечатать» означает ровно одно: предъявить хранилищу доли мастер-ключа,
-чтобы оно положило ключ себе в память. К печати на бумаге слово отношения не имеет.
+Throughout the rest of the lab, "to unseal" means exactly one thing: to present the store with shares
+of the master key so it puts the key into its memory. The word has nothing to do with printing on paper.
 
-Почему так сделано. Если бы мастер-ключ лежал рядом с зашифрованными данными, шифрование
-не значило бы ничего: укравший диск получил бы и то и другое. Поэтому ключ живёт
-**только в оперативной памяти** и попадает туда, когда его предъявит человек или внешняя
-система.
+Why it's built this way. If the master key sat next to the encrypted data, the encryption would mean
+nothing: whoever stole the disk would get both. So the key lives **only in RAM** and gets there when
+a person or an external system presents it.
 
-Отсюда следствие, которое стоит принять сразу: **после каждого перезапуска пода OpenBao
-запечатывается снова.** Перезагрузили узел, обновили версию, кластер переселил под —
-хранилище опять не отвечает, пока его не распечатают. В проде это решают
-автораспечатыванием через внешний модуль (облачный KMS, аппаратный HSM), и это отдельный
-проект. В лабе будем распечатывать руками и увидим механику вживую.
+From this follows a consequence worth accepting straight away: **after every restart of the Pod,
+OpenBao is sealed again.** A node rebooted, a version upgraded, the cluster relocated the Pod — and
+the store stops answering again until it's unsealed. In production this is handled with auto-unseal
+through an external module (a cloud KMS, a hardware HSM), and that's a project of its own. In the lab
+we'll unseal by hand and see the mechanism live.
 
-**Урок шире, чем эта ошибка.** **Управляемый сервис снял с вас установку, обновление, репликацию
-и бэкапы, но не снял операционные решения.** Cozystack поднял вам процесс OpenBao за две
-минуты. Где хранить unseal-ключи, кто имеет право распечатывать, что делать в три часа
-ночи, когда узел перезагрузился, — это по-прежнему ваши вопросы, и хорошо, что платформа
-не решила их за вас молча.
+**A lesson broader than this error.** **A managed service took installation, upgrades, replication,
+and backups off your plate, but it didn't take the operational decisions.** Cozystack brought up the
+OpenBao process for you in two minutes. Where to keep the unseal keys, who is allowed to unseal, what
+to do at three in the morning when a node has rebooted — these are still your questions, and it's a
+good thing the platform didn't quietly answer them for you.
 
 </details>
 
-## Шаг 5. Инициализируем и распечатываем
+## Step 5. Initialize and unseal
 
-📍 **Где:** на виртуалке, в лабораторном кластере.
+📍 **Where:** on the bastion, in the lab cluster.
 
-**Что сейчас произойдёт:** OpenBao сгенерирует мастер-ключ, разрежет его на доли и отдаст
-их нам вместе с root-токеном. Второй раз этого не будет никогда — ключи показывают
-ровно один раз.
+**What's about to happen:** OpenBao will generate a master key, cut it into shares, and hand them to
+us along with a root token. This will never happen a second time — the keys are shown exactly once.
 
 ```bash
-# operator init выполняется один раз за жизнь хранилища: создаёт мастер-ключ и печатает
-# его доли вместе с root-токеном. Повторно эти значения не покажет никто.
-#   -key-shares=1     на сколько долей разрезать мастер-ключ
-#   -key-threshold=1  сколько долей надо предъявить, чтобы собрать его обратно
+# operator init runs once in the life of the store: it creates the master key and prints
+# its shares together with a root token. No one will show these values again.
+#   -key-shares=1     how many shares to cut the master key into
+#   -key-threshold=1  how many shares must be presented to reassemble it
 kubectl exec bao-workbench -- bao operator init -key-shares=1 -key-threshold=1
 ```
 
-**Что вы должны увидеть:**
+**What you should see:**
 
 ```
 Unseal Key 1: 8kJq…=
 Initial Root Token: s.7Yx…
 ```
 
-⚠️ **Скопируйте оба значения в файл на виртуалке прямо сейчас** — например в
-`~/openbao-lab.txt`, а не только в буфер обмена. Повторно их не покажет никто. Потеряете
-unseal-ключ — потеряете все секреты в хранилище, восстановить их невозможно by design.
+⚠️ **Copy both values into a file on the bastion right now** — say into
+`~/openbao-lab.txt`, and not just to the clipboard. No one will show them again. Lose the
+unseal key and you lose every secret in the store — recovering them is impossible by design.
 
-Оба понадобятся ещё не раз, и вот когда:
+You'll need both more than once, and here's when:
 
-- **unseal-ключ** — каждый раз, когда под хранилища перезапустится. При перезапуске оно
-  запечатывается заново, и все команды начинают отвечать `Code: 503 ... * Vault is sealed`.
-  Лечится повторной распечаткой той же командой, с того же места, где остановились;
-- **корневой токен** — в конце лабы, для скрипта проверки. Между этими моментами пройдёт
-  почти вся лаба, и терминал вы к тому времени, скорее всего, закроете.
+- **the unseal key** — every time the store's Pod restarts. On restart it's sealed again, and every
+  command starts replying `Code: 503 ... * Vault is sealed`.
+  The cure is to unseal again with the same command, from the same spot where you left off;
+- **the root token** — at the end of the lab, for the check script. Almost the whole lab will pass
+  between these two moments, and by then you'll most likely have closed the terminal.
 
 <details>
-<summary><b>Что означают `-key-shares` и `-key-threshold`, и почему в проде не так</b></summary>
+<summary><b>What `-key-shares` and `-key-threshold` mean, and why production is different</b></summary>
 
-Мастер-ключ не выдаётся целиком. Он разрезается на `key-shares` долей, и чтобы собрать
-его обратно, нужно предъявить `key-threshold` из них. Схема называется разделением
-секрета Шамира.
+The master key isn't handed out whole. It's cut into `key-shares` shares, and to reassemble it you
+must present `key-threshold` of them. The scheme is called Shamir's Secret Sharing.
 
-Смысл в том, чтобы **распечатывание не мог сделать один человек**. Классическая
-production-настройка — пять долей, порог три: доли раздают пяти держателям в разных
-подразделениях, и чтобы поднять хранилище после перезагрузки, нужно собрать любых троих.
-Один уволившийся администратор не уносит с собой доступ, один недобросовестный — не
-получает его в одиночку.
+The point is that **no single person can do the unsealing**. The classic production setup is five
+shares with a threshold of three: the shares are handed to five holders in different departments, and
+to bring the store up after a reboot you need to gather any three. One administrator who leaves
+doesn't carry access away with them, and one dishonest administrator doesn't get it single-handedly.
 
-Мы ставим одну долю и порог один, потому что в лабе вы один и нам нужна механика, а не
-процедура. **В проде так делать нельзя**, и это не формальность: единственная доля
-означает единственную точку, откуда утечёт всё.
+We set one share and a threshold of one, because in the lab you're on your own and we want the
+mechanism, not the procedure. **You must not do this in production**, and that isn't a formality: a
+single share means a single point from which everything can leak.
 
 </details>
 
-Распечатываем. Подставьте свой unseal-ключ:
+Unseal it. Substitute your own unseal key:
 
 ```bash
-# unseal передаёт хранилищу одну долю мастер-ключа. Когда долей набирается порог,
-# ключ оказывается в памяти процесса и хранилище начинает обслуживать запросы.
-kubectl exec bao-workbench -- bao operator unseal <ваш-unseal-ключ>
-# Повторяем status, чтобы увидеть изменившееся состояние.
+# unseal hands the store one share of the master key. Once the shares reach the threshold,
+# the key ends up in the process's memory and the store starts serving requests.
+kubectl exec bao-workbench -- bao operator unseal <your-unseal-key>
+# We repeat status to see the changed state.
 kubectl exec bao-workbench -- bao status
 ```
 
-**Что вы должны увидеть** — `Sealed  false` и `Initialized  true`.
+**What you should see** — `Sealed  false` and `Initialized  true`.
 
-Теперь входим root-токеном. Он запомнится внутри рабочего пода, и следующие команды
-токен спрашивать не будут:
+Now we log in with the root token. It will be remembered inside the working Pod, and the following
+commands won't ask for the token:
 
 ```bash
-# login обменивает введённый токен на запись в файле внутри пода — дальше утилита
-# берёт токен оттуда сама, и вписывать его в каждую команду не придётся.
-# -it даёт поду терминал: без него утилите некуда вывести запрос и негде принять ввод.
+# login exchanges the entered token for an entry in a file inside the Pod — from then on the utility
+# takes the token from there itself, and you won't have to type it into every command.
+# -it gives the Pod a terminal: without it the utility has nowhere to print its prompt and nowhere to take input.
 kubectl exec -it bao-workbench -- bao login
 ```
 
-Утилита спросит токен и **не покажет его при вводе** — так и задумано. Вставьте
-Initial Root Token из вывода `init`.
+The utility will ask for the token and **won't show it as you type** — that's by design. Paste the
+Initial Root Token from the `init` output.
 
-⚠️ **Если `bao login` жалуется, что не может записать файл токена**, передавайте токен
-переменной окружения в каждой команде:
-`kubectl exec bao-workbench -- env BAO_TOKEN='ваш-токен' bao status`.
-Способ рабочий, но токен попадает в историю команд — в лабе терпимо, в проде нет.
+⚠️ **If `bao login` complains that it can't write the token file**, pass the token as an environment
+variable in every command:
+`kubectl exec bao-workbench -- env BAO_TOKEN='your-token' bao status`.
+It works, but the token ends up in your command history — tolerable in the lab, not in production.
 
-## Шаг 6. Включаем движок и кладём пароль
+## Step 6. Enable the engine and store the password
 
-📍 **Где:** на виртуалке, в лабораторном кластере.
+📍 **Where:** on the bastion, in the lab cluster.
 
-Свежий OpenBao пуст: в нём нет ни одного места, куда можно что-то положить. Движки
-секретов подключают явно.
+A fresh OpenBao is empty: there isn't a single place in it to put anything. Secrets engines are
+enabled explicitly.
 
 ```bash
-# secrets enable подключает движок — часть хранилища, умеющую свой вид работы.
-#   -path=secret  на какой путь его повесить: дальше всё пишется как secret/…
-#   kv-v2         какой именно движок: «ключ-значение» с историей версий
+# secrets enable turns on an engine — a part of the store that knows one kind of work.
+#   -path=secret  which path to hang it on: from here on everything is written as secret/…
+#   kv-v2         which engine exactly: "key-value" with version history
 kubectl exec bao-workbench -- bao secrets enable -path=secret kv-v2
 ```
 
 <details>
-<summary><b>Что такое движок секретов и почему их несколько</b></summary>
+<summary><b>What a secrets engine is, and why there's more than one</b></summary>
 
-OpenBao не одно хранилище, а набор движков, каждый из которых умеет свою работу и
-подключается на свой путь:
+OpenBao isn't a single store but a set of engines, each of which knows its own job and is mounted on
+its own path:
 
-| Движок | Что делает |
+| Engine | What it does |
 |---|---|
-| `kv-v2` | хранит то, что вы в него положили, с историей версий. Обычный «ключ-значение» |
-| движки баз данных | **сам** заводит в PostgreSQL или MongoDB временного пользователя на два часа и сам его удаляет |
-| PKI | выпускает сертификаты по запросу, вместо годовой заявки в отдел ИБ |
-| transit | шифрует данные по запросу, не храня их: ключ не покидает хранилище |
+| `kv-v2` | stores what you put into it, with version history. An ordinary "key-value" |
+| database engines | **themselves** create a temporary user in PostgreSQL or MongoDB for two hours and delete it themselves |
+| PKI | issues certificates on demand, instead of a once-a-year request to the security department |
+| transit | encrypts data on demand without storing it: the key never leaves the store |
 
-`-path=secret` — на какой путь подключить. Дальше все обращения к этому движку идут
-через `secret/…`.
+`-path=secret` — which path to mount it on. From here on all access to this engine goes through
+`secret/…`.
 
-Мы берём `kv-v2` — самый простой случай: у нас есть готовый пароль, его надо положить.
-Куда интереснее движки баз данных: они убирают постоянный пароль как явление, выдавая
-приложению временную учётку под каждый запуск. Это следующий уровень, и до него надо
-дорасти; начинать разумно отсюда.
+We take `kv-v2` — the simplest case: we have a ready password that needs to be stored. The database
+engines are far more interesting: they do away with the permanent password as a phenomenon, issuing
+the application a temporary account for each run. That's the next level, and one has to grow into it;
+it makes sense to start here.
 
 </details>
 
-Кладём пароль:
+Store the password:
 
 ```bash
-# kv put записывает новую версию целиком: перечисленные поля станут её содержимым.
-# Полей может быть сколько угодно; здесь их два — пароль и имя пользователя базы.
+# kv put writes a whole new version: the listed fields become its contents.
+# There can be any number of fields; here there are two — the password and the database username.
 kubectl exec bao-workbench -- \
   bao kv put secret/passes/db password=Propusk2026 username=passes_app
 ```
 
-**Что вы должны увидеть** — табличку с `version  1` и временем создания.
+**What you should see** — a little table with `version  1` and a creation time.
 
-Проверяем, что читается:
+Let's check that it reads back:
 
 ```bash
-# kv get читает запись и печатает её поля таблицей. Читаем пока root-токеном — то есть
-# проверяем, что запись легла, а не то, что прав хватит приложению.
+# kv get reads the record and prints its fields as a table. We're still reading with the root token — that is,
+# we're checking that the record landed, not that the application will have enough permissions.
 kubectl exec bao-workbench -- bao kv get secret/passes/db
 ```
 
-## Шаг 7. Выдаём приложению доступ — ровно на одну строку
+## Step 7. Grant the application access — to exactly one line
 
-📍 **Где:** на виртуалке, в лабораторном кластере.
+📍 **Where:** on the bastion, in the lab cluster.
 
-Root-токен приложению давать нельзя: с ним можно всё, включая чтение чужих секретов и
-удаление хранилища. Приложению нужен доступ только на чтение одного пути.
+You mustn't give the application the root token: with it you can do anything, including reading
+others' secrets and deleting the store. The application needs read access to just one path.
 
-Пишем политику:
+Let's write a policy:
 
 ```bash
-# policy write сохраняет в хранилище именованный список прав.
-#   passes-read  имя политики; по нему её потом выдадут токену
-#   -            взять текст политики со стандартного ввода, а не из файла
-#   -i           у kubectl exec: пробросить этот ввод внутрь пода
-# <<'HCL' … HCL — способ передать многострочный текст прямо в команду, без файла.
+# policy write saves a named list of permissions in the store.
+#   passes-read  the policy's name; it's later granted to a token by this name
+#   -            take the policy text from standard input rather than from a file
+#   -i           in kubectl exec: forward that input into the Pod
+# <<'HCL' … HCL is a way to pass multi-line text straight into the command, without a file.
 kubectl exec -i bao-workbench -- bao policy write passes-read - <<'HCL'
 path "secret/data/passes/db" {
   capabilities = ["read"]
@@ -692,10 +686,10 @@ HCL
 ```
 
 <details>
-<summary><b>Разбираем политику</b></summary>
+<summary><b>Reading the policy</b></summary>
 
-Политика — список путей и того, что с ними разрешено. Всё, что не разрешено явно,
-запрещено; отдельного «запретить» писать не нужно.
+A policy is a list of paths and what is allowed on them. Anything not explicitly allowed is denied;
+there's no need to write a separate "deny".
 
 ```hcl
 path "secret/data/passes/db" {
@@ -703,117 +697,116 @@ path "secret/data/passes/db" {
 }
 ```
 
-`secret/data/passes/db` — путь **в API**, а не в файловой системе. У движка `kv-v2` он
-устроен так: `secret` — куда подключён движок, `data` — служебная приставка самого
-движка, `passes/db` — то, что вы задавали в команде `kv put`.
+`secret/data/passes/db` is a path **in the API**, not in the filesystem. In the `kv-v2` engine it's
+structured like this: `secret` — where the engine is mounted, `data` — the engine's own internal
+prefix, `passes/db` — what you specified in the `kv put` command.
 
-⚠️ **Эта приставка `data` — источник половины непонятных отказов.** В командной строке
-вы пишете `secret/passes/db`, а в политике — `secret/data/passes/db`. Утилита `bao kv`
-подставляет `data` за вас, политика — нет.
+⚠️ **This `data` prefix is the source of half of all baffling denials.** On the command line you
+write `secret/passes/db`, but in the policy — `secret/data/passes/db`. The `bao kv` utility inserts
+`data` for you; the policy does not.
 
-`capabilities = ["read"]` — можно только читать. Не писать, не удалять, не перечислять
-соседние пути.
+`capabilities = ["read"]` — read only. Not write, not delete, not list neighboring paths.
 
-Второй блок, `secret/metadata/passes/db`, — доступ к сведениям о версиях: когда
-записывали, сколько версий, какая текущая. Тоже только чтение.
+The second block, `secret/metadata/passes/db`, is access to version information: when it was written,
+how many versions there are, which is current. Read only as well.
 
-`bao policy write passes-read -` — последний дефис означает «читай содержимое со
-стандартного ввода». Поэтому команда запускается с `kubectl exec -i`: флаг `-i`
-пробрасывает ввод внутрь пода.
+`bao policy write passes-read -` — the trailing dash means "read the contents from standard input".
+That's why the command runs with `kubectl exec -i`: the `-i` flag forwards input into the Pod.
 
 </details>
 
-Выпускаем токен с этой политикой:
+Issue a token with this policy:
 
 ```bash
-# token create выпускает новый токен и привязывает к нему набор прав.
-#   -policy=passes-read  какие права: та политика, что записана выше
-#   -ttl=24h             срок жизни; через сутки токен перестанет работать сам
-#   -field=token         напечатать только значение токена, без таблицы вокруг —
-#                        так его удобно скопировать и передать дальше
+# token create issues a new token and binds a set of permissions to it.
+#   -policy=passes-read  which permissions: the policy written above
+#   -ttl=24h             lifetime; after a day the token stops working on its own
+#   -field=token         print only the token value, without the table around it —
+#                        that way it's easy to copy and pass along
 kubectl exec bao-workbench -- \
   bao token create -policy=passes-read -ttl=24h -field=token
 ```
 
-**Что вы должны увидеть** — одну строку с токеном.
+**What you should see** — a single line with the token.
 
-Скопируйте токен — сейчас он понадобится.
+Copy the token — you'll need it in a moment.
 
-Срок жизни здесь не формальность. Ушёл токен в лог, попал в бэкап, утёк с виртуалкой —
-послезавтра он бесполезен. Пароль в манифесте таким свойством не обладает.
+The lifetime here isn't a formality. The token slipped into a log, ended up in a backup, leaked with
+the bastion — the day after tomorrow it's useless. A password in a manifest has no such property.
 
-## Шаг 8. Кладём токен в кластер и убираем пароль из манифеста
+## Step 8. Put the token into the cluster and remove the password from the manifest
 
-📍 **Где:** на виртуалке, в лабораторном кластере.
+📍 **Where:** on the bastion, in the lab cluster.
 
-Приложению нужно чем-то доказать OpenBao, что оно — это оно. Этим и будет токен.
+The application needs something to prove to OpenBao that it is who it claims to be. The token is that
+something.
 
 ```bash
-# create secret generic заводит объект-секрет прямо в кластере, минуя файл на диске.
-#   passes-bao-token      имя объекта; по нему на секрет сошлётся описание приложения
-#   --from-literal=имя=…  положить значение строкой из командной строки
-#                         (есть и --from-file, когда значение лежит в файле)
+# create secret generic creates a Secret object directly in the cluster, bypassing a file on disk.
+#   passes-bao-token      the object's name; the application's description will reference the secret by it
+#   --from-literal=name=…  set the value as a string from the command line
+#                          (there's also --from-file, when the value is in a file)
 kubectl create secret generic passes-bao-token \
-  --from-literal=token='вставьте-токен-из-предыдущего-шага'
+  --from-literal=token='paste-the-token-from-the-previous-step'
 ```
 
-**Обратите внимание: команда, а не файл.** Токен создаётся прямо в кластере и в Git не
-попадает никогда — там нет файла, в который он мог бы попасть.
+**Note: a command, not a file.** The token is created directly in the cluster and never makes it
+into Git — there's no file for it to make it into.
 
 <details>
-<summary><b>Секрет нулевого уровня: честно про то, что мы не победили</b></summary>
+<summary><b>Secret zero: an honest word about what we didn't beat</b></summary>
 
-Логичное возражение: мы убрали пароль от базы, но положили в кластер токен. Не поменяли
-ли мы шило на мыло?
+A reasonable objection: we removed the database password but put a token into the cluster. Haven't we
+just swapped one problem for another?
 
-Не поменяли, и вот чем токен отличается от пароля:
+We haven't, and here's how the token differs from the password:
 
-| | Пароль в манифесте | Токен в кластере |
+| | Password in a manifest | Token in the cluster |
 |---|---|---|
-| Лежит в Git | да, навсегда, во всей истории коммитов | нет, его создали командой |
-| Срок жизни | вечный | сутки, дальше сам мёртв |
-| Что даёт | полный доступ к базе пропусков | чтение одной строки в хранилище |
-| Отзыв | сменить пароль везде, где он прописан | одна команда, мгновенно |
-| Видно, кто пользовался | нет | да, в аудит-логе |
+| Sits in Git | yes, forever, throughout the commit history | no, it was created by a command |
+| Lifetime | eternal | a day, then dead on its own |
+| What it grants | full access to the passes database | reading one line in the store |
+| Revocation | change the password everywhere it's written | one command, instantly |
+| You can see who used it | no | yes, in the audit log |
 
-Но полностью проблему это не закрывает, и делать вид, что закрывает, нечестно. **Всегда
-остаётся один секрет, которым приложение доказывает своё право на остальные.** У него
-даже есть имя — секрет нулевого уровня. Убрать его невозможно: чем-то представиться надо.
+But this doesn't fully close the problem, and pretending it does would be dishonest. **There is
+always one secret with which the application proves its right to the rest.** It even has a name —
+secret zero. Removing it is impossible: you have to identify yourself with something.
 
-Что с ним делают взрослые системы:
+What grown-up systems do with it:
 
-- **Kubernetes-аутентификация.** OpenBao проверяет служебный токен пода в самом
-  Kubernetes и выдаёт свой в обмен. Тогда «секретом нулевого уровня» становится
-  идентичность пода, которую выдаёт кластер, а не строка, которую положил человек
-- **Одноразовые токены (response wrapping).** Оператор выдаёт токен, который можно
-  использовать один раз. Если приложение получило отказ «уже использован» — значит,
-  токен перехватили, и это видно сразу
+- **Kubernetes authentication.** OpenBao verifies the Pod's service token against Kubernetes itself
+  and issues its own in exchange. Then "secret zero" becomes the Pod's identity, granted by the
+  cluster, rather than a string a human put there
+- **Single-use tokens (response wrapping).** An operator issues a token that can be used once. If the
+  application gets an "already used" denial, the token was intercepted — and that's visible
+  immediately
 
-Оба способа существуют и работают, но в этой лабе они увели бы нас далеко. Держите в
-голове, что путь есть, и что цель — не «ноль секретов», а «один короткий, узкий и
-отзываемый вместо десятка вечных».
+Both approaches exist and work, but in this lab they would take us far afield. Keep in mind that a
+path exists, and that the goal isn't "zero secrets" but "one short-lived, narrow, revocable secret
+instead of a dozen eternal ones".
 
 </details>
 
-Теперь применяем чистый манифест. Сначала подставьте свой номер тенанта:
+Now we apply the clean manifest. First, substitute your own tenant number:
 
 ```bash
-# sed правит текст по образцу s/что-заменить/на-что/g; g = во всех местах строки,
-# а не только в первом. -i означает «править сам файл», а не печатать результат
-# на экран. Вместо workshop03 из примера подставьте свой номер.
+# sed edits text by the pattern s/what-to-replace/with-what/g; g = in every place on the line,
+# not just the first. -i means "edit the file itself" rather than print the result
+# to the screen. In place of workshop03 from the example, substitute your own number.
 
-# macOS: пустые кавычки после -i обязательны — иначе sed примет следующее слово
-# за расширение для резервной копии и ничего не заменит
+# macOS: the empty quotes after -i are mandatory — otherwise sed will take the next word
+# as a backup-file extension and replace nothing
 sed -i '' 's/tenant-workshopXX/tenant-workshop03/g' secrets-demo.yaml
 # Linux
 sed -i 's/tenant-workshopXX/tenant-workshop03/g' secrets-demo.yaml
 ```
 
 <details>
-<summary><b>Разбираем манифест построчно</b></summary>
+<summary><b>A closer look: what's inside secrets-demo.yaml</b></summary>
 
-Начнём с главного: **найдите в этом файле пароль.** Его там нет — ни открытым текстом,
-ни в base64, ни ссылкой на объект, в котором он лежал бы.
+Let's start with the main thing: **find the password in this file.** It isn't there — not in
+plaintext, not in base64, not as a reference to an object it would sit in.
 
 ```yaml
       volumes:
@@ -823,9 +816,9 @@ sed -i 's/tenant-workshopXX/tenant-workshop03/g' secrets-demo.yaml
             sizeLimit: 1Mi
 ```
 
-`emptyDir` — временная папка, которая живёт столько же, сколько под, и исчезает вместе с
-ним. `medium: Memory` означает, что это не файл на диске, а область в оперативной памяти.
-Пароль не попадёт ни на диск узла, ни в снимок тома, ни в бэкап.
+`emptyDir` is a temporary folder that lives as long as the Pod and disappears along with it.
+`medium: Memory` means it isn't a file on disk but a region of RAM. The password won't reach the
+node's disk, nor a volume snapshot, nor a backup.
 
 ```yaml
       initContainers:
@@ -833,10 +826,10 @@ sed -i 's/tenant-workshopXX/tenant-workshop03/g' secrets-demo.yaml
           image: openbao/openbao:2.5.1
 ```
 
-Init-контейнер — контейнер, который отрабатывает **до** основного и должен успешно
-завершиться. Если он упадёт, основной не запустится вообще. Для получения секрета это
-именно то поведение, которое нужно: приложение не должно стартовать с пустым паролем и
-падать потом на первом запросе к базе.
+An init container is a container that runs **before** the main one and must finish successfully.
+If it fails, the main one won't start at all. For fetching a secret this is exactly the behavior you
+want: the application shouldn't start with an empty password and then fail on its first request to
+the database.
 
 ```yaml
               bao kv get -field=password secret/passes/db \
@@ -844,9 +837,9 @@ Init-контейнер — контейнер, который отрабаты�
               chmod 0400 /secrets/db_password
 ```
 
-Забираем одно поле и кладём в файл. `tr -d '\n'` убирает перевод строки, если он вдруг
-появится: пароль с лишним символом на конце не подойдёт базе, а искать такое неприятно.
-`chmod 0400` — читать может только владелец.
+We take one field and write it to a file. `tr -d '\n'` strips the newline, should one appear: a
+password with an extra character on the end won't work for the database, and tracking that down is
+unpleasant. `chmod 0400` — only the owner can read it.
 
 ```yaml
           env:
@@ -859,8 +852,8 @@ Init-контейнер — контейнер, который отрабаты�
                   key: token
 ```
 
-Адрес хранилища и токен. Токен — по ссылке на объект, который вы создали командой.
-В файле только имя объекта, а имя — не секрет.
+The store's address and the token. The token comes by reference to the object you created with a
+command. The file holds only the object's name, and a name is not a secret.
 
 ```yaml
       securityContext:
@@ -870,9 +863,9 @@ Init-контейнер — контейнер, который отрабаты�
         fsGroup: 1000
 ```
 
-Всё работает не от root. `fsGroup` нужен, чтобы оба контейнера — тот, что пишет файл, и
-тот, что его читает, — имели к папке доступ. Без этого init-контейнер напишет файл,
-который основной не сможет открыть, и вы полчаса будете думать, где ошиблись.
+Everything runs as non-root. `fsGroup` is needed so that both containers — the one that writes the
+file and the one that reads it — have access to the folder. Without it the init container will write
+a file the main one can't open, and you'll spend half an hour wondering where you went wrong.
 
 ```yaml
           volumeMounts:
@@ -881,241 +874,236 @@ Init-контейнер — контейнер, который отрабаты�
               readOnly: true
 ```
 
-Основному контейнеру папка отдана только на чтение. Приложение не может ни испортить
-пароль, ни подменить его.
+The folder is given to the main container read-only. The application can neither corrupt the password
+nor swap it out.
 
 </details>
 
-**Применяем.** Deployment сменится новой версией: init-контейнер сходит в хранилище,
-положит пароль в память пода и только после этого запустится само приложение.
+**Apply it.** The Deployment will roll over to a new version: the init container will go to the store,
+place the password into the Pod's memory, and only then will the application itself start.
 
 ```bash
 kubectl apply -f secrets-demo.yaml
-# Ждём, пока новая версия полностью сменит старую. Если init-контейнер не сумеет забрать
-# пароль, ожидание не завершится — и это ровно то поведение, которое нам нужно.
+# We wait until the new version has fully replaced the old one. If the init container can't fetch
+# the password, the wait won't finish — and that's exactly the behavior we want.
 kubectl rollout status deploy/secrets-demo
 ```
 
-## Шаг 9. Проверяем, что приложение получило пароль из хранилища
+## Step 9. Verify the application got its password from the store
 
-📍 **Где:** на виртуалке, в лабораторном кластере.
+📍 **Where:** on the bastion, in the lab cluster.
 
-Сначала посмотрим, что сказал init-контейнер:
+First let's look at what the init container said:
 
 ```bash
-# -c выбирает контейнер внутри пода. Их здесь два, и без -c kubectl не угадает, какой
-# нужен. fetch-secret — тот, что отработал до запуска приложения.
+# -c selects a container inside the Pod. There are two here, and without -c kubectl can't guess which
+# one you mean. fetch-secret is the one that ran before the application started.
 kubectl logs deploy/secrets-demo -c fetch-secret
 ```
 
-**Что вы должны увидеть:**
+**What you should see:**
 
 ```
-пароль получен из OpenBao, в манифесте его нет
+password fetched from OpenBao, not present in the manifest
 ```
 
-Теперь сам сервис:
+Now the service itself:
 
 ```bash
-# Основной контейнер: он читает файл, который положил init-контейнер.
+# The main container: it reads the file the init container placed.
 kubectl logs deploy/secrets-demo -c app --tail=2
 ```
 
-Отпечаток **изменился** — раньше был `sha256:a609df223d57`, теперь другой. Приложение
-работает с новым паролем, которого нет ни в одном файле репозитория.
+The fingerprint has **changed** — it used to be `sha256:a609df223d57`, now it's different. The
+application is working with a new password that isn't in any file in the repository.
 
-Уберём наивный секрет, он больше не нужен и только мешает:
+Let's remove the naive secret; it's no longer needed and only gets in the way:
 
 ```bash
-# delete убирает объект из кластера. Приложение на него больше не ссылается,
-# поэтому удаление ничего не сломает.
+# delete removes the object from the cluster. The application no longer references it,
+# so the deletion won't break anything.
 kubectl delete secret passes-db
 ```
 
-## Шаг 10. Ротация: меняем пароль, не трогая ни одного файла
+## Step 10. Rotation: change the password without touching a single file
 
-📍 **Где:** на виртуалке, в лабораторном кластере.
+📍 **Where:** on the bastion, in the lab cluster.
 
-Возвращаемся к первому требованию аудитора: «поменяйте пароль». Раньше это означало
-найти все места, где он прописан, поправить, закоммитить, выкатить и надеяться, что
-ничего не забыли.
+Back to the auditor's first demand: "change the password." Before, that meant finding every place
+it's written, fixing them, committing, rolling out, and hoping nothing was missed.
 
-Теперь:
+Now:
 
 ```bash
-# Тот же kv put. Прежняя версия записи не стирается — рядом появляется вторая.
+# The same kv put. The previous version of the record isn't erased — a second one appears alongside it.
 kubectl exec bao-workbench -- \
   bao kv put secret/passes/db password=Propusk2026-осень username=passes_app
-# rollout restart пересоздаёт поды приложения, не меняя ни строчки в его описании.
-# Ради этого всё и затевалось: новый пароль подхватится при следующем запуске.
+# rollout restart recreates the application's Pods without changing a single line in its description.
+# This is what it was all for: the new password is picked up on the next start.
 kubectl rollout restart deploy/secrets-demo
 kubectl rollout status deploy/secrets-demo
-# Отпечаток в логе покажет, что пароль сменился, не показывая сам пароль.
+# The fingerprint in the log will show that the password changed, without showing the password itself.
 kubectl logs deploy/secrets-demo -c app --tail=2
 ```
 
-**Что вы должны увидеть** — отпечаток снова изменился. Две команды, ноль изменённых
-файлов, ноль коммитов.
+**What you should see** — the fingerprint has changed again. Two commands, zero changed files, zero
+commits.
 
-⚠️ **Приложение подхватывает новое значение при перезапуске, а не мгновенно.** Мы
-забираем секрет init-контейнером на старте — простой и надёжный способ, но обновление
-требует рестарта. Если сервис должен подхватывать секрет на лету, применяют
-дополнительный контейнер рядом, который перечитывает значение по таймеру и обновляет
-файл. Это сложнее, и начинать стоит не с этого.
+⚠️ **The application picks up the new value on restart, not instantly.** We fetch the secret with an
+init container at startup — a simple, reliable approach, but updating requires a restart. If a
+service needs to pick up a secret on the fly, you add a sidecar container that re-reads the value on
+a timer and updates the file. That's more complex, and it's not where you should start.
 
-Посмотрим историю:
+Let's look at the history:
 
 ```bash
-# kv metadata get показывает не значения, а сведения о версиях записи: сколько их,
-# когда каждая создана и какая сейчас текущая.
+# kv metadata get shows not the values but information about the record's versions: how many there are,
+# when each was created, and which is current now.
 kubectl exec bao-workbench -- bao kv metadata get secret/passes/db
 ```
 
-**Что вы должны увидеть** — обе версии со временем создания. Старое значение не пропало:
-если выяснится, что новый пароль базе не подошёл, есть куда вернуться.
+**What you should see** — both versions with their creation times. The old value hasn't vanished: if
+the new password turns out not to suit the database, there's somewhere to roll back to.
 
-Прежнее значение можно и прочитать целиком:
+You can also read the previous value in full:
 
 ```bash
-# -version=1 читает первую записанную версию вместо текущей.
+# -version=1 reads the first version written instead of the current one.
 kubectl exec bao-workbench -- bao kv get -version=1 secret/passes/db
 ```
 
-Вот это и есть **ротация**: замена секрета на новый по плану, а не по факту утечки.
-Регламент вида «пароли служебных учёток меняются раз в квартал» из невыполнимого
-становится строчкой в расписании.
+This is what **rotation** is: replacing a secret with a new one by plan, not after a leak has
+happened. A rule like "service-account passwords are changed once a quarter" goes from unachievable
+to a line in a schedule.
 
-## Шаг 11. Аудит-лог: кто и что спрашивал
+## Step 11. The audit log: who asked for what
 
-📍 **Где:** на виртуалке, в лабораторном кластере.
+📍 **Where:** on the bastion, in the lab cluster.
 
-Второе требование аудитора — «покажите, кто читал пароль». Включаем журнал:
+The auditor's second demand — "show me who read the password." Let's turn on the log:
 
 ```bash
-# audit enable подключает устройство журналирования.
-#   file              тип устройства: писать записи текстом
-#   file_path=stdout  вместо файла на диске — в стандартный вывод пода, откуда
-#                     логи забирает платформа
+# audit enable turns on an audit device.
+#   file              the device type: write records as text
+#   file_path=stdout  instead of a file on disk — to the Pod's standard output, from where
+#                     the platform collects the logs
 kubectl exec bao-workbench -- bao audit enable file file_path=stdout
-# audit list перечисляет включённые устройства — проверка, что команда выше прошла.
+# audit list lists the enabled devices — a check that the command above went through.
 kubectl exec bao-workbench -- bao audit list
 ```
 
-**Что вы должны увидеть** — таблицу с одним включённым устройством типа `file`.
+**What you should see** — a table with one enabled device of type `file`.
 
 <details>
-<summary><b>Что попадает в аудит-лог и чем он отличается от обычного лога</b></summary>
+<summary><b>What goes into the audit log, and how it differs from an ordinary log</b></summary>
 
-С этого момента OpenBao пишет запись **на каждый запрос к API**: кто спросил (какой
-токен, какая политика), что именно, когда, с какого адреса и что ответили. Записи две на
-запрос — сам запрос и ответ на него.
+From this moment OpenBao writes a record **for every API request**: who asked (which token, which
+policy), what exactly, when, from what address, and what was answered. There are two records per
+request — the request itself and the response to it.
 
-Три отличия от привычного лога приложения:
+Three differences from a familiar application log:
 
-**Пишутся и отказы.** Попытка прочитать чужой путь оставляет след ровно так же, как
-успешное чтение. Именно отказы интересны службе ИБ: успешные чтения — это работа,
-а серия отказов — это разведка.
+**Denials are written too.** An attempt to read someone else's path leaves a trace exactly as a
+successful read does. It's the denials that interest the security team: successful reads are work,
+while a series of denials is reconnaissance.
 
-**Значения секретов не попадают в журнал.** Пути, имена и токены хешируются, сами
-секреты не пишутся. Журнал можно отдать наружу, не отдав вместе с ним содержимое.
+**Secret values don't get into the log.** Paths, names, and tokens are hashed; the secrets themselves
+aren't written. The log can be handed outside without handing over its contents along with it.
 
-**Если журнал писать некуда, OpenBao перестаёт работать.** Это сознательное решение:
-хранилище, которое обслуживает запросы, не имея возможности их записать, хуже
-неработающего. Отсюда практическое следствие — не включайте единственное аудит-устройство
-в файл на диске, который может заполниться.
+**If there's nowhere to write the log, OpenBao stops working.** This is a deliberate decision: a
+store that serves requests while unable to record them is worse than one that's down. Hence a
+practical corollary — don't point your only audit device at a file on a disk that can fill up.
 
-⚠️ **Прочитать этот журнал в лабе вам не дадут, и это надо сказать прямо.** Мы направили
-его в стандартный вывод пода OpenBao, а логи подов в тенанте ваша роль читать не может —
-тенант отдаёт вам управление сервисами, но не доступ к их внутренностям. В настоящей
-инсталляции журнал забирает сборщик логов платформы и кладёт туда, где его смотрит
-служба ИБ, а не вы через `kubectl`.
+⚠️ **You won't be allowed to read this log in the lab, and that has to be said plainly.** We directed
+it to the standard output of the OpenBao Pod, and your role can't read the logs of Pods in the
+tenant — the tenant hands you management of services, but not access to their internals. In a real
+installation the platform's log collector picks the log up and puts it where the security team looks
+at it, not you via `kubectl`.
 
-Что при этом всё-таки видно вам самим — история версий из предыдущего шага
-(`bao kv metadata get`): кто и когда **писал**, с точностью до секунды. Это не полный
-аудит, но на вопрос «когда последний раз меняли пароль» отвечает.
+What you can still see yourself is the version history from the previous step
+(`bao kv metadata get`): who **wrote**, and when, down to the second. It's not a full audit, but it
+answers the question "when was the password last changed".
 
 </details>
 
-## Проверка
+## The check
 
-📍 **Где:** на виртуалке, в том же окне терминала, где вы работали с `kubectl`.
+📍 **Where:** on the bastion, in the same terminal window where you worked with `kubectl`.
 
 ```bash
 cd labs/08-openbao
-# Скрипт читает эти три переменные окружения, поэтому задать их надо до запуска
-# и в том же окне терминала.
-export KUBECONFIG=~/lab.kubeconfig     # какой кластер проверять
-export COZY_TENANT=workshop03          # ваш номер тенанта
-export BAO_TOKEN='ваш-root-токен'      # тот, что напечатал bao operator init
+# The script reads these three environment variables, so you must set them before running it
+# and in the same terminal window.
+export KUBECONFIG=~/lab.kubeconfig     # which cluster to check
+export COZY_TENANT=workshop03          # your tenant number
+export BAO_TOKEN='your-root-token'     # the one bao operator init printed
 ./check.sh
 ```
 
-⚠️ **На Windows скрипт запускается из WSL**, а не из PowerShell — как его поставить,
-написано в начале лабы 0. Без WSL лабу можно пройти, но отчёта-артефакта не будет.
+⚠️ **On Windows the script is run from WSL**, not from PowerShell — how to set it up is written at
+the start of Lab 0. You can complete the lab without WSL, but there'll be no report artifact.
 
-Скрипт проверит не факт применения манифестов, а работу по существу: хранилище
-распечатано, секрет читается по токену, версий больше одной (значит, ротация была),
-аудит включён, а в манифесте приложения нет ни одного пароля открытым текстом.
+The script checks not the fact that manifests were applied, but the substance of the work: the store
+is unsealed, the secret reads back with the token, there's more than one version (so a rotation
+happened), auditing is on, and there isn't a single plaintext password in the application's manifest.
 
-Рядом появится файл отчёта. **В отчёт не попадает ни один секрет** — только версии,
-имена и отпечатки.
+A report file will appear alongside. **Not a single secret goes into the report** — only versions,
+names, and fingerprints.
 
-## Уборка
+## Cleanup
 
 ```bash
-# delete -f = «убери из кластера всё, что описано в этом файле».
+# delete -f = "remove from the cluster everything described in this file".
 kubectl delete -f secrets-demo.yaml
-# То, что создавалось командой, а не файлом, удаляется по имени.
+# What was created by a command rather than a file is deleted by name.
 kubectl delete secret passes-bao-token
 kubectl delete pod bao-workbench
 ```
 
-Сам OpenBao удаляется в дашборде: приложение `secrets` → удалить.
+OpenBao itself is deleted in the dashboard: the `secrets` application → delete.
 
-Почему это дёшево. Хранилище секретов в классической инсталляции — проект: сервер,
-кластеризация, сертификаты, регламент распечатывания, интеграция с мониторингом. Здесь
-вы получили его за две минуты и отдали обратно за десять секунд, а занятое им место
-освободилось.
+Why this is cheap. A secrets store in a classic installation is a project: a server, clustering,
+certificates, an unsealing procedure, monitoring integration. Here you got it in two minutes and gave
+it back in ten seconds, and the space it took is freed.
 
-⚠️ **С удалением исчезнут все секреты внутри.** Unseal-ключ и root-токен от удалённого
-хранилища превращаются в бесполезные строки. Если вы клали туда что-то настоящее —
-сначала заберите.
+⚠️ **Deleting it removes every secret inside.** The unseal key and root token of a deleted store turn
+into useless strings. If you put something real in there — retrieve it first.
 
-## Что мы теперь умеем
+## What we can now do
 
-- Объяснять коллеге, почему Secret в Kubernetes — это не «зашифровано», и подкреплять
-  это одной командой
-- Заказывать OpenBao, инициализировать его и распечатывать, понимая, что происходит
-- Класть секрет в хранилище и выдавать приложению доступ ровно на один путь коротким
-  токеном
-- Менять пароль, не трогая ни одного файла в репозитории, и видеть историю версий
-- Внятно отвечать на вопрос «кто читал этот пароль» — и понимать, откуда берётся ответ
+- Explain to a colleague why a Secret in Kubernetes isn't "encrypted," and back it up with a single
+  command
+- Order OpenBao, initialize it, and unseal it, understanding what's happening
+- Put a secret into the store and grant the application access to exactly one path with a short-lived
+  token
+- Change a password without touching a single file in the repository, and see the version history
+- Answer the question "who read this password" clearly — and understand where the answer comes from
 
-## А в vSphere это было бы
+## And in vSphere this would be
 
-Прямого аналога нет, и это честный ответ. Пароли служебных учёток в классической
-инфраструктуре живут в трёх местах одновременно: в файле настроек на виртуалке, в
-парольном менеджере отдела и в голове того, кто настраивал. Ротация означает поход по
-всем трём, поэтому её не делают. Вопрос «кто читал» не имеет ответа, потому что чтение
-файла никто не записывает.
+There's no direct analogue, and that's the honest answer. In classic infrastructure, service-account
+passwords live in three places at once: in a config file on a VM, in the department's password
+manager, and in the head of whoever set it up. Rotation means a trip through all three, which is why
+it isn't done. The question "who read it" has no answer, because no one records the reading of a file.
 
-Есть vSphere Credential Store, есть Windows Credential Manager, есть корпоративные
-парольные менеджеры — все они решают задачу «человеку удобно хранить пароли». Задачу
-«приложение получает пароль само, по политике, на время и под запись» они не решают.
+There's the vSphere Credential Store, there's Windows Credential Manager, there are corporate
+password managers — they all solve the problem of "it's convenient for a person to store passwords."
+The problem of "an application gets the password itself, by policy, for a limited time, and on the
+record" they don't solve.
 
-**Где vSphere удобнее, честно.** Ни в чём из вышеперечисленного — но за удобство
-приходится платить, и вот чем.
+**Where vSphere is more convenient, honestly.** In none of the above — but convenience comes at a
+price, and here's what it is.
 
-Пароль в файле на виртуалке **всегда доступен**: перезагрузился хост, поднялась машина,
-служба прочитала файл и заработала. Никого не надо будить в три часа ночи. OpenBao после
-перезапуска запечатан, и пока его не распечатают, приложения не стартуют. Это добавляет
-в вашу инфраструктуру новую точку отказа и новый регламент — с дежурными, с носителями
-ключей, с описанной процедурой. Автораспечатывание через внешний KMS эту проблему
-снимает, но добавляет зависимость от того самого внешнего KMS.
+A password in a file on a VM is **always available**: the host rebooted, the machine came up, the
+service read the file and started working. Nobody has to be woken at three in the morning. OpenBao
+after a restart is sealed, and until it's unsealed the applications don't start. This adds a new
+point of failure and a new procedure to your infrastructure — with on-call staff, with key holders,
+with a documented process. Auto-unseal through an external KMS removes this problem, but adds a
+dependency on that very external KMS.
 
-И второе. Файл на диске понимает любой администратор с первого взгляда. Пути, политики,
-токены, TTL, приставка `data` в середине пути — это отдельная модель, которую команде
-придётся выучить, и первые пару месяцев она будет источником непонятных отказов.
+And second. A file on disk is understood by any administrator at a glance. Paths, policies, tokens,
+TTLs, the `data` prefix in the middle of a path — this is a separate model the team will have to
+learn, and for the first couple of months it will be a source of baffling denials.
 
-Выигрыш всё равно перевешивает, но он не бесплатный, и планировать переход надо с этой
-ценой в уме.
+The gain still outweighs it, but it isn't free, and you should plan the migration with this cost in
+mind.

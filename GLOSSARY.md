@@ -56,3 +56,40 @@ inside code fences, the tenant placeholder `workshopXX`, the paths
 When a term is not in this table, prefer the wording that a native engineer
 would actually use in that language's Kubernetes documentation — never a raw
 transliteration of the English word.
+
+## Resolved consistency decisions (one rendering, everywhere)
+
+These were pinned after review to stop drift. Use exactly these:
+
+| Concept (ru) | Canonical English | Note |
+|---|---|---|
+| ведущий (the person leading the workshop) | **the instructor** | never "the host" — "host" means a machine here |
+| стенд | **testbed** | never the calque "stand" |
+| зоопарк (the metaphor for a sprawl of tools) | **menagerie** | one word, everywhere the metaphor recurs |
+| виртуалка / джамп-хост (the shared VM you SSH into) | **the bastion** | never "VM" — reserve "VM"/"virtual machine" for actual VMs and VMInstances |
+| Pod (the Kubernetes object) | **Pod** (capitalized) | even in running prose |
+
+## Reader-facing placeholders (translate — they are instructions, not code)
+
+Descriptive fill-in placeholders are meant to be replaced by the reader, so they
+are localized in every language (in prose AND in the shipped file), even though
+they sit inside code:
+
+| ru placeholder | English |
+|---|---|
+| `ЗдесьВашПароль` | `YourPasswordHere` |
+| `ваш-пароль-passapp` | `your-passapp-password` |
+| `ВАШ-ЛОГИН` | `YOUR-LOGIN` |
+| `ЗАМЕНИТЕ-МЕНЯ` | `REPLACE-ME` |
+| `пароль` (as a placeholder value) | `password` |
+| `хост` (as a placeholder value) | `host` |
+| `<адрес-виртуалки>` | `<bastion-address>` |
+| `<имя>` | `<name>` |
+| `имя.yaml` | `name.yaml` |
+| `/Users/имя`, `/home/имя` | `/Users/name`, `/home/name` |
+| `<скрыто>` | `<hidden>` |
+| credential labels `логин:` / `пароль:` / `хост:` / `база:` | `login:` / `password:` / `host:` / `database:` |
+
+**Keep verbatim** (functional tokens the scripts/manifests actually depend on):
+`workshopXX`, `ВСТАВЬТЕ_PRESIGNED_URL`, `ВСТАВЬТЕ_...` fields in `convert.sh`,
+and every other identifier that appears unchanged in the shipped files.

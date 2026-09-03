@@ -1,57 +1,58 @@
-## 17. Разбор: что делает convert.sh
+## 17. A closer look: what's inside convert.sh
 
-Скрипт состоит из пяти шагов, и каждый печатает, чем занят.
+The script has five steps, and each one prints what it's up to.
 
-**Шаг 1 — проверка аппаратного ускорения.** Смотрит, есть ли устройство `/dev/kvm`.
-`virt-v2v` внутри себя запускает маленькую виртуальную машину, чтобы залезть в образ, —
-и если процессор пробрасывается внутрь нашей машины, эта вложенная виртуализация идёт
-быстро. Если нет — включается программный режим: медленнее, но работает. Строка
-`LIBGUESTFS_BACKEND=direct` — это как раз переключение в такой режим.
+**Step 1 — checking for hardware acceleration.** It looks for the `/dev/kvm` device.
+Internally, `virt-v2v` spins up a tiny virtual machine to get inside the image — and if the
+processor is passed through into our machine, this nested virtualization runs fast. If it
+isn't, a software mode kicks in: slower, but it works. The line
+`LIBGUESTFS_BACKEND=direct` is exactly that switch into such a mode.
 
-**Шаг 2 — скачивание исходного образа.**
+**Step 2 — downloading the source image.**
 
 ```bash
 wget -O source.ova "$OVA_URL"
 ```
 
-Тянет `app-1.ova` из общего хранилища воркшопа — того самого, что в карте выше. Ведущий
-залил туда файл заранее. **В своём проекте на этом месте была бы выгрузка из vSphere:**
-`Export OVF Template` или `ovftool`, а дальше та же самая переупаковка.
+It pulls `app-1.ova` from the workshop's shared storage — the very one on the map above. The
+instructor uploaded the file there ahead of time. **In your own project, this is where an
+export from vSphere would go:** `Export OVF Template` or `ovftool`, and then the same
+repackaging.
 
-**Шаг 3 — сама переупаковка.**
+**Step 3 — the repackaging itself.**
 
 ```bash
 virt-v2v -i ova /root/source.ova -o local -os /root/out -of qcow2 -on app
 ```
 
-`-i ova` — что на входе: файл формата OVA. `-o local -os /root/out` — куда сложить
-результат: в локальную папку `/root/out`. `-of qcow2` — **обязательный** флаг: без него
-`virt-v2v` выберет формат по умолчанию, и платформа такой диск не примет. `-on app` —
-как назвать результат, отсюда возьмётся имя файла `app.qcow2`.
+`-i ova` — what goes in: a file in OVA format. `-o local -os /root/out` — where to put the
+result: into the local folder `/root/out`. `-of qcow2` — a **required** flag: without it
+`virt-v2v` will pick a default format, and the platform won't accept that disk. `-on app` —
+what to name the result, and that's where the file name `app.qcow2` comes from.
 
-Идти это будет минуты — на экране побегут строки вроде `Copying disk 1/1`. Именно
-здесь и происходит та вторая, невидимая работа с драйверами, о которой сказано выше.
+This will take a few minutes — lines like `Copying disk 1/1` will scroll across the screen.
+This is exactly where that second, invisible work with the drivers mentioned above happens.
 
-**Шаг 4 — выгрузка в ваш бакет.**
+**Step 4 — uploading into your bucket.**
 
 ```bash
 mc alias set mybucket "$S3_ENDPOINT" "$ACCESS_KEY" "$SECRET_KEY"
 mc cp /root/out/app.qcow2 "mybucket/$BUCKET/app.qcow2"
 ```
 
-`mc alias set` запоминает адрес хранилища и ключи под коротким именем `mybucket`, чтобы
-дальше не повторять их в каждой команде. `mc cp` копирует файл — синтаксис нарочно
-такой же, как у обычного `cp`.
+`mc alias set` remembers the storage address and keys under the short name `mybucket`, so you
+don't have to repeat them in every command afterwards. `mc cp` copies the file — the syntax is
+deliberately the same as ordinary `cp`.
 
-**Шаг 5 — ссылка для платформы.**
+**Step 5 — a link for the platform.**
 
 ```bash
 mc share download --expire 168h "mybucket/$BUCKET/app.qcow2"
 ```
 
-Создаёт временную подписанную ссылку на семь дней (168 часов). Подписанную — значит,
-внутрь адреса вшита криптографическая подпись, и по этой ссылке файл скачает кто угодно,
-но только по ней и только пока она жива. Открывать бакет всему миру не нужно, и ключи
-доступа платформе передавать тоже не нужно.
+It creates a temporary signed link valid for seven days (168 hours). Signed — meaning a
+cryptographic signature is baked into the address, and with this link anyone can download the
+file, but only with it and only while it's alive. There's no need to open the bucket to the
+whole world, and no need to hand your access keys to the platform either.
 
-Ссылку ищите в выводе после слова `Share:` — она понадобится на следующей фазе.
+Look for the link in the output after the word `Share:` — you'll need it in the next phase.

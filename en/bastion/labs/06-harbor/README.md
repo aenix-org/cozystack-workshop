@@ -1,218 +1,225 @@
-# Лаба 6 · Свой приватный реестр образов
+# Lab 6 · Your own private image registry
 
 | | |
 |---|---|
-| **Время** | 45 минут, из них 10 — ожидание |
-| **Что доказывает** | Реестр образов заводится за десять минут, и кластер умеет тянуть только из него |
-| **Что понадобится** | Кластер из лабы 0, `kubectl`, `docker` (или `podman`) на виртуалке, доступ в дашборд |
+| **Time** | 45 minutes, 10 of them spent waiting |
+| **What it proves** | An image registry stands up in ten minutes, and the cluster can pull only from it |
+| **What you'll need** | The cluster from Lab 0, `kubectl`, `docker` (or `podman`) on the bastion, dashboard access |
 
-## Зачем это
+## Why this matters
 
-Сервис «Пропуск» дошёл до информационной безопасности, и оттуда пришло письмо.
+The "Passes" service made it as far as information security, and an email came back.
 
-> Образы контейнеров тянутся из публичных реестров в интернете. Это неприемлемо:
-> состав образа никем не проверен, содержимое может измениться под тем же именем,
-> а при недоступности внешнего ресурса продуктивный сервис не запустится. Все образы
-> должны храниться во внутреннем реестре организации.
+> Container images are pulled from public registries on the internet. This is unacceptable:
+> nobody has vetted what's inside an image, its contents can change under the same name,
+> and if the external resource is unavailable, a production service won't start. All images
+> must be stored in the organization's internal registry.
 
-Возразить нечего — каждый пункт по делу. Публичный образ с тегом `latest` сегодня и
-завтра может быть разным. Автор образа может его удалить. Внешний реестр может
-ограничить вам скорость скачивания в самый неподходящий момент — и это не гипотеза, так
-делают все крупные публичные реестры.
+There's nothing to argue with — every point is fair. A public image tagged `latest` can be one
+thing today and another tomorrow. The image's author can delete it. An external registry can
+throttle your download speed at the worst possible moment — and that's not hypothetical, every
+large public registry does it.
 
-Значит, нужен свой реестр. Обычно это отдельный проект: заявка на виртуалку, установка,
-сертификаты, хранилище, бэкапы, чей-то квартал. Сегодня это позиция в каталоге.
+So you need a registry of your own. Normally that's a project in itself: a request for a VM,
+installation, certificates, storage, backups, someone's quarter. Today it's a line item in the
+catalog.
 
-И раз реестр свой и закрытый — кластеру придётся выдать в него доступ. На этом
-спотыкаются все, и мы споткнёмся тоже, специально.
+And since the registry is yours and closed, the cluster will have to be granted access to it.
+This is where everyone trips up, and we'll trip up too, on purpose.
 
-## Словарик
+## Little glossary
 
-| Термин | Что это | Похоже на… но |
+| Term | What it is | Like… but |
 |---|---|---|
-| **Образ (image)** | Слепок приложения со всем, что нужно для запуска | **Шаблон VM**, но неизменяемый: внутрь не зайти и не поправить, собирают новый |
-| **Слой (layer)** | Часть образа. Образ собран из слоёв, слои переиспользуются | одинаковые слои разных образов хранятся в реестре один раз |
-| **Тег (tag)** | Метка версии образа: `passes-api:v1` | **Имя версии шаблона**, но тег можно переназначить на другой образ, и это главный источник бед |
-| **Реестр (registry)** | Хранилище образов с доступом по HTTP | **Content Library**, но отдаёт слои по сети при каждом запуске, а не копирует шаблон целиком |
-| **Harbor** | Реестр с интерфейсом, проектами, правами и сканером уязвимостей | **Content Library + права + отчёты**, но умеет проверять содержимое образов и подписывать их |
-| **Проект в Harbor** | Область внутри реестра со своими правами | **Папка в Content Library**, но бывает публичным или закрытым, и от этого зависит, нужны ли креды |
-| **`imagePullSecret`** | Секрет с логином и паролем к реестру, который читает узел | **Учётка для подключения Content Library**, но нужен **узлу**, а не вам; ваш `docker login` кластеру не помогает |
-| **Dockerfile** | Инструкция, как собрать образ | **Инструкция по подготовке шаблона**, но выполняется целиком и заново при каждой сборке |
-| **Downward API** | Способ отдать поду сведения о нём самом через переменные окружения | **Гостевые переменные из VMware Tools**, но значения подставляет кластер при запуске, приложение их не запрашивает |
+| **Image** | A snapshot of an application with everything needed to run it | **A VM template**, but immutable: you can't step inside and fix it, you build a new one |
+| **Layer** | A part of an image. An image is built from layers, and layers are reused | identical layers of different images are stored in the registry only once |
+| **Tag** | A version label for an image: `passes-api:v1` | **A template version name**, but a tag can be reassigned to a different image, and that's the main source of trouble |
+| **Registry** | An image store served over HTTP | **A Content Library**, but it hands out layers over the network on every launch rather than copying the whole template |
+| **Harbor** | A registry with a UI, projects, permissions and a vulnerability scanner | **Content Library + permissions + reports**, but it can inspect image contents and sign them |
+| **A project in Harbor** | An area inside the registry with its own permissions | **A folder in a Content Library**, but it can be public or private, and that determines whether credentials are needed |
+| **`imagePullSecret`** | A Secret holding a login and password for the registry, read by the node | **The account for connecting a Content Library**, but it's needed by the **node**, not by you; your `docker login` does the cluster no good |
+| **Dockerfile** | The instructions for building an image | **The instructions for preparing a template**, but it runs in full and from scratch on every build |
+| **Downward API** | A way to give a Pod information about itself through environment variables | **Guest variables from VMware Tools**, but the values are injected by the cluster at launch; the application doesn't ask for them |
 
-## Два кубконфига: не перепутайте
+## Two kubeconfigs: don't mix them up
 
-Дальше в лабе два разных кластера, и это стоит развести до первой команды.
+From here on the lab involves two different clusters, and it's worth keeping them apart before
+the first command.
 
-| Кубконфиг | Что это | Что в нём делаем |
+| Kubeconfig | What it is | What we do with it |
 |---|---|---|
-| `~/.kube/config` | Управляющий кластер Cozystack, ваш тенант | смотрим на managed-сервисы: Harbor, базы, очереди |
-| `~/lab.kubeconfig` | **Ваш** кластер `lab` из лабы 0 | разворачиваем приложение |
+| `~/.kube/config` | The Cozystack management cluster, your tenant | look at managed services: Harbor, databases, queues |
+| `~/lab.kubeconfig` | **Your** `lab` cluster from Lab 0 | deploy the application |
 
-Оба берутся в дашборде. Тенантный лежит в секрете `kubeconfig-tenant-workshopXX`
-(вкладка Secrets), кластерный — в разделе доступов вашего кластера `lab`.
+Both come from the dashboard. The tenant one lives in the `kubeconfig-tenant-workshopXX`
+Secret (the Secrets tab), the cluster one in the access section of your `lab` cluster.
 
-⚠️ **Самая частая причина «у меня ничего не работает» в этой лабе — команда ушла не в
-тот кластер.** Перед каждым блоком команд написано, куда он адресован. Если сомневаетесь:
+⚠️ **The most common cause of "nothing works for me" in this lab is a command that went to the
+wrong cluster.** Before every block of commands it's written which cluster it's meant for. If
+you're unsure:
 
 ```bash
-# echo печатает значение переменной: каким файлом доступа сейчас пользуется kubectl.
-# Пусто — значит kubectl возьмёт файл по умолчанию ~/.kube/config, а не тот, что вы думаете.
+# echo prints the value of the variable: which access file kubectl is using right now.
+# Empty means kubectl will use the default file ~/.kube/config, not the one you think.
 echo $KUBECONFIG
 
-# get nodes = «покажи узлы кластера». Здесь это лакмусовая бумажка:
-# по ответу видно, в какой из двух кластеров ушла команда.
+# get nodes = "show the cluster's nodes". Here it's a litmus test:
+# the answer tells you which of the two clusters the command went to.
 kubectl get nodes
 ```
 
-В кластере `lab` будет один узел с именем вида `kubernetes-lab-md0-...`. В управляющем
-кластере эта команда, скорее всего, вернёт отказ — у тенанта нет прав смотреть узлы.
+The `lab` cluster will have a single node named something like `kubernetes-lab-md0-...`. In the
+management cluster this command will most likely return a refusal — a tenant has no permission to
+view nodes.
 
-## Что лежит в папке лабы
+## What's in the lab folder
 
-Все файлы уже у вас — вы забрали их вместе с репозиторием. Создавать и печатать заново
-ничего не нужно: там, где ниже написано `kubectl apply -f имя.yaml`, файл берётся отсюда.
+All the files are already yours — you got them along with the repository. There's nothing to
+create or type out again: wherever it says `kubectl apply -f name.yaml` below, the file is taken
+from here.
 
 ```bash
-# все команды этой лабы выполняются из папки лабы — перейдите в неё
+# every command in this lab is run from the lab folder — change into it
 cd labs/06-harbor
 ```
 
-| Файл | Что это | Когда пригодится |
+| File | What it is | When it comes in handy |
 |---|---|---|
-| `app/` | Исходники сервиса «Пропуск» на Go и `Dockerfile` — из них собираете образ | собираете локально, `docker build` |
-| `passes-broken.yaml` | **Намеренно неполный** файл: без реквизитов доступа к реестру | применяете, чтобы увидеть отказ своими глазами |
-| `passes.yaml` | Тот же файл, но с доступом к реестру | применяете после того, как разобрались |
-| `check.sh` | Проверка, что образ приехал из вашего Harbor, а не из интернета | запускаете в конце лабы |
+| `app/` | The "Passes" service sources in Go and a `Dockerfile` — you build the image from them | you build locally, `docker build` |
+| `passes-broken.yaml` | A **deliberately incomplete** file: no registry access credentials | you apply it to see the refusal with your own eyes |
+| `passes.yaml` | The same file, but with registry access | you apply it once you've figured things out |
+| `check.sh` | A check that the image came from your Harbor, not from the internet | you run it at the end of the lab |
 
-## Шаг 1. Создаём Harbor
+## Step 1. Create Harbor
 
-📍 **Где:** в браузере, в дашборде Cozystack. Реестр — общий ресурс тенанта, а не вашего
-учебного кластера, поэтому заводится он там же, где заводился сам кластер.
+📍 **Where:** in the browser, in the Cozystack dashboard. The registry is a shared tenant
+resource, not part of your lab cluster, so it's created in the same place the cluster itself was.
 
-Тенант → **Создать приложение** → `Harbor`.
+Tenant → **Create application** → `Harbor`.
 
-| Поле | Значение | Почему так |
+| Field | Value | Why |
 |---|---|---|
-| Имя | `harbor` | попадёт в адрес реестра; какой получится — увидите после создания |
-| Host | оставить пустым | тогда адрес соберётся сам из имени и домена тенанта |
-| Storage class | `replicated` | данные лягут в трёх копиях на разные узлы |
-| Trivy → enabled | **выключить** | сканер уязвимостей качает базу на несколько гигабайт; на учебном стенде это лишние двадцать минут ожидания |
-| Database → replicas | `1` | отказоустойчивость базы реестра сегодня не проверяем |
+| Name | `harbor` | it becomes part of the registry address; you'll see what comes out after creation |
+| Host | leave empty | then the address is assembled on its own from the name and the tenant domain |
+| Storage class | `replicated` | the data will be kept in three copies across different nodes |
+| Trivy → enabled | **turn off** | the vulnerability scanner downloads a database several gigabytes in size; on a training testbed that's an extra twenty minutes of waiting |
+| Database → replicas | `1` | we're not testing the fault tolerance of the registry's database today |
 | Database → size | `5Gi` | |
 | Redis → replicas | `1` | |
 | Redis → size | `1Gi` | |
-| Core / Registry preset | оставить предложенный | |
+| Core / Registry preset | leave as suggested | |
 
-⚠️ **Redis в этой форме — внутренний кеш самого Harbor, к следующей лабе он отношения не
-имеет.** В лабе про кеширование вы заведёте отдельный Redis для своего приложения. Имя
-совпадает, роли разные.
+⚠️ **The Redis in this form is Harbor's own internal cache; it has nothing to do with the next
+lab.** In the lab about caching you'll stand up a separate Redis for your own application. The
+name is the same, the roles are different.
 
-Нажимаем создать и ждём. Harbor поднимается пять-десять минут: это не одно приложение,
-а несколько служб плюс база данных плюс объектное хранилище под сами слои образов.
+Click create and wait. Harbor comes up in five to ten minutes: it's not a single application but
+several services plus a database plus object storage for the image layers themselves.
 
-⚠️ **Если Harbor висит в состоянии «не готов» дольше пятнадцати минут** — посмотрите, что
-происходит: `kubectl -n tenant-workshopXX get pods | grep harbor`. Чаще всего это очередь
-установки, общая на всю платформу: ваше приложение стоит в ней за чужими и ждёт.
+⚠️ **If Harbor sits in a "not ready" state longer than fifteen minutes** — look at what's
+happening: `kubectl -n tenant-workshopXX get pods | grep harbor`. Most often it's the install
+queue, shared across the whole platform: your application is behind other people's in it and is
+waiting.
 
-Слои образов Harbor хранит в S3-совместимом хранилище, и бакет под них создаётся сам —
-своё хранилище в тенанте для этого включать не нужно, подойдёт родительское. Если поды
-всё же не появляются больше получаса, напишите в чат воркшопа с выводом этой команды.
+Harbor stores image layers in S3-compatible storage, and the bucket for them is created on its
+own — you don't need to enable your own storage in the tenant for this, the parent one will do.
+If the Pods still don't appear after more than half an hour, write to the workshop chat with the
+output of this command.
 
-## Шаг 2. Забираем реквизиты и заходим в реестр
+## Step 2. Grab the credentials and log in to the registry
 
-📍 **Где:** в дашборде, потом в терминале на виртуалке.
+📍 **Where:** in the dashboard, then in a terminal on the bastion.
 
-Откройте созданное приложение `harbor` и найдите вкладку с секретами. Там лежит секрет
-с реквизитами реестра, а в нём три нужных ключа:
+Open the `harbor` application you created and find the tab with the secrets. There you'll find a
+secret with the registry credentials, and inside it three keys you need:
 
-| Ключ | Что в нём |
+| Key | What's in it |
 |---|---|
-| `url` | адрес вашего реестра, вида `https://harbor-....<домен стенда>` |
-| `admin-password` | пароль администратора |
-| `redis-password` | внутренний пароль Harbor, вам не нужен |
+| `url` | your registry's address, of the form `https://harbor-....<testbed domain>` |
+| `admin-password` | the administrator's password |
+| `redis-password` | Harbor's internal password, which you don't need |
 
-Логин — `admin`.
+The login is `admin`.
 
-⚠️ **Не угадывайте адрес реестра, возьмите его из ключа `url`.** Платформа добавляет к
-имени приложения префикс с типом сервиса, поэтому адрес может оказаться не тем, что вы
-ожидали по имени. Тот же адрес виден в списке ingress-ов приложения.
+⚠️ **Don't guess the registry's address, take it from the `url` key.** The platform prefixes the
+application name with the service type, so the address may turn out different from what you
+expected from the name. The same address is visible in the application's list of ingresses.
 
-Тот же пароль доступен и командой. Читать **все** секреты подряд тенанту не разрешено —
-проверьте сами, `kubectl auth can-i get secrets` ответит `no`. Но на каждое созданное вами
-приложение платформа заводит отдельное правило, разрешающее именно его реквизиты:
+The same password is also available via a command. A tenant isn't allowed to read **all** secrets
+across the board — check for yourself, `kubectl auth can-i get secrets` answers `no`. But for each
+application you create, the platform sets up a separate rule allowing exactly its credentials:
 
 ```bash
-# get secret = «покажи объект-секрет». Имя секрета собрано из префикса типа
-# приложения и его имени: harbor- + harbor.
-#   -n tenant-workshopXX  в каком пространстве имён искать — в вашем тенанте
-#   -o jsonpath='...'     вытащить из объекта одно поле, а не печатать его целиком
-#   base64 -d             раскодировать: значения внутри секретов лежат в base64
-#   ; echo                дописать перевод строки, иначе пароль слипнется с приглашением
+# get secret = "show the Secret object". The secret's name is assembled from the prefix
+# for the application type and its name: harbor- + harbor.
+#   -n tenant-workshopXX  which namespace to look in — your tenant
+#   -o jsonpath='...'     pull a single field out of the object rather than printing the whole thing
+#   base64 -d             decode: values inside secrets are stored in base64
+#   ; echo                add a newline, otherwise the password runs into the prompt
 kubectl -n tenant-workshopXX get secret harbor-harbor-credentials \
   -o jsonpath='{.data.admin-password}' | base64 -d; echo
 ```
 
-Дашборд удобнее тем, что не надо возиться с base64. Команда удобнее тем, что её можно
-вставить в скрипт.
+The dashboard is more convenient in that you don't have to fuss with base64. The command is more
+convenient in that you can drop it into a script.
 
-Откройте адрес в браузере и войдите. Вы увидите интерфейс Harbor с одним проектом
+Open the address in a browser and log in. You'll see the Harbor UI with a single project,
 `library`.
 
-Теперь то же самое из терминала. `docker login` спрашивает имя и пароль и сохраняет
-реквизиты на вашем виртуалке, в файле `~/.docker/config.json`. После этого `docker push`
-и `docker pull` ходят в этот реестр, не спрашивая ничего.
+Now the same thing from the terminal. `docker login` asks for a username and password and saves
+the credentials on your bastion, in the file `~/.docker/config.json`. After that `docker push`
+and `docker pull` go to this registry without asking anything.
 
 ```bash
-# login = «запомни реквизиты вот этого реестра».
-# Аргумент — адрес реестра из ключа url; harbor-harbor.workshop03.example.org здесь пример.
-# Команда спросит имя пользователя (admin) и пароль; пароль при вводе не отображается.
+# login = "remember the credentials for this registry".
+# The argument is the registry address from the url key; harbor-harbor.workshop03.example.org here is an example.
+# The command will ask for a username (admin) and a password; the password isn't shown as you type.
 docker login harbor-harbor.workshop03.example.org
 ```
 
-Дальше по тексту `harbor-harbor.workshop03.example.org` — это **ваш** адрес, подставляйте свой.
+From here on in the text `harbor-harbor.workshop03.example.org` is **your** address — substitute your own.
 
-**Что вы должны увидеть:**
+**What you should see:**
 
 ```
 Login Succeeded
 ```
 
-⚠️ **Этот `docker login` научил заходить в реестр ваш виртуалку — и только его.** Кластеру
-он не помог ничем. Запомните это, оно понадобится чуть дальше по лабе.
+⚠️ **This `docker login` taught your bastion to log in to the registry — and only it.** It did
+nothing for the cluster. Remember this; you'll need it a little further into the lab.
 
-## Шаг 3. Заводим закрытый проект
+## Step 3. Set up a private project
 
-📍 **Где:** в браузере, в Harbor.
+📍 **Where:** in the browser, in Harbor.
 
 **Projects** → **New Project**.
 
-| Поле | Значение | Почему так |
+| Field | Value | Why |
 |---|---|---|
-| Project Name | `passes` | по одному проекту на сервис — так проще раздавать права |
-| Access Level | **не отмечать Public** | ИБ просила закрытый реестр, а не «свой, но открытый всему интернету» |
-| Storage quota | `-1` (без ограничения) | на стенде квота только помешает |
+| Project Name | `passes` | one project per service — that makes it easier to hand out permissions |
+| Access Level | **do not check Public** | security asked for a closed registry, not "yours, but open to the whole internet" |
+| Storage quota | `-1` (no limit) | on the testbed a quota would only get in the way |
 
-Проект `library`, который был там с самого начала, — публичный. Из него образы тянутся
-без всяких реквизитов. Мы им пользоваться не будем именно поэтому: он не покажет ту
-самую ошибку с доступом, ради которой лаба сделана.
+The `library` project, which was there from the very start, is public. Images are pulled from it
+without any credentials at all. That's exactly why we won't use it: it won't produce the very
+access error the lab was built around.
 
-## Шаг 4. Собираем образ
+## Step 4. Build the image
 
-📍 **Где:** на виртуалке (в терминале bastion).
+📍 **Where:** on the bastion (in the bastion terminal).
 
-В папке этой лабы лежит `app/` — исходник сервиса «Пропуск» и инструкция по сборке.
-Прежде чем собирать, разберём, что там.
+In this lab's folder there's `app/` — the source of the "Passes" service and the build
+instructions. Before building, let's go over what's in there.
 
 <details>
-<summary><b>Разбираем приложение построчно</b></summary>
+<summary><b>A closer look: what's inside the app</b></summary>
 
-Файл `app/main.go`, около семидесяти строк на Go. Он делает ровно две вещи.
+The file `app/main.go`, about seventy lines of Go. It does exactly two things.
 
-**Отвечает на `/healthz` словом `ok`.** Это адрес для проверки готовности: кластер стучится
-сюда и не пускает трафик на копию, пока не получит ответ.
+**It answers `/healthz` with the word `ok`.** This is the readiness-check address: the cluster
+knocks here and doesn't send traffic to a replica until it gets an answer.
 
-**Отвечает на `/` небольшим JSON**, в котором сообщает о себе:
+**It answers `/` with a small JSON** in which it reports about itself:
 
 ```json
 {
@@ -226,15 +233,15 @@ Login Succeeded
 }
 ```
 
-Откуда приложение знает своё имя, узел и пространство имён? Оно их **не выясняет**.
-Их кладёт кластер при запуске, в переменные окружения:
+How does the application know its own name, node and namespace? It **doesn't find them out**.
+The cluster puts them there at launch, into environment variables:
 
 ```go
-Pod:  env("POD_NAME", "неизвестно"),
-Node: env("NODE_NAME", "неизвестно"),
+Pod:  env("POD_NAME", "unknown"),
+Node: env("NODE_NAME", "unknown"),
 ```
 
-А в манифесте написано, что туда положить:
+And the manifest says what to put there:
 
 ```yaml
             - name: POD_NAME
@@ -243,17 +250,17 @@ Node: env("NODE_NAME", "неизвестно"),
                   fieldPath: metadata.name
 ```
 
-Это называется downward API — «сведения, спущенные сверху». Ближайший аналог в vSphere —
-гостевые переменные, которые VMware Tools отдаёт внутрь машины. Разница в том, что здесь
-приложение ничего не спрашивает и никуда не ходит: значения уже лежат в окружении к
-моменту, когда процесс стартовал. Ни клиента к API кластера, ни прав на этот API не
-нужно.
+This is called the downward API — "information handed down from above". The closest analogue in
+vSphere is the guest variables that VMware Tools hands into the machine. The difference is that
+here the application asks for nothing and goes nowhere: the values are already sitting in the
+environment by the time the process starts. No client to the cluster API, no permissions on that
+API needed.
 
-**Внешних библиотек в приложении нет ни одной, только стандартная библиотека Go.** Это не
-кокетство: сборка с зависимостями пошла бы в интернет за пакетами, а вся лаба началась
-с того, что ИБ ходить в интернет запретила.
+**There isn't a single external library in the application, only the Go standard library.** This
+isn't affectation: a build with dependencies would go to the internet for packages, and the whole
+lab started with security forbidding trips to the internet.
 
-Файл `app/Dockerfile` — инструкция по сборке. В ней два этапа:
+The file `app/Dockerfile` is the build instructions. It has two stages:
 
 ```dockerfile
 FROM golang:1.23-alpine AS build
@@ -264,114 +271,115 @@ FROM alpine:3.21
 COPY --from=build /out/passes-api /usr/local/bin/passes-api
 ```
 
-Первый этап — сборочный. Туда нужен весь компилятор Go, это примерно 350 МБ. Второй
-этап — то, что реально поедет в кластер: из первого этапа переносится **только готовый
-бинарник**, всё остальное выбрасывается.
+The first stage is the build stage. It needs the entire Go compiler, roughly 350 MB. The second
+stage is what actually ships to the cluster: from the first stage **only the finished binary** is
+carried over, everything else is thrown away.
 
-Итог — образ около десяти мегабайт вместо трёхсот пятидесяти. Дело не только в размере:
-внутри нет ни компилятора, ни исходников, ни пакетного менеджера. Тому, кто в контейнер
-всё-таки попал, нечем воспользоваться.
+The result is an image of about ten megabytes instead of three hundred and fifty. It's not only
+about size: inside there's no compiler, no sources, no package manager. Whoever did get into the
+container has nothing to work with.
 
-Сравните с тем, как это устроено у шаблонов виртуальных машин. Шаблон несёт в себе всю
-операционную систему целиком, вместе с компилятором, если он там когда-то оказался.
-Уменьшить его задним числом почти невозможно.
+Compare this with how it works for virtual machine templates. A template carries the whole
+operating system inside it, along with the compiler if it ever ended up there. Shrinking it after
+the fact is nearly impossible.
 
-Последние строки:
+The last lines:
 
 ```dockerfile
 RUN adduser -D -u 10001 app
 USER 10001
 ```
 
-Приложение работает не от root. В правильно настроенном кластере под от root не пустят,
-и это не наша придирка, а требование, с которым вы столкнётесь в любом современном
-кластере.
+The application doesn't run as root. In a properly configured cluster a Pod won't be allowed to
+run as root, and that's not us being fussy but a requirement you'll run into in any modern
+cluster.
 
 </details>
 
-Собирает образ команда `docker build`: она читает `Dockerfile`, выполняет описанные там
-шаги и кладёт результат в хранилище образов на вашем виртуалке. Имя, под которым результат
-там ляжет, задаётся флагом `-t` и состоит из трёх частей:
+The `docker build` command builds the image: it reads the `Dockerfile`, runs the steps described
+there, and puts the result into the image store on your bastion. The name the result is stored
+under is set by the `-t` flag and consists of three parts:
 
-| Часть | Что значит |
+| Part | What it means |
 |---|---|
-| `harbor-harbor.workshop03.example.org` | адрес реестра — куда пойдут за образом |
-| `passes/passes-api` | проект и имя внутри реестра |
-| `v1` | тег версии |
+| `harbor-harbor.workshop03.example.org` | the registry address — where they'll go for the image |
+| `passes/passes-api` | the project and name inside the registry |
+| `v1` | the version tag |
 
-Адрес реестра — часть имени образа. Именно поэтому переезд на свой реестр меняет все
-манифесты: имя образа становится другим.
+The registry address is part of the image name. That's precisely why moving to your own registry
+changes every manifest: the image name becomes a different one.
 
-Собираем. Замените адрес на свой:
+Let's build. Replace the address with your own:
 
 ```bash
 cd labs/06-harbor
 
-# build = «собери образ по Dockerfile».
-#   --platform linux/amd64  под какой процессор собирать; узлы кластера на x86,
-#                           а виртуалку может быть на ARM — тогда без флага выйдет не то
-#   -t <адрес>/<проект>/<имя>:<тег>  как назвать результат. Адрес реестра в начале имени
-#                           — это то, куда потом уедет docker push
-#   app/                    последний аргумент — папка с Dockerfile и исходниками;
-#                           её содержимое целиком передаётся сборщику
+# build = "build the image from the Dockerfile".
+#   --platform linux/amd64  which processor to build for; the cluster nodes are on x86,
+#                           and the bastion may be on ARM — then without the flag you get the wrong thing
+#   -t <address>/<project>/<name>:<tag>  what to name the result. The registry address at the start of the name
+#                           is where docker push will later send it
+#   app/                    the last argument — the folder with the Dockerfile and sources;
+#                           its entire contents are handed to the builder
 docker build --platform linux/amd64 -t harbor-harbor.workshop03.example.org/passes/passes-api:v1 app/
 ```
 
-⚠️ **`--platform linux/amd64` — не украшение.** Если у вас Mac на Apple Silicon (M1–M4)
-или виртуалку на ARM, без этого флага соберётся образ под ARM. Он соберётся без ошибок,
-запушится без ошибок, а в кластере — узлы там на обычных x86 — под встанет в
-`CrashLoopBackOff`, и в логах будет `exec format error`. Диагностируется это долго,
-потому что ничто вокруг не намекает, что дело в архитектуре процессора.
+⚠️ **`--platform linux/amd64` is not decoration.** If you have a Mac on Apple Silicon (M1–M4) or
+an ARM bastion, without this flag you'll build an ARM image. It will build without errors, push
+without errors, and in the cluster — the nodes there are on ordinary x86 — the Pod will land in
+`CrashLoopBackOff`, and the logs will say `exec format error`. This takes a long time to diagnose,
+because nothing around it hints that the issue is the processor architecture.
 
-**Что вы должны увидеть** — строки о шагах сборки и в конце:
+**What you should see** — lines about the build steps and, at the end:
 
 ```
 Successfully tagged harbor-harbor.workshop03.example.org/passes/passes-api:v1
 ```
 
-## Шаг 5. Отправляем образ в свой реестр
+## Step 5. Send the image to your registry
 
-📍 **Где:** на виртуалке (в терминале bastion).
+📍 **Where:** on the bastion (in the bastion terminal).
 
-Собранный образ пока лежит только у вас на диске. `docker push` отправляет его в реестр
-слой за слоем; слои, которые в реестре уже есть, повторно не передаются.
+The built image so far lives only on your disk. `docker push` sends it to the registry layer by
+layer; layers that are already in the registry are not sent again.
 
 ```bash
-# push = «отправь образ в реестр». Куда отправлять, docker берёт из имени образа:
-# первая часть имени — адрес реестра, туда он и пойдёт, с реквизитами от docker login.
+# push = "send the image to the registry". Where to send it, docker takes from the image name:
+# the first part of the name is the registry address, and there it goes, with the credentials from docker login.
 docker push harbor-harbor.workshop03.example.org/passes/passes-api:v1
 ```
 
-**Что вы должны увидеть** — как уезжают слои, и в конце строку с длинным хешем `digest`.
+**What you should see** — the layers going out, and at the end a line with a long hash, the
+`digest`.
 
-Загляните в Harbor в браузере: **Projects** → `passes` → там появился репозиторий
-`passes/passes-api`, а в нём тег `v1`. Видны размер, дата и тот же самый `digest`.
+Take a look in Harbor in the browser: **Projects** → `passes` → a repository `passes/passes-api`
+has appeared there, and in it the tag `v1`. You can see the size, the date and that same `digest`.
 
-Вот этот `digest` — точное содержимое образа. Тег `v1` можно завтра переназначить на
-другой образ, и никто не заметит; `digest` подделать нельзя. Отсюда правило, которое
-рано или поздно выучивает каждый: **в продуктив катят по digest, а не по тегу.**
+That `digest` is the exact contents of the image. The tag `v1` can be reassigned tomorrow to a
+different image and no one will notice; the `digest` can't be forged. Hence the rule everyone
+learns sooner or later: **you ship to production by digest, not by tag.**
 
-## Шаг 6. Разворачиваем в кластер
+## Step 6. Deploy to the cluster
 
-📍 **Где:** на виртуалке, кластер `lab`.
+📍 **Where:** on the bastion, the `lab` cluster.
 
 ```bash
-# KUBECONFIG говорит kubectl, каким файлом доступа пользоваться. Переключаемся на
-# ваш кластер `lab`: дальше все kubectl-команды идут в него.
-# Действует до закрытия окна терминала.
+# KUBECONFIG tells kubectl which access file to use. We switch to your `lab` cluster:
+# from here on all kubectl commands go to it.
+# It stays in effect until the terminal window is closed.
 export KUBECONFIG=~/lab.kubeconfig
 ```
 
-В папке лабы лежит `passes-broken.yaml`. В нём вместо адреса реестра стоит заглушка
-`HARBOR-HOST` — её надо заменить на ваш адрес. Делает это `sed`: он правит файл на месте,
-ничего не спрашивая и не показывая. Возьмите строку для своей системы:
+In the lab folder there's `passes-broken.yaml`. Instead of the registry address it has a
+placeholder, `HARBOR-HOST` — it needs to be replaced with your address. `sed` does this: it edits
+the file in place, without asking or showing anything. Take the line for your system:
 
 ```bash
-# sed -i = «правь файл на месте»
-#   's|что|на что|g'  заменить все вхождения; разделитель | взят вместо / потому,
-#                     что в адресе есть слеши и их пришлось бы экранировать
-#   Версия sed в macOS требует после -i обязательный аргумент; пустые кавычки
-#   означают «резервную копию не делать». В Linux такого аргумента быть не должно.
+# sed -i = "edit the file in place"
+#   's|what|with what|g'  replace all occurrences; the separator | is used instead of / because
+#                     the address has slashes and they would have to be escaped
+#   The sed in macOS requires a mandatory argument after -i; the empty quotes
+#   mean "make no backup copy". On Linux there must be no such argument.
 
 # Linux
 sed -i    's|HARBOR-HOST|harbor-harbor.workshop03.example.org|g' passes-broken.yaml
@@ -379,20 +387,20 @@ sed -i    's|HARBOR-HOST|harbor-harbor.workshop03.example.org|g' passes-broken.y
 sed -i '' 's|HARBOR-HOST|harbor-harbor.workshop03.example.org|g' passes-broken.yaml
 ```
 
-Применяем:
+Apply it:
 
 ```bash
-# apply = «приведи кластер к тому, что описано в файле»
+# apply = "bring the cluster to what's described in the file"
 kubectl apply -f passes-broken.yaml
 
-# get pods = «покажи поды».
-#   -l app=passes-api  только те, у которых есть эта метка, а не все подряд
-#   -w                 не выходить, а печатать изменения по мере их появления;
-#                      прервать наблюдение — Ctrl+C
+# get pods = "show the Pods".
+#   -l app=passes-api  only the ones with this label, not everything
+#   -w                 don't exit, print changes as they appear;
+#                      stop watching — Ctrl+C
 kubectl get pods -l app=passes-api -w
 ```
 
-**Что вы увидите** — и это не то, чего вы ждали:
+**What you'll see** — and it's not what you were expecting:
 
 ```
 NAME                          READY   STATUS             RESTARTS   AGE
@@ -400,12 +408,12 @@ passes-api-6c9d4f7b8-2xk4n    0/1     ErrImagePull       0          8s
 passes-api-6c9d4f7b8-2xk4n    0/1     ImagePullBackOff   0          22s
 ```
 
-Прервите наблюдение по `Ctrl+C` и посмотрите, что говорит кластер:
+Stop watching with `Ctrl+C` and see what the cluster says:
 
 ```bash
-# describe = «расскажи об объекте подробно». В самом конце вывода идёт журнал событий:
-# что кластер пытался сделать с подом и чем это закончилось.
-# tail -12 оставляет последние двенадцать строк — события как раз там.
+# describe = "tell me about the object in detail". At the very end of the output comes the event log:
+# what the cluster tried to do with the Pod and how it ended.
+# tail -12 keeps the last twelve lines — the events are right there.
 kubectl describe pod -l app=passes-api | tail -12
 ```
 
@@ -415,102 +423,103 @@ kubectl describe pod -l app=passes-api | tail -12
     failed to resolve reference: unexpected status from HEAD request: 401 Unauthorized
 ```
 
-> **Остановитесь и подумайте, прежде чем читать дальше.**
+> **Stop and think before reading on.**
 >
-> Вы только что успешно зашли в реестр командой `docker login` и успешно отправили туда
-> образ. Реестр вас знает. Почему кластер получает отказ?
+> You just successfully logged in to the registry with `docker login` and successfully sent the
+> image there. The registry knows you. Why does the cluster get refused?
 
 <details>
-<summary><b>Ответ и урок шире, чем эта ошибка</b></summary>
+<summary><b>The answer, and a lesson broader than this error</b></summary>
 
-**Образ скачиваете не вы.** Его скачивает `kubelet` — служба на узле кластера. Это другая
-машина, другой процесс и другой пользователь.
+**You're not the one downloading the image.** `kubelet` downloads it — a service on the cluster
+node. That's a different machine, a different process and a different user.
 
-Ваш `docker login` записал реквизиты в файл `~/.docker/config.json` на **вашем виртуалке**.
-Узел кластера про этот файл не знает и знать не может: между ним и вашим виртуалкой нет
-вообще ничего общего, кроме того, что вы отправляете туда команды.
+Your `docker login` wrote the credentials into the file `~/.docker/config.json` on **your
+bastion**. The cluster node knows nothing about that file and can't: between it and your bastion
+there's nothing in common at all, other than the fact that you send commands there.
 
-Вернитесь к предупреждению после `docker login` чуть раньше по лабе. Там было сказано
-ровно это, но пока не было видно последствий.
+Go back to the warning after `docker login` a little earlier in the lab. That's exactly what it
+said, but the consequences weren't visible yet.
 
-**Как правильно.** Реквизиты нужно положить в сам кластер — в объект типа `Secret`
-специального вида, — а потом в манифесте приложения указать, каким секретом
-пользоваться при скачивании. Такой секрет называется `imagePullSecret`.
+**How to do it right.** The credentials need to be placed into the cluster itself — into a Secret
+object of a special kind — and then the application's manifest needs to say which secret to use
+when downloading. Such a secret is called an `imagePullSecret`.
 
-**Почему кластеру нужны отдельные реквизиты, а не ваши.** Три причины, и все три
-практические.
+**Why the cluster needs separate credentials rather than yours.** Three reasons, and all three are
+practical.
 
-Первая: вас может не быть. Узел перезапустится в три часа ночи и пойдёт скачивать образ
-заново. Если бы он ходил под вашей учёткой, всё держалось бы на том, что вы работаете
-в этой компании и ваш пароль не истёк.
+First: you might not be around. A node will restart at three in the morning and go download the
+image again. If it went under your account, everything would hinge on your still working at this
+company and your password not having expired.
 
-Вторая: права разные. Вам нужно право **писать** в реестр, чтобы отправлять туда сборки.
-Кластеру нужно только **читать**. Давать кластеру право стирать образы из реестра — плохая
-идея, а с вашей учёткой вы дали бы именно его.
+Second: the permissions differ. You need permission to **write** to the registry, to send builds
+there. The cluster needs only to **read**. Giving the cluster permission to erase images from the
+registry is a bad idea, and with your account you'd have given it exactly that.
 
-Третья: следы разные. Когда в журнале реестра видно, что образ скачал `robot$passes-puller`,
-а не `admin`, разбор инцидента становится возможным.
+Third: the trail differs. When the registry log shows that the image was downloaded by
+`robot$passes-puller` rather than `admin`, an incident investigation becomes possible.
 
-**Почему не настроить узел напрямую.** Можно положить реквизиты прямо на узел, в конфиг
-среды выполнения контейнеров, — тогда `imagePullSecret` не нужен. Так иногда делают.
-Но узлы в кластере одноразовые: их пересоздают при обновлении, добавляют при росте
-нагрузки, убивают при сбое. Настройка, сделанная руками на узле, живёт до первой замены
-узла. Секрет в кластере переживает любую замену.
+**Why not configure the node directly.** You can put the credentials straight on the node, into
+the container runtime config — then no `imagePullSecret` is needed. People sometimes do that. But
+nodes in a cluster are disposable: they're recreated on upgrade, added as load grows, killed on
+failure. A setting made by hand on a node lives until the node is first replaced. A secret in the
+cluster outlives any replacement.
 
-**Урок шире, чем эта ошибка.** `ImagePullBackOff` — это почти всегда одно из трёх: опечатка в
-имени образа, нет реквизитов, или образ есть, но не под ту архитектуру процессора.
-Смотрите не на статус пода, а на `kubectl describe pod` — там написана настоящая причина.
+**A lesson broader than this error.** `ImagePullBackOff` is almost always one of three things: a
+typo in the image name, no credentials, or the image exists but not for the right processor
+architecture. Look not at the Pod's status but at `kubectl describe pod` — that's where the real
+cause is written.
 
 </details>
 
-## Шаг 7. Выдаём кластеру доступ к реестру
+## Step 7. Grant the cluster access to the registry
 
-📍 **Где:** на виртуалке, кластер `lab`.
+📍 **Where:** on the bastion, the `lab` cluster.
 
-Создаём секрет с реквизитами реестра. Отдельная разновидность команды `create secret`
-делает секрет такого вида, который `kubelet` умеет читать сам при скачивании образов:
+We create a secret with the registry credentials. A separate variant of the `create secret`
+command makes a secret of the kind `kubelet` can read on its own when downloading images:
 
 ```bash
-# create secret docker-registry = «заведи секрет с реквизитами к реестру»
-#   harbor             имя секрета внутри кластера; на него сошлётся манифест приложения
-#   --docker-server    к какому реестру эти реквизиты — тот же адрес, что в имени образа
-#   --docker-username  кто заходит
-#   --docker-password  пароль; одинарные кавычки нужны, если в нём есть $, ! или пробел
+# create secret docker-registry = "create a secret with registry credentials"
+#   harbor             the secret's name inside the cluster; the application manifest will refer to it
+#   --docker-server    which registry these credentials are for — the same address as in the image name
+#   --docker-username  who's logging in
+#   --docker-password  the password; single quotes are needed if it has a $, ! or space
 kubectl create secret docker-registry harbor \
   --docker-server=harbor-harbor.workshop03.example.org \
   --docker-username=admin \
-  --docker-password='ВАШ-ПАРОЛЬ'
+  --docker-password='YOUR-PASSWORD'
 ```
 
-⚠️ **Пароль в командной строке остаётся в истории оболочки.** На стенде это неважно,
-в рабочем окружении — важно. Способ без истории:
+⚠️ **A password on the command line stays in the shell history.** On the testbed this doesn't
+matter, in a working environment it does. A way without the history:
 
 ```bash
-# read кладёт введённое с клавиатуры в переменную HARBOR_PASS:
-#   -s  не показывать вводимое на экране
-#   -r  не считать обратный слеш служебным символом
-# На экране после этой строки ничего не появится: вставьте пароль и нажмите Enter.
+# read puts what's typed at the keyboard into the HARBOR_PASS variable:
+#   -s  don't show what's typed on the screen
+#   -r  don't treat a backslash as a special character
+# Nothing will appear on the screen after this line: paste the password and press Enter.
 read -rs HARBOR_PASS
 
-# Дальше пароль подставляется из переменной, поэтому в историю оболочки уходит
-# только имя переменной. Двойные кавычки обязательны: без них пробелы разорвут значение.
+# From here the password is substituted from the variable, so only the variable name
+# goes into the shell history. The double quotes are mandatory: without them spaces would break the value.
 kubectl create secret docker-registry harbor \
   --docker-server=harbor-harbor.workshop03.example.org \
   --docker-username=admin \
   --docker-password="$HARBOR_PASS"
 
-# unset стирает переменную, чтобы пароль не достался следующим командам в этом окне
+# unset erases the variable so the password doesn't reach the next commands in this window
 unset HARBOR_PASS
 ```
 
 <details>
-<summary><b>Что внутри этого секрета и почему у него отдельный тип</b></summary>
+<summary><b>What's inside this secret and why it has a separate type</b></summary>
 
-Спросим у кластера, какого вида секрет получился:
+Let's ask the cluster what kind of secret came out:
 
 ```bash
-#   -o jsonpath='{.type}'  напечатать одно поле объекта — тип секрета
-#   {"\n"}                 добавить перевод строки, иначе вывод слипнется с приглашением
+#   -o jsonpath='{.type}'  print a single field of the object — the secret's type
+#   {"\n"}                 add a newline, otherwise the output runs into the prompt
 kubectl get secret harbor -o jsonpath='{.type}{"\n"}'
 ```
 
@@ -518,39 +527,37 @@ kubectl get secret harbor -o jsonpath='{.type}{"\n"}'
 kubernetes.io/dockerconfigjson
 ```
 
-У секрета есть **тип**, и он не декоративный. Обычный секрет — это набор пар
-«ключ-значение», и что с ними делать, решает приложение. Секрет типа
-`kubernetes.io/dockerconfigjson` понимает сам `kubelet`: он знает, что внутри лежит
-файл того же формата, что и `~/.docker/config.json`, и умеет им пользоваться при
-скачивании образов.
+The secret has a **type**, and it's not decorative. An ordinary secret is a set of key-value
+pairs, and what to do with them is up to the application. A secret of type
+`kubernetes.io/dockerconfigjson` is understood by `kubelet` itself: it knows that inside is a file
+of the same format as `~/.docker/config.json`, and it can use it when downloading images.
 
-Посмотреть содержимое (пароль там в base64 — это **не шифрование**, а способ
-записать бинарные данные текстом, раскодировать может кто угодно):
+To look at the contents (the password there is in base64 — that's **not encryption**, but a way to
+write binary data as text, and anyone can decode it):
 
 ```bash
-# .data.\.dockerconfigjson — ключ внутри секрета. Имя ключа само начинается с точки,
-# поэтому её экранируют: иначе jsonpath примет её за разделитель пути.
-# base64 -d раскодирует значение обратно в текст — увидите тот же формат,
-# что и в файле ~/.docker/config.json на вашем виртуалке.
+# .data.\.dockerconfigjson — the key inside the secret. The key name itself starts with a dot,
+# so it's escaped: otherwise jsonpath would take it for a path separator.
+# base64 -d decodes the value back into text — you'll see the same format
+# as in the file ~/.docker/config.json on your bastion.
 kubectl get secret harbor -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d
 ```
 
-Отсюда важное: **секрет в Kubernetes по умолчанию не зашифрован**, он лишь отделён
-правами доступа. Тот, кто может читать секреты в пространстве имён, видит пароли. Как
-с этим быть по-человечески — отдельная лаба про хранилище секретов.
+Hence something important: **a Secret in Kubernetes is not encrypted by default**, it's merely
+walled off by access permissions. Whoever can read secrets in the namespace sees the passwords.
+How to handle this like a human being is a separate lab about a secrets store.
 
-**Как это делают в бою.** Не учёткой `admin`. В Harbor есть роботы: **Projects** →
-`passes` → **Robot Accounts** → создать робота с правом только `pull`. Реквизиты робота
-кладут в `imagePullSecret`, и тогда утечка секрета из кластера означает, что кто-то может
-скачать ваши образы, — неприятно, но не смертельно. Утечка `admin` означает, что кто-то
-может их подменить.
+**How it's done in the field.** Not with the `admin` account. Harbor has robots: **Projects** →
+`passes` → **Robot Accounts** → create a robot with only `pull` permission. The robot's credentials
+go into the `imagePullSecret`, and then a leaked secret from the cluster means someone can download
+your images — unpleasant, but not fatal. A leaked `admin` means someone can substitute them.
 
-Мы берём `admin`, чтобы не растягивать лабу. Знайте, что это упрощение.
+We use `admin` so as not to drag out the lab. Know that this is a simplification.
 
 </details>
 
-Теперь применяем правильный манифест. Сначала та же подстановка адреса, что и раньше,
-только в другом файле; потом убираем сломанное приложение и ставим рабочее:
+Now apply the correct manifest. First the same address substitution as before, only in a
+different file; then remove the broken application and put up the working one:
 
 ```bash
 # Linux
@@ -558,56 +565,56 @@ sed -i    's|HARBOR-HOST|harbor-harbor.workshop03.example.org|g' passes.yaml
 # macOS
 sed -i '' 's|HARBOR-HOST|harbor-harbor.workshop03.example.org|g' passes.yaml
 
-# delete -f = удалить из кластера ровно те объекты, что описаны в файле
+# delete -f = remove from the cluster exactly the objects described in the file
 kubectl delete -f passes-broken.yaml
 kubectl apply -f passes.yaml
 
-# rollout status ждёт, пока новые копии не станут готовы, и завершается сам.
-# Если не дождётся — вернёт ошибку, поэтому такую строку удобно ставить в скрипты.
+# rollout status waits until the new replicas become ready, then finishes on its own.
+# If it doesn't get there, it returns an error, which is why such a line is handy in scripts.
 kubectl rollout status deployment/passes-api
 ```
 
-**Что вы должны увидеть:**
+**What you should see:**
 
 ```
 deployment "passes-api" successfully rolled out
 ```
 
-Отличие рабочего манифеста от сломанного — ровно две строки:
+The difference between the working manifest and the broken one is exactly two lines:
 
 ```yaml
       imagePullSecrets:
         - name: harbor
 ```
 
-## Шаг 8. Смотрим, что получилось
+## Step 8. See what came out of it
 
-📍 **Где:** на виртуалке, кластер `lab`.
+📍 **Where:** on the bastion, the `lab` cluster.
 
-Наружу приложение не выставлено, а посмотреть на него надо. `port-forward` роет туннель
-с виртуалки внутрь кластера: пока команда работает, обращение на `localhost:8080` уходит
-на сервис `passes-api`. Ближайший аналог — временный проброс порта на NAT-шлюзе, только
-без правки сети.
+The application isn't exposed to the outside, but you need to look at it. `port-forward` digs a
+tunnel from the bastion into the cluster: while the command is running, a request to
+`localhost:8080` goes to the `passes-api` service. The closest analogue is a temporary port
+forward on a NAT gateway, only without touching the network.
 
 ```bash
-# port-forward svc/passes-api = туннель до сервиса, а не до конкретного пода
-#   8080:80 — левое число порт у вас на виртуалке, правое порт сервиса в кластере
-# Окно не закрывайте: туннель живёт, пока команда работает.
+# port-forward svc/passes-api = a tunnel to the service, not to a specific Pod
+#   8080:80 — the left number is the port on your bastion, the right one the service port in the cluster
+# Don't close the window: the tunnel lives as long as the command runs.
 kubectl port-forward svc/passes-api 8080:80
 ```
 
-В другом окне терминала:
+In another terminal window:
 
 ```bash
-# curl — «сходи по адресу и покажи ответ».
-#   -s     не показывать индикатор загрузки
-#   ; echo дописать перевод строки: ответ приходит одной строкой, без неё
-#          он слипнется с приглашением оболочки
+# curl — "go to the address and show the answer".
+#   -s     don't show the progress indicator
+#   ; echo add a newline: the answer comes as a single line, and without it
+#          it runs into the shell prompt
 curl -s http://localhost:8080/; echo
 ```
 
-**Что вы должны увидеть** — JSON, в котором приложение сообщает, какая копия ответила,
-на каком узле она работает и из какого реестра приехала:
+**What you should see** — a JSON in which the application reports which replica answered, on which
+node it runs and from which registry it arrived:
 
 ```json
 {
@@ -621,132 +628,136 @@ curl -s http://localhost:8080/; echo
 }
 ```
 
-Поле `pod` в ответе — имя копии, которая ответила. Сверьте его со списком копий:
+The `pod` field in the answer is the name of the replica that answered. Compare it against the
+list of replicas:
 
 ```bash
-# новое окно терминала про переменную KUBECONFIG не знает — задайте её и здесь,
-# иначе kubectl пойдёт не в тот кластер
+# a new terminal window knows nothing about the KUBECONFIG variable — set it here too,
+# otherwise kubectl will go to the wrong cluster
 export KUBECONFIG=~/lab.kubeconfig
 
-# та же выборка по метке: в списке должно быть имя, которое вы видели в ответе
+# the same selection by label: the list should contain the name you saw in the answer
 kubectl get pods -l app=passes-api
 ```
 
-Повторите запрос несколько раз — имя останется **одним и тем же**, и это не поломка.
-`port-forward` выбирает одну копию в момент запуска и держит туннель именно к ней до
-`Ctrl+C`; балансировки в этом пути нет вообще. Она есть у `Service`, но увидеть её можно
-только изнутри кластера — снаружи вы разговариваете с конкретным подом.
+Repeat the request several times — the name will stay **the same one**, and that's not a
+malfunction. `port-forward` picks a single replica at the moment it starts and holds the tunnel to
+exactly that one until `Ctrl+C`; there's no balancing on this path at all. There is on the
+`Service`, but you can only see it from inside the cluster — from outside you're talking to a
+specific Pod.
 
-Проверить балансировку по-настоящему можно так — восемь запросов из временного пода,
-который живёт внутри кластера:
+You can check the balancing for real like this — eight requests from a temporary Pod that lives
+inside the cluster:
 
 ```bash
-# run поднимает одноразовый под, --rm убирает его за собой.
-# Всё после -- выполняется внутри пода: восемь раз дёргаем сервис по внутреннему имени
-# и печатаем строку с именем отвечающей копии.
+# run brings up a one-off Pod, --rm cleans it up afterwards.
+# Everything after -- runs inside the Pod: eight times we hit the service by its internal name
+# and print the line with the name of the replica that answered.
 kubectl run probe --rm -i --restart=Never --quiet --image=curlimages/curl:8.11.1 \
   -- sh -c 'for i in $(seq 1 8); do curl -s http://passes-api/ | grep -o "passes-api-[a-z0-9-]*"; done'
 ```
 
-**Что вы должны увидеть:** два разных имени вперемешку — вот это и есть `Service`,
-раскладывающий запросы по копиям.
+**What you should see:** two different names mixed together — this is the `Service` spreading
+requests across the replicas.
 
-Закрыть туннель — `Ctrl+C` в первом окне.
+To close the tunnel — `Ctrl+C` in the first window.
 
-Замкните круг: зайдите в Harbor в браузере, в проект `passes`. У репозитория
-`passes/passes-api` счётчик скачиваний (**Pulls**) стал ненулевым. Ваш кластер
-действительно ходил именно сюда.
+Close the loop: go into Harbor in the browser, into the `passes` project. On the
+`passes/passes-api` repository the download counter (**Pulls**) has become non-zero. Your cluster
+really did go exactly here.
 
-## Проверка
+## Verification
 
-📍 **Где:** на виртуалке, в том же окне терминала, где вы работали с `kubectl`.
+📍 **Where:** on the bastion, in the same terminal window where you worked with `kubectl`.
 
-Скрипт ходит в оба кластера сразу и берёт их из переменных окружения. Первые две
-обязательны, третья — путь к тенантному кубконфигу.
+The script goes to both clusters at once and takes them from environment variables. The first two
+are mandatory, the third is the path to the tenant kubeconfig.
 
 ```bash
 cd labs/06-harbor
 
-# в каком кластере проверять приложение — в вашем `lab`
+# which cluster to check the application in — your `lab`
 export KUBECONFIG=~/lab.kubeconfig
-# ваш номер тенанта: из него скрипт соберёт имя пространства имён tenant-workshop03
+# your tenant number: from it the script assembles the namespace name tenant-workshop03
 export COZY_TENANT=workshop03
-# где лежит доступ к управляющему кластеру — там скрипт посмотрит на сам Harbor.
-# Не задать можно: тогда скрипт поищет ~/.kube/config, а не найдя — пропустит
-# проверки на управляющем кластере и скажет об этом.
+# where the access to the management cluster lives — there the script will look at Harbor itself.
+# You can leave it unset: then the script looks for ~/.kube/config, and not finding it — skips
+# the checks on the management cluster and says so.
 export COZY_KUBECONFIG=~/.kube/config
 
 ./check.sh
 ```
 
-⚠️ **На Windows скрипт запускается из WSL**, а не из PowerShell — как его поставить,
-написано в начале лабы 0. Без WSL лабу можно пройти, но отчёта-артефакта не будет.
+⚠️ **On Windows the script is run from WSL**, not from PowerShell — how to install it is written
+at the start of Lab 0. Without WSL you can do the lab, but there'll be no artifact report.
 
-Скрипт проверяет не факт создания Harbor, а работу по существу: реестр отвечает по своему
-API, приложение в кластере запущено из образа, лежащего именно в вашем реестре, секрет с
-реквизитами существует и указывает на тот же адрес, а сам сервис отдаёт JSON с именем
-пода, который действительно существует.
+The script checks not the fact that Harbor was created, but the work in substance: the registry
+answers over its API, the application in the cluster was started from an image lying in your very
+own registry, the secret with the credentials exists and points to the same address, and the
+service itself returns a JSON with the name of a Pod that actually exists.
 
-## Уборка
+## Cleanup
 
-Приложение и Harbor понадобятся в следующей лабе — сейчас не удаляем.
+The application and Harbor will be needed in the next lab — don't delete them now.
 
-Когда закончите со всеми лабами:
+When you're done with all the labs:
 
 ```bash
-# удаляем объекты, описанные в файле: и Deployment, и Service
+# delete the objects described in the file: both the Deployment and the Service
 kubectl delete -f passes.yaml
-# секрет создавался командой, а не файлом, — удаляем его по имени
+# the secret was created by a command, not a file — delete it by name
 kubectl delete secret harbor
 ```
 
-Сам Harbor удаляется через дашборд, как обычное приложение. Вместе с ним уйдёт и
-хранилище слоёв — это десяток секунд, а не заявка на списание виртуалки.
+Harbor itself is deleted through the dashboard, like any ordinary application. Along with it the
+layer store goes too — that's a dozen seconds, not a request to write off a VM.
 
-Стоит понимать, что именно вы удаляете. Реестр — это не только место, где лежат образы,
-но и единственный ответ на вопрос «а что мы вообще выкатывали в продуктив за последний
-год». Удалять его в рабочем окружении так же легко, как здесь, вам не захочется.
+It's worth understanding what exactly you're deleting. A registry isn't only the place where the
+images sit, but also the only answer to the question "what did we actually ship to production over
+the past year". Deleting it in a working environment as easily as here is not something you'll
+want.
 
-## Что мы теперь умеем
+## What we can do now
 
-- Заводить себе реестр образов и объяснять, чем он отличается от Content Library
-- Собирать образ двухэтапной сборкой и понимать, почему итог получается в тридцать раз меньше
-- Отличать `docker login` на виртуалке от доступа, который нужен кластеру
-- Читать `ImagePullBackOff` и находить настоящую причину в `describe pod`
-- Отдавать поду сведения о нём самом через downward API, не давая ему прав на API кластера
+- Set ourselves up an image registry and explain how it differs from a Content Library
+- Build an image with a two-stage build and understand why the result comes out thirty times smaller
+- Tell a `docker login` on the bastion apart from the access the cluster needs
+- Read `ImagePullBackOff` and find the real cause in `describe pod`
+- Give a Pod information about itself through the downward API, without granting it permissions on the cluster API
 
-## А в vSphere это было бы
+## In vSphere this would be
 
-Ближайший аналог реестра — Content Library. Сходство есть: и то и другое хранит образы
-и раздаёт их машинам, и то и другое умеет права и синхронизацию между площадками.
+The closest analogue of a registry is a Content Library. There is a similarity: both store images
+and hand them out to machines, and both can do permissions and synchronization between sites.
 
-Дальше расходится, и разница не в мелочах.
+Beyond that they diverge, and the difference isn't in the details.
 
-**Content Library копирует шаблон целиком.** Реестр раздаёт слои и хранит одинаковые слои
-один раз. Если у вас двадцать сервисов на одной базовой Alpine, база лежит в реестре в
-единственном экземпляре, и при запуске двадцать первого сервиса узел скачает только его
-собственный слой — считанные мегабайты.
+**A Content Library copies the whole template.** A registry hands out layers and stores identical
+layers once. If you have twenty services on the same base Alpine, the base lies in the registry in
+a single copy, and when the twenty-first service launches the node will download only its own
+layer — a handful of megabytes.
 
-**Шаблон именуется, образ адресуется.** У образа есть digest — хеш содержимого. По нему
-можно проверить, что вы запускаете ровно тот код, который собрали, и никакой другой.
-У шаблона такого нет: вы полагаетесь на то, что никто его не подменил.
+**A template is named, an image is addressed.** An image has a digest — a hash of its contents. By
+it you can verify that you're running exactly the code you built and no other. A template has no
+such thing: you rely on no one having swapped it.
 
-**Реестр — это HTTP-сервис.** Из этого следует то, ради чего всё и затевалось: сборка
-в конвейере кладёт туда образ одной командой, кластер забирает его другой, никто не
-монтирует хранилищ и не копирует файлов между площадками руками.
+**A registry is an HTTP service.** From this follows the whole point of the exercise: a build in
+the pipeline puts an image there with one command, the cluster fetches it with another, and no one
+mounts storage or copies files between sites by hand.
 
-**Где vSphere удобнее, честно.** Три вещи.
+**Where vSphere is more convenient, honestly.** Three things.
 
-Content Library не требует ничего понимать про реквизиты. Подключили — работает. Здесь
-вам пришлось отдельно объяснять кластеру, как ходить в реестр, и вы на этом споткнулись,
-как спотыкаются все.
+A Content Library doesn't require understanding anything about credentials. Connect it — it works.
+Here you had to separately explain to the cluster how to reach the registry, and you tripped up on
+it, as everyone does.
 
-Права в vCenter — единые. Одна учётка на всё: и на машины, и на библиотеку, и на сеть.
-Здесь права в дашборде, права в кластере и права в Harbor — три разных набора, которые
-надо держать согласованными. Это цена того, что реестр — самостоятельный продукт, а не
-часть платформы.
+Permissions in vCenter are unified. One account for everything: machines, the library, and the
+network. Here permissions in the dashboard, permissions in the cluster and permissions in Harbor
+are three different sets that must be kept in sync. That's the price of the registry being a
+product in its own right, not part of the platform.
 
-Шаблон можно поправить. Развернули из шаблона машину, донастроили, сняли новый шаблон —
-и то, что точная последовательность действий нигде не записана, ничему не мешает. Образ так
-не собирают: если сборка не воспроизводится из `Dockerfile`, вы попали в неприятность.
-Дисциплина полезная, но привыкать к ней тяжело, и делать вид, что это не так, глупо.
+A template can be edited. You deploy a machine from a template, tune it further, capture a new
+template — and the fact that the exact sequence of steps is written down nowhere doesn't get in
+the way of anything. Images aren't built that way: if the build doesn't reproduce from the
+`Dockerfile`, you're in trouble. The discipline is useful, but getting used to it is hard, and
+pretending otherwise is foolish.

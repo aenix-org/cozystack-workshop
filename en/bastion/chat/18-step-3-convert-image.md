@@ -1,69 +1,68 @@
-## 18. Шаг 3: конвертация образа
+## 18. Step 3: converting the image
 
-**Превращаем образ VMware в образ для KVM**
+**Turning a VMware image into a KVM image**
 
-📍 **Где:** внутри машины-конвертера, куда вы только что зашли через консоль. Не на виртуалке.
+📍 **Where:** inside the converter machine you just logged into over the console. Not on the bastion.
 
-📄 Работаем со `scripts/convert.sh`. У этой машины сеть есть, поэтому она скачает
-файл сама — копировать через буфер не нужно.
+📄 We're working with `scripts/convert.sh`. This machine has network access, so it will download the
+file itself — no need to copy anything through the clipboard.
 
-Забираем скрипт с гитхаба прямо в машину:
+Pull the script from GitHub straight onto the machine:
 ```bash
 curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/bastion/scripts/convert.sh
 ```
 
-Открываем его:
+Open it:
 ```bash
 nano convert.sh
 ```
 
-**Вот и пригодились три значения, которые вы записали в блокнот на шаге 1.** В начале
-файла есть блок «ВСТАВЬТЕ СВОИ ЗНАЧЕНИЯ» — замените в нём заглушки на свои, оставив
-кавычки на месте:
+**Now those three values you jotted down in step 1 come in handy.** Near the top of the
+file there's a block labeled «ВСТАВЬТЕ СВОИ ЗНАЧЕНИЯ» — replace the placeholders in it with your
+own, leaving the quotes in place:
 
 ```
-BUCKET="имя-вашего-бакета"
-ACCESS_KEY="ваш-accessKey"
-SECRET_KEY="ваш-secretKey"
+BUCKET="your-bucket-name"
+ACCESS_KEY="your-accessKey"
+SECRET_KEY="your-secretKey"
 ```
 
-Строку `S3_ENDPOINT` и ссылку на исходный образ не трогайте — они уже правильные
-и одинаковые у всех.
+Leave the `S3_ENDPOINT` line and the link to the source image alone — they're already correct
+and the same for everyone.
 
-Сохранить в nano: `Ctrl+O`, затем `Enter`, затем `Ctrl+X` для выхода. Проверить, что
-заглушек не осталось:
+To save in nano: `Ctrl+O`, then `Enter`, then `Ctrl+X` to exit. Check that no placeholders
+are left:
 ```bash
-grep ВСТАВЬТЕ convert.sh || echo "всё заполнено, можно запускать"
+grep ВСТАВЬТЕ convert.sh || echo "all filled in, ready to run"
 ```
 
-Запускаем — обязательно через `sudo`, скрипту нужны права root. И запускаем **в `screen`**:
-конвертация идёт минут пять, а вы сейчас на цепочке из двух соединений (ваш ноутбук → SSH
-на виртуалку → консоль машины-конвертера). Если любое звено моргнёт, обычный запуск
-оборвётся на середине. `screen` держит процесс, даже когда связь пропала:
+Run it — always through `sudo`, the script needs root privileges. And run it **in `screen`**:
+the conversion takes about five minutes, and right now you're on a chain of two connections (your laptop → SSH
+to the bastion → the converter machine's console). If any link in the chain drops, an ordinary run
+will break off halfway. `screen` keeps the process alive even when the connection drops:
 
 ```bash
-screen -S convert          # войти в отдельную сессию
-sudo bash convert.sh       # запустить внутри неё
-#  оборвалась связь? заходите заново до этой же машины, потом:  screen -r convert
+screen -S convert          # start a separate session
+sudo bash convert.sh       # run it inside that session
+#  connection dropped? log back in to this same machine, then:  screen -r convert
 ```
 
-Что происходит внутри: скрипт скачивает исходный образ, запускает `virt-v2v`,
-сжимает результат и заливает его в ваш бакет.
+What happens inside: the script downloads the source image, runs `virt-v2v`,
+compresses the result and uploads it to your bucket.
 
-Самое важное делает `virt-v2v`. Он меняет не только формат файла: он подкладывает
-внутрь гостевой системы драйверы virtio и правит загрузчик. Без этого машина
-на новом гипервизоре не стартует вовсе.
+The most important work is done by `virt-v2v`. It changes more than just the file format: it slips
+virtio drivers into the guest system and fixes up the bootloader. Without this, the machine
+won't start at all on the new hypervisor.
 
-⏳ **Это займёт около пяти минут.** На нашем стенде нет вложенной виртуализации,
-поэтому конвертация идёт в режиме эмуляции. Прогресс виден в консоли — не закрывайте её.
+⏳ **This will take about five minutes.** Our testbed has no nested virtualization,
+so the conversion runs in emulation mode. The progress is visible in the console — don't close it.
 
-В конце скрипт напечатает **presigned-ссылку** на ваш образ — ищите в выводе строку,
-начинающуюся со слова `Share:`, ссылка идёт сразу за ним.
+At the end the script will print a **presigned link** to your image — look in the output for a line
+starting with the word `Share:`, the link comes right after it.
 
-**Что с ней делать:** скопируйте её в тот же блокнот. На следующем шаге вы вернётесь на виртуалку, откроете `manifests/03-app-vm.yaml` и вставите её в поле `url` — туда, где
-сейчас стоит заглушка `ВСТАВЬТЕ_PRESIGNED_URL`. Та самая, про которую я предупреждал,
-когда мы подставляли номера.
+**What to do with it:** copy it into that same notepad. In the next step you'll go back to the bastion, open `manifests/03-app-vm.yaml` and paste it into the `url` field — where
+the `ВСТАВЬТЕ_PRESIGNED_URL` placeholder currently sits. The very one I warned you about
+when we were filling in the numbers.
 
-Это временная подписанная ссылка: хранилище наружу не открыто, а ссылку вы сделали
-своими же ключами. Она живёт неделю — на воркшоп и на эксперименты после хватит
-с запасом.
+This is a temporary signed link: the storage isn't exposed to the outside, and you made the link
+with your own keys. It lives for a week — plenty for the workshop and for experimenting afterward.

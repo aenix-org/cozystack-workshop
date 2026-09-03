@@ -1,91 +1,93 @@
-# Скрипты проверки
+# Check scripts
 
-В каждой папке лабы лежит `check.sh`. Он проверяет, что лаба действительно выполнена —
-не «файл применён», а **работает по сути**.
+Every lab folder contains a `check.sh`. It verifies that the lab is actually done —
+not that "a file was applied," but that it **works in substance**.
 
-Участник запускает его сам, когда захочет. Результат — отчёт в терминале и файл-артефакт,
-который можно приложить куда угодно: в чат сообщества, в заявку на сертификацию, себе в
-заметки.
+You run it yourself, whenever you like. The result is a report in the terminal and an
+artifact file you can attach anywhere: the community chat, a certification application, your
+own notes.
 
-## Как запустить
+## How to run it
 
 ```bash
 cd labs/03-scale
 ./check.sh
 ```
 
-Вы на виртуалке (Linux) — `bash`, `kubectl` и всё нужное уже есть, ставить ничего не
-надо. Файл доступа к учебному кластеру — тот самый `lab.kubeconfig`, который вы создали
-в лабе 0, — скрипт находит через переменную `KUBECONFIG`:
+You're on the bastion (Linux) — `bash`, `kubectl`, and everything else you need are already
+there; nothing to install. The credentials for the lab cluster — that same
+`lab.kubeconfig` you created in lab 0 — are found by the script through the `KUBECONFIG`
+variable:
 
 ```bash
 export KUBECONFIG=~/lab.kubeconfig
 ```
 
-> Если вы проходите лабы не на виртуалке, а со своего компьютера на Windows — как
-> поставить WSL и где взять `lab.kubeconfig`, описано в ноутбучном наборе:
+> If you're doing the labs not on the bastion but from your own Windows machine — how to
+> install WSL and where to get `lab.kubeconfig` is described in the laptop kit:
 > [`../../laptop/check/README.md`](../../laptop/check/README.md).
 
-Скрипт сам поймёт, куда смотреть, по переменной `KUBECONFIG`. Если её нет — скажет об этом
-и остановится.
+The script figures out where to look on its own, via the `KUBECONFIG` variable. If it's
+not set, it tells you so and stops.
 
-Для лаб, где нужен доступ к тенанту на управляющем кластере, дополнительно нужна
-переменная `COZY_TENANT` — имя вашего тенанта, например `workshop07`:
+For labs that need access to a tenant on the management cluster, you also need the
+`COZY_TENANT` variable — the name of your tenant, for example `workshop07`:
 
 ```bash
 export COZY_TENANT=workshop07
 ./check.sh
 ```
 
-## Что получается на выходе
+## What you get out of it
 
-В терминале — по строке на проверку:
+In the terminal — one line per check:
 
 ```
-[  OK  ] приложение развёрнуто и отвечает
-[  OK  ] имя пода подставляется в страницу
-[ FAIL ] автомасштабирование не настроено
-         не найден HorizontalPodAutoscaler для deployment/rickroll
-         подсказка: примените hpa.yaml из этой папки
+[  OK  ] application deployed and responding
+[  OK  ] Pod name is injected into the page
+[ FAIL ] autoscaling is not configured
+         no HorizontalPodAutoscaler found for deployment/rickroll
+         hint: apply hpa.yaml from this folder
 ```
 
-⚠️ **Отчёт кладётся в папку лабы и содержит дату со временем.** Если репозиторий общий или
-вы прогоняли проверку несколько раз, там накопится несколько файлов — смотрите на время в
-имени, чтобы не принять чужой или прошлый прогон за свой.
+⚠️ **The report is written into the lab folder and carries the date and time.** If the
+repository is shared or you've run the check several times, several files will pile up there
+— look at the time in the name so you don't mistake someone else's run, or an earlier one,
+for your own.
 
-Рядом появляется файл `report-<лаба>-<дата>.md` — тот же результат в разметке, вместе с
-собранными свидетельствами: версии, вывод команд, имена объектов. Это и есть артефакт.
+Alongside it appears a file `report-<lab>-<date>.md` — the same result in Markdown, together
+with the collected evidence: versions, command output, object names. That's the artifact.
 
-## Требования к автору скрипта
+## Requirements for the script's author
 
-**Проверяем суть, а не факт применения.** Плохо: «существует объект Deployment». Хорошо:
-«приложение отвечает по HTTP и в ответе есть имя пода».
+**Check substance, not the fact of application.** Bad: "a Deployment object exists." Good:
+"the application responds over HTTP and the response contains the Pod's name."
 
-**Каждый провал объясняет, что делать.** Строка `FAIL` без подсказки — брак. Читатель
-запускает скрипт именно потому, что застрял.
+**Every failure explains what to do.** A `FAIL` line without a hint is defective. The reader
+runs the script precisely because they're stuck.
 
-**Скрипт не чинит и не создаёт.** Только читает. Единственное исключение — временный под
-для проверки сетевой доступности, который удаляется за собой.
+**The script neither fixes nor creates.** It only reads. The one exception is a temporary
+Pod for testing network reachability, which cleans up after itself.
 
-**Работает на macOS и Linux.** Никакого GNU-специфичного `sed -i`, `readlink -f`,
-`date -d`. Проверять на обеих системах.
+**Works on macOS and Linux.** No GNU-specific `sed -i`, `readlink -f`, `date -d`. Test on
+both systems.
 
-**Не падает на первой ошибке.** Прогоняет все проверки и показывает полную картину.
-`set -e` не использовать.
+**Doesn't stop at the first error.** It runs every check and shows the full picture.
+Don't use `set -e`.
 
-**Не печатает пароли и токены.** Если значение секретное — писать `<скрыто>`.
+**Doesn't print passwords or tokens.** If a value is secret, write `<hidden>`.
 
-**Идемпотентен.** Запуск десять раз подряд не меняет состояние кластера.
+**Idempotent.** Running it ten times in a row doesn't change the cluster's state.
 
-## Общая библиотека
+## Shared library
 
-`check/lib.sh` — общие функции, подключается в начале каждого скрипта:
+`check/lib.sh` — shared functions, sourced at the start of every script:
 
-- `ok "текст"` / `fail "текст" "подсказка"` / `warn "текст"` — вывод результата
-- `need_kubeconfig` — проверить, что `KUBECONFIG` задан и кластер отвечает
-- `need_tenant` — проверить, что задан `COZY_TENANT`
-- `evidence "заголовок" "значение"` — добавить свидетельство в артефакт
-- `finish` — подвести итог, записать отчёт, вернуть код возврата
+- `ok "text"` / `fail "text" "hint"` / `warn "text"` — print a result
+- `need_kubeconfig` — check that `KUBECONFIG` is set and the cluster responds
+- `need_tenant` — check that `COZY_TENANT` is set
+- `evidence "heading" "value"` — add a piece of evidence to the artifact
+- `finish` — sum up, write the report, return the exit code
 
-Код возврата: `0` — всё прошло, `1` — есть провалы. Так скрипт можно использовать
-в автоматике.
+Exit code: `0` — everything passed, `1` — there are failures. That way the script can be used
+in automation.
