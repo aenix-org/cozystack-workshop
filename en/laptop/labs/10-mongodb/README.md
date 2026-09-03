@@ -1,139 +1,140 @@
-# Лаба 10 · Документное хранилище
+# Lab 10 · Document store
 
 | | |
 |---|---|
-| **Время** | 45 минут |
-| **Что доказывает** | Данные разной формы можно хранить без пустых колонок и без таблицы под каждый случай — и за это придётся заплатить дисциплиной |
-| **Что понадобится** | Кластер из лабы 0 и `~/lab.kubeconfig`; доступ в дашборд своего тенанта; номер тенанта вида `workshopXX`, готовность читать код на JavaScript |
+| **Time** | 45 minutes |
+| **What it proves** | Data of differing shapes can be stored without empty columns and without a separate table for every case — and you pay for it in discipline |
+| **What you'll need** | The cluster from lab 0 and `~/lab.kubeconfig`; access to your tenant's dashboard; a tenant number of the form `workshopXX`; a willingness to read JavaScript code |
 
-> ⚠️ **Лаба плотная, и в ней придётся читать код на JavaScript.** Беритесь за неё на
-> свежую голову, а не сразу после другой длинной лабы. Код везде разобран построчно —
-> знать язык заранее не требуется.
+> ⚠️ **This lab is dense, and it asks you to read JavaScript code.** Take it on with a
+> fresh head, not right after another long lab. The code is walked through line by line
+> everywhere — you don't need to know the language in advance.
 
-## Зачем это
+## Why this matters
 
-Сервис «Пропуск» выкатили с одним типом пропуска — разовым, на конкретную дату. Через
-месяц пришли уточнения от заказчика, и все они разумные:
+The "Pass" service was rolled out with a single type of pass — a one-time pass for a
+specific date. A month later the client came back with refinements, all of them reasonable:
 
-| Тип пропуска | Что нужно дополнительно |
+| Pass type | What else is needed |
 |---|---|
-| Разовый | дата, вход |
-| Недельный | период с и по, список входов, отметка о сдаче бейджа |
-| Автомобильный | номер машины, модель, есть ли прицеп, масса, номер парковки |
-| Групповой | организация, контактное лицо, сопровождающий, список участников с возрастом |
+| One-time | date, entrance |
+| Weekly | a from/to period, a list of entrances, a mark for whether the badge was returned |
+| Vehicle | plate number, model, whether there's a trailer, weight, parking-space number |
+| Group | organization, contact person, escort, a list of participants with their ages |
 
-В таблице с фиксированными колонками у этой задачи два решения, и оба плохие.
+In a table with fixed columns this problem has two solutions, and both are bad.
 
-**Решение первое: одна таблица со всеми колонками.** Заводим `car_plate`, `car_model`,
+**Solution one: a single table with every column.** You add `car_plate`, `car_model`,
 `trailer`, `weight_kg`, `parking`, `valid_from`, `valid_to`, `badge_returned`,
-`organization`, `contact`, `escort` — и у разового пропуска одиннадцать пустых полей из
-пятнадцати. Через полгода колонок будет тридцать, никто не помнит, какие из них
-обязательны для какого типа, и первое же поле `NOT NULL` ломает половину сценариев.
+`organization`, `contact`, `escort` — and a one-time pass has eleven empty fields out of
+fifteen. Six months on there are thirty columns, nobody remembers which of them are
+required for which type, and the very first `NOT NULL` field breaks half the scenarios.
 
-**Решение второе: таблица под каждый тип.** Четыре таблицы вместо одной, плюс пятая,
-которая их связывает, чтобы охрана могла показать общий список на проходной. Каждый новый
-тип пропуска — миграция схемы, релиз и согласование. А запрос «покажи все пропуска на
-сегодня» превращается в `UNION` из четырёх кусков, который надо править при добавлении
-пятого.
+**Solution two: a table per type.** Four tables instead of one, plus a fifth that ties them
+together so security can show a combined list at the gate. Every new pass type means a
+schema migration, a release, and sign-off. And the query "show me all passes for today"
+turns into a `UNION` of four pieces that has to be edited when you add a fifth.
 
-**Список участников группового пропуска не помещается ни в то, ни в другое.** Он
-переменной длины, значит нужна ещё одна таблица со ссылкой на пропуск.
+**The list of participants on a group pass fits neither.** It's variable in length, so it
+needs yet another table with a reference back to the pass.
 
-Есть третий путь: хранилище, которое не требует, чтобы все записи были одинаковой формы.
-В этой лабе мы заведём MongoDB, положим в неё четыре пропуска четырёх разных форм и
-поищем по ним. А потом честно посмотрим, за что мы за это платим — потому что платим, и
-немало.
+There's a third way: a store that doesn't require every record to have the same shape. In
+this lab we'll stand up MongoDB, put four passes of four different shapes into it, and
+search across them. And then we'll take an honest look at what we pay for it — because we
+do pay, and not a little.
 
-Термины Kubernetes и MongoDB объясняются в этой лабе при первом появлении, а часть
-собрана в словарике ниже.
+Kubernetes and MongoDB terms are explained in this lab when they first appear, and some are
+collected in the little glossary below.
 
-## Словарик
+## Mini-glossary
 
-| Термин | Что это | Похоже на… но |
+| Term | What it is | Like… but |
 |---|---|---|
-| **Документ** | Одна запись. Набор полей, вложенных объектов и списков | **Строка таблицы**, но у соседней записи набор полей может быть другим, и это не ошибка |
-| **Коллекция** | Набор документов | **Таблица**, но схемы у неё нет по умолчанию. Схему можно добавить, но это отдельное решение |
-| **BSON** | Двоичный формат, в котором лежат документы | похож на JSON, но с типами: дата — это дата, а не строка |
-| **Набор реплик** | Несколько копий, одна главная, остальные подхватывают | **Кластер с HA**, но копии голосуют между собой, поэтому их нужно нечётное число |
-| **`mongosh`** | Командная оболочка MongoDB | **PowerCLI**, но это полноценный JavaScript, а не язык запросов |
+| **Document** | A single record. A set of fields, nested objects and lists | **A table row**, but the neighboring record may have a different set of fields, and that's not an error |
+| **Collection** | A set of documents | **A table**, but it has no schema by default. You can add a schema, but that's a separate decision |
+| **BSON** | The binary format the documents are stored in | Like JSON, but with types: a date is a date, not a string |
+| **Replica set** | Several copies, one primary, the rest take over | **An HA cluster**, but the copies vote among themselves, so you need an odd number of them |
+| **`mongosh`** | The MongoDB command shell | **PowerCLI**, but it's full JavaScript, not a query language |
 
-Остальные слова этой лабы — _id, Шардирование, Точечная запись поля, Разреженный индекс,
-Валидатор схемы, $lookup — вводятся по ходу, в том шаге, где впервые понадобятся. Заучивать их
-сейчас не нужно: в отрыве от действия они не запомнятся.
+The remaining words in this lab — _id, Sharding, Dotted field notation, Sparse index,
+Schema validator, $lookup — are introduced as we go, in the step where they're first needed.
+There's no need to memorize them now: divorced from the action they won't stick.
 
 <details>
-<summary><b>Если хотите увидеть весь список сразу</b></summary>
+<summary><b>If you'd like to see the whole list at once</b></summary>
 
-| Термин | Что это | Похоже на… но |
+| Term | What it is | Like… but |
 |---|---|---|
-| **`_id`** | Уникальный ключ документа | **Первичный ключ**, но создаётся сам, если вы его не задали |
-| **Шардирование** | Разделение данных между наборами реплик | про объём, а не про надёжность |
-| **Точечная запись поля** | Обращение к вложенному полю через точку: `car.plate` | **Путь к файлу в папке**, но работает и внутрь списков: `members.age` |
-| **Разреженный индекс** | Индекс, в который попадают только документы, где поле есть | прямая необходимость там, где поле есть у меньшинства записей |
-| **Валидатор схемы** | Правило, которому обязан соответствовать документ | **Проверка формы перед сохранением**, но включается вручную и задним числом, схемы по умолчанию нет |
-| **`$lookup`** | Способ подтянуть данные из другой коллекции | **JOIN**, но односторонний и заметно дороже: соединение не выбирается оптимизатором, а выполняется перебором |
+| **`_id`** | The document's unique key | **A primary key**, but it's created for you if you don't set it |
+| **Sharding** | Splitting data across replica sets | About volume, not about reliability |
+| **Dotted field notation** | Reaching a nested field through a dot: `car.plate` | **A file path in a folder**, but it also reaches into lists: `members.age` |
+| **Sparse index** | An index that includes only documents where the field is present | A plain necessity where the field is present in only a minority of records |
+| **Schema validator** | A rule a document is required to satisfy | **Form validation before saving**, but it's turned on manually and after the fact — there's no schema by default |
+| **`$lookup`** | A way to pull in data from another collection | **A JOIN**, but one-directional and noticeably more expensive: the join isn't chosen by an optimizer, it's carried out by brute force |
 
 </details>
 
-## Что лежит в папке лабы
+## What's in the lab folder
 
-Все файлы уже у вас — вы забрали их вместе с репозиторием. Создавать и печатать заново
-ничего не нужно: там, где ниже написано `kubectl apply -f имя.yaml`, файл берётся отсюда.
+You already have all the files — you got them along with the repository. There's nothing to
+create or retype: wherever it says `kubectl apply -f name.yaml` below, the file is taken from
+here.
 
 ```bash
 cd labs/10-mongodb
 ```
 
-| Файл | Что это | Когда пригодится |
+| File | What it is | When you'll need it |
 |---|---|---|
-| `mongodb.yaml` | Заказ базы под документы — то же, что кнопка в дашборде | применяете **в тенанте**, не в кластере `lab` |
-| `passes.js` | Заполнение базы пропусками разных типов: разовый, на неделю, на автомобиль | выполняете в базе |
-| `validator.js` | Правила проверки документов — чтобы в базу не попал мусор | выполняете следом |
-| `check.sh` | Проверка, что документы разной формы лежат рядом, а негодные отклоняются | запускаете в конце лабы |
+| `mongodb.yaml` | The order for a document database — the same thing as the button in the dashboard | you apply it **in the tenant**, not in the `lab` cluster |
+| `passes.js` | Filling the database with passes of different types: one-time, weekly, vehicle | you run it in the database |
+| `validator.js` | Rules for validating documents — so that no junk gets into the database | you run it next |
+| `check.sh` | A check that documents of different shapes sit side by side and unfit ones are rejected | you run it at the end of the lab |
 
-## Шаг 1. Заказываем MongoDB
+## Step 1. Order MongoDB
 
-📍 **Где:** в браузере, в дашборде Cozystack, в своём тенанте.
+📍 **Where:** in the browser, in the Cozystack dashboard, in your tenant.
 
-Тенант → **Создать приложение** → `MongoDB`.
+Tenant → **Create application** → `MongoDB`.
 
-| Поле | Значение | Почему так |
+| Field | Value | Why |
 |---|---|---|
-| Имя | `passes` | коротко, дальше его придётся набирать в адресах |
-| Version | `v8` | текущая ветка |
-| Replicas | **1** | учебный стенд. Про то, почему в проде три, — сразу ниже |
-| Size | `5Gi` | четыре документа занимают байты, остальное — запас |
-| Storage class | `replicated` | данные лягут в трёх копиях на разные узлы |
-| Resources preset | `s1.small` | 1 процессор, 2 ГБ |
-| Sharding | выключено | шардируют, когда данные не помещаются на один сервер |
-| Users | пользователь `passapp`, пароль **задайте явно** | под ним будем работать |
-| Databases | база `passes`, в роли admin — `passapp` | без роли пользователя не примут |
-| External | выключено | наружу не выставляем |
+| Name | `passes` | short — you'll have to type it in addresses later |
+| Version | `v8` | the current branch |
+| Replicas | **1** | a training testbed. Why it's three in production is right below |
+| Size | `5Gi` | four documents take up bytes, the rest is headroom |
+| Storage class | `replicated` | the data will be laid down in three copies on different nodes |
+| Resources preset | `s1.small` | 1 processor, 2 GB |
+| Sharding | off | you shard when the data doesn't fit on a single server |
+| Users | the `passapp` user, set the password **explicitly** | it's the one we'll work under |
+| Databases | the `passes` database, with `passapp` in the admin role | without a role the user won't be accepted |
+| External | off | we're not exposing it outward |
 
-⚠️ **Пароль обязательно задайте руками и запишите.** Если оставить поле пустым, чарт
-сгенерирует пароль сам — и положит его в секрет, которого в дашборде не видно. Останетесь
-с работающей базой, к которой не можете подключиться.
+⚠️ **Be sure to set the password by hand and write it down.** If you leave the field empty,
+the chart will generate a password itself — and put it in a secret that isn't visible in the
+dashboard. You'll be left with a working database you can't connect to.
 
-Два слова, которые дальше встретятся не раз. **Чарт** — заготовка, по которой платформа
-разворачивает сервис: набор шаблонов плюс значения, которые вы заполнили в форме. Ближе
-всего к шаблону виртуальной машины с мастером настройки. **Секрет** — объект кластера, в
-котором лежат пароли и ключи; в дашборде он показывается отдельной вкладкой в карточке
-приложения.
+Two words you'll meet more than once from here on. **A chart** is the blueprint the platform
+uses to deploy a service: a set of templates plus the values you filled in on the form. The
+closest thing is a virtual machine template with a setup wizard. **A Secret** is a cluster
+object that holds passwords and keys; in the dashboard it's shown as a separate tab on the
+application card.
 
-⚠️ **Пользователь без роли — отказ при развёртывании.** Если завести `passapp` в разделе
-Users, но не выдать ему роль ни в одной базе в разделе Databases, чарт остановится с
-ошибкой «user is not assigned to any database role». Это не поломка, а защита от
-бесполезного пользователя, но сообщение находят не сразу.
+⚠️ **A user without a role means a failure at deployment.** If you create `passapp` in the
+Users section but don't grant it a role in any database in the Databases section, the chart
+will stop with the error "user is not assigned to any database role". This isn't a breakage
+but a safeguard against a useless user, though the message isn't found right away.
 
-⚠️ **Одна копия — это не MongoDB в нормальном виде, и стоит понимать почему.** MongoDB
-рассчитана на набор из трёх реплик: они выбирают главную голосованием, и потеря одной не
-останавливает работу. Голосование требует большинства, поэтому копий делают нечётное
-число. С одной копией голосовать не с кем, и чарт включает для этого особый режим
-`unsafeFlags`. В лабе это экономит ресурсы стенда, в проде так делать нельзя.
+⚠️ **A single copy is not MongoDB in its normal form, and it's worth understanding why.**
+MongoDB is designed for a set of three replicas: they elect a primary by vote, and losing
+one doesn't stop the work. A vote requires a majority, so the number of copies is made odd.
+With a single copy there's no one to vote with, and for this the chart turns on a special
+`unsafeFlags` mode. In the lab this saves testbed resources; in production you must not do it
+this way.
 
-### То же самое текстом — и разбор полей
+### A closer look: what's inside mongodb.yaml
 
-В папке лабы лежит `mongodb.yaml`:
+The lab folder contains `mongodb.yaml`:
 
 ```yaml
 apiVersion: apps.cozystack.io/v1alpha1
@@ -151,7 +152,7 @@ spec:
   sharding: false
   users:
     passapp:
-      password: ЗдесьВашПароль
+      password: YourPasswordHere
   databases:
     passes:
       roles:
@@ -161,233 +162,237 @@ spec:
     enabled: false
 ```
 
-`namespace: tenant-workshopXX` — **управляемые сервисы живут в вашем тенанте на
-управляющем кластере, а не в лабораторном кластере из лабы 0.** Это два разных кластера.
+`namespace: tenant-workshopXX` — **managed services live in your tenant on the management
+cluster, not in the lab cluster from lab 0.** These are two different clusters.
 
-`users` и `databases` — две связанные карты, и связь между ними обязательная.
-В `users` перечисляются учётные записи, в `databases` — базы и то, кто в них что может.
-`roles.admin` даёт право читать, писать и менять структуру внутри одной базы;
-`roles.readonly` — только читать.
+`users` and `databases` are two linked maps, and the link between them is mandatory.
+`users` lists the accounts, `databases` lists the databases and who can do what in them.
+`roles.admin` grants the right to read, write and change the structure within a single
+database; `roles.readonly` — read only.
 
-⚠️ Пользователи заводятся в служебной базе `admin`, а права выдаются в вашей. Поэтому в
-строке подключения понадобится `authSource=admin` — про это отдельно на следующем шаге.
+⚠️ Users are created in the service database `admin`, but privileges are granted in yours.
+That's why the connection string will need `authSource=admin` — more on that separately in
+the next step.
 
-`sharding: false` — обычный набор реплик. Включённое шардирование добавляет
-конфигурационные серверы и маршрутизаторы: три-четыре лишних пода ради разделения данных,
-которого нам не нужно.
+`sharding: false` — an ordinary replica set. Turning sharding on adds config servers and
+routers: three or four extra pods for a data split we don't need.
 
-Применяется этот файл **не в лабораторный кластер**, а в тенант — значит, и файл доступа
-нужен тенантный. Кубконфиг (файл с адресом кластера и данными для входа) берётся в
-дашборде: **Info → вкладка Secrets → `kubeconfig-tenant-workshopXX`**. Сохраните его
-в `~/.kube/workshop` — этот путь используется во всех лабах.
+This file is applied **not to the lab cluster** but to the tenant — which means the access
+file needs to be the tenant one too. The kubeconfig (the file with the cluster's address and
+login data) is taken from the dashboard: **Info → the Secrets tab → `kubeconfig-tenant-workshopXX`**.
+Save it to `~/.kube/workshop` — this path is used in every lab.
 
-Теперь заказываем базу текстом. Команда ничего не устанавливает сама: она передаёт заказ
-платформе, а та поднимает у себя всё нужное.
+Now we order the database as text. The command doesn't install anything itself: it hands the
+order to the platform, and the platform brings up everything needed on its side.
 
 ```bash
-# apply = «приведи кластер к тому, что описано в файле».
-#   --kubeconfig ~/.kube/workshop  каким файлом доступа пользоваться. Без него kubectl
-#                                  возьмёт доступ по умолчанию и уедет не в тот кластер
-#   -f mongodb.yaml                какой файл применить (-f = file)
+# apply = "bring the cluster to what's described in the file".
+#   --kubeconfig ~/.kube/workshop  which access file to use. Without it kubectl
+#                                  will take the default access and wander off to the wrong cluster
+#   -f mongodb.yaml                which file to apply (-f = file)
 kubectl --kubeconfig ~/.kube/workshop apply -f mongodb.yaml
 ```
 
-**Что вы должны увидеть** — `mongodb.apps.cozystack.io/passes created`. Слово `created`
-означает, что заказ принят, а не что база готова.
+**What you should see** — `mongodb.apps.cozystack.io/passes created`. The word `created`
+means the order was accepted, not that the database is ready.
 
-Готовности ждать три-пять минут: поднимается сервер, инициализируется набор реплик,
-заводятся пользователи. Смотреть, как идут дела, можно так:
+Readiness takes three to five minutes: the server comes up, the replica set is initialized,
+the users are created. You can watch how things are going like this:
 
 ```bash
-# get = «покажи, что есть». Колонка READY скажет, дошёл ли заказ до рабочего состояния.
-#   -n tenant-workshopXX  в каком namespace искать (namespace — перегородка внутри
-#                         кластера; ваш тенант это и есть отдельный namespace)
+# get = "show me what's there". The READY column will tell you whether the order reached a working state.
+#   -n tenant-workshopXX  which namespace to look in (a namespace is a partition inside
+#                         the cluster; your tenant is exactly such a separate namespace)
 kubectl --kubeconfig ~/.kube/workshop get mongodb passes -n tenant-workshopXX
 ```
 
-⚠️ **Секрет `mongodb-passes-credentials` в дашборде первые минуты будет с пустым
-паролем.** Там лежат реквизиты служебной учётки `databaseAdmin`, и чарт заполняет их
-только после того, как оператор (программа платформы, которая доводит заказ до рабочего
-состояния и потом следит за ним) заведёт пользователей, — то есть на следующем круге
-согласования состояния. Подождите несколько минут и обновите страницу. Нам эта учётка не
-понадобится: мы работаем под `passapp`, чей пароль вы задали сами.
+⚠️ **The `mongodb-passes-credentials` Secret in the dashboard will have an empty password
+for the first few minutes.** It holds the credentials of the service account `databaseAdmin`,
+and the chart fills them in only after the operator (the platform's program that drives the
+order to a working state and then keeps watch over it) has created the users — that is, on
+the next round of reconciling the state. Wait a few minutes and refresh the page. We won't
+need this account: we work under `passapp`, whose password you set yourself.
 
-## Шаг 2. Заводим рабочий под
+## Step 2. Create a working Pod
 
-📍 **Где:** на ноутбуке, в лабораторном кластере.
+📍 **Where:** on the laptop, in the lab cluster.
 
-Расстановка та же, что и в других лабах про управляемые сервисы.
+The layout is the same as in the other labs about managed services.
 
-**MongoDB живёт в вашем тенанте на управляющем кластере.** Ваша роль в тенанте позволяет
-заказывать и удалять сервисы, но не запускать там свои поды и не пробрасывать порты.
+**MongoDB lives in your tenant on the management cluster.** Your role in the tenant lets you
+order and delete services, but not run your own Pods there or forward ports.
 
-**Ваша рабочая площадка — лабораторный кластер из лабы 0.** Оттуда и пойдём, по
-внутреннему адресу:
+**Your working ground is the lab cluster from lab 0.** That's where we'll go from, over the
+internal address:
 
 ```
 mongodb-passes-rs0.tenant-workshopXX.svc.cozy.local:27017
 ```
 
-| Часть | Что означает |
+| Part | What it means |
 |---|---|
-| `mongodb-` | приставка, которую каталог Cozystack добавляет к имени приложения |
-| `passes` | имя, которое вы задали в дашборде |
-| `-rs0` | имя набора реплик. Оператор так называет сервис первого набора |
-| `tenant-workshopXX` | ваш тенант. Подставьте свой номер |
-| `svc.cozy.local` | зона внутренних имён управляющего кластера |
-| `27017` | штатный порт MongoDB |
+| `mongodb-` | the prefix the Cozystack catalog adds to the application name |
+| `passes` | the name you set in the dashboard |
+| `-rs0` | the replica-set name. The operator names the service of the first set this way |
+| `tenant-workshopXX` | your tenant. Substitute your own number |
+| `svc.cozy.local` | the internal-name zone of the management cluster |
+| `27017` | MongoDB's standard port |
 
-**Под** — наименьшая единица запуска в Kubernetes: один или несколько контейнеров,
-которые всегда живут на одном узле и делят один адрес. Ближайший аналог — виртуальная
-машина, поднятая ради одной задачи, только создаётся она за секунды и гасится без
-сожаления. Мы поднимем такой под с образом `mongo:8.0`: внутри него лежит `mongosh` —
-командная оболочка MongoDB, и ставить её себе на ноутбук не придётся.
+**A Pod** is the smallest unit of execution in Kubernetes: one or several containers that
+always live on the same node and share a single address. The closest analogue is a virtual
+machine brought up for a single task, except it's created in seconds and shut down without
+regret. We'll bring up such a Pod with the `mongo:8.0` image: inside it sits `mongosh` — the
+MongoDB command shell — and you won't have to install it on your laptop.
 
-Адрес базы вместе с именем пользователя и паролем записывается одной строкой — она
-называется строкой подключения. Разберём её до того, как набирать команду.
+The database address together with the username and password is written as a single line —
+it's called the connection string. Let's walk through it before typing the command.
 
 <details>
-<summary><b>Разбираем строку подключения</b></summary>
+<summary><b>Walking through the connection string</b></summary>
 
 ```
-mongodb://passapp:пароль@хост:27017/passes?authSource=admin&directConnection=true
+mongodb://passapp:password@host:27017/passes?authSource=admin&directConnection=true
 ```
 
-`mongodb://` — схема. Дальше имя пользователя, пароль, адрес, порт.
+`mongodb://` — the scheme. Then the username, password, address, port.
 
-`/passes` после порта — **база по умолчанию**. Подключились и сразу оказались в ней,
-без отдельной команды.
+`/passes` after the port — **the default database**. You connect and you're immediately in
+it, without a separate command.
 
-`authSource=admin` — **в какой базе искать саму учётную запись.** Пользователь `passapp`
-заведён в служебной базе `admin`, а права ему выданы в `passes`. Без этого параметра
-драйвер пойдёт искать учётку в `passes`, не найдёт и вернёт «Authentication failed» —
-сообщение, которое выглядит как «неверный пароль» и уводит поиск не туда. Это самая
-частая ошибка при первом подключении к управляемой MongoDB.
+`authSource=admin` — **which database to look for the account itself in.** The `passapp`
+user is created in the service database `admin`, while its privileges are granted in
+`passes`. Without this parameter the driver will go looking for the account in `passes`,
+won't find it, and will return "Authentication failed" — a message that looks like "wrong
+password" and sends the search off in the wrong direction. This is the most common mistake
+on a first connection to a managed MongoDB.
 
-`directConnection=true` — «подключайся прямо к этому серверу, не пытайся выяснить состав
-набора реплик». Без этого параметра драйвер спросит у сервера, кто ещё есть в наборе, и
-получит внутренние имена участников, которые не всегда разрешаются снаружи. Для одной
-копии выяснять нечего, поэтому проще сказать прямо. В проде с тремя копиями наоборот:
-параметр не ставят, потому что нужен как раз автоматический переход на новую главную при
-отказе старой.
+`directConnection=true` — "connect straight to this server, don't try to work out the makeup
+of the replica set". Without this parameter the driver will ask the server who else is in
+the set, and get back the internal names of the members, which don't always resolve from
+outside. With a single copy there's nothing to work out, so it's simpler to say so directly.
+In production with three copies it's the opposite: you don't set the parameter, because what
+you want there is exactly the automatic switch to a new primary when the old one fails.
 
-**Почему адрес и пароль переменной пода, а не прямо в команде.** Всё, что вы напишете в
-`kubectl exec`, попадёт в историю вашей оболочки и в список процессов на узле. Переменная
-пода задаётся один раз, и дальше пароль в командах не появляется.
+**Why the address and password go in a Pod variable rather than straight into the command.**
+Everything you write in `kubectl exec` ends up in your shell history and in the process list
+on the node. The Pod variable is set once, and after that the password doesn't appear in
+commands.
 
-Полностью проблему это не решает, и честнее сказать сразу: значение, переданное через
-`--env`, остаётся в описании пода — его видит любой, у кого есть право читать поды в вашем
-пространстве имён, оно лежит в базе кластера и попадает в журнал аудита. Для учебного
-стенда это приемлемо, для боевого — нет: там пароль кладут в Secret и подключают через
-`envFrom`. Именно этим занята лаба про секреты.
+This doesn't solve the problem entirely, and it's more honest to say so up front: a value
+passed through `--env` stays in the Pod's spec — visible to anyone with the right to read
+Pods in your namespace, it sits in the cluster database and lands in the audit log. For a
+training testbed that's acceptable, for a production one it isn't: there you put the password
+in a Secret and wire it in through `envFrom`. That's exactly what the lab on secrets is about.
 
 </details>
 
-Поднимаем под. Подставьте свой номер тенанта вместо `workshopXX` и свой пароль вместо
-`ЗдесьВашПароль`:
+Bring up the Pod. Substitute your tenant number for `workshopXX` and your password for
+`YourPasswordHere`:
 
 ```bash
-# KUBECONFIG — каким файлом доступа пользуется kubectl. Здесь лабораторный кластер
-# из лабы 0: свои поды вы запускаете только в нём, в тенант вас с этим не пустят.
+# KUBECONFIG — which access file kubectl uses. Here it's the lab cluster
+# from lab 0: you launch your own Pods only in it, the tenant won't let you in with this.
 export KUBECONFIG=~/lab.kubeconfig
 
-# run = «создай один под и запусти в нём этот образ». Значимые флаги:
-#   --image=mongo:8.0        что запускать. В образе есть оболочка mongosh
-#   --restart=Never          создать именно одиночный под, а не Deployment. Иначе
-#                            кластер поднимал бы его заново каждый раз, как он завершится
-#   --env=MONGO_URI=...      переменная окружения внутри пода. Пароль остаётся в ней,
-#                            а не повторяется в каждой следующей команде
-#   --command -- sleep 86400 чем занять контейнер. Образ mongo по умолчанию запустил бы
-#                            сервер базы — он нам не нужен, нужен живой контейнер, в
-#                            который можно зайти. 86400 секунд — это сутки
+# run = "create a single Pod and run this image in it". The flags that matter:
+#   --image=mongo:8.0        what to run. The image contains the mongosh shell
+#   --restart=Never          create exactly a single Pod, not a Deployment. Otherwise
+#                            the cluster would bring it back up every time it finished
+#   --env=MONGO_URI=...      an environment variable inside the Pod. The password stays in it,
+#                            rather than being repeated in every following command
+#   --command -- sleep 86400 what to keep the container busy with. The mongo image would by default start
+#                            the database server — we don't need it, we need a live container
+#                            you can step into. 86400 seconds is a day
 kubectl run mongo-workbench \
   --image=mongo:8.0 \
   --restart=Never \
-  --env=MONGO_URI="mongodb://passapp:ЗдесьВашПароль@mongodb-passes-rs0.tenant-workshopXX.svc.cozy.local:27017/passes?authSource=admin&directConnection=true" \
+  --env=MONGO_URI="mongodb://passapp:YourPasswordHere@mongodb-passes-rs0.tenant-workshopXX.svc.cozy.local:27017/passes?authSource=admin&directConnection=true" \
   --command -- sleep 86400
 
-# wait = «не отдавай управление, пока условие не выполнится»
-#   --for=condition=Ready  ждём, пока под сам сообщит о готовности
-#   --timeout=180s         сколько ждать, прежде чем вернуть ошибку и не висеть вечно
+# wait = "don't return control until the condition is met"
+#   --for=condition=Ready  we wait until the Pod reports readiness itself
+#   --timeout=180s         how long to wait before returning an error rather than hanging forever
 kubectl wait --for=condition=Ready pod/mongo-workbench --timeout=180s
 ```
 
-**Что вы должны увидеть** — `pod/mongo-workbench created`, а следом
+**What you should see** — `pod/mongo-workbench created`, followed by
 `pod/mongo-workbench condition met`.
 
-Теперь заведём короткую команду, чтобы не набирать всё это каждый раз, и проверим связь
-с базой:
+Now let's set up a short command so we don't have to type all of this every time, and check
+the connection to the database:
 
 ```bash
-# mo — сокращение, которое живёт до закрытия окна терминала: так в оболочке
-# объявляют собственную команду.
-#   exec        выполнить что-то внутри уже работающего пода
-#   -i          пробросить внутрь стандартный ввод: без него подать программу не выйдет
-#   sh -c '...' запускаем в поде оболочку, чтобы она сама подставила $MONGO_URI.
-#               Кавычки одинарные намеренно: подставить переменную должен под, а не
-#               ваш терминал, — иначе пароль попадёт в историю команд
-#   --quiet     не печатать приветствие mongosh, оставить только ответ
+# mo — a shortcut that lives until you close the terminal window: this is how you
+# declare your own command in the shell.
+#   exec        run something inside an already-running Pod
+#   -i          forward standard input inside: without it you can't feed in a program
+#   sh -c '...' we run a shell in the Pod so that it substitutes $MONGO_URI itself.
+#               The quotes are single on purpose: the Pod should substitute the variable, not
+#               your terminal — otherwise the password ends up in the command history
+#   --quiet     don't print the mongosh greeting, leave only the answer
 mo() { kubectl exec -i mongo-workbench -- sh -c 'mongosh --quiet "$MONGO_URI"'; }
 
-# ping — служебный запрос «ты живой?». Ничего не читает и не пишет, проверяет связь
-# и то, что реквизиты приняты. Знак | отправляет эту строку на вход mongosh
+# ping — a service request, "are you alive?". It reads and writes nothing, it checks the connection
+# and that the credentials were accepted. The | sign sends this line to mongosh's input
 echo 'db.runCommand({ ping: 1 })' | mo
 ```
 
-**Что вы должны увидеть** — `{ ok: 1 }`.
+**What you should see** — `{ ok: 1 }`.
 
-`mongosh` читает программу со стандартного ввода, поэтому эта же команда умеет
-проглатывать целые файлы: `mo < passes.js`.
+`mongosh` reads the program from standard input, so this same command can swallow whole
+files: `mo < passes.js`.
 
-⚠️ **Если ответ `Authentication failed`** — связь есть, а реквизиты не те. Проверьте по
-порядку: `authSource=admin` в строке подключения; пароль совпадает с тем, что вы задали в
-дашборде; имя пользователя `passapp`. Пересоздать под с исправленной строкой:
-`kubectl delete pod mongo-workbench` и заново.
+⚠️ **If the answer is `Authentication failed`** — the connection is there but the
+credentials are wrong. Check in order: `authSource=admin` in the connection string; the
+password matches the one you set in the dashboard; the username is `passapp`. To recreate the
+Pod with a corrected string: `kubectl delete pod mongo-workbench` and start over.
 
-⚠️ **Если ответ `getaddrinfo ENOTFOUND` или подключение висит** — не разрешается имя.
-Скорее всего, не подставили свой номер вместо `workshopXX` или приложение в дашборде ещё
-не готово.
+⚠️ **If the answer is `getaddrinfo ENOTFOUND` or the connection hangs** — the name isn't
+resolving. Most likely you didn't substitute your own number for `workshopXX`, or the
+application in the dashboard isn't ready yet.
 
-Разглядывать данные удобнее не по одной команде, а в живой оболочке — она остаётся
-открытой, и запросы в ней набираются один за другим:
+It's more convenient to examine the data not one command at a time but in a live shell — it
+stays open, and you type queries in it one after another:
 
 ```bash
-# -it вместо -i: добавляется t — «выдай мне терминал». Отсюда приглашение к вводу,
-# история команд по стрелке вверх и подсветка. Без t оболочка молча ждала бы ввода.
+# -it instead of -i: a t is added — "give me a terminal". Hence the input prompt,
+# command history on the up arrow, and highlighting. Without t the shell would silently wait for input.
 kubectl exec -it mongo-workbench -- sh -c 'mongosh "$MONGO_URI"'
 ```
 
-**Что вы должны увидеть** — приглашение вида `passes>`: имя базы, в которой вы оказались.
+**What you should see** — a prompt of the form `passes>`: the name of the database you've
+landed in.
 
-Дальше в тексте команды показаны так, как их набирают в этой оболочке. Выйти — `exit`.
+From here on the commands in the text are shown the way you type them in this shell. To
+exit — `exit`.
 
-## Шаг 3. Кладём четыре пропуска четырёх разных форм
+## Step 3. Put in four passes of four different shapes
 
-📍 **Где:** на ноутбуке, в лабораторном кластере.
+📍 **Where:** on the laptop, in the lab cluster.
 
-Файл `passes.js` — это программа для `mongosh`: она добавляет в базу четыре пропуска и
-печатает, сколько документов получилось. Ни одной таблицы заранее создавать не нужно, и
-чуть ниже разобрано почему.
+The file `passes.js` is a program for `mongosh`: it adds four passes to the database and
+prints how many documents there turned out to be. There's no need to create a single table
+in advance, and just below there's an explanation of why.
 
 ```bash
 cd labs/10-mongodb
-# Знак < подаёт содержимое файла на вход команды — то же самое, как если бы вы
-# набрали весь текст файла руками в оболочке mongosh.
+# The < sign feeds the file's contents into the command's input — the same thing as if you
+# typed the whole text of the file by hand in the mongosh shell.
 mo < passes.js
 ```
 
-**Что вы должны увидеть** — `документов в коллекции: 4`.
+**What you should see** — `документов в коллекции: 4`.
 
 <details>
-<summary><b>Разбираем, что мы положили</b></summary>
+<summary><b>Walking through what we put in</b></summary>
 
-Первое, что стоит заметить: **никакого `CREATE TABLE` не было**. Коллекция `passes`
-появилась в момент первой вставки. Схемы у неё нет — то есть по умолчанию MongoDB не
-имеет мнения о том, какие поля бывают у документа.
+The first thing worth noticing: **there was no `CREATE TABLE`**. The `passes` collection
+came into being at the moment of the first insert. It has no schema — that is, by default
+MongoDB has no opinion about which fields a document may have.
 
-Теперь по документам.
+Now to the documents.
 
-**Разовый пропуск** — самая короткая форма:
+**The one-time pass** — the shortest shape:
 
 ```js
   {
@@ -400,29 +405,29 @@ mo < passes.js
   }
 ```
 
-Шесть полей, все скалярные. В таблице это была бы обычная строка.
+Six fields, all scalar. In a table this would be an ordinary row.
 
-`ISODate(...)` — не строка, а именно дата. MongoDB хранит документы в двоичном формате
-BSON, где у значения есть тип: дата, целое, дробное, логическое, двоичные данные. Это
-важное отличие от обычного JSON: по дате можно сравнивать и сортировать, по строке
-`"2026-09-01"` — только если повезло с форматом записи.
+`ISODate(...)` is not a string but precisely a date. MongoDB stores documents in the binary
+BSON format, where a value has a type: date, integer, floating-point, boolean, binary data.
+This is an important difference from plain JSON: you can compare and sort by a date, but by
+the string `"2026-09-01"` only if you're lucky with the way it was written.
 
-**Недельный пропуск** — вместо `valid_on` появились `valid_from` и `valid_to`, вместо
-одного входа `entrances` — **список**:
+**The weekly pass** — instead of `valid_on` there are now `valid_from` and `valid_to`, and
+instead of a single entrance, `entrances` is now **a list**:
 
 ```js
     entrances: ["Северная", "Южная"],
     badge_returned: false
 ```
 
-Список прямо в поле. В таблице для этого понадобилась бы либо отдельная таблица
-«пропуск — вход», либо строка с запятыми, которую потом никто не сможет нормально
-искать.
+A list right in the field. In a table this would have needed either a separate
+"pass — entrance" table or a comma-separated string that later nobody could search properly.
 
-Поля `badge_returned` у разового пропуска нет вообще. Не `NULL`, не пусто — **нет
-такого поля в этом документе.** Это разные вещи, и они по-разному ищутся.
+The one-time pass has no `badge_returned` field at all. Not `NULL`, not empty — **there is
+no such field in this document.** These are different things, and they're searched for
+differently.
 
-**Автомобильный пропуск** — появился **вложенный объект**:
+**The vehicle pass** — a **nested object** has appeared:
 
 ```js
     car: {
@@ -433,10 +438,11 @@ BSON, где у значения есть тип: дата, целое, дроб
     },
 ```
 
-Всё, что относится к машине, лежит внутри одного поля `car`. Это не строка с JSON внутри,
-а полноценная структура: по `car.plate` можно искать и строить индекс.
+Everything to do with the vehicle sits inside a single `car` field. This isn't a string with
+JSON inside, but a full-fledged structure: you can search by `car.plate` and build an index
+on it.
 
-**Групповой пропуск** — **список объектов**:
+**The group pass** — **a list of objects**:
 
 ```js
     members: [
@@ -446,218 +452,217 @@ BSON, где у значения есть тип: дата, целое, дроб
     ]
 ```
 
-Список участников переменной длины, у каждого свои поля. И — обратите внимание — у этого
-документа **нет поля `guest`**: вместо гостя тут организация и контактное лицо. Форма
-документа отличается от остальных не одним полем, а по сути.
+A variable-length list of participants, each with their own fields. And — note — this
+document **has no `guest` field**: in place of a guest there's an organization and a contact
+person. The document's shape differs from the others not by one field but in essence.
 
-Вот ради этого документная модель и существует. Ни пустых колонок, ни четырёх таблиц, ни
-пятой связующей.
+This is exactly what the document model exists for. No empty columns, no four tables, no
+fifth to tie them together.
 
 </details>
 
-## Шаг 4. Ищем по документам разной формы
+## Step 4. Search across documents of different shapes
 
-📍 **Где:** в оболочке `mongosh` внутри рабочего пода.
+📍 **Where:** in the `mongosh` shell inside the working Pod.
 
-Всё нужное охране и руководству — обычные запросы. Читаются они одинаково: `db` — база,
-к которой вы подключены, `passes` — коллекция в ней, дальше через точку идёт действие, а
-в скобках — условие отбора. Условие всегда записывается объектом: «поле — какое значение
-у него должно быть».
+Everything security and management need is ordinary queries. They all read the same way:
+`db` is the database you're connected to, `passes` is the collection in it, then after a dot
+comes the action, and in the parentheses is the selection condition. The condition is always
+written as an object: "field — what value it should have".
 
-**Все пропуска на конкретную дату:**
+**All passes for a specific date:**
 
 ```js
-// find = «покажи документы, подходящие под условие»
-// { valid_on: ISODate(...) } — у документа поле valid_on должно быть равно ровно этой
-// дате. ISODate — это дата, а не строка: сравнение идёт по времени, а не по написанию
+// find = "show the documents that match the condition"
+// { valid_on: ISODate(...) } — the document's valid_on field must equal exactly this
+// date. ISODate is a date, not a string: the comparison is by time, not by spelling
 db.passes.find({ valid_on: ISODate("2026-09-02T07:30:00Z") })
 ```
 
-**Что вы должны увидеть** — один документ, автомобильный пропуск Кузнецова.
+**What you should see** — a single document, Kuznetsov's vehicle pass.
 
-**Только автомобильные:**
+**Vehicle passes only:**
 
 ```js
-// Условие по обычному строковому полю: совпадение целиком, без учёта регистра не бывает
+// A condition on an ordinary string field: a whole match, there's no case-insensitivity here
 db.passes.find({ type: "автомобильный" })
 ```
 
-**Поиск по номеру машины — обращение внутрь вложенного объекта через точку:**
+**Searching by plate number — reaching inside a nested object through a dot:**
 
 ```js
-// "car.plate" — путь внутрь документа: поле plate внутри объекта car.
-// Кавычки вокруг пути обязательны, иначе JavaScript прочитает точку по-своему
+// "car.plate" — a path into the document: the plate field inside the car object.
+// The quotes around the path are mandatory, otherwise JavaScript will read the dot its own way
 db.passes.find({ "car.plate": "А123ВС174" })
 ```
 
 <details>
-<summary><b>Почему это работает и чем отличается от «строки с JSON внутри»</b></summary>
+<summary><b>Why this works and how it differs from "a string with JSON inside"</b></summary>
 
-`"car.plate"` — точечная запись пути к полю. MongoDB понимает структуру документа и
-умеет обращаться внутрь, а не хранит вложенный объект куском текста.
+`"car.plate"` is dotted notation for a path to a field. MongoDB understands the document's
+structure and can reach inside, rather than storing the nested object as a chunk of text.
 
-Разница практическая. Если бы `car` лежал в реляционной таблице колонкой типа `TEXT` с
-JSON внутри, поиск по номеру означал бы `LIKE '%А123ВС174%'` — полный перебор без
-индекса, с ложными срабатываниями. Здесь это обычное условие, под которое можно построить
-индекс, и мы это сделаем.
+The difference is practical. If `car` sat in a relational table as a `TEXT` column with JSON
+inside, searching by plate would mean `LIKE '%А123ВС174%'` — a full scan without an index,
+with false positives. Here it's an ordinary condition you can build an index on, and we will.
 
-⚠️ Кавычки вокруг `"car.plate"` обязательны: без них JavaScript прочитает точку как
-обращение к свойству объекта и не поймёт, чего от него хотят.
+⚠️ The quotes around `"car.plate"` are mandatory: without them JavaScript will read the dot
+as accessing an object property and won't understand what's being asked of it.
 
 </details>
 
-**Пропуска, действующие на нескольких входах:**
+**Passes valid at several entrances:**
 
 ```js
-// entrances — не строка, а список: ["Северная", "Южная"]. Условие всё равно пишется
-// как для обычного поля, MongoDB сама проверит его на каждом элементе списка
+// entrances is not a string but a list: ["Северная", "Южная"]. The condition is still written
+// as for an ordinary field, MongoDB will check it against each element of the list itself
 db.passes.find({ entrances: "Южная" })
 ```
 
-Обратите внимание: условие написано так, будто `entrances` — обычное поле со значением
-`"Южная"`, а на деле это список. **MongoDB сама понимает, что если поле — список, то
-условие надо проверять на каждом элементе.** Отдельного синтаксиса для «содержит» не
-требуется.
+Note: the condition is written as though `entrances` were an ordinary field with the value
+`"Южная"`, when in fact it's a list. **MongoDB understands on its own that if a field is a
+list, the condition must be checked against each element.** No separate syntax for "contains"
+is required.
 
-**Групповые пропуска, где есть несовершеннолетние:**
+**Group passes that include minors:**
 
 ```js
-// Путь members.age ведёт внутрь списка объектов — к полю age каждого участника.
-// $lt = less than, «меньше чем». Условие с $ — не значение, а способ сравнения:
-// «поле должно быть меньше 16», а не «поле должно быть равно 16»
+// The path members.age leads inside a list of objects — to the age field of each participant.
+// $lt = less than. A condition with $ is not a value but a way of comparing:
+// "the field must be less than 16", not "the field must equal 16"
 db.passes.find({ "members.age": { $lt: 16 } })
 ```
 
-Точечный путь работает и внутрь списка объектов: условие проверяется на каждом участнике.
-`$lt` — «меньше чем». Условий такого рода около двадцати: `$gt`, `$gte`, `$in`, `$ne`,
-`$exists`, `$regex` и так далее.
+The dotted path works into a list of objects too: the condition is checked against each
+participant. `$lt` — "less than". There are about twenty conditions of this kind: `$gt`,
+`$gte`, `$in`, `$ne`, `$exists`, `$regex`, and so on.
 
-**Все пропуска, у которых вообще указана машина:**
+**All passes that have a vehicle specified at all:**
 
 ```js
-// $exists спрашивает не про значение, а про само наличие поля в документе:
-// «в этом документе поле car вообще есть?»
+// $exists asks not about the value but about the very presence of the field in the document:
+// "does this document have a car field at all?"
 db.passes.find({ car: { $exists: true } })
 ```
 
-`$exists` — то самое различие между «поля нет» и «поле пустое». В таблице такого вопроса
-не возникает: колонка есть всегда, вопрос только в `NULL`.
+`$exists` is that very distinction between "the field is absent" and "the field is empty". In
+a table this question doesn't arise: the column is always there, the only question is `NULL`.
 
-**Сводка для руководства — сколько пропусков какого типа.** Здесь запрос не отбирает
-документы, а считает по ним итог, поэтому и команда другая — `aggregate`. Разберём её
-до того, как набирать.
+**A summary for management — how many passes of each type.** Here the query doesn't select
+documents but computes a total over them, so the command is different — `aggregate`. Let's
+walk through it before typing.
 
 <details>
-<summary><b>Разбираем конвейер агрегации</b></summary>
+<summary><b>Walking through the aggregation pipeline</b></summary>
 
-Агрегация в MongoDB — это **конвейер**: список этапов, каждый из которых получает на вход
-результат предыдущего. Похоже на конвейер команд в оболочке, где вывод одной уходит на
-вход следующей.
+Aggregation in MongoDB is a **pipeline**: a list of stages, each of which takes the result of
+the previous one as input. It's like a pipeline of commands in a shell, where the output of
+one goes to the input of the next.
 
-`$group` — сгруппировать. `_id: "$type"` означает «ключ группировки — значение поля
-`type`»; знак доллара перед именем говорит «это ссылка на поле, а не строка». `$sum: 1` —
-прибавлять единицу за каждый документ, то есть считать их.
+`$group` — group. `_id: "$type"` means "the grouping key is the value of the `type` field";
+the dollar sign before the name says "this is a reference to a field, not a string".
+`$sum: 1` — add one for each document, that is, count them.
 
-`$sort: { count: -1 }` — упорядочить по убыванию; `-1` это «по убыванию», `1` — «по
-возрастанию».
+`$sort: { count: -1 }` — order in descending order; `-1` is "descending", `1` is "ascending".
 
-Тот же результат в SQL — `SELECT type, count(*) FROM passes GROUP BY type ORDER BY 2 DESC`.
-Короче, привычнее, и в этом честное сравнение не в пользу MongoDB: язык запросов у неё
-многословнее и осваивается дольше.
+The same result in SQL — `SELECT type, count(*) FROM passes GROUP BY type ORDER BY 2 DESC`.
+Shorter, more familiar, and here an honest comparison goes against MongoDB: its query
+language is wordier and takes longer to master.
 
 </details>
 
 ```js
-// aggregate = «прогони документы через цепочку этапов». Этапы идут по порядку,
-// каждый получает то, что выдал предыдущий:
-//   $group — разложить документы по группам, по значению поля type, и сосчитать каждую
-//   $sort  — упорядочить группы по количеству, -1 значит «по убыванию»
+// aggregate = "run the documents through a chain of stages". The stages go in order,
+// each receiving what the previous one produced:
+//   $group — sort the documents into groups by the value of the type field, and count each one
+//   $sort  — order the groups by count, -1 means "descending"
 db.passes.aggregate([
   { $group: { _id: "$type", count: { $sum: 1 } } },
   { $sort: { count: -1 } }
 ])
 ```
 
-**Что вы должны увидеть** — четыре строки вида `{ _id: 'разовый', count: 1 }`.
+**What you should see** — four rows of the form `{ _id: 'разовый', count: 1 }`.
 
-## Шаг 5. Индекс на поле, которого у большинства нет
+## Step 5. An index on a field that most don't have
 
-📍 **Где:** в оболочке `mongosh` внутри рабочего пода.
+📍 **Where:** in the `mongosh` shell inside the working Pod.
 
-Охрана ищет по номеру машины каждый день. Посмотрим, какой ценой этот поиск обходится
-сейчас: запрос тот же, что и раньше, но вместо документов мы просим отчёт о том, как
-база их искала.
+Security searches by plate number every day. Let's look at what this search costs right now:
+the query is the same as before, but instead of documents we ask for a report on how the
+database looked for them.
 
 ```js
-// explain = «не отдавай документы, расскажи, как ты их искала»
-//   "executionStats"     режим отчёта: не только план, но и что получилось на деле
-//   .executionStats      берём из ответа именно этот раздел, чтобы не читать всё
-// В отчёте смотрим на totalDocsExamined — сколько документов база прочитала,
-// чтобы отдать один
+// explain = "don't give me the documents, tell me how you looked for them"
+//   "executionStats"     report mode: not only the plan, but what actually happened
+//   .executionStats      we take exactly this section from the answer, so as not to read all of it
+// In the report we look at totalDocsExamined — how many documents the database read,
+// to return one
 db.passes.find({ "car.plate": "А123ВС174" }).explain("executionStats").executionStats
 ```
 
-**Что вы должны увидеть** — `totalDocsExamined` равно числу документов в коллекции.
-База просмотрела все, чтобы найти один. На четырёх документах это незаметно, на
-четырёхстах тысячах — уже нет.
+**What you should see** — `totalDocsExamined` equals the number of documents in the
+collection. The database looked through all of them to find one. With four documents this
+goes unnoticed, with four hundred thousand it no longer does.
 
-Строим индекс — отдельную структуру, по которой база находит нужные документы, не читая
-все подряд:
+We build an index — a separate structure the database uses to find the documents it needs
+without reading them all in a row:
 
 ```js
-// createIndex = «построй индекс по этому полю и поддерживай его дальше сама»
-//   { "car.plate": 1 }   по какому полю. 1 — порядок «по возрастанию»
-//   name: "car_plate"    как назвать индекс, чтобы потом его узнавать и удалять
-//   sparse: true         в индекс попадают только документы, у которых поле есть
+// createIndex = "build an index on this field and keep maintaining it yourself from now on"
+//   { "car.plate": 1 }   on which field. 1 is "ascending" order
+//   name: "car_plate"    what to name the index, so you can recognize and delete it later
+//   sparse: true         only documents that have the field get into the index
 db.passes.createIndex({ "car.plate": 1 }, { name: "car_plate", sparse: true })
 
-// Повторяем тот же отчёт и сравниваем с предыдущим
+// We repeat the same report and compare it with the previous one
 db.passes.find({ "car.plate": "А123ВС174" }).explain("executionStats").executionStats
 ```
 
-**Что вы должны увидеть** — `totalDocsExamined` равно единице, а в плане появилось
-`IXSCAN` вместо `COLLSCAN`. Это названия способов поиска: `COLLSCAN` — перебор всей
-коллекции, `IXSCAN` — обращение по индексу.
+**What you should see** — `totalDocsExamined` equals one, and in the plan `IXSCAN` has
+appeared instead of `COLLSCAN`. These are the names of the search methods: `COLLSCAN` is a
+scan of the whole collection, `IXSCAN` is a lookup by index.
 
 <details>
-<summary><b>Что такое разреженный индекс и зачем он здесь</b></summary>
+<summary><b>What a sparse index is and why it's here</b></summary>
 
-`{ "car.plate": 1 }` — по какому полю строить; `1` означает «по возрастанию», `-1` — по
-убыванию. Для поиска по точному совпадению направление не важно, для сортировки — важно.
+`{ "car.plate": 1 }` — which field to build on; `1` means "ascending", `-1` — descending.
+For an exact-match search the direction doesn't matter; for sorting it does.
 
-`sparse: true` — **в индекс попадают только те документы, у которых поле есть.**
+`sparse: true` — **only those documents that have the field get into the index.**
 
-Без этого флага MongoDB завела бы в индексе запись и для трёх документов без машины,
-со значением «поля нет». Индекс стал бы почти вдвое больше, а пользы от этих записей —
-никакой: никто не ищет пропуска по признаку «машина не указана».
+Without this flag MongoDB would have created an index entry for the three documents without a
+vehicle too, with a "field absent" value. The index would become almost twice as large, and
+those entries would be of no use whatsoever: nobody searches for passes by the criterion "no
+vehicle specified".
 
-В реальном журнале пропусков автомобильных процентов десять. Разреженный индекс будет
-в десять раз меньше обычного и в десять раз дешевле в обслуживании.
+In a real pass log about ten percent are vehicle passes. A sparse index will be ten times
+smaller than an ordinary one and ten times cheaper to maintain.
 
-⚠️ **У разреженного индекса есть цена, и её надо знать.** Сортировка по этому полю через
-такой индекс потеряет документы без поля — их в нём нет. MongoDB в
-таких случаях сама откажется от индекса и пойдёт перебором; неприятно то, что происходит
-это молча.
+⚠️ **A sparse index has a price, and you need to know it.** Sorting by this field through
+such an index will lose the documents without the field — they aren't in it. In such cases
+MongoDB will itself abandon the index and fall back to a scan; the unpleasant part is that
+this happens silently.
 
-**А теперь то, ради чего этот шаг.** В реляционной базе с одной таблицей на все типы
-пропусков индекс по `car_plate` пришлось бы строить по колонке, где у девяноста процентов
-строк `NULL`. Часть СУБД такие строки в индекс всё равно кладёт, и он раздувается.
-Обходят это частичными индексами — механизмом того же рода, что `sparse`, только
-доступным не везде и заметным не сразу.
+**And now the point of this step.** In a relational database with a single table for all pass
+types, an index on `car_plate` would have to be built on a column where ninety percent of the
+rows are `NULL`. Some DBMSs put such rows into the index anyway, and it bloats. This is worked
+around with partial indexes — a mechanism of the same kind as `sparse`, only not available
+everywhere and not obvious right away.
 
-То есть проблема одна и та же. Разница в том, что здесь она не возникает как побочный
-эффект от «положим все типы в одну таблицу»: у нас нет колонки, которую пришлось завести
-ради меньшинства записей.
+So the problem is one and the same. The difference is that here it doesn't arise as a side
+effect of "let's put all the types in one table": we have no column that had to be created
+for the sake of a minority of records.
 
 </details>
 
-## Предсказуемая неудача · Пропуск, которого нет в списке
+## A predictable failure · The pass that isn't on the list
 
-Продолжаем работать. Дежурный на проходной выписал ещё один разовый пропуск — через
-скрипт, который писали в спешке:
+Let's keep working. The officer at the gate issued another one-time pass — through a script
+written in a hurry:
 
 ```js
-// insertOne = «добавь один документ». Что в нём за поля, база не спрашивает
+// insertOne = "add one document". What fields are in it, the database doesn't ask
 db.passes.insertOne({
   tipe: "разовый",
   guest: "Николаев Сергей Игоревич",
@@ -666,76 +671,77 @@ db.passes.insertOne({
 })
 ```
 
-Вставка прошла успешно: вернулся `acknowledged: true` («приняла») и новый `_id` —
-уникальный ключ документа, база придумала его сама. Проверим, что документов стало пять:
+The insert succeeded: back came `acknowledged: true` ("accepted") and a new `_id` — the
+document's unique key, which the database came up with itself. Let's check that there are now
+five documents:
 
 ```js
-// countDocuments = «сосчитай документы, подходящие под условие».
-// Пустые фигурные скобки — условие без ограничений, то есть «все»
+// countDocuments = "count the documents that match the condition".
+// Empty curly braces are a condition with no restrictions, that is, "all"
 db.passes.countDocuments({})
 ```
 
-Пять. Теперь то, что каждое утро делает охрана — открывает список разовых пропусков:
+Five. Now what security does every morning — opens the list of one-time passes:
 
 ```js
-// Тот же отбор по типу, что и на шаге с поиском: показать пропуска, у которых
-// поле type равно «разовый»
+// The same selection by type as in the search step: show the passes whose
+// type field equals "разовый"
 db.passes.find({ type: "разовый" })
 ```
 
-> **Остановитесь и подумайте, прежде чем читать дальше.**
+> **Stop and think before you read on.**
 >
-> Сколько пропусков вернулось? Где пятый? Что произошло бы при такой же ошибке
-> в реляционной базе — и почему это лучше?
+> How many passes came back? Where's the fifth? What would happen with the same mistake in a
+> relational database — and why is that better?
 
 <details>
-<summary><b>Ответ и урок шире, чем эта ошибка</b></summary>
+<summary><b>The answer, and a lesson broader than this error</b></summary>
 
-Вернулся один пропуск, а не два. Гость Николаев приедет, охрана его не найдёт, и
-разбираться будут долго — потому что документ **есть**, он **вставился успешно** и
-никакой ошибки нигде не записано.
+One pass came back, not two. Guest Nikolaev will arrive, security won't find him, and sorting
+it out will take a while — because the document **exists**, it **was inserted successfully**,
+and no error was recorded anywhere.
 
-Причина в двух опечатках: `tipe` вместо `type` и `data` вместо `valid_on`. MongoDB их не
-заметила, потому что **у коллекции нет схемы, а значит нет и мнения о том, какие поля
-правильные.** Для неё `tipe` — такое же законное поле, как любое другое.
+The cause is two typos: `tipe` instead of `type` and `data` instead of `valid_on`. MongoDB
+didn't notice them, because **the collection has no schema, and so no opinion about which
+fields are correct.** To it, `tipe` is just as legitimate a field as any other.
 
-Найдём пострадавших — документы, у которых поля `type` нет вовсе:
+Let's find the casualties — documents that have no `type` field at all:
 
 ```js
-// $exists: false — обратное тому, что было на прошлом шаге: «поля в документе нет».
-// Такой запрос стоит держать под рукой: он показывает, что накопилось мимо схемы
+// $exists: false — the opposite of the previous step: "the field is not in the document".
+// It's worth keeping such a query handy: it shows what has accumulated past the schema
 db.passes.find({ type: { $exists: false } })
 ```
 
-В реляционной базе `INSERT` с колонкой `tipe` упал бы сразу: `column "tipe" does not
-exist`. Ошибка вылезла бы на тестах, а не через неделю на проходной. **Это и есть главная
-плата за гибкость схемы: проверку, которую раньше делала база, теперь должен делать
-кто-то другой.**
+In a relational database an `INSERT` with a `tipe` column would fail immediately:
+`column "tipe" does not exist`. The error would surface in tests, not a week later at the
+gate. **This is the main price of schema flexibility: the check the database used to do must
+now be done by someone else.**
 
-**Урок шире, чем эта ошибка.** И вот здесь важно не сделать неверный вывод. Правильный вывод — не «документные базы
-плохие», а «отсутствие схемы по умолчанию не означает отсутствие схемы вообще». Схема у
-ваших данных есть всегда: она либо описана явно, либо живёт в головах и в коде, где её
-никто не проверяет.
+**A lesson broader than this mistake.** And here it's important not to draw the wrong
+conclusion. The right conclusion is not "document databases are bad", but "no schema by
+default doesn't mean no schema at all". Your data always has a schema: it's either described
+explicitly, or it lives in people's heads and in the code, where nobody checks it.
 
-Уберём испорченный документ и включим проверку.
+Let's remove the corrupted document and turn on validation.
 
 </details>
 
-Удаляем документы без типа:
+We delete the documents without a type:
 
 ```js
-// deleteMany = «удали все документы, подходящие под условие». Условие то же,
-// что и в поиске выше, — значит, удалится ровно то, что вы только что видели
+// deleteMany = "delete all documents that match the condition". The condition is the same
+// as in the search above — which means exactly what you just saw will be deleted
 db.passes.deleteMany({ type: { $exists: false } })
 ```
 
-**Что вы должны увидеть** — `deletedCount: 1`.
+**What you should see** — `deletedCount: 1`.
 
-Теперь включим проверку — правило, которому обязан соответствовать каждый документ.
-Оно лежит в файле `validator.js`; разберём его до того, как применять.
+Now let's turn on validation — a rule every document is required to satisfy. It's in the file
+`validator.js`; let's walk through it before applying it.
 
 <details>
-<summary><b>Разбираем правило</b></summary>
+<summary><b>Walking through the rule</b></summary>
 
 ```js
 db.runCommand({
@@ -746,17 +752,17 @@ db.runCommand({
 });
 ```
 
-`collMod` — изменить настройки существующей коллекции. Валидатор навешивается на живую
-коллекцию задним числом, останавливать ничего не требуется.
+`collMod` — change the settings of an existing collection. The validator is hung on a live
+collection after the fact, nothing needs to be stopped.
 
 ```js
       required: ["type", "host"],
 ```
 
-Обязательные поля. **Обратите внимание, чего в списке нет: `guest`.** У группового
-пропуска гостя нет, вместо него организация. Правило обязано быть достаточно широким,
-чтобы законная форма документа через него проходила, — и вот это ограничение чувствуется
-сразу: чем разнообразнее ваши документы, тем меньше можно потребовать от всех сразу.
+The required fields. **Note what's not in the list: `guest`.** The group pass has no guest,
+an organization in its place. The rule has to be broad enough for a legitimate document shape
+to pass through it — and this constraint is felt at once: the more varied your documents, the
+less you can demand of all of them together.
 
 ```js
         type: {
@@ -764,8 +770,8 @@ db.runCommand({
         },
 ```
 
-Значение только из списка. Пятый тип пропуска потребует изменения правила — и это
-хорошо: изменение станет осознанным.
+A value from the list only. A fifth pass type will require changing the rule — and that's
+good: the change becomes deliberate.
 
 ```js
         car: {
@@ -775,304 +781,314 @@ db.runCommand({
         },
 ```
 
-Правила работают и на вложенных объектах. Если поле `car` есть, у него обязан быть
-`plate`. Если поля нет — никаких требований, документ законен.
+The rules work on nested objects too. If the `car` field is present, it must have a `plate`.
+If the field is absent — no requirements, the document is legitimate.
 
 ```js
   validationLevel: "strict",
   validationAction: "error"
 ```
 
-`strict` — проверять все вставки и все изменения. Есть более мягкий `moderate`: он
-проверяет новые документы и изменения тех, что уже правилу соответствуют, а старые
-неправильные оставляет в покое. Именно с `moderate` включают проверку на коллекции, в
-которой уже накопился разнобой: сначала перестаём портить дальше, потом чиним старое,
-потом переходим на `strict`.
+`strict` — validate all inserts and all updates. There's a gentler `moderate`: it validates
+new documents and updates to those that already satisfy the rule, while leaving the old
+invalid ones alone. It's with `moderate` that you turn validation on for a collection where
+inconsistency has already piled up: first we stop making it worse, then we fix the old, then
+we switch to `strict`.
 
-`error` — отвергать. Есть `warn`: записать в журнал и всё равно принять. Годится, чтобы
-неделю посмотреть, сколько всего прилетит, прежде чем включать отказ.
+`error` — reject. There's `warn`: record it in the log and accept it anyway. Good for
+watching for a week how much comes in before turning on rejection.
 
 </details>
 
-Применяем правило:
+We apply the rule:
 
 ```bash
-# Тот же приём, что и с passes.js: содержимое файла подаётся на вход mongosh.
-# Правило навешивается на живую коллекцию — останавливать базу не требуется
+# The same trick as with passes.js: the file's contents are fed to mongosh's input.
+# The rule is hung on a live collection — no need to stop the database
 mo < validator.js
 ```
 
-**Что вы должны увидеть** — `правило установлено`.
+**What you should see** — `правило установлено`.
 
-Пробуем повторить ту же опечатку — теперь под присмотром правила:
+We try to repeat the same typo — now under the rule's watch:
 
 ```js
-// Поле tipe правилу неизвестно, а обязательного type в документе нет.
-// Раньше такой документ молча ложился в коллекцию
+// The tipe field is unknown to the rule, and there's no required type in the document.
+// Before, such a document would silently settle into the collection
 db.passes.insertOne({ tipe: "разовый", guest: "Проверка", host: "x@corp.ru" })
 ```
 
-**Что вы должны увидеть** — `MongoServerError: Document failed validation`. Теперь
-опечатка не проходит.
+**What you should see** — `MongoServerError: Document failed validation`. Now the typo
+doesn't get through.
 
-⚠️ **Проверка ловит не всё, и это надо сказать прямо.** Правило требует, чтобы поле
-`type` было и было из списка. Опечатку в **необязательном** поле — `guestt` вместо
-`guest` — оно пропустит: документ по-прежнему законен, только с лишним полем. Запретить
-любые незнакомые поля можно (`additionalProperties: false`), но тогда каждое новое поле
-потребует правки правила, и вы вернётесь ровно к тому, от чего уходили — к миграции
-схемы на каждый чих. Где провести черту — решение, которое принимаете вы, и оно всегда
-компромисс.
+⚠️ **Validation doesn't catch everything, and this has to be said plainly.** The rule
+requires the `type` field to be present and to be from the list. A typo in an **optional**
+field — `guestt` instead of `guest` — it will let through: the document is still legitimate,
+just with an extra field. You can forbid any unknown fields (`additionalProperties: false`),
+but then every new field will require editing the rule, and you'll come right back to what
+you were getting away from — a schema migration for every little thing. Where to draw the
+line is a decision you make, and it's always a compromise.
 
-## Шаг 6. Честно: где документная модель проигрывает
+## Step 6. Honestly: where the document model loses
 
-📍 **Где:** в оболочке `mongosh` внутри рабочего пода.
+📍 **Where:** in the `mongosh` shell inside the working Pod.
 
-Гибкость схемы — не единственное отличие, и остальные не в пользу MongoDB.
+Schema flexibility isn't the only difference, and the rest aren't in MongoDB's favor.
 
 <details>
-<summary><b>Джойнов в привычном виде нет</b></summary>
+<summary><b>There are no joins in the usual form</b></summary>
 
-Задача: к каждому пропуску подтянуть телефон и должность сотрудника, который его заказал.
-Сотрудники — в отдельной коллекции `staff`, ключ — почта.
+The task: for each pass, pull in the phone number and job title of the employee who ordered
+it. Employees are in a separate collection `staff`, keyed by email.
 
-В SQL это одна строчка: `JOIN staff ON staff.email = passes.host`.
+In SQL this is one line: `JOIN staff ON staff.email = passes.host`.
 
-Здесь — этап конвейера:
+Here — a pipeline stage:
 
 ```js
 db.passes.aggregate([
-  // $lookup = «для каждого пропуска сходи в другую коллекцию и принеси оттуда запись»
+  // $lookup = "for each pass, go to another collection and bring back a record from there"
   { $lookup: {
-      from: "staff",          // куда идти — коллекция сотрудников
-      localField: "host",     // какое поле пропуска сравнивать
-      foreignField: "email",  // с каким полем сотрудника
-      as: "host_info"         // под каким именем положить найденное в документ
+      from: "staff",          // where to go — the employees collection
+      localField: "host",     // which pass field to compare
+      foreignField: "email",  // with which employee field
+      as: "host_info"         // under what name to put what's found into the document
   } },
-  // Найденное всегда кладётся списком, даже если совпадение одно.
-  // $unwind разворачивает список обратно в одно значение
+  // What's found is always put as a list, even if there's a single match.
+  // $unwind unrolls the list back into a single value
   { $unwind: "$host_info" }
 ])
 ```
 
-Коллекции `staff` у нас нет — запрос вернёт пусто. Он здесь как образец записи, а не как
-шаг лабы.
+We don't have a `staff` collection — the query will return nothing. It's here as a sample of
+the syntax, not as a lab step.
 
-Работает. Но:
+It works. But:
 
-- `$lookup` **односторонний**: для каждого документа слева выполняется поиск справа. Это
-  не оптимизатор, который выберет способ соединения, а именно перебор с поиском
-- результат приезжает **списком**, даже если совпадение одно. Отсюда `$unwind`, чтобы
-  его развернуть
-- соединять больше двух коллекций получается громоздко и медленно
-- в шардированной установке до недавнего времени `$lookup` работал с ограничениями
+- `$lookup` is **one-directional**: for each document on the left a search is run on the
+  right. This isn't an optimizer that will choose a join method, but precisely a brute-force
+  lookup
+- the result comes back **as a list**, even if there's a single match. Hence `$unwind`, to
+  unroll it
+- joining more than two collections turns out cumbersome and slow
+- in a sharded deployment, until recently `$lookup` worked with limitations
 
-Поэтому в мире MongoDB задачу решают иначе: **данные, которые нужны вместе, кладут
-вместе.** Телефон и должность заказчика записывают прямо в документ пропуска.
+That's why in the MongoDB world the task is solved differently: **data that's needed together
+is stored together.** The requester's phone number and job title are written straight into
+the pass document.
 
-И вот это — настоящий размен, а не мелкое неудобство:
+And this is a real trade-off, not a minor inconvenience:
 
-| | Ссылка на `staff` | Копия данных в документе |
+| | A reference to `staff` | A copy of the data in the document |
 |---|---|---|
-| Чтение | нужен `$lookup` | одно обращение |
-| Сотрудник сменил телефон | поправили в одном месте | надо обойти все пропуска |
-| Целостность | база следит | следит приложение, то есть вы |
+| Reading | needs `$lookup` | a single lookup |
+| An employee changed their phone number | fixed in one place | you have to go through all the passes |
+| Integrity | the database watches over it | the application watches over it, that is, you |
 
-В реляционной базе выбора нет — там нормализация и внешние ключи. Здесь выбор есть, и
-вместе с ним ответственность.
+In a relational database there's no choice — there it's normalization and foreign keys. Here
+there's a choice, and with it responsibility.
 
 </details>
 
 <details>
-<summary><b>Внешних ключей нет совсем</b></summary>
+<summary><b>There are no foreign keys at all</b></summary>
 
-Попробуйте:
+Try it:
 
 ```js
-// Поле host по смыслу ссылается на сотрудника. Такого сотрудника не существует —
-// проверит ли это база? Правилу из прошлого шага документ соответствует: type на
-// месте и из списка, host — строка
+// The host field, by meaning, refers to an employee. No such employee exists —
+// will the database check this? The document satisfies the rule from the last step: type is
+// in place and from the list, host is a string
 db.passes.insertOne({ type: "разовый", host: "не-существует@corp.ru", guest: "Тест" })
 ```
 
-Документ вставится. Сотрудника с такой почтой нет, база на это не посмотрит.
+The document will be inserted. There's no employee with such an email, and the database won't
+look at that.
 
-В реляционной базе внешний ключ отверг бы такую строку. Здесь понятия внешнего ключа нет
-в принципе: **связность данных полностью на приложении.** Валидатор из предыдущего шага
-проверяет форму документа, но не может проверить, что значение поля существует в другой
-коллекции.
+In a relational database a foreign key would reject such a row. Here the concept of a foreign
+key doesn't exist at all: **the coherence of the data is entirely on the application.** The
+validator from the previous step checks the shape of the document, but can't check that a
+field's value exists in another collection.
 
-Практически это значит: каждую проверку «а есть ли такой сотрудник» пишет разработчик,
-и если он её забыл — узнаете вы, когда охрана попытается позвонить заказчику.
+In practice this means: every "is there such an employee" check is written by the developer,
+and if they forgot it — you'll find out when security tries to call the requester.
 
-Не забудьте убрать тестовый документ:
+Don't forget to remove the test document:
 
 ```js
-// deleteOne = «удали один документ, подходящий под условие», а не все сразу
+// deleteOne = "delete one document that matches the condition", not all of them at once
 db.passes.deleteOne({ host: "не-существует@corp.ru" })
 ```
 
 </details>
 
 <details>
-<summary><b>Транзакции есть, но не по умолчанию</b></summary>
+<summary><b>There are transactions, but not by default</b></summary>
 
-Здесь важно быть точным, потому что про MongoDB часто говорят неправду в обе стороны.
+Here it's important to be precise, because people often say untrue things about MongoDB in
+both directions.
 
-**Правда:** многодокументные транзакции в MongoDB есть, начиная с версии 4.0 для наборов
-реплик. Изменить два документа так, чтобы применились оба или ни одного, можно.
+**True:** multi-document transactions do exist in MongoDB, starting from version 4.0 for
+replica sets. You can change two documents so that either both apply or neither does.
 
-**Тоже правда:** по умолчанию их нет. Атомарна операция над **одним документом**. Хотите
-больше — открывайте сессию и явно начинайте транзакцию:
+**Also true:** by default they're not there. An operation on **a single document** is atomic.
+If you want more — open a session and explicitly begin a transaction:
 
 ```js
-// Сессия — отдельный «разговор» с базой, внутри которого можно объявить транзакцию
+// A session is a separate "conversation" with the database, within which you can declare a transaction
 const s = db.getMongo().startSession();
-s.startTransaction();          // с этого места изменения копятся, но никому не видны
-// … операции через s.getDatabase("passes") …
-s.commitTransaction();         // применить всё разом. Отменить всё разом — abortTransaction()
+s.startTransaction();          // from this point changes accumulate, but are visible to no one
+// … operations through s.getDatabase("passes") …
+s.commitTransaction();         // apply it all at once. To cancel it all at once — abortTransaction()
 ```
 
-**И третья правда, самая практичная:** транзакции в MongoDB дороже, чем в реляционной
-базе, у них есть ограничение по времени, и вся модель данных построена на предположении,
-что вам они почти не нужны. Если ваш сценарий требует их часто, это признак того, что
-данные стоило разложить иначе — или что документная база тут не нужна.
+**And a third truth, the most practical:** transactions in MongoDB are more expensive than in
+a relational database, they have a time limit, and the whole data model is built on the
+assumption that you hardly need them. If your scenario requires them often, that's a sign the
+data should have been laid out differently — or that a document database isn't needed here.
 
-Для сервиса пропусков это не проблема: пропуск — это один документ, и все операции над
-ним атомарны сами по себе. Для расчёта зарплаты — проблема, и большая.
+For a pass service this isn't a problem: a pass is a single document, and all operations on it
+are atomic by themselves. For payroll it's a problem, and a big one.
 
 </details>
 
 <details>
-<summary><b>Разнобой в схеме заводится сам</b></summary>
+<summary><b>Schema inconsistency creeps in on its own</b></summary>
 
-Мы уже видели это на опечатке. Но есть более коварная разновидность: разнобой, который
-завёлся не по ошибке, а по недосмотру.
+We've already seen this with the typo. But there's a more insidious variety: inconsistency
+that crept in not through an error but through oversight.
 
-Через год в коллекции обнаруживается, что дата хранится тремя способами: `ISODate`,
-строкой `"2026-09-01"` и числом с меткой времени — потому что писали три разные команды в
-разное время. Поиск по диапазону дат находит треть записей, и никто не понимает почему.
+A year later you discover in the collection that dates are stored in three ways: as
+`ISODate`, as the string `"2026-09-01"`, and as a number with a timestamp — because three
+different teams wrote them at different times. A range search over dates finds a third of the
+records, and nobody understands why.
 
-Посмотреть, что реально лежит в коллекции, можно так:
+You can see what's actually in the collection like this:
 
 ```js
 db.passes.aggregate([
-  // $$ROOT — весь документ целиком. $objectToArray разбирает его на пары
-  // «имя поля — значение», чтобы дальше работать с полями как с данными
+  // $$ROOT — the whole document in full. $objectToArray breaks it into
+  // "field name — value" pairs, so you can then work with the fields as data
   { $project: { fields: { $objectToArray: "$$ROOT" } } },
-  // Разворачиваем список пар: одна пара — одна строка на входе следующего этапа
+  // We unroll the list of pairs: one pair — one row at the input of the next stage
   { $unwind: "$fields" },
-  // Группируем по двум признакам сразу: имя поля (k) и тип его значения (t),
-  // и считаем, сколько раз такое сочетание встретилось
+  // We group by two attributes at once: the field name (k) and its value type (t),
+  // and count how many times such a combination occurred
   { $group: { _id: { k: "$fields.k", t: { $type: "$fields.v" } }, n: { $sum: 1 } } },
-  { $sort: { "_id.k": 1 } }   // по алфавиту, чтобы одно поле шло рядом со своими типами
+  { $sort: { "_id.k": 1 } }   // alphabetically, so one field sits next to its own types
 ])
 ```
 
-Запрос раскладывает каждый документ на пары «поле — значение», определяет тип значения и
-считает, сколько раз какое поле какого типа встретилось. На наших четырёх документах он
-покажет ровную картину. На реальной коллекции через год он показывает то, о чём никто не
-подозревал, и это один из самых полезных запросов при разборе унаследованной базы.
+The query breaks each document into "field — value" pairs, determines the type of the value,
+and counts how many times each field appeared with each type. On our four documents it will
+show an even picture. On a real collection a year on it shows what nobody suspected, and it's
+one of the most useful queries when untangling an inherited database.
 
-**Вывод, который стоит унести:** валидатор схемы — не украшение и не «формальность для
-галочки». В документной базе это единственное, что стоит между вами и разнобоем. Включать
-его надо сразу, а не когда припечёт.
+**The takeaway worth carrying off:** a schema validator is not decoration and not a
+"box-ticking formality". In a document database it's the only thing standing between you and
+inconsistency. It should be turned on right away, not when things get desperate.
 
 </details>
 
-**Итог честного сравнения:**
+**The bottom line of an honest comparison:**
 
-| Задача | Реляционная | Документная |
+| Task | Relational | Document |
 |---|---|---|
-| Записи одинаковой формы | естественно | тоже можно, но зачем |
-| Записи разной формы | пустые колонки или таблица на тип | естественно |
-| Списки и вложенность | отдельные таблицы | поле в документе |
-| Соединение с другими данными | JOIN, оптимизатор | `$lookup` или копия данных |
-| Целостность ссылок | база следит | следит приложение |
-| Транзакции | по умолчанию | явно, дороже, реже |
-| Защита от опечаток | схема есть всегда | валидатор, если включили |
-| Изменение схемы | миграция и релиз | новое поле появляется само |
+| Records of the same shape | natural | also possible, but why |
+| Records of different shapes | empty columns or a table per type | natural |
+| Lists and nesting | separate tables | a field in the document |
+| Joining with other data | JOIN, an optimizer | `$lookup` or a copy of the data |
+| Referential integrity | the database watches over it | the application watches over it |
+| Transactions | by default | explicit, more expensive, rarer |
+| Protection against typos | there's always a schema | a validator, if you turned it on |
+| Changing the schema | a migration and a release | a new field appears on its own |
 
-## Проверка
+## Verification
 
-📍 **Где:** на ноутбуке, в том же окне терминала, где вы работали с `kubectl`.
+📍 **Where:** on the laptop, in the same terminal window where you worked with `kubectl`.
 
-Скрипт проверки подключается к базе сам, поэтому ему нужно то же, что и вам: доступ к
-лабораторному кластеру, номер тенанта и пароль пользователя `passapp`. Передаются они
-переменными окружения.
+The verification script connects to the database itself, so it needs the same things you do:
+access to the lab cluster, the tenant number, and the password of the `passapp` user. They're
+passed as environment variables.
 
 ```bash
 cd labs/10-mongodb
-# Тот же файл доступа, что и в шагах выше: скрипт работает изнутри кластера lab
+# The same access file as in the steps above: the script works from inside the lab cluster
 export KUBECONFIG=~/lab.kubeconfig
-# Номер тенанта: из него скрипт соберёт адрес базы. Подставьте свой
+# The tenant number: from it the script will assemble the database address. Substitute your own
 export COZY_TENANT=workshop03
-# Пароль в одинарных кавычках: в них оболочка не трогает $, ! и & внутри строки.
-# В отчёт пароль не попадает
-export MONGO_PASSWORD='ваш-пароль-passapp'
+# The password in single quotes: inside them the shell doesn't touch $, ! and & within the string.
+# The password doesn't make it into the report
+export MONGO_PASSWORD='your-passapp-password'
 ./check.sh
 ```
 
-⚠️ **На Windows скрипт запускается из WSL**, а не из PowerShell — как его поставить,
-написано в начале лабы 0. Без WSL лабу можно пройти, но отчёта-артефакта не будет.
+⚠️ **On Windows the script is run from WSL**, not from PowerShell — how to set it up is
+written at the start of lab 0. Without WSL you can still complete the lab, but there will be
+no report artifact.
 
-Скрипт проверит не факт создания сервиса, а работу по существу: в коллекции есть
-документы всех четырёх форм, поиск по вложенному полю и внутрь списка работает, на редкое
-поле построен разреженный индекс, валидатор схемы включён, а документов без типа не
-осталось.
+The script will check not the fact of the service's creation but the work in substance: the
+collection has documents of all four shapes, search by a nested field and into a list works,
+a sparse index is built on the rare field, the schema validator is turned on, and no
+documents without a type remain.
 
-Пароль в отчёт не попадает.
+The password doesn't make it into the report.
 
-## Уборка
+## Cleanup
 
-Рабочий под больше не нужен — он всё это время держал контейнер занятым командой `sleep`:
+The working Pod is no longer needed — all this time it kept the container busy with the
+`sleep` command:
 
 ```bash
-# delete = «убери из кластера». Под исчезает вместе со своей переменной MONGO_URI,
-# так что пароль в кластере не остаётся
+# delete = "remove from the cluster". The Pod disappears along with its MONGO_URI variable,
+# so the password doesn't remain in the cluster
 kubectl delete pod mongo-workbench
 ```
 
-Сама MongoDB удаляется в дашборде: приложение `passes` → удалить.
+MongoDB itself is deleted in the dashboard: the `passes` application → delete.
 
-Почему это дёшево. Набор реплик MongoDB в классической инфраструктуре — три виртуальные
-машины, установка, настройка голосования, мониторинг задержки репликации и человек,
-который умеет всё это чинить. Здесь вы взяли сервис на час и вернули за десять секунд, а
-занятое место вернулось в свободную ёмкость кластера — его тут же может занять кто-то
-другой.
+Why this is cheap. A MongoDB replica set in classic infrastructure is three virtual machines,
+installation, vote configuration, monitoring of replication lag, and a person who knows how
+to fix all of it. Here you took a service for an hour and returned it in ten seconds, and the
+space it occupied went back into the cluster's free capacity — someone else can claim it
+right away.
 
-⚠️ **С удалением исчезнут и данные.** Четыре пропуска восстанавливаются одной командой,
-так что в лабе это не потеря. Если положите туда что-то настоящее — сначала включите
-резервные копии, они в форме заказа отдельным разделом.
+⚠️ **The data will disappear along with the deletion.** The four passes are restored with a
+single command, so in the lab this is no loss. If you put something real in there — turn on
+backups first; they're a separate section on the order form.
 
-## Что мы теперь умеем
+## What we can do now
 
-- Объяснять, когда документная модель уместна, а когда это способ нажить проблем
-- Заказывать MongoDB из каталога и не спотыкаться о `authSource`, роли и одну копию
-- Класть документы разной формы и искать по вложенным полям и внутрь списков
-- Строить разреженный индекс и понимать, чем он платит за экономию
-- Включать валидатор схемы и видеть, от чего он защищает, а от чего нет
-- Называть вслух то, чего в документной базе нет: внешних ключей, привычных джойнов,
-  транзакций по умолчанию
+- Explain when the document model is appropriate and when it's a way to make trouble for
+  yourself
+- Order MongoDB from the catalog and not stumble over `authSource`, roles, and a single copy
+- Store documents of different shapes and search by nested fields and into lists
+- Build a sparse index and understand what it pays for its savings
+- Turn on a schema validator and see what it protects against and what it doesn't
+- Name out loud what a document database lacks: foreign keys, the usual joins, transactions
+  by default
 
-## А в vSphere это было бы
+## And in vSphere this would be
 
-Три машины под набор реплик, и самое трудоёмкое в них — не установка, а настройка
-голосования между копиями: кто главный, что делать при потере связи, как возвращать
-отставшую. Плюс отдельный разговор с ИБ о том, кто будет обновлять эту базу через год.
+Three machines for the replica set, and the most labor-intensive part of them is not the
+installation but configuring the vote among the copies: who is primary, what to do on loss of
+connection, how to bring a lagging one back. Plus a separate conversation with the
+information-security team about who will be updating this database a year from now.
 
-Здесь — позиция в каталоге и пять минут.
+Here — an entry in the catalog and five minutes.
 
-**Где vSphere удобнее, честно.** Виртуальная машина с MongoDB — это машина, к которой вы
-можете подойти: зайти по SSH, посмотреть `mongotop`, поправить конфиг, снять снимок перед
-рискованной операцией. Управляемый сервис этого не даёт **намеренно**: в тенант вас не
-пустят ни `exec` в под, ни в логи базы. Пока всё работает, это преимущество — меньше
-способов сломать. Когда база ведёт себя странно, привычный набор действий администратора
-недоступен, и остаётся идти к тому, кто эксплуатирует платформу.
+**Where vSphere is more convenient, honestly.** A virtual machine with MongoDB is a machine
+you can walk up to: log in over SSH, look at `mongotop`, tweak the config, take a snapshot
+before a risky operation. A managed service doesn't give you this **deliberately**: the
+tenant won't let you `exec` into a Pod or into the database's logs. As long as everything
+works, that's an advantage — fewer ways to break it. When the database behaves strangely, the
+administrator's usual set of actions is unavailable, and all that's left is to go to whoever
+operates the platform.
 
-И второе, специфичное именно для MongoDB. Управляемый сервис фиксирует версию и набор
-параметров. Обновление мажорной версии MongoDB — операция, которую в своей инсталляции вы
-планируете сами, с проверкой совместимости приложения и с возможностью откатиться на
-снимок. Здесь смена версии — это поле в форме и чужой сценарий обновления под капотом.
-Обычно это ровно то, чего вы хотите. Но в тот день, когда обновление пойдёт не так,
-разбираться вы будете не своими руками, и это надо понимать заранее, а не выяснять по
-ходу.
+And a second thing, specific to MongoDB in particular. A managed service pins the version and
+the set of parameters. Upgrading a major version of MongoDB is an operation that in your own
+installation you plan yourself, with an application-compatibility check and the option to roll
+back to a snapshot. Here a version change is a field on the form and someone else's upgrade
+procedure under the hood. Usually this is exactly what you want. But on the day the upgrade
+goes wrong, you won't be sorting it out with your own hands, and you need to understand this
+in advance, not discover it along the way.

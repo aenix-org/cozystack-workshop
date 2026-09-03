@@ -1,8 +1,8 @@
-## 15. Разбор: что внутри 02-conversion-vm.yaml
+## 15. A closer look: what's inside 02-conversion-vm.yaml
 
-В файле **два** объекта, разделённых строкой `---`. Так в YAML записывают несколько
-документов в одном файле. Виртуальной машины без диска не бывает, поэтому диск
-описывается отдельно и всегда создаётся первым.
+The file holds **two** objects, separated by a `---` line. That's how YAML packs several
+documents into one file. A virtual machine can't exist without a disk, so the disk is
+described separately and is always created first.
 
 ```yaml
 kind: VMDisk
@@ -16,27 +16,27 @@ spec:
   storageClass: replicated
 ```
 
-`kind: VMDisk` — диск сам по себе, отдельный объект. Это непривычно: в vSphere диск —
-свойство машины, здесь — самостоятельная сущность, которую можно создать заранее,
-подключить к машине, отключить и подключить к другой.
+`kind: VMDisk` — the disk on its own, a separate object. This takes getting used to: in
+vSphere a disk is a property of the machine, here it's a standalone entity you can create
+ahead of time, attach to a machine, detach, and attach to another.
 
-`source.image.name: ubuntu-20.04` — откуда взять содержимое. Это тот самый каталог
-образов из карты выше: Cozystack заранее скачал с `cloud-images.ubuntu.com`
-официальный облачный образ Ubuntu 20.04 и держит его у себя. Здесь мы просим сделать с
-него копию. В интернет за ним никто не пойдёт, копия делается внутри кластера.
+`source.image.name: ubuntu-20.04` — where to pull the contents from. This is that same image
+catalog from the map above: Cozystack has already downloaded the official Ubuntu 20.04 cloud
+image from `cloud-images.ubuntu.com` and keeps it locally. Here we're asking it to make a
+copy. Nobody reaches out to the internet for it; the copy is made inside the cluster.
 
-⚠️ **Версия Ubuntu указана намеренно, менять её не надо.** На 24.04 машина не
-загружается, на 22.04 переупаковка спотыкается о старую базу пакетов RPM внутри
-CentOS 7 — `virt-v2v` не может её разобрать. Проверено, чтобы вам не пришлось.
+⚠️ **The Ubuntu version is specified deliberately — don't change it.** On 24.04 the machine
+won't boot; on 22.04 the repack trips over the old RPM package database inside CentOS 7 —
+`virt-v2v` can't parse it. Tested so you don't have to.
 
-`storage: 25Gi` — размер диска. Каталожный образ Ubuntu занимает 20Gi, и **диск должен
-быть больше образа**, иначе копирование оборвётся на середине, а диск потом зависнет в
-состоянии `Terminating` и будет мешаться. Запас нужен ещё и потому, что внутри будут
-лежать одновременно скачанный `app-1.ova` и результат переупаковки.
+`storage: 25Gi` — the disk size. The catalog Ubuntu image takes up 20Gi, and **the disk must
+be larger than the image**, otherwise the copy breaks off midway and the disk then hangs in a
+`Terminating` state and gets in the way. The headroom is also needed because the downloaded
+`app-1.ova` and the repack result will sit inside it at the same time.
 
-`storageClass: replicated` — как хранить. `replicated` означает несколько копий на
-разных узлах: узел выключился — данные на месте. Аналог — политика хранения в vSphere.
-Бывает ещё `local` — быстрее, но живёт на одном узле.
+`storageClass: replicated` — how to store it. `replicated` means several copies on different
+nodes: a node goes down — the data is still there. The analog is a storage policy in vSphere.
+There's also `local` — faster, but it lives on a single node.
 
 ```yaml
 kind: VMInstance
@@ -50,20 +50,20 @@ spec:
     - name: convert-tools
 ```
 
-`instanceType: u1.large` — размер машины, готовый набор «столько-то процессоров,
-столько-то памяти»: здесь два процессора и восемь гигабайт. Переупаковка держит образ
-в памяти кусками и требует её всерьёз.
+`instanceType: u1.large` — the machine size, a ready-made bundle of "so many CPUs, so much
+memory": here two CPUs and eight gigabytes. The repack holds the image in memory in chunks and
+demands it in earnest.
 
-`instanceProfile: ubuntu` — набор настроек виртуального железа под эту гостевую систему:
-какие дисковые контроллеры, какая сетевая карта, как проброшены часы. Ближайший
-аналог — «Guest OS Type» в мастере создания VM, который так же молча меняет десяток
-настроек под выбранную систему.
+`instanceProfile: ubuntu` — a set of virtual-hardware settings tailored to this guest system:
+which disk controllers, which network card, how the clock is passed through. The closest analog
+is "Guest OS Type" in the VM creation wizard, which likewise silently changes a dozen settings
+to fit the chosen system.
 
-`runStrategy: Always` — держать машину включённой, а если упадёт — поднять. Это не
-«автозапуск при старте хоста», а постоянно действующее правило: платформа следит, чтобы
-машина была запущена.
+`runStrategy: Always` — keep the machine running, and if it crashes, bring it back up. This
+isn't "autostart when the host boots" but a standing rule: the platform makes sure the machine
+is running.
 
-`disks` — какие диски подключить. Ссылка по имени на объект `VMDisk`, описанный выше.
+`disks` — which disks to attach. A reference by name to the `VMDisk` object described above.
 
 ```yaml
   cloudInit: |
@@ -74,14 +74,15 @@ spec:
       - [ bash, -c, "wget ... mc && chmod +x /usr/local/bin/mc" ]
 ```
 
-`cloudInit` — инструкции, которые машина выполнит сама при первом запуске. Это
-стандартный механизм всех облачных образов: система при старте ищет такой текст и
-исполняет. В vSphere ближайший аналог — Customization Specification, только описанная
-текстом и лежащая в том же файле, что и сама машина.
+`cloudInit` — instructions the machine runs by itself on first boot. This is the standard
+mechanism of every cloud image: at startup the system looks for such text and executes it. In
+vSphere the closest analog is a Customization Specification, only here it's expressed as text
+and sits in the same file as the machine itself.
 
-Здесь мы просим задать пароль, поставить `virt-v2v` с его зависимостями и скачать
-`mc` — консольный клиент для работы с S3-хранилищем, тот самый, которым будем заливать
-результат в бакет.
+Here we're asking it to set a password, install `virt-v2v` with its dependencies, and download
+`mc` — a console client for working with S3 storage, the very one we'll use to upload the
+result into the bucket.
 
-⚠️ **Пароль в открытом виде** — только для учебного стенда, машина живёт полчаса и
-доступна лишь изнутри кластера. На рабочей машине вместо `password` кладут ssh-ключи.
+⚠️ **The password in plain text** — only for the training testbed: the machine lives for half an
+hour and is reachable only from inside the cluster. On a real machine you put ssh keys in place
+of `password`.

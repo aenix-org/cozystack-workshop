@@ -1,15 +1,16 @@
-## 32. После воркшопа
+## 32. After the workshop
 
-**Что остаётся у вас**
+**What you keep**
 
-• **Окружение — на месяц.** Тенант ваш, ломайте и пересобирайте что угодно.
-  Попробуйте то, на что сегодня не хватило времени: поднять Redis, сделать копию
-  виртуалки, потрогать живую миграцию.
-• **Этот чат — тоже на месяц.** Вопрос через две недели — обычное дело.
-• **Домашние лабораторные и сертификат.** Задания пришлю отдельным сообщением.
-  Сертификат — то, что можно показать руководителю: в компании есть человек,
-  который умеет это руками.
+• **The environment — for a month.** The tenant is yours; break it and rebuild
+  whatever you like. Try the things there wasn't time for today: bring up Redis,
+  make a copy of a VM, get your hands on live migration.
+• **This chat — also for a month.** A question two weeks from now is perfectly
+  normal.
+• **Take-home labs and a certificate.** I'll send the assignments in a separate
+  message. The certificate is something you can show your manager: the company
+  has someone who can actually do this by hand.
 
-Спасибо за работу. Если захотите разобрать свой парк — напишите мне лично,
-посмотрим, что поедет как есть, что заменится сервисами, а что честно стоит
-оставить на месте.
+Thanks for the work today. If you'd like to go through your own fleet, message
+me directly and we'll look at what runs as-is, what gets replaced by services,
+and what honestly should stay where it is.

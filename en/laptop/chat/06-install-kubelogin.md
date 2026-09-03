@@ -1,16 +1,16 @@
-## 6. Ставим kubelogin
+## 6. Installing kubelogin
 
-**kubelogin — вход по учётной записи**
+**kubelogin — logging in with your account**
 
-Без него `kubectl` не сможет открыть браузер для логина и будет отвечать ошибкой
-авторизации. Файл обязательно должен называться `kubectl-oidc_login` — под этим именем
-kubectl находит его как плагин.
+Without it, `kubectl` cannot open a browser for the login and will keep answering
+with an authorization error. The file must be named exactly `kubectl-oidc_login` —
+that is the name under which kubectl finds it as a plugin.
 
 **macOS**
 ```bash
 brew install int128/kubelogin/kubelogin
 ```
-Без Homebrew:
+Without Homebrew:
 ```bash
 ARCH=$([ "$(uname -m)" = "arm64" ] && echo arm64 || echo amd64)
 curl -L -o kubelogin.zip "https://github.com/int128/kubelogin/releases/latest/download/kubelogin_darwin_${ARCH}.zip"
@@ -38,10 +38,10 @@ Expand-Archive -Force "$HOME\kubelogin.zip" "$HOME\kubelogin-tmp"
 Move-Item -Force "$HOME\kubelogin-tmp\kubelogin.exe" "$HOME\bin\kubectl-oidc_login.exe"
 Remove-Item -Recurse -Force "$HOME\kubelogin.zip","$HOME\kubelogin-tmp"
 ```
-(папка `$HOME\bin` уже создана и добавлена в PATH на прошлом шаге)
+(the `$HOME\bin` folder was already created and added to PATH in the previous step)
 
-**Проверяем:**
+**Let's check:**
 ```
 kubectl oidc-login --help
 ```
-Если вывелась справка — плагин на месте и kubectl его видит.
+If the help text printed, the plugin is in place and kubectl sees it.

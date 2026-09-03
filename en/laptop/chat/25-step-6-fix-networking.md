@@ -1,47 +1,39 @@
-## 25. Шаг 6: чиним сеть внутри машины
+## 25. Step 6: fix the network inside the machine
 
-**Сначала сеть, потом всё остальное**
+**Network first, everything else after**
 
-📍 **Где:** внутри вашей виртуалки, в консоли. Не на ноутбуке.
+📍 **Where:** inside your virtual machine, in the console. Not on the laptop.
 
-📄 Это содержимое `scripts/netfix-dhcp.sh` из репозитория. **Скачивать его в машину
-не надо и не получится** — сети у неё пока нет, она и есть наша поломка. Команды
-набираем руками, их две. Файл в репозитории — чтобы перечитать потом.
+📄 This is the contents of `scripts/netfix-dhcp.sh` from the repository. **You don't need to download it into the machine, and you can't** — the machine has no network yet, and that missing network is exactly our breakage. Type the commands by hand; there are two of them. The file lives in the repository so you can reread it later.
 
-Приложение сейчас не работает, и это не поломка стенда. Внутри образа осталось прошлое:
-статический адрес из сети VMware и шлюз, которого здесь нет. Машина держится за них
-и не видит ни кластерного DNS, ни соседей.
+The application is down right now, and this is not a fault of the testbed. The past still lingers inside the image: a static address from the VMware network and a gateway that doesn't exist here. The machine clings to them and sees neither the cluster DNS nor its neighbors.
 
-Зайдите в машину через консоль — с ноутбука:
+Enter the machine through the console — from the laptop:
 ```bash
 virtctl console --namespace=tenant-workshopXX vm-instance-app-1
 ```
-🖱 **Или мышкой:** в дашборде откройте свою машину и нажмите **VNC** — это та же
-консоль, только в браузере. Оба пути идут через API кластера и работают даже сейчас,
-когда сеть внутри машины сломана.
+🖱 **Or with the mouse:** in the dashboard, open your machine and click **VNC** — it's the same console, just in the browser. Both paths go through the cluster API and work even now, when the network inside the machine is broken.
 
-Дальше — внутри машины (это CentOS, сеть настраивается здесь, а не в netplan):
+Next — inside the machine (this is CentOS, the network is configured here, not in netplan):
 ```bash
 sed -i 's/^BOOTPROTO=.*/BOOTPROTO=dhcp/; /^IPADDR/d; /^GATEWAY/d; /^NETMASK/d; /^PREFIX/d; /^DNS/d' /etc/sysconfig/network-scripts/ifcfg-eth0
 ```
-Проверьте глазами, что получилось:
+Check with your own eyes what came out:
 ```bash
 cat /etc/sysconfig/network-scripts/ifcfg-eth0
 ```
-Должна остаться строка `BOOTPROTO=dhcp`, а строк с адресом и шлюзом быть не должно.
-Если правите вручную через `nano` — результат тот же, только дольше.
+The line `BOOTPROTO=dhcp` should remain, and there should be no lines with an address or a gateway. If you edit it by hand with `nano`, the result is the same, just slower.
 
-Теперь машину надо перезапустить:
+Now the machine needs to be restarted:
 ```bash
 reboot
 ```
-🖱 **Или мышкой:** в дашборде на странице машины кнопка **Restart**.
+🖱 **Or with the mouse:** in the dashboard, on the machine's page, the **Restart** button.
 
-После перезагрузки проверьте, что адрес стал кластерным:
+After the reboot, check that the address has become a cluster one:
 ```bash
 ip -4 addr show eth0
 ```
-Должно быть что-то вида `10.244.x.x`. Значит, машина в сети кластера и видит его DNS.
+It should be something like `10.244.x.x`. That means the machine is on the cluster network and sees its DNS.
 
-⚠️ Порядок важен: пока адрес старый, имена сервисов не разрешаются, и править конфиг
-приложения бессмысленно.
+⚠️ Order matters: while the address is still the old one, service names don't resolve, and there's no point editing the application's config.

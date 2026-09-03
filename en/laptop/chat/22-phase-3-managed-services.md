@@ -1,12 +1,14 @@
-## 22. Фаза 3. Выбрасываем зоопарк
+## 22. Phase 3. Ditching the menagerie
 
-**Шаги 5, 7, 8, 9.** Самая ценная часть. Внутри перевезённой машины до сих пор живут свои
-Postgres и Kafka — те самые, которые кто-то поставил однажды и с тех пор никто не трогает.
+**Steps 5, 7, 8, 9.** The most valuable part. Inside the machine we moved over, its own
+Postgres and Kafka are still living — the very ones someone installed once and nobody has
+touched since.
 
-Мы их **не везём**. Вместо них берём готовые из каталога Cozystack и перенастраиваем
-приложение. Разница простая: за managed-сервисом стоит репликация, автоматические бэкапы
-и мониторинг, а за самодельным — надежда на то, что человек, который его ставил, ещё
-работает в компании.
+We are **not** bringing them along. Instead we take ready-made ones from the Cozystack
+catalog and reconfigure the application. The difference is simple: behind a managed service
+there's replication, automatic backups and monitoring; behind a homemade one, the hope that
+the person who set it up still works at the company.
 
-Порядок такой: сначала заводим сервисы (шаг 5), потом переключаем на них приложение
-(шаг 7), потом создаём в базе таблицу (шаг 8) и проверяем всю цепочку (шаг 9).
+The order is this: first we spin up the services (step 5), then we point the application at
+them (step 7), then we create a table in the database (step 8) and check the whole chain
+(step 9).

@@ -1,182 +1,138 @@
-# Лаба 0 · Свой кластер Kubernetes
+# Lab 0 · Your own Kubernetes cluster
 
 | | |
 |---|---|
-| **Время** | 15 минут, из них 10 — ожидание |
-| **Что доказывает** | Кластер — это позиция в каталоге, а не проект на квартал |
-| **Что понадобится** | Доступ в дашборд тенанта; `kubectl`, `kubelogin` и `git` на ноутбуке |
+| **Time** | 15 minutes, 10 of them spent waiting |
+| **What it proves** | A cluster is an item in a catalog, not a quarter-long project |
+| **What you'll need** | Access to the tenant dashboard; `kubectl`, `kubelogin` and `git` on your laptop |
 
-## Зачем это
+## Why this matters
 
-Дальше вы будете разворачивать приложения, ломать их, чинить и масштабировать. Для всего
-этого нужна площадка, где вы полноправный хозяин и где ошибка ничего не стоит.
+Later on you'll be deploying applications, breaking them, fixing them and scaling them. For all of that you need a place where you are the full owner and where a mistake costs nothing.
 
-В vSphere такую площадку вам бы выделяли. Здесь вы возьмёте её сами, за десять минут,
-и точно так же сами удалите, когда закончите.
+In vSphere such a place would be handed to you. Here you take it yourself, in ten minutes, and you delete it yourself just as easily when you're done.
 
-## Словарик
+## Mini-glossary
 
-Семь слов, которые дальше встретятся в каждой лабе. В третьей колонке — вещь из vSphere,
-на которую термин похож, и сразу же то, чем он от неё отличается: аналогии здесь помогают
-понять, но ни одна не совпадает полностью, и знать, где именно она расходится, важнее,
-чем саму аналогию.
+Seven words that will come up in every lab from here on. The third column names the thing from vSphere the term resembles — and, right away, where it differs: the analogies here help you understand, but not one of them matches completely, and knowing exactly where an analogy breaks matters more than the analogy itself.
 
-| Термин | Что это | Похоже на… но |
+| Term | What it is | Like… but |
 |---|---|---|
-| **Кластер Kubernetes** | Несколько машин плюс управляющая программа, которая раскладывает по ним приложения. Вы отдаёте ей приложение и не указываете, на какой машине его запускать, — она решает сама | **Кластер ESXi**, но DRS раскладывает и потом непрерывно балансирует виртуальные машины, перевозя их между хостами. Здесь единица — контейнер, и место для него выбирается один раз, при запуске, плюс заново при отказе узла; сам по себе кластер запущенное не перекладывает |
-| **Control plane** | Управляющий слой кластера: принимает ваши команды, хранит желаемое состояние и раздаёт задания узлам | **vCenter**, но это не отдельный сервер с веб-мордой, а несколько процессов; в Cozystack они живут в платформе, а не на ваших узлах |
-| **Узел (node)** | Машина, на которой в итоге запускаются ваши приложения | **Хост ESXi**, но здесь это виртуалка, а не железо, и создаётся она за минуты |
-| **Node group** | Описание группы одинаковых узлов: сколько их и какого размера | **Кластер хостов**, но группа умеет сама добавлять и убирать узлы по нагрузке |
-| **Кубконфиг** | Файл с адресом кластера и вашим доступом к нему. Без него `kubectl` не знает, куда обращаться | **Адрес vCenter вместе с учёткой**, но это обычный текстовый файл у вас на диске, а не настройка в клиенте |
-| **Тенант** | Ваш участок платформы: своя квота, свои права, свои объекты | **Пул ресурсов плюс права на папку**, но это ещё и граница видимости — сосед в ваш тенант не заглянет |
-| **Namespace** | Раздел внутри кластера, куда складываются объекты | **Папка в инвентаре vCenter**, но разделение строже: объекты из разных namespace не находят друг друга по коротким именам |
+| **Kubernetes cluster** | Several machines plus a management program that spreads applications across them. You hand it an application and don't tell it which machine to run it on — it decides for itself | **An ESXi cluster**, but DRS both places and then continuously rebalances virtual machines, moving them between hosts. Here the unit is a container, and its placement is chosen once, at startup, plus again when a node fails; the cluster does not reshuffle what is already running on its own |
+| **Control plane** | The cluster's management layer: it takes your commands, stores the desired state and hands out work to the nodes | **vCenter**, but it isn't a separate server with a web UI — it's a handful of processes; in Cozystack they live in the platform, not on your nodes |
+| **Node** | The machine your applications ultimately run on | **An ESXi host**, but here it's a VM, not hardware, and it's created in minutes |
+| **Node group** | A description of a group of identical nodes: how many, and what size | **A cluster of hosts**, but the group can add and remove nodes by itself according to load |
+| **Kubeconfig** | A file holding the cluster's address and your access to it. Without it, `kubectl` doesn't know where to reach | **The vCenter address together with an account**, but this is a plain text file on your disk, not a setting in a client |
+| **Tenant** | Your slice of the platform: your own quota, your own permissions, your own objects | **A resource pool plus permissions on a folder**, but it's also a visibility boundary — a neighbor won't peek into your tenant |
+| **Namespace** | A section inside the cluster where objects are placed | **A folder in the vCenter inventory**, but the separation is stricter: objects in different namespaces don't find each other by short names |
 
-Про контейнеры отдельно, потому что это главное расхождение с привычным миром. Контейнер —
-это запущенное приложение вместе со всем, что ему нужно для работы, упакованное в один
-файл-образ. От виртуальной машины отличается тем, что внутри нет своей операционной
-системы: контейнер пользуется ядром той машины, на которой запущен. Отсюда и разница в
-масштабах — виртуалка стартует минуту и весит гигабайты, контейнер стартует за секунду и
-весит десятки мегабайт. Именно поэтому кластеру не жалко перезапускать их пачками, чем вы
-и займётесь в следующих лабах.
+Containers deserve a word of their own, because this is the main departure from the world you're used to. A container is a running application together with everything it needs to work, packed into a single image file. It differs from a virtual machine in that it has no operating system of its own inside: a container uses the kernel of the machine it runs on. Hence the difference in scale — a VM takes a minute to start and weighs gigabytes, a container starts in a second and weighs tens of megabytes. That is exactly why the cluster thinks nothing of restarting them by the batch, which is what you'll be doing in the labs ahead.
 
-## Если у вас Windows — прочитайте это первым
+## If you're on Windows — read this first
 
-Команды в лабах написаны для командной строки Linux и macOS. В обычном PowerShell часть
-из них не заработает: у PowerShell другой синтаксис и другой набор команд.
+The commands in the labs are written for the Linux and macOS command line. In plain PowerShell some of them won't work: PowerShell has different syntax and a different set of commands.
 
-Решается это **WSL** — подсистемой Linux внутри Windows. Ставится одной командой в
-PowerShell, запущенном от имени администратора:
+The fix is **WSL** — a Linux subsystem inside Windows. It installs with a single command in PowerShell run as Administrator:
 
 ```powershell
-# ставит подсистему Linux внутрь Windows: ядро, службу и дистрибутив Ubuntu
-# по умолчанию. После установки Windows попросит перезагрузиться.
+# installs the Linux subsystem inside Windows: the kernel, the service and the default
+# Ubuntu distribution. After installation Windows will ask you to reboot.
 wsl --install
 ```
 
-После перезагрузки у вас появится консоль Ubuntu — и дальше вы работаете в ней, как все
-остальные. Внутри WSL понадобится свой `kubectl` — команда, которой вы обращаетесь
-к кластеру:
+After the reboot you'll have an Ubuntu console — and from there you work in it like everyone else. Inside WSL you'll need a `kubectl` of your own — the command you use to reach the cluster:
 
 ```bash
-# snap — менеджер пакетов Ubuntu. --classic ставит пакет без изоляции:
-# в изолированном виде kubectl не увидит файл доступа в вашей домашней папке.
+# snap is Ubuntu's package manager. --classic installs the package without isolation:
+# in isolated mode kubectl won't see the access file in your home folder.
 sudo snap install kubectl --classic
 ```
 
-Диски Windows видны из WSL по пути `/mnt/c/...`, поэтому файлы, скачанные обычным
-браузером, доступны и внутри — копировать их никуда не нужно. Пригодится это чуть дальше,
-когда вы получите файл доступа к кластеру: если сохраните его в Windows, из WSL он будет
-лежать по адресу вида `/mnt/c/Users/Иван/Downloads/имя-файла`.
+Windows drives are visible from WSL under the path `/mnt/c/...`, so files downloaded with an ordinary browser are available inside too — there's no need to copy them anywhere. This comes in handy a little later, when you get the cluster's access file: if you save it on Windows, from WSL it will sit at a path like `/mnt/c/Users/Ivan/Downloads/filename`.
 
-⚠️ **Если WSL запрещён политикой безопасности** — на корпоративном ноутбуке это обычное
-дело — лабы всё равно проходятся: всё, что делается в дашборде, от операционной системы не
-зависит. Не получится только запускать скрипты проверки и несколько шагов, целиком
-состоящих из команд. Такие места отмечены отдельно.
+⚠️ **If WSL is blocked by security policy** — a common thing on a corporate laptop — the labs can still be done: everything performed in the dashboard is independent of the operating system. The only things you won't be able to run are the check scripts and a few steps made up entirely of commands. Those places are marked separately.
 
-## Что лежит в папке лабы
+## What's in the lab folder
 
-Все файлы уже у вас — вы забрали их вместе с репозиторием. Создавать и печатать заново
-ничего не нужно: там, где ниже написано `kubectl apply -f имя.yaml`, файл берётся отсюда.
+All the files are already yours — you took them along with the repository. There's nothing to create or type out again: wherever it says `kubectl apply -f name.yaml` below, the file is taken from here.
 
 ```bash
-# путь отсчитывается от корня репозитория — его вы забираете на следующем шаге
+# the path is counted from the repository root — you fetch it in the next step
 cd labs/00-cluster
 ```
 
-| Файл | Что это | Когда пригодится |
+| File | What it is | When you'll need it |
 |---|---|---|
-| `cluster.yaml` | Описание учебного кластера: версия, узлы, мониторинг | применяете на управляющем кластере на первом шаге |
-| `check.sh` | Проверка, что кластер поднялся и вы к нему подключились | запускаете в конце лабы |
+| `cluster.yaml` | Description of the lab cluster: version, nodes, monitoring | you apply it on the management cluster in the first step |
+| `check.sh` | A check that the cluster came up and you connected to it | you run it at the end of the lab |
 
-## Шаг 0. Забираем материалы
+## Step 0. Fetching the materials
 
-📍 **Где:** на ноутбуке.
+📍 **Where:** on your laptop.
 
-В репозитории лежат манифесты — файлы с описанием того, что создать в кластере, —
-и скрипты проверки. Они нужны начиная с этой лабы:
+The repository holds the manifests — files describing what to create in the cluster — and the check scripts. You need them starting with this lab:
 
 ```bash
-# clone = скачать репозиторий целиком, вместе с историей изменений.
-# Рядом появится папка cozystack-migration-workshop, в неё и переходим.
+# clone = download the entire repository, together with its change history.
+# A folder cozystack-migration-workshop appears alongside; we move into it.
 git clone https://github.com/aenix-org/cozystack-migration-workshop.git
 cd cozystack-migration-workshop
 ```
 
-Дальше все пути в лабах отсчитываются от этой папки.
+From here on, every path in the labs is counted from this folder.
 
-## Забираем доступ к платформе
+## Getting access to the platform
 
-📍 **Где:** в браузере, потом на ноутбуке.
+📍 **Where:** in the browser, then on your laptop.
 
-Всё, что вы закажете у платформы, живёт на **управляющем кластере** — там же, где ваш
-тенант. Чтобы обращаться к нему командами, нужен файл доступа. Возьмите его в дашборде:
-приложение `Info` → вкладка `Secrets` → секрет `kubeconfig-tenant-workshopXX` → `Reveal`.
-Скопируйте содержимое и сохраните на ноутбуке под именем `~/.kube/workshop`.
+Everything you order from the platform lives on the **management cluster** — the same place as your tenant. To reach it with commands, you need an access file. Fetch it in the dashboard: the `Info` application → the `Secrets` tab → the `kubeconfig-tenant-workshopXX` Secret → `Reveal`. Copy the contents and save it on your laptop under the name `~/.kube/workshop`.
 
-Этот путь используется во всех лабах — если сохраните файл в другое место, дальше
-придётся каждый раз подставлять свой.
+This path is used in every lab — if you save the file somewhere else, you'll have to substitute your own each time from here on.
 
 ```bash
-# Проверяем, что файл читается и кластер отвечает.
-# --kubeconfig говорит kubectl, каким файлом доступа пользоваться в этой команде.
+# Check that the file is readable and the cluster answers.
+# --kubeconfig tells kubectl which access file to use in this command.
 kubectl --kubeconfig ~/.kube/workshop get kubernetes.apps.cozystack.io -n tenant-workshopXX
 ```
 
-**Что вы должны увидеть:** либо пустой список, либо строку `No resources found` — кластеров
-вы пока не создавали. Важно другое: ответил сам кластер, а не сообщение об ошибке.
+**What you should see:** either an empty list, or the line `No resources found` — you haven't created any clusters yet. What matters is something else: the cluster itself answered, not an error message.
 
-⚠️ **При первом обращении откроется браузер.** Доступ выдан не сертификатом, а через
-Keycloak — это сервер входа, как «войти через корпоративный аккаунт» во внутренних
-сервисах. `kubectl` вызовет `kubelogin`, тот откроет окно браузера, вы залогинитесь как
-`workshopXX`, и дальше команды пойдут молча, пока пропуск не истечёт. Если вместо браузера
-вы увидели ошибку про отсутствующий плагин — `kubelogin` не установлен либо его файл назван
-не `kubectl-oidc_login`. Как ставить, написано в начале воркшопа.
+⚠️ **On the first call a browser opens.** Access is granted not by a certificate but through Keycloak — a sign-in server, like "sign in with your corporate account" in internal services. `kubectl` will call `kubelogin`, which opens a browser window, you sign in as `workshopXX`, and from then on the commands run silently until your pass expires. If instead of a browser you saw an error about a missing plugin — `kubelogin` isn't installed, or its file isn't named `kubectl-oidc_login`. How to install it is written at the start of the workshop.
 
-⚠️ **Ваш номер тенанта — это логин, под которым вы входите в дашборд:** `workshop03`,
-`workshop07` и так далее. Namespace вашего тенанта складывается из слова `tenant-` и этого
-номера: `tenant-workshop03`. Дальше везде, где написано `workshopXX`, подставляйте свой.
+⚠️ **Your tenant number is the login you sign in to the dashboard with:** `workshop03`, `workshop07` and so on. Your tenant's namespace is made of the word `tenant-` and this number: `tenant-workshop03`. Everywhere below that says `workshopXX`, substitute your own.
 
-## Шаг 1. Создаём кластер
+## Step 1. Creating the cluster
 
-📍 **Где:** в браузере, в дашборде Cozystack.
+📍 **Where:** in the browser, in the Cozystack dashboard.
 
-Тенант → **Создать приложение** → `Kubernetes`.
+Tenant → **Create application** → `Kubernetes`.
 
-Заполняем:
+Fill in:
 
-| Поле | Значение | Почему так |
+| Field | Value | Why so |
 |---|---|---|
-| Имя | `lab` | коротко — его придётся набирать в командах |
-| Версия | оставить предложенную | это последняя стабильная |
-| Control plane replicas | **1** | по умолчанию их две; для учебного стенда хватит одной |
-| Node group: имя | `md0` | это имя попадёт в имя узла — дальше вы увидите его в выводе `kubectl get nodes` |
-| Node group: min replicas | **1** | начинаем с одного узла |
-| Node group: max replicas | **3** | потолок, до которого группа может вырасти сама; по умолчанию стоит 10, и на этом потолке построена лаба про масштабирование |
-| Node group: instance type | `u1.medium` | 1 процессор, 4 ГБ |
+| Name | `lab` | short — you'll have to type it in commands |
+| Version | leave the one offered | it's the latest stable |
+| Control plane replicas | **1** | the default is two; one is enough for a training testbed |
+| Node group: name | `md0` | this name ends up in the node name — you'll see it later in the output of `kubectl get nodes` |
+| Node group: min replicas | **1** | we start with one node |
+| Node group: max replicas | **3** | the ceiling the group may grow to by itself; the default is 10, and the scaling lab is built on that ceiling |
+| Node group: instance type | `u1.medium` | 1 processor, 4 GB |
 | Node group: disk | `20Gi` | |
-| Storage class | `replicated` | данные лягут в трёх копиях на разные узлы |
-| Addons → **Monitoring agents** | **включить** | иначе метрики не будут копиться, и в лабе про графики смотреть окажется не на что |
+| Storage class | `replicated` | the data lands in three copies on different nodes |
+| Addons → **Monitoring agents** | **enable** | otherwise metrics won't accumulate, and in the charts lab there'll be nothing to look at |
 
-Нажимаем создать.
+Click create.
 
-⚠️ **`Monitoring agents` включите сразу.** Сбор метрик нельзя включить задним числом: если
-поставить галочку через неделю, всё, что происходило до этого, потеряно навсегда. Лаба про
-графики опирается на данные, которые копятся с сегодняшнего дня.
+⚠️ **Enable `Monitoring agents` right away.** Metrics collection can't be switched on after the fact: if you tick the box a week later, everything that happened before then is lost forever. The charts lab relies on data that accumulates starting today.
 
-⚠️ **Если рядом с вами кто-то делает то же самое — разойдитесь по времени на пару минут.**
-Несколько одновременных созданий нагружают внутренний механизм установки, и оба кластера
-будут подниматься втрое дольше. Лабы проходятся в своём темпе, спешить некуда.
+⚠️ **If someone next to you is doing the same thing — stagger by a couple of minutes.** Several simultaneous creations load the internal installer, and both clusters will take three times as long to come up. The labs go at their own pace; there's no need to rush.
 
-### То же самое из командной строки — и файл, который за этим стоит
+### The same thing from the command line — and the file behind it
 
-Это не запасной вариант на случай, если дашборд лежит. Кнопка в дашборде собирает ровно
-такой же файл и отправляет его в кластер — то есть текст здесь первичен, а мышка
-надстройка над ним. К работе текстом мы и ведём: описание, лежащее в файле, можно
-отревьюить, положить в Git и откатить, а нажатие кнопки — нельзя.
+This isn't a fallback for when the dashboard is down. The button in the dashboard assembles exactly this same file and sends it to the cluster — that is, the text is primary here, and the mouse is a layer on top of it. Working with text is where we're heading: a description that lives in a file can be reviewed, put in Git and rolled back, whereas a button press cannot.
 
-Файл лежит в папке этой лабы: **`labs/00-cluster/cluster.yaml`**. Открывать и печатать
-заново ничего не нужно — он уже у вас, если вы забрали репозиторий в начале лабы. Ниже
-он же целиком, чтобы разобрать по полям.
+The file sits in this lab's folder: **`labs/00-cluster/cluster.yaml`**. There's nothing to open or type out again — it's already yours, if you took the repository at the start of the lab. Here it is in full, so we can go through it field by field.
 
 ```yaml
 apiVersion: apps.cozystack.io/v1alpha1
@@ -201,208 +157,157 @@ spec:
       storageClass: replicated
 ```
 
-⚠️ Команды ниже выполняются **на управляющем кластере** — тем доступом, который вам
-выдали вместе с тенантом. Файла доступа к самому кластеру `lab` пока не существует: он
-появится только после того, как кластер поднимется.
+⚠️ The commands below run **on the management cluster** — with the access you were given along with the tenant. There is no access file for the `lab` cluster itself yet: it appears only after the cluster comes up.
 
 ```bash
-# переходим в папку лабы — дальше все файлы берутся отсюда
+# move into the lab folder — from here on all files are taken from here
 cd labs/00-cluster
-# перед применением подставьте в файле свой номер тенанта вместо XX.
-# apply = «приведи кластер к тому, что описано в файле». Кластер команда не поднимает
-# сама — она передаёт заказ платформе, а та решает, что и в каком порядке создать.
-#   -f   взять описание из файла
+# before applying, substitute your own tenant number in the file in place of XX.
+# apply = "bring the cluster to what's described in the file". The command doesn't bring
+# the cluster up itself — it hands the order to the platform, which decides what to
+# create and in what order.
+#   -f   take the description from the file
 kubectl apply -f cluster.yaml
-# get = «покажи, что есть». kubernetes.apps.cozystack.io — полное имя типа объекта,
-# того самого, что описан в файле (kind: Kubernetes), lab — имя вашего заказа.
-#   -n   в каком namespace искать; без флага kubectl смотрит в namespace по умолчанию
-#   -w   следить и печатать изменения. Выйти — Ctrl+C, установка от этого не прервётся
-# Ждём, пока в колонке READY появится True.
+# get = "show what's there". kubernetes.apps.cozystack.io is the full name of the object
+# type, the very one described in the file (kind: Kubernetes), lab is the name of your order.
+#   -n   which namespace to look in; without the flag kubectl looks in the default namespace
+#   -w   watch and print changes. To exit — Ctrl+C, the installation won't be interrupted by it
+# Wait until True appears in the READY column.
 kubectl -n tenant-workshopXX get kubernetes.apps.cozystack.io lab -w
 ```
 
-## Шаг 2. Ждём и смотрим, из чего он собирается
+## Step 2. Waiting, and watching what it's assembled from
 
-📍 **Где:** в браузере, в дашборде.
+📍 **Where:** in the browser, in the dashboard.
 
-Статус перейдёт в `Ready` обычно за пять-десять минут.
+The status will turn to `Ready`, usually within five to ten minutes.
 
-⚠️ **Если прошло больше двадцати минут и статус не меняется — причина может быть не в
-вашем кластере.** Установку всех приложений на платформе ведёт общая очередь, и если в ней
-стоит чья-то долгая операция, ваш кластер ждёт своей. Посмотреть, взяли ли его в работу:
+⚠️ **If more than twenty minutes have passed and the status isn't changing — the cause may not be your cluster.** Installation of all applications on the platform is driven by a shared queue, and if someone's long operation is standing in it, your cluster waits its turn. To see whether it's been picked up for work:
 
 ```bash
-# Смотрим на сам заказ и на то, что платформа о нём пишет.
-# Раздел status.conditions в конце вывода — это её отчёт: взяли ли в работу,
-# что мешает, чего ждёт.
+# Look at the order itself and at what the platform writes about it.
+# The status.conditions section at the end of the output is its report: whether it's been
+# picked up for work, what's blocking, what it's waiting for.
 kubectl --kubeconfig ~/.kube/workshop -n tenant-workshopXX \
   get kubernetes.apps.cozystack.io lab -o yaml
 ```
 
-Если и там ничего внятного — посмотрите события тенанта. Это журнал того, что платформа
-делала с вашими объектами:
+If nothing there is clear either — look at the tenant's events. This is a log of what the platform did with your objects:
 
 ```bash
-# events = журнал происшествий. Сортируем по времени, чтобы свежее было внизу.
+# events = a log of incidents. We sort by time so the freshest is at the bottom.
 kubectl --kubeconfig ~/.kube/workshop -n tenant-workshopXX \
   get events --sort-by=.lastTimestamp | tail -20
 ```
 
-Самая частая находка здесь — строка `exceeded quota: tenant-quota`. Она означает, что
-кластеру не хватает выделенной вашему тенанту доли ресурсов, и сам он из этого состояния
-не выйдет: нужно освободить место или расширить квоту.
+The most common find here is the line `exceeded quota: tenant-quota`. It means the cluster is short of the resource share allotted to your tenant, and it won't get out of this state on its own: you need to free up space or expand the quota.
 
-Пока установка идёт, посмотрите в дашборде, что именно появляется в вашем тенанте.
+While the installation runs, look in the dashboard at what exactly appears in your tenant.
 
-**Control plane** развернулся как несколько обычных приложений. Никакой отдельной машины
-под «vCenter этого кластера» нет: управляющий слой — это процессы, которые работают
-рядом со всем остальным.
+**The control plane** deployed as several ordinary applications. There is no separate machine playing "the vCenter of this cluster": the management layer is processes that run alongside everything else.
 
-**Узел** — а вот это виртуальная машина. Самая обычная, такая же, как те, что вы
-мигрируете: со своим диском, своей памятью и своим адресом, и живёт она в вашем тенанте.
+**A node** — now that is a virtual machine. A perfectly ordinary one, just like those you migrate: with its own disk, its own memory and its own address, and it lives in your tenant.
 
-Из этого следует важное: **Kubernetes здесь не заменяет виртуализацию, а живёт поверх неё.**
-Вам не нужно выбирать между «у нас виртуалки» и «у нас контейнеры» — работает и то и другое,
-на одном железе и в одном интерфейсе.
+From this follows something important: **Kubernetes here does not replace virtualization — it lives on top of it.** You don't have to choose between "we run VMs" and "we run containers" — both work, on the same hardware and in the same interface.
 
-## Шаг 3. Забираем доступ к новому кластеру
+## Step 3. Getting access to the new cluster
 
-📍 **Где:** на ноутбуке; сам файл забираем командой или из дашборда.
+📍 **Where:** on your laptop; the file itself is fetched with a command or from the dashboard.
 
-**Что мы забираем.** Кубконфиг кластера `lab` — текстовый файл, в котором записаны адрес
-его API-сервера и ваши данные доступа к нему. Без такого файла `kubectl` не знает, куда
-обращаться и кем представляться. Файл вы создаёте у себя на ноутбуке сами, под именем
-`~/lab.kubeconfig`; `~` в путях — ваша домашняя папка: `/Users/имя` на macOS,
-`/home/имя` в Linux и WSL.
+**What we're fetching.** The kubeconfig of the `lab` cluster — a text file recording the address of its API server and your access data for it. Without such a file, `kubectl` doesn't know where to reach or whom to present itself as. You create the file on your laptop yourself, under the name `~/lab.kubeconfig`; `~` in paths is your home folder: `/Users/name` on macOS, `/home/name` on Linux and WSL.
 
-⚠️ **Это второй файл доступа, а не замена первому.** Тот, что вам выдали вместе
-с тенантом (в лабах он лежит по пути `~/.kube/workshop`), ведёт на управляющий кластер —
-туда, где вы заказываете приложения и где только что создали `lab`. Новый файл ведёт
-внутрь самого кластера `lab`. Это два разных кластера с разными адресами, и дальше нужны
-оба: заказы платформе — первым файлом, работа внутри своего кластера — вторым.
+⚠️ **This is a second access file, not a replacement for the first.** The one you were given along with the tenant (in the labs it sits at the path `~/.kube/workshop`) leads to the management cluster — where you order applications and where you just created `lab`. The new file leads inside the `lab` cluster itself. These are two different clusters with different addresses, and from here you need both: orders to the platform go through the first file, work inside your own cluster through the second.
 
-**Где он лежит.** Платформа положила его в секрет `kubernetes-lab-admin-kubeconfig`
-в вашем тенанте. Секрет — объект кластера, в котором хранят пароли, ключи и файлы
-доступа. Нужный ключ внутри секрета — `admin.conf`.
+**Where it sits.** The platform put it in the Secret `kubernetes-lab-admin-kubeconfig` in your tenant. A Secret is a cluster object where passwords, keys and access files are kept. The key you need inside the Secret is `admin.conf`.
 
-⚠️ **В секрете четыре ключа, и берите именно `admin.conf`.** Рядом лежит `admin.svc` — то
-же самое, но с внутренним адресом, который виден только изнутри кластера; с ноутбука по
-нему не подключиться. Пара `super-admin.*` даёт права в обход настроенных ограничений и
-нужна для разбора аварий, а не для повседневной работы.
+⚠️ **There are four keys in the Secret, and you want exactly `admin.conf`.** Next to it sits `admin.svc` — the same thing but with an internal address visible only from inside the cluster; you can't connect over it from your laptop. The `super-admin.*` pair grants rights that bypass the configured restrictions and is meant for post-incident work, not for everyday use.
 
-**Основной способ — командой.** Cozystack заводит на ваш кластер отдельное правило
-доступа, разрешающее читать ровно этот секрет и ничего больше. Команда выполняется
-**на управляющем кластере**, тем доступом, который вам выдали вместе с тенантом,
-а результат кладётся в файл на ноутбуке:
+**The primary way — with a command.** Cozystack sets up on your cluster a separate access rule allowing exactly this Secret to be read and nothing more. The command runs **on the management cluster**, with the access you were given along with the tenant, and the result is put into a file on your laptop:
 
 ```bash
-# get secret = показать секрет; -o go-template — не печатать его целиком,
-# а достать из него одно поле и вывести как текст:
-#   index .data "admin.conf"   взять из секрета ключ admin.conf
-#   base64decode               содержимое секретов хранится закодированным в base64,
-#                              эта функция возвращает исходный текст
-#   > ~/lab.kubeconfig         записать вывод в файл вместо экрана
+# get secret = show the Secret; -o go-template — don't print it whole,
+# but pull one field out of it and output it as text:
+#   index .data "admin.conf"   take the admin.conf key from the Secret
+#   base64decode               the contents of Secrets are stored base64-encoded,
+#                              this function returns the original text
+#   > ~/lab.kubeconfig         write the output to a file instead of the screen
 kubectl -n tenant-workshopXX get secret kubernetes-lab-admin-kubeconfig \
   -o go-template='{{ printf "%s\n" (index .data "admin.conf" | base64decode) }}' > ~/lab.kubeconfig
 ```
 
-**То же самое мышкой.** Этот же секрет виден в дашборде на странице приложения `lab`,
-в списке его секретов — ищите по имени `kubernetes-lab-admin-kubeconfig`. Скопируйте
-значение ключа `admin.conf`, откройте любой текстовый редактор, вставьте скопированное
-и сохраните файл под именем `lab.kubeconfig` в домашней папке.
+**The same thing with the mouse.** This same Secret is visible in the dashboard on the `lab` application's page, in its list of secrets — look by the name `kubernetes-lab-admin-kubeconfig`. Copy the value of the `admin.conf` key, open any text editor, paste what you copied, and save the file under the name `lab.kubeconfig` in your home folder.
 
-## Шаг 4. Подключаемся
+## Step 4. Connecting
 
-📍 **Где:** на ноутбуке.
+📍 **Where:** on your laptop.
 
-**Что сейчас произойдёт:** мы скажем `kubectl`, каким файлом доступа пользоваться, и
-спросим у кластера список его узлов.
+**What's about to happen:** we tell `kubectl` which access file to use, and ask the cluster for the list of its nodes.
 
-macOS и Linux:
+macOS and Linux:
 
 ```bash
-# KUBECONFIG — переменная, из которой kubectl узнаёт, какой файл доступа брать.
-# export делает её видимой всем командам, запущенным дальше в этом окне терминала.
+# KUBECONFIG is the variable from which kubectl learns which access file to take.
+# export makes it visible to all commands run further in this terminal window.
 export KUBECONFIG=~/lab.kubeconfig
-# nodes — узлы кластера, те самые виртуальные машины, на которых пойдут ваши
-# приложения. Ответ заодно доказывает, что файл доступа рабочий.
+# nodes are the cluster's nodes, the very virtual machines your applications will run on.
+# The answer also proves the access file works.
 kubectl get nodes
 ```
 
-Windows PowerShell — только если WSL поставить не удалось:
+Windows PowerShell — only if you couldn't install WSL:
 
 ```powershell
-# в PowerShell переменные окружения задаются через $env: и живут до закрытия окна
+# in PowerShell environment variables are set via $env: and live until the window closes
 $env:KUBECONFIG="$HOME\lab.kubeconfig"
 kubectl get nodes
 ```
 
-**Что вы должны увидеть** — одну строку с вашим узлом и статусом `Ready`:
+**What you should see** — a single line with your node and the status `Ready`:
 
 ```
 NAME                        STATUS   ROLES    AGE   VERSION
 kubernetes-lab-md0-xxxxx    Ready    <none>   3m    v1.35.6
 ```
 
-⚠️ **`TLS handshake timeout` и `context deadline exceeded` — отказ на стороне кластера,
-а не ошибка в команде.** Управляющая часть вашего кластера работает в одной копии, и когда
-платформа под нагрузкой, она на несколько десятков секунд перестаёт отвечать. Команда
-падает, вы повторяете её через полминуты — и она проходит. Если это случилось посреди
-`apply`, повторите: команда приводит кластер к описанному в файле состоянию, а не
-добавляет новое, поэтому дважды ничего не создастся.
+⚠️ **`TLS handshake timeout` and `context deadline exceeded` are a refusal on the cluster's side, not an error in the command.** The management part of your cluster runs in a single copy, and when the platform is under load it stops responding for a few tens of seconds. The command fails, you repeat it half a minute later — and it goes through. If this happened in the middle of an `apply`, repeat it: the command brings the cluster to the state described in the file rather than adding something new, so nothing gets created twice.
 
-⚠️ **Переменную `KUBECONFIG` нужно задавать в каждом новом окне терминала.** Забыли —
-`kubectl` пойдёт в какой-то другой кластер или скажет, что подключиться не к чему. Это
-самая частая причина «у меня всё сломалось» во всех лабах. Если что-то ведёт себя
-странно — первым делом проверьте `echo $KUBECONFIG`.
+⚠️ **The `KUBECONFIG` variable has to be set in every new terminal window.** Forget it, and `kubectl` will go to some other cluster or say there's nothing to connect to. This is the single most common cause of "everything's broken for me" across all the labs. If something behaves oddly — the first thing to check is `echo $KUBECONFIG`.
 
-## Проверка
+## The check
 
-📍 **Где:** на ноутбуке, в том же окне терминала, где вы работали с `kubectl`.
+📍 **Where:** on your laptop, in the same terminal window where you were working with `kubectl`.
 
 ```bash
-# скрипт запускается из папки лабы: файлы он ищет рядом с собой
+# the script runs from the lab folder: it looks for files next to itself
 cd labs/00-cluster
-# ./ перед именем означает «запусти файл вот отсюда»; без этого оболочка
-# будет искать команду check.sh среди системных папок и не найдёт
+# ./ before the name means "run the file right from here"; without it the shell
+# will look for the check.sh command among the system folders and won't find it
 ./check.sh
 ```
 
-⚠️ **На Windows скрипт запускается из WSL**, а не из PowerShell — как его поставить,
-написано в начале этой лабы. Без WSL лабу можно пройти, но отчёта-артефакта не будет.
+⚠️ **On Windows the script runs from WSL**, not from PowerShell — how to install it is written at the start of this lab. Without WSL the lab can be completed, but there'll be no report artifact.
 
-Скрипт убедится, что кластер отвечает, узлы в строю и на них есть место под будущие
-приложения. Рядом появится файл отчёта — его можно приложить куда угодно как
-доказательство, что лаба сделана.
+The script makes sure the cluster answers, the nodes are in order and there's room on them for future applications. A report file appears next to it — you can attach it anywhere as proof the lab is done.
 
-## Уборка
+## Cleanup
 
-Кластер понадобится в лабах 1–5 и дальше. Удалять его сейчас не надо.
+You'll need the cluster in labs 1–5 and beyond. Don't delete it now.
 
-Когда закончите со всеми лабами — удалите приложение `lab` через дашборд.
+When you're done with all the labs — delete the `lab` application through the dashboard.
 
-Само удаление занимает несколько минут: платформа гасит узел-виртуалку, снимает
-управляющие компоненты и отпускает диски. Если очередь установки в этот момент занята
-чужой долгой операцией, ждать можно и дольше — тогда помогает тот же приём с пометкой
-`reconcile.fluxcd.io/requestedAt`, что описан выше по лабе.
+The deletion itself takes a few minutes: the platform shuts down the node VM, removes the management components and releases the disks. If the installation queue is busy with someone's long operation at that moment, the wait can be longer — then the same trick with the `reconcile.fluxcd.io/requestedAt` annotation, described earlier in the lab, helps.
 
-Важно другое: **освободившееся вернётся в квоту целиком и само.** Не нужно ни просить
-кого-то, ни объяснять, зачем вы это брали.
+What matters is something else: **what's freed returns to the quota in full and by itself.** There's no need to ask anyone or explain why you took it.
 
-## Что мы теперь умеем
+## What we can now do
 
-- Заводить себе кластер Kubernetes, не обращаясь ни к кому
-- Понимать, что control plane — это процессы, а узел — виртуальная машина
-- Забирать доступ и подключаться с ноутбука
-- Знать, где искать причину, когда `kubectl` ведёт себя странно
+- Spin up a Kubernetes cluster for ourselves, without going to anyone
+- Understand that the control plane is processes, and a node is a virtual machine
+- Fetch access and connect from your laptop
+- Know where to look for the cause when `kubectl` behaves oddly
 
-## А в vSphere это было бы
+## And in vSphere this would be
 
-Kubernetes в vSphere — это отдельный продукт, отдельная лицензия и проект внедрения с
-участием вендора. Здесь — пункт в каталоге и десять минут.
+Kubernetes in vSphere is a separate product, a separate license and a rollout project with the vendor involved. Here it's an item in a catalog and ten minutes.
 
-**Где vSphere удобнее, честно.** Если вам нужны только виртуальные машины и ничего кроме,
-vCenter даёт больше готовых инструментов управления ими: шаблоны, клоны, кастомизация
-гостевой ОС, права на уровне отдельной папки. Cozystack умеет виртуалки, но экосистема
-вокруг них здесь моложе. Выигрыш появляется там, где вам нужны и виртуалки, и всё
-остальное сразу — базы, очереди, кластеры, реестры — в одном месте и по одному API.
+**Where vSphere is more convenient, honestly.** If all you need is virtual machines and nothing else, vCenter gives you more ready-made tools for managing them: templates, clones, guest-OS customization, permissions at the level of a single folder. Cozystack can do VMs, but the ecosystem around them here is younger. The gain appears where you need both VMs and everything else at once — databases, queues, clusters, registries — in one place and through one API.

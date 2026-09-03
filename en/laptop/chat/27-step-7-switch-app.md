@@ -1,31 +1,27 @@
-## 27. Шаг 7: переключаем приложение на управляемые сервисы
+## 27. Step 7: switch the application over to the managed services
 
-**Меняем прибитые адреса на имена**
+**Replace hard-coded addresses with names**
 
-📍 **Где:** внутри вашей виртуалки, после перезагрузки.
+📍 **Where:** inside your VM, after the reboot.
 
-📄 Это содержимое `scripts/connect-managed.sh`. Тоже набираем руками — по той же
-причине, и потому что команд всего три.
+📄 This is the content of `scripts/connect-managed.sh`. Type it out by hand too — for the same reason, and because it's only three commands.
 
-Внутри машины откройте конфиг приложения:
+Inside the machine, open the application config:
 ```bash
 cat /etc/orders/application.properties
 ```
-Вы увидите те самые `192.168.10.30` и `192.168.10.40`. Это боль любой легаси-системы:
-никто уже не помнит, почему именно эти адреса.
+You'll see those same `192.168.10.30` and `192.168.10.40`. This is the pain of every legacy system: nobody remembers anymore why these particular addresses.
 
-Замените их на имена сервисов (подставьте свой номер вместо `XX`):
+Replace them with the service names (substitute your own number for `XX`):
 ```bash
 sed -i 's|192.168.10.30|postgres-db-rw.tenant-workshopXX.svc.cozy.local|g' /etc/orders/application.properties
 sed -i 's|192.168.10.40|kafka-kafka-kafka-bootstrap.tenant-workshopXX.svc.cozy.local|g' /etc/orders/application.properties
 systemctl restart orders-api
 ```
-(двумя командами, а не одной с переносом: перенос строки при копировании из чата
-часто теряется, и команда выполняется наполовину)
+(two commands rather than one with a line break: a line break often gets lost when copying from chat, and the command ends up running only halfway)
 
-Проверяем:
+Check it:
 ```bash
 curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/actuator/health
 ```
-`200` — приложение видит и базу, и очередь. Если `503` — вернитесь на шаг с сетью,
-скорее всего адрес не сменился.
+`200` — the application can see both the database and the queue. If you get `503`, go back to the networking step; most likely the address didn't change.

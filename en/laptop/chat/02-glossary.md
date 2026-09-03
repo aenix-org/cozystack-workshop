@@ -1,26 +1,27 @@
-## 2. Словарик: как это называется у вас и как здесь
+## 2. A little glossary: what it's called on your side and what it's called here
 
-**Одно сообщение, к которому можно возвращаться**
+**One message you can come back to**
 
-Половина непонимания на воркшопах — не про технологию, а про слова. Ниже перевод. Там, где
-аналогия врёт, я честно пишу, где именно: неверная аналогия хуже её отсутствия.
+Half the confusion at workshops isn't about the technology — it's about the words. Below is the
+translation. Wherever the analogy is misleading, I say honestly where exactly: a wrong analogy is worse than
+none at all.
 
-| В vSphere | В Cozystack / Kubernetes | Где аналогия врёт |
+| In vSphere | In Cozystack / Kubernetes | Where the analogy is misleading |
 |---|---|---|
-| Виртуальная машина | **VM Instance** | Ничего не врёт, это она и есть |
-| Диск VM | **VM Disk** | Отдельный объект. Машины без диска не бывает, поэтому диск всегда создаётся первым |
-| Шаблон VM | Образ в каталоге | — |
-| Контейнер приложения | **Под** | Под одноразовый. Его не чинят — удаляют, и создаётся новый |
+| Virtual machine | **VM Instance** | Nothing is misleading here — that's exactly what it is |
+| VM disk | **VM Disk** | A separate object. There's no VM without a disk, so the disk is always created first |
+| VM template | An image in the catalog | — |
+| Application container | **Pod** | A Pod is disposable. You don't fix it — you delete it, and a new one is created |
 | vApp | **Deployment** | — |
-| Пул ресурсов | **Тенант** с квотой | Тенант ещё и граница доступа: чужой в него не заглянет |
-| vCenter | API-сервер | Дашборд — это морда к нему, а не сам он |
-| HA | **Deployment** держит N копий | Не «поднимет упавшую», а «всегда держит столько, сколько сказано» |
-| Пул балансировщика | **Service** | — |
-| Datastore | **Storage Class** | `replicated` — с репликацией на три узла, `local` — без неё |
-| Отдельная VM с Postgres | **Postgres из каталога** | Приезжает с репликацией и бэкапами, обновляется сам |
-| Заявка в отдел ИТ | *нет аналога* | Вы делаете это сами, за минуту |
+| Resource pool | **Tenant** with a quota | A tenant is also an access boundary: an outsider can't peek inside |
+| vCenter | API server | The dashboard is a face for it, not the thing itself |
+| HA | A **Deployment** keeps N copies | Not "brings a crashed one back up," but "always keeps as many as you asked for" |
+| Load balancer pool | **Service** | — |
+| Datastore | **Storage Class** | `replicated` — replicated across three nodes, `local` — without replication |
+| A separate VM with Postgres | **Postgres from the catalog** | Comes with replication and backups, updates itself |
+| A ticket to the IT department | *no analogy* | You do it yourself, in a minute |
 
-**Одна вещь, к которой придётся привыкнуть.** В vSphere вы **создаёте** объект: нажали —
-он появился, дальше живёт сам. Здесь вы **описываете желаемое состояние**, а кластер
-постоянно сравнивает его с фактическим и устраняет разницу. Поэтому если что-то удалить,
-оно может вернуться — не потому что глюк, а потому что вы не отменяли желание.
+**One thing you'll have to get used to.** In vSphere you **create** an object: you click —
+it appears, and from then on it lives on its own. Here you **describe the desired state**, and the
+cluster constantly compares it with the actual state and eliminates the difference. So if you delete
+something, it may come back — not because of a glitch, but because you never canceled the desired state.

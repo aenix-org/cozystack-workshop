@@ -1,13 +1,12 @@
-## 28. Шаг 8: почему приложение всё ещё падает
+## 28. Step 8: why the application still crashes
 
-**База пустая — приложению нужна его схема**
+**The database is empty — the application needs its schema**
 
-📍 **Где:** внутри вашей виртуалки. Она уже в сети кластера и видит базу по имени.
+📍 **Where:** inside your own VM. It is already on the cluster network and can see the database by name.
 
-### Сначала — вторая проверка, которая тоже не пройдёт
+### First — a second check that will also fail
 
-Адреса мы поправили, приложение перезапустилось и на здоровье отвечает `200`. Выглядит
-так, будто всё готово. Попробуем создать заказ:
+We fixed the addresses, the application restarted, and its health endpoint answers `200`. It looks like everything is ready. Let's try to create an order:
 
 ```bash
 curl -s -X POST localhost:8080/api/orders \
@@ -15,37 +14,27 @@ curl -s -X POST localhost:8080/api/orders \
   -d '{"item":"test order"}' -w '\nHTTP %{http_code}\n'
 ```
 
-**Прилетает `500`.** Хотя health только что был `200`.
+**Back comes a `500`.** Even though health was `200` a moment ago.
 
 <details>
-<summary><b>Почему health зелёный, а заказ не создаётся</b></summary>
+<summary><b>Why health is green but the order won't create</b></summary>
 
-Потому что проверка здоровья у этого приложения смотрит только на **факт подключения** к
-базе: соединение открылось, сервер ответил — значит «живо». Есть ли внутри нужные таблицы,
-она не проверяет.
+Because this application's health check looks only at the **fact of a connection** to the database: the connection opened, the server answered — so it's "alive." Whether the tables it needs are inside, it does not check.
 
-А таблиц нет. Когда вы заказали Postgres в каталоге, вам выдали **пустой сервер**: база
-`orders` и пользователь `orders` заведены, и всё. На старой машине таблицы были — их
-когда-то создало приложение при первом запуске, и за годы про это все забыли.
+And there are no tables. When you ordered Postgres from the catalog, you were handed an **empty server**: the `orders` database and the `orders` user are set up, and that's all. On the old machine the tables existed — the application created them once, long ago, on its first run, and over the years everyone forgot about it.
 
-Заодно вы только что увидели, чего стоит зелёный health-check. Он говорит «я дозвонился
-до базы», а не «я работаю». В реальном проекте на такой проверке легко построить
-мониторинг, который будет бодро показывать всё зелёным, пока пользователи не могут
-оформить ни одного заказа.
+You've just seen, into the bargain, what a green health check is worth. It says "I got through to the database," not "I'm working." In a real project it's easy to build monitoring on a check like this that will cheerfully show everything green while users can't place a single order.
 
 </details>
 
-**Что делаем.** Мы везём приложение, а не его данные, поэтому таблицы нужно создать
-заново. Это делается один раз, файлом со списком команд на SQL. Такой файл называют
-**схемой** — он описывает, как устроено хранилище: какие таблицы, какие в них поля
-и какого типа.
+**What we do.** We're moving the application, not its data, so the tables have to be created anew. This is done once, with a file containing a list of SQL commands. Such a file is called a **schema** — it describes how the storage is laid out: which tables, which fields they hold, and of what type.
 
 <details>
-<summary><b>Что именно создаёт этот файл — разбор построчно</b></summary>
+<summary><b>What this file actually creates — a line-by-line breakdown</b></summary>
 
-Файл — `scripts/orders-schema.sql` в репозитории. Внутри всего две команды.
+The file is `scripts/orders-schema.sql` in the repository. It contains just two commands.
 
-**Первая создаёт таблицу заказов:**
+**The first creates the orders table:**
 
 ```sql
 CREATE TABLE IF NOT EXISTS orders (
@@ -59,37 +48,26 @@ CREATE TABLE IF NOT EXISTS orders (
 );
 ```
 
-Поле за полем:
+Field by field:
 
-- `id BIGSERIAL PRIMARY KEY` — номер заказа. `BIGSERIAL` значит «база сама выдаёт
-  следующий по порядку», `PRIMARY KEY` — «он уникален и по нему ищут».
-- `item` — что заказали. `NOT NULL` — заказ без предмета не имеет смысла, база такую
-  строку не примет.
-- `status` — состояние заказа, по умолчанию `NEW`. Меняется на `PROCESSED`, когда
-  сообщение прошло через Kafka.
-- `created_by` / `processed_by` — кто создал и кто обработал. Именно сюда приложение
-  пишет `kafka`, и по этому полю на шаге 9 будет видно, что очередь реально работает.
-- `created_at` / `processed_at` — когда. `TIMESTAMPTZ` — время с часовым поясом.
-- `IF NOT EXISTS` — «если таблица уже есть, ничего не делай и не ругайся». Благодаря
-  этому файл можно накатить повторно, ничего не сломав.
+- `id BIGSERIAL PRIMARY KEY` — the order number. `BIGSERIAL` means "the database hands out the next one in sequence itself," `PRIMARY KEY` means "it is unique and used to look the row up."
+- `item` — what was ordered. `NOT NULL` — an order with no item makes no sense, and the database won't accept such a row.
+- `status` — the state of the order, `NEW` by default. It changes to `PROCESSED` once the message has passed through Kafka.
+- `created_by` / `processed_by` — who created it and who processed it. This is exactly where the application writes `kafka`, and it's this field that will show, at step 9, that the queue really works.
+- `created_at` / `processed_at` — when. `TIMESTAMPTZ` — a timestamp with time zone.
+- `IF NOT EXISTS` — "if the table already exists, do nothing and don't complain." Thanks to this the file can be applied again without breaking anything.
 
-**Вторая добавляет одну строку истории:**
+**The second adds one row of history:**
 
 ```sql
 INSERT INTO orders (...) SELECT '12x rack rails', 'PROCESSED', ...
 WHERE NOT EXISTS (SELECT 1 FROM orders);
 ```
 
-Это косметика: чтобы на шаге 9 список заказов не был пустым. `WHERE NOT EXISTS`
-означает «вставь только если таблица пустая» — повторный запуск дубля не создаст.
+This is cosmetic: so that at step 9 the list of orders isn't empty. `WHERE NOT EXISTS` means "insert only if the table is empty" — running it again won't create a duplicate.
 
-**Чего в файле намеренно нет:** ни `CREATE DATABASE`, ни `CREATE USER`. И база, и роль
-уже созданы каталогом Cozystack, когда вы заказали Postgres на шаге 5. В этом и смысл
-управляемого сервиса: рутину он берёт на себя, вам остаётся только ваша схема.
+**What is deliberately absent from the file:** no `CREATE DATABASE`, no `CREATE USER`. Both the database and the role were already created by the Cozystack catalog when you ordered Postgres at step 5. This is the whole point of a managed service: it takes the routine on itself, and all that's left for you is your own schema.
 
 </details>
 
-> ⚠️ **Расхождение в комментариях файла.** В шапке `orders-schema.sql` написано, что
-> сначала нужен `GRANT CREATE,USAGE ON SCHEMA public` под суперпользователем. **Это
-> устарело, делать не нужно** — роль `orders` входит в `orders_admin`, который владеет
-> базой и схемой, права у неё уже есть. Проверено. Комментарий в файле поправим.
+> ⚠️ **Discrepancy in the file's comments.** The header of `orders-schema.sql` says that first you need `GRANT CREATE,USAGE ON SCHEMA public` as the superuser. **This is out of date, don't do it** — the `orders` role belongs to `orders_admin`, which owns the database and the schema, so it already has the rights. Verified. We'll fix the comment in the file.

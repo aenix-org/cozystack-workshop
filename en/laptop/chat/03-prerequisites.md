@@ -1,14 +1,14 @@
-## 3. Перед началом: что понадобится
+## 3. Before you start: what you'll need
 
-**Готовимся к работе**
+**Getting ready**
 
-Управлять кластером будем с ваших ноутбуков. Нужны четыре утилиты — поставим их прямо
-сейчас, дальше они пригодятся на каждом шаге.
+We'll manage the cluster from your laptops. You'll need four tools — let's install them right
+now, since you'll reach for them at every step from here on.
 
-• `kubectl` — основной инструмент. Через него создаём виртуальные машины, диски, базы.
-• `virtctl` — всё, что касается виртуалок: консоль, SSH, проброс порта.
-• `kubelogin` — вход по вашей учётной записи через браузер.
-• `git` — им заберём папку с готовыми файлами воркшопа.
+• `kubectl` — the main tool. We use it to create virtual machines, disks and databases.
+• `virtctl` — everything to do with VMs: console, SSH, port-forward.
+• `kubelogin` — logging in under your own account through the browser.
+• `git` — we'll use it to pull down the folder with the workshop's ready-made files.
 
-Следующими сообщениями — команды под каждую операционную систему.
-Ставьте, потом отпишитесь в чат, если что-то не встало.
+The next few messages have the commands for each operating system.
+Install them, then let us know in the chat if something didn't go through.
