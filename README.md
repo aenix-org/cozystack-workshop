@@ -17,6 +17,10 @@ technical terms are identical across languages.
 | [`en/`](en/) | English — flagship translation, and the pivot for the others | complete |
 | [`zh/`](zh/) | Chinese (Simplified) | complete |
 | [`es/`](es/) | Spanish | complete |
+| [`ja/`](ja/) | Japanese | in progress |
+| [`ko/`](ko/) | Korean | in progress |
+| [`de/`](de/) | German | in progress |
+| [`hi/`](hi/) | Hindi | in progress |
 
 Russian is where the text is written and edited first. English is translated
 from Russian and polished to flagship quality; the other languages are produced

@@ -158,3 +158,37 @@ follow the glossary targets (login: / password: / host: / database:).
 | the reader's machine | **la laptop** | not "portátil" (pick one: laptop) |
 | named Secret object | **el Secret `<name>`** | keep English "Secret"; "un secreto" only for generic confidential data |
 | monitoring | **monitoreo** | pick one (not mix with monitorización) |
+
+## Additional languages (ja / ko / de / hi) — concept terms
+
+Fixed product/CLI/Kubernetes-object names stay verbatim in these languages too
+(same never-translate list as above). Concept-term targets:
+
+| Concept | 日本語 (ja) | 한국어 (ko) | Deutsch (de) | हिन्दी (hi) |
+|---|---|---|---|---|
+| cluster | クラスター | 클러스터 | Cluster | क्लस्टर |
+| control plane | コントロールプレーン | 컨트롤 플레인 | Control Plane | कंट्रोल प्लेन |
+| node | ノード | 노드 | Node | नोड |
+| tenant | テナント | 테넌트 | Tenant | टेनेंट |
+| manifest | マニフェスト | 매니페스트 | Manifest | मैनिफ़ेस्ट |
+| apply (kubectl apply) | 適用 | 적용 | anwenden | लागू करना |
+| reconcile | リコンサイル | 조정(reconcile) | abgleichen (reconcile) | रिकॉन्साइल |
+| self-healing | 自己修復 | 자가 복구 | Selbstheilung | स्व-उपचार |
+| autoscaling | オートスケーリング | 오토스케일링 | Autoskalierung | ऑटोस्केलिंग |
+| rollout | ロールアウト | 롤아웃 | Rollout | रोलआउट |
+| image | イメージ | 이미지 | Image | इमेज |
+| virtual machine (VM) | 仮想マシン | 가상 머신 | virtuelle Maschine (VM) | वर्चुअल मशीन (VM) |
+| container | コンテナ | 컨테이너 | Container | कंटेनर |
+| management cluster | 管理クラスター | 관리 클러스터 | Management-Cluster | प्रबंधन क्लस्टर |
+| the bastion (shared VM) | bastion（共有VM） | bastion(공유 VM) | der Bastion (gemeinsame VM) | bastion (साझा VM) |
+| dashboard | ダッシュボード | 대시보드 | Dashboard | डैशबोर्ड |
+| quota | クォータ | 쿼터 | Quota | कोटा |
+| testbed | テスト環境 | 테스트베드 | Testumgebung | परीक्षण मंच |
+| menagerie (metaphor) | 動物園 | 동물원 | Zoo | चिड़ियाघर |
+| the instructor | 講師 | 강사 | die Lehrkraft | प्रशिक्षक |
+| workshop (event) | ワークショップ | 워크숍 | Workshop | वर्कशॉप |
+
+Reader-facing placeholders (YourPasswordHere, YOUR-LOGIN, etc.) are localized in
+each language the same way as the en/zh/es tables above; functional placeholders
+(workshopXX, ВСТАВЬТЕ_*) stay verbatim. Pod, Secret and other K8s object names
+stay in English in all languages.
