@@ -79,6 +79,10 @@ on a different lens — technical accuracy, terminology against
 structural integrity (code/output byte-identity, Markdown parity) — and every
 finding was applied before the language was committed.
 
+## License
+
+Licensed under the [Apache License, Version 2.0](LICENSE). See [`NOTICE`](NOTICE).
+
 ## Contributing a fix or a translation
 
 1. Edit the **Russian** source under `ru/` (that is where meaning is decided).
