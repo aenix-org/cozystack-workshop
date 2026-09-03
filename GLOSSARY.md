@@ -93,3 +93,27 @@ they sit inside code:
 **Keep verbatim** (functional tokens the scripts/manifests actually depend on):
 `workshopXX`, `ВСТАВЬТЕ_PRESIGNED_URL`, `ВСТАВЬТЕ_...` fields in `convert.sh`,
 and every other identifier that appears unchanged in the shipped files.
+
+## Chinese (zh) — resolved canonical renderings
+
+Pinned after review to stop drift. Use exactly these Chinese head-terms everywhere
+(gloss `（English）` at first mention is fine; the head-term must be identical after):
+
+| Concept | 中文 (use this) | not |
+|---|---|---|
+| testbed | **测试环境** | 不用 raw "testbed" / 测试台 |
+| menagerie (the metaphor) | **动物园** | 不用 大杂烩 / 乱七八糟的东西 — one image everywhere, incl. index & headings |
+| the instructor (ведущий) | **讲师** | 不用 raw "instructor" |
+| workshop (the event) | **工作坊** | 不用 raw "workshop" |
+| catalog (platform catalog) | **目录** | 不用 raw "catalog" |
+| presigned link/URL | **预签名链接 / 预签名 URL** | 不用 raw "presigned" |
+| manifest | **清单** | 不用 raw "manifest" |
+| lab cluster `lab` | **实验集群 `lab`** | keep the `lab` backticks; not bare "lab 集群" |
+| ESXi host / host (the machine) | **主机** | 不用 raw "host" in prose |
+| reservation (vSphere) | **资源预留（reservation）** first, **预留** after | 不用 raw "reservation" |
+| hypervisor | **虚拟机监控程序（hypervisor）** | 不用 bare "hypervisor" |
+| home directory | **主目录** | 不用 "home 目录" |
+
+Punctuation in Chinese prose: use the full-width colon `：` (not `:`) and corner
+brackets `「」` for quoted/emphasized phrases — consistently across all files.
+Colons inside code fences, inline code, URLs, ports and ratios stay half-width.
