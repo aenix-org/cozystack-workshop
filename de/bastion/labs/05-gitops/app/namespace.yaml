@@ -1,29 +1,30 @@
 ---
-# Лаба 5 · Инфраструктура в Git. Пространство имён под сервис «Пропуск».
+# Lab 5 · Infrastruktur in Git. Namespace für den Dienst «Пропуск».
 #
-# Руками этот файл в кластер не применяется. Вы кладёте его в свой репозиторий на
-# GitHub, в папку apps/, а в кластер `lab` его переносит Flux — сам, по расписанию:
+# Diese Datei wird nicht von Hand auf den Cluster angewendet. Sie legen sie in Ihr Repository auf
+# GitHub, in den Ordner apps/, und Flux überträgt sie selbst in den Cluster `lab` — nach Zeitplan:
 #     cp app/*.yaml ~/passes-gitops/apps/
 #     cd ~/passes-gitops && git add apps && git commit -m "add passes service v1" && git push
 #
-# Как читать любой манифест: apiVersion — версия схемы описания (по ней кластер знает,
-# как его разбирать), kind — что создаём, metadata.name — имя, по которому объект потом
-# искать. Эти три поля есть в каждом объекте и ниже отдельно не поясняются.
+# Wie man ein beliebiges Manifest liest: apiVersion — die Version des Beschreibungsschemas (daran
+# erkennt der Cluster, wie er es parsen muss), kind — was wir erstellen, metadata.name — der Name,
+# unter dem das Objekt später gesucht wird. Diese drei Felder gibt es in jedem Objekt und sie werden
+# unten nicht gesondert erklärt.
 #
-# Пространство имён (namespace) — логическая перегородка внутри одного кластера:
-# своя область видимости имён, свои права, свои квоты. Ближайшее в vSphere — папка
-# в дереве vCenter или resource pool.
+# Ein Namespace ist eine logische Trennwand innerhalb eines einzelnen Clusters:
+# eigener Namenssichtbarkeitsbereich, eigene Rechte, eigene Quotas. Das Nächstliegende in vSphere ist
+# ein Ordner im vCenter-Baum oder ein Resource Pool.
 #
-# Зачем оно лежит в Git вместе с приложением, а не создано руками: когда сервис уедет
-# из репозитория, Flux уберёт и пространство имён. Не останется пустой перегородки,
-# про которую через полгода никто не вспомнит, зачем она заводилась.
+# Warum er zusammen mit der Anwendung in Git liegt und nicht von Hand erstellt wird: wenn der Dienst
+# aus dem Repository verschwindet, entfernt Flux auch den Namespace. Es bleibt keine leere Trennwand
+# zurück, bei der sich in einem halben Jahr niemand mehr erinnert, wozu sie angelegt wurde.
 apiVersion: v1
 kind: Namespace
 metadata:
   name: passes
-  # Метка на работу сервиса не влияет — она нужна, чтобы одной командой найти всё,
-  # что относится к «Пропуску»: kubectl get all -A -l app.kubernetes.io/part-of=passes.
-  # Имя part-of взято из общепринятого набора меток Kubernetes, а не придумано нами:
-  # чужие инструменты (мониторинг, выгрузки) ищут именно его.
+  # Das Label beeinflusst nicht den Betrieb des Dienstes — es wird gebraucht, um mit einem einzigen
+  # Befehl alles zu finden, was zum «Пропуск» gehört: kubectl get all -A -l app.kubernetes.io/part-of=passes.
+  # Der Name part-of stammt aus dem gängigen Satz von Kubernetes-Labels und ist nicht von uns erfunden:
+  # fremde Werkzeuge (Monitoring, Exporte) suchen genau nach ihm.
   labels:
     app.kubernetes.io/part-of: passes

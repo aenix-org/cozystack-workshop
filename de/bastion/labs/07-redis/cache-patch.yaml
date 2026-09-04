@@ -1,48 +1,48 @@
 ---
-# Лаба 7 · рабочее включение кеша. Применяется поверх уже развёрнутого passes-api
-# в вашем кластере `lab` (export KUBECONFIG=~/lab.kubeconfig):
+# Lab 7 · den Cache im Ernstfall aktivieren. Wird über die bereits ausgerollte passes-api
+# in eurem `lab`-Cluster angewendet (export KUBECONFIG=~/lab.kubeconfig):
 #   kubectl patch deployment passes-api --patch-file cache-patch.yaml
 #
-# Это патч, а не полный манифест: здесь описано только то, что меняется. Всё остальное —
-# образ, метки, пробы, ресурсы — остаётся из passes-api.yaml нетронутым. Поэтому файл
-# и начинается сразу со spec: путь до контейнера повторяет структуру Deployment, чтобы
-# кластер понял, куда именно вносить правку.
+# Das ist ein Patch, kein vollständiges Manifest: hier ist nur beschrieben, was sich ändert. Alles Übrige —
+# das Image, die Labels, die Probes, die Ressourcen — bleibt aus passes-api.yaml unangetastet. Deshalb
+# beginnt die Datei gleich mit spec: der Pfad bis zum Container spiegelt die Struktur des Deployments wider, damit
+# der Cluster versteht, wo genau die Änderung einzutragen ist.
 #
-# Имя контейнера `api` — не украшение, а адрес: по нему кластер находит нужный контейнер
-# в списке. Ошибётесь в имени — вместо правки получите второй контейнер.
+# Der Containername `api` ist keine Zierde, sondern eine Adresse: darüber findet der Cluster den richtigen Container
+# in der Liste. Vertippt ihr euch im Namen, bekommt ihr statt einer Änderung einen zweiten Container.
 #
-# Подставьте адрес своего Redis вместо REDIS-ADDR — это заглушка, а не имя хоста.
-# Адрес вы берёте в дашборде, в карточке своего managed-приложения Redis.
+# Setzt die Adresse eures eigenen Redis anstelle von REDIS-ADDR ein — das ist ein Platzhalter, kein Hostname.
+# Die Adresse entnehmt ihr dem Dashboard, in der Karte eurer verwalteten Redis-Anwendung.
 spec:
   template:
     spec:
       containers:
         - name: api
-          # Списки env в Kubernetes сливаются по полю name, поэтому три записи ниже
-          # добавятся к тем, что уже есть в Deployment, а не заменят их собой.
+          # env-Listen in Kubernetes werden über das Feld name zusammengeführt, deshalb
+          # werden die drei Einträge unten zu den bereits im Deployment vorhandenen hinzugefügt, statt sie zu ersetzen.
           env:
-            # Появление этой переменной и есть «включить кеш»: приложение проверяет её
-            # на старте и, если она задана, ходит сначала в Redis. Пустая или
-            # отсутствующая — работает как раньше, через справочник на каждый запрос.
+            # Das Auftauchen dieser Variable ist genau das, was «den Cache aktivieren» bedeutet: die Anwendung prüft sie
+            # beim Start und geht, falls sie gesetzt ist, zuerst zu Redis. Leer oder
+            # nicht vorhanden — arbeitet sie wie zuvor, über das Verzeichnis bei jeder Anfrage.
             - name: REDIS_ADDR
               value: "REDIS-ADDR:6379"
-            # Пароль не пишем текстом: он приезжает из секрета, который вы
-            # создадите отдельной командой. В манифесте, который лежит в Git,
-            # паролю не место.
+            # Das Passwort schreiben wir nicht im Klartext: es kommt aus einem Secret, das ihr
+            # mit einem separaten Befehl erstellt. In ein Manifest, das in Git liegt,
+            # gehört ein Passwort nicht.
             #
-            # secretKeyRef — это ссылка: name — имя объекта-секрета в том же кластере,
-            # key — какое поле внутри него взять. Значение подставляется при запуске
-            # пода и в файле не появляется никогда.
+            # secretKeyRef ist eine Referenz: name — der Name des Secret-Objekts im selben Cluster,
+            # key — welches Feld daraus zu nehmen ist. Der Wert wird beim Start
+            # des Pods eingesetzt und taucht niemals in der Datei auf.
             - name: REDIS_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: redis-password
                   key: password
-            # Сколько секунд запись живёт в кеше. Шестьдесят — потому что
-            # справочник сотрудников меняется раз в день, а не раз в секунду.
+            # Wie viele Sekunden ein Eintrag im Cache lebt. Sechzig — weil
+            # sich das Mitarbeiterverzeichnis einmal am Tag ändert, nicht einmal pro Sekunde.
             #
-            # Больше срок — реже ходим в справочник, но дольше отдаём устаревшую
-            # фамилию. Меньше — данные свежее, выигрыш меньше. Это компромисс,
-            # а не настройка с правильным значением.
+            # Längere Frist — wir gehen seltener ins Verzeichnis, geben aber länger einen veralteten
+            # Nachnamen aus. Kürzer — die Daten sind frischer, der Gewinn ist geringer. Das ist ein Kompromiss,
+            # keine Einstellung mit einem richtigen Wert.
             - name: CACHE_TTL
               value: "60"

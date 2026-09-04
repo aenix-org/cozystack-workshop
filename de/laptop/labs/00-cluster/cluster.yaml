@@ -1,9 +1,9 @@
-# Учебный кластер Kubernetes для лаб 1-14.
-# Перед применением замените tenant-workshopXX на свой namespace.
+# Trainings-Kubernetes-Cluster für die Labs 1-14.
+# Vor dem Anwenden tenant-workshopXX durch euren eigenen Namespace ersetzen.
 #
-# Применяется на УПРАВЛЯЮЩЕМ кластере — тем доступом, который выдали вместе
-# с тенантом. Кубконфига самого этого кластера ещё не существует: он появится
-# только после того, как кластер поднимется.
+# Wird auf dem VERWALTUNGS-Cluster angewendet — mit dem Zugang, der zusammen
+# mit dem Tenant ausgegeben wurde. Die kubeconfig dieses Clusters selbst existiert noch
+# nicht: sie erscheint erst, nachdem der Cluster hochgefahren ist.
 #
 #   kubectl apply -f cluster.yaml
 #
@@ -16,18 +16,18 @@ spec:
   version: v1.35
   storageClass: replicated
   controlPlane:
-    # Одна копия управляющего слоя: учебный стенд, беречь ресурсы важнее
-    # отказоустойчивости.
+    # Eine einzige Kopie der Control Plane: Dies ist ein Trainingsstand, Ressourcen
+    # zu schonen ist wichtiger als Ausfallsicherheit.
     replicas: 1
   addons:
     monitoringAgents:
-      # Включать сразу. Задним числом сбор метрик не включается: всё, что
-      # происходило до установки галочки, потеряно. Лаба 14 опирается на эти данные.
+      # Sofort aktivieren. Die Metrikerfassung lässt sich nicht rückwirkend aktivieren:
+      # alles, was vor dem Setzen des Häkchens passiert ist, ist verloren. Lab 14 stützt sich auf diese Daten.
       enabled: true
   nodeGroups:
     md0:
-      # Группа умеет добавлять узлы сама, если копиям перестанет хватать места.
-      # В лабе про масштабирование до этого не дойдёт: там растут копии, а не узлы.
+      # Die Gruppe kann selbst Nodes hinzufügen, wenn den Kopien der Platz ausgeht.
+      # Im Skalierungs-Lab kommt es nicht so weit: dort wachsen die Kopien, nicht die Nodes.
       minReplicas: 1
       maxReplicas: 3
       instanceType: u1.medium

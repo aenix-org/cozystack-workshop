@@ -1,76 +1,76 @@
-# Лаба 6 · Свой приватный реестр образов. Рецепт сборки образа сервиса «Пропуск».
+# Lab 6 · Ihre eigene private Image-Registry. Build-Rezept für das Image des Dienstes «Пропуск».
 #
-# Что такое Dockerfile: пошаговый рецепт, по которому из исходников получается образ —
-# готовый к запуску слепок файловой системы вместе с указанием, что в нём запускать.
-# Ближайшее в vSphere — сборка золотого шаблона ВМ, только описанная текстом и
-# повторяемая: один и тот же рецепт даёт один и тот же результат на любой машине.
+# Was ein Dockerfile ist: ein schrittweises Rezept, aus dem aus Quellcode ein Image entsteht —
+# ein startfertiges Abbild des Dateisystems zusammen mit der Angabe, was darin ausgeführt wird.
+# Das Nächstliegende in vSphere ist der Bau einer goldenen VM-Vorlage, nur als Text beschrieben und
+# wiederholbar: dasselbe Rezept liefert auf jeder Maschine dasselbe Ergebnis.
 #
-# Собирается на вашем виртуалке, из папки лабы (последний аргумент — папка с этим
-# файлом и исходниками):
+# Wird auf Ihrer VM gebaut, aus dem Lab-Ordner (das letzte Argument ist der Ordner mit dieser
+# Datei und den Quellen):
 #     docker build --platform linux/amd64 -t HARBOR-HOST/passes/passes-api:v1 app/
 #     docker push HARBOR-HOST/passes/passes-api:v1
-# HARBOR-HOST замените на адрес своего Harbor: первая часть имени образа — это адрес
-# реестра, по ней docker push и понимает, куда отправлять.
+# Ersetzen Sie HARBOR-HOST durch die Adresse Ihres eigenen Harbor: der erste Teil des Image-Namens ist die
+# Registry-Adresse, und daran erkennt docker push, wohin gesendet werden soll.
 #
-# ВНИМАНИЕ: --platform linux/amd64 обязателен на Mac с процессором Apple Silicon и на любом
-# ARM-виртуалке. Без него соберётся образ под ARM: соберётся без ошибок, отправится
-# в реестр без ошибок, а в кластере (узлы там на x86) упадёт с «exec format error».
+# ACHTUNG: --platform linux/amd64 ist auf einem Mac mit Apple-Silicon-Prozessor und auf jeder
+# ARM-VM zwingend erforderlich. Ohne ihn erhalten Sie ein ARM-Image: es baut ohne Fehler, wird
+# ohne Fehler in die Registry gepusht und stürzt dann im Cluster (dessen Knoten x86 sind) mit «exec format error» ab.
 #
-# Каждая строка рецепта создаёт слой — неизменяемый срез файловой системы. Слои
-# кешируются и переиспользуются: поэтому файлы копируются по одному, а не папкой
-# целиком, — правка main.go не заставляет заново тянуть зависимости.
+# Jede Zeile des Rezepts erzeugt eine Schicht (Layer) — einen unveränderlichen Ausschnitt des Dateisystems. Schichten
+# werden zwischengespeichert und wiederverwendet: deshalb werden Dateien einzeln kopiert statt des ganzen
+# Ordners auf einmal — das Bearbeiten von main.go erzwingt kein erneutes Herunterladen der Abhängigkeiten.
 #
-# ДВА ЭТАПА. Первый — сборочный: сюда нужен весь компилятор Go, а это примерно 350 МБ.
-# Второй — то, что поедет в кластер: туда переносится только готовый бинарник.
-# Итоговый образ получается около 10 МБ вместо 350, и внутри него нет ни компилятора,
-# ни исходников, ни пакетного менеджера — то есть нечем воспользоваться тому, кто
-# в контейнер всё-таки попал.
+# ZWEI STUFEN. Die erste ist die Build-Stufe: sie benötigt den gesamten Go-Compiler, etwa 350 MB.
+# Die zweite ist das, was in den Cluster geht: nur das fertige Binary wird übernommen.
+# Das resultierende Image wird am Ende etwa 10 MB groß statt 350, und darin gibt es keinen Compiler,
+# keine Quellen und keinen Paketmanager — also nichts, was jemand nutzen könnte, der es
+# trotzdem in den Container geschafft hat.
 
-# --- Этап 1: сборка -----------------------------------------------------------------
-# FROM — с какого готового образа начинаем. Здесь официальный образ с компилятором Go
-# поверх Alpine (минимальный Linux, несколько мегабайт). Версия зафиксирована: с тегом
-# latest один и тот же рецепт через полгода собрал бы другое.
-# AS build — имя этапа, по нему второй этап заберёт результат.
+# --- Stufe 1: Build -----------------------------------------------------------------
+# FROM — mit welchem fertigen Image wir beginnen. Hier ist es das offizielle Image mit dem Go-Compiler
+# auf Alpine (einem minimalen Linux, wenige Megabyte). Die Version ist fixiert: mit dem
+# latest-Tag würde dasselbe Rezept ein halbes Jahr später etwas anderes bauen.
+# AS build — der Name der Stufe, über den die zweite Stufe das Ergebnis abholt.
 FROM golang:1.23-alpine AS build
-# Рабочая папка внутри образа: дальнейшие команды выполняются относительно неё.
-# Если папки нет, она создаётся.
+# Arbeitsordner im Image: nachfolgende Befehle laufen relativ dazu.
+# Wenn der Ordner nicht existiert, wird er erstellt.
 WORKDIR /src
-# go.mod — описание модуля: имя и версия Go. Внешних зависимостей у приложения нет,
-# поэтому скачивать из интернета нечего, и сборка проходит там, где выхода наружу нет.
+# go.mod — die Modulbeschreibung: Name und Go-Version. Die Anwendung hat keine externen Abhängigkeiten,
+# daher gibt es nichts aus dem Internet herunterzuladen, und der Build läuft dort, wo es keinen Zugang nach außen gibt.
 COPY go.mod ./
-# Сам исходник. Копируется отдельной строкой, чтобы правка кода не сбрасывала кеш
-# предыдущего слоя.
+# Der Quellcode selbst. Wird in einer eigenen Zeile kopiert, damit das Bearbeiten des Codes den Cache
+# der vorherigen Schicht nicht ungültig macht.
 COPY main.go ./
-# RUN выполняет команду при сборке (не при запуске) и сохраняет результат слоем.
-#   CGO_ENABLED=0  собрать статически, без привязки к системным библиотекам. Без этого
-#                  бинарнику потребуется glibc, которой в конечном образе не будет,
-#                  и контейнер упадёт при старте, а не при сборке
-#   -trimpath      убрать из бинарника пути сборочной машины: сборка становится
-#                  воспроизводимой, и наружу не уезжает имя вашей домашней папки
-#   -ldflags="-s -w"  выбросить отладочные таблицы — файл становится заметно меньше
-#   -o /out/...    куда положить результат; отсюда его заберёт второй этап
+# RUN führt einen Befehl beim Build aus (nicht beim Start) und speichert das Ergebnis als Schicht.
+#   CGO_ENABLED=0  statisch bauen, ohne Bindung an Systembibliotheken. Ohne dies
+#                  bräuchte das Binary glibc, die im endgültigen Image nicht vorhanden ist,
+#                  und der Container würde beim Start scheitern, nicht beim Build
+#   -trimpath      Build-Maschinen-Pfade aus dem Binary entfernen: der Build wird
+#                  reproduzierbar, und der Name Ihres Home-Ordners gelangt nicht nach außen
+#   -ldflags="-s -w"  die Debug-Tabellen verwerfen — die Datei wird deutlich kleiner
+#   -o /out/...    wohin das Ergebnis gelegt wird; von dort holt es die zweite Stufe ab
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/passes-api .
 
-# --- Этап 2: то, что поедет в кластер -----------------------------------------------
-# Второй FROM начинает образ заново, с чистого листа: всё нажитое на первом этапе
-# остаётся там и в итоговый образ не попадает.
+# --- Stufe 2: das, was in den Cluster geht -----------------------------------------------
+# Das zweite FROM beginnt das Image neu, von einem leeren Blatt: alles, was in der ersten Stufe angesammelt wurde,
+# bleibt dort und gelangt nicht in das endgültige Image.
 FROM alpine:3.21
-# Заводим пользователя, под которым будет работать приложение: от root оно работать
-# не должно. В правильно настроенном кластере под от root не пустят вовсе, и это не
-# придирка, а стандартное требование безопасности.
-#   -D          создать без пароля, не задавая вопросов
-#   -u 10001    числовой идентификатор; кластер проверяет именно число, а не имя
+# Wir legen den Benutzer an, unter dem die Anwendung laufen wird: als root darf sie nicht laufen.
+# In einem korrekt konfigurierten Cluster würde ein Pod als root gar nicht zugelassen, und das ist keine
+# Spitzfindigkeit, sondern eine übliche Sicherheitsanforderung.
+#   -D          ohne Passwort erstellen, ohne Nachfragen
+#   -u 10001    numerischer Identifikator; der Cluster prüft genau die Zahl, nicht den Namen
 RUN adduser -D -u 10001 app
-# Единственное, что переносится с первого этапа, — готовый бинарник. --from=build
-# указывает на имя этапа. /usr/local/bin — папка, которая есть в PATH любого Linux.
+# Das Einzige, was aus der ersten Stufe übernommen wird, ist das fertige Binary. --from=build
+# verweist auf den Namen der Stufe. /usr/local/bin ist ein Ordner, der im PATH jedes Linux existiert.
 COPY --from=build /out/passes-api /usr/local/bin/passes-api
-# С этого места процесс в контейнере работает под пользователем 10001, а не под root.
-# Порядок важен: строки выше выполнялись от root, иначе adduser не сработал бы.
+# Ab dieser Stelle läuft der Prozess im Container unter Benutzer 10001, nicht unter root.
+# Die Reihenfolge ist wichtig: die Zeilen oben liefen als root, sonst hätte adduser nicht funktioniert.
 USER 10001
-# Объявление порта — справочная запись для человека и инструментов. Порт она не
-# открывает и ничего не настраивает: доступ к нему описан в манифесте (passes.yaml).
+# Port-Deklaration — ein Hinweis für Menschen und Werkzeuge. Sie öffnet den Port nicht
+# und konfiguriert nichts: der Zugang dazu ist im Manifest (passes.yaml) beschrieben.
 EXPOSE 8080
-# Что запускать при старте контейнера. Форма списком, а не строкой: так команда
-# запускается напрямую, без промежуточной оболочки, и сигнал остановки от кластера
-# доходит до самого приложения, а не до shell, который его породил.
+# Was beim Start des Containers ausgeführt wird. In Listenform statt als Zeichenkette: so wird der Befehl
+# direkt ausgeführt, ohne eine zwischengeschaltete Shell, und das Stopp-Signal vom Cluster
+# erreicht die Anwendung selbst, nicht die Shell, die sie erzeugt hat.
 ENTRYPOINT ["/usr/local/bin/passes-api"]

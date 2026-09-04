@@ -1,17 +1,17 @@
 ---
-# Лаба 7 · генератор нагрузки с веб-мордой.
-# Тот же, что в лабе про масштабирование: нагрузку запускают кнопкой в браузере,
-# а гистограмму задержек видно там же. Если он у вас уже развёрнут — этот файл
-# применять не нужно, kubectl ответит «unchanged».
+# Lab 7 · Lastgenerator mit Weboberfläche.
+# Derselbe wie im Skalierungs-Lab: Die Last startet man mit einem Knopf im Browser,
+# und das Latenz-Histogramm ist gleich dort sichtbar. Wenn er bei Ihnen bereits
+# ausgerollt ist, muss diese Datei nicht angewendet werden — kubectl antwortet mit „unchanged".
 #
-# Где применяется: ваш кластер `lab` (export KUBECONFIG=~/lab.kubeconfig).
-# Команда: kubectl apply -f fortio.yaml
+# Wo es angewendet wird: Ihr Cluster `lab` (export KUBECONFIG=~/lab.kubeconfig).
+# Befehl: kubectl apply -f fortio.yaml
 #
-# Два объекта через `---`: Deployment (сам генератор) и Service (имя, по которому
-# до него добираются). apiVersion, kind и metadata.name дальше не комментируются.
+# Zwei Objekte, getrennt durch `---`: ein Deployment (der Generator selbst) und ein Service (der Name,
+# über den man ihn erreicht). apiVersion, kind und metadata.name werden weiter nicht kommentiert.
 #
-# Образ берётся с публичного Docker Hub, а не из вашего Harbor: Fortio — не часть
-# сервиса «Пропуск», а измерительный прибор, который живёт в кластере временно.
+# Das Image wird vom öffentlichen Docker Hub bezogen, nicht aus Ihrem Harbor: Fortio ist kein Teil
+# des Dienstes „Пропуск", sondern ein Messinstrument, das nur vorübergehend im Cluster lebt.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -19,10 +19,10 @@ metadata:
   labels:
     app: fortio
 spec:
-  # Одна копия. Генератор нагрузки не нужно масштабировать — нужно, чтобы он один
-  # честно считал задержки. Две копии дали бы две несведённые гистограммы.
+  # Eine einzige Kopie. Ein Lastgenerator muss nicht skaliert werden — er soll als Einziger
+  # die Latenzen ehrlich zählen. Zwei Kopien ergäben zwei nicht zusammengeführte Histogramme.
   replicas: 1
-  # Метка, по которой Deployment узнаёт свой под. Совпадает с меткой в template ниже.
+  # Das Label, an dem das Deployment seinen Pod erkennt. Stimmt mit dem Label im Template unten überein.
   selector:
     matchLabels:
       app: fortio
@@ -31,8 +31,8 @@ spec:
       labels:
         app: fortio
     spec:
-      # Те же требования безопасности, что и у остального: процесс не от root,
-      # системные вызовы ограничены профилем seccomp.
+      # Dieselben Sicherheitsanforderungen wie beim Rest: Der Prozess läuft nicht als root,
+      # und Systemaufrufe sind durch ein seccomp-Profil eingeschränkt.
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
@@ -44,13 +44,13 @@ spec:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # Тег `latest` здесь — упрощение для воркшопа, и оно противоречит тому, чему
-          # учит лаба про свой реестр: образ под этим тегом может незаметно смениться
-          # между двумя apply, и вчерашний замер станет невоспроизводимым. Для
-          # генератора нагрузки на учебном стенде это допустимо, для рабочей системы нет.
+          # Der Tag `latest` ist hier eine Vereinfachung für den Workshop und widerspricht dem, was
+          # das Lab über die eigene Registry lehrt: Das Image unter diesem Tag kann sich zwischen zwei
+          # Applies unbemerkt ändern, und die gestrige Messung wird nicht reproduzierbar. Für einen
+          # Lastgenerator auf einem Übungsstand ist das akzeptabel, für ein Produktivsystem nicht.
           image: fortio/fortio:latest
-          # `server` — режим, в котором Fortio поднимает веб-интерфейс и ждёт, пока вы
-          # нажмёте кнопку. Без этого аргумента образ отработает разовую команду и выйдет.
+          # `server` ist der Modus, in dem Fortio die Weboberfläche hochfährt und darauf wartet, dass Sie
+          # den Knopf drücken. Ohne dieses Argument führt das Image einen einmaligen Befehl aus und beendet sich.
           args: ["server"]
           ports:
             - containerPort: 8080
@@ -60,15 +60,15 @@ spec:
               cpu: 100m
               memory: 64Mi
             limits:
-              # Генератору нужен запас по процессору, иначе он упрётся
-              # в себя и вы будете нагружать не приложение, а Fortio.
+              # Der Generator braucht CPU-Reserve, sonst wird er zum eigenen Flaschenhals
+              # und Sie belasten Fortio statt der Anwendung.
               cpu: "1"
               memory: 256Mi
 ---
-# Service нужен, чтобы открыть веб-интерфейс: до генератора по имени добираются
-# проброской порта — kubectl port-forward svc/fortio 8081:8080 — и заходят
-# на localhost:8081. Обстрелять сервис можно и без Service, командой
-# kubectl exec deploy/fortio, но гистограмму в браузере даёт только этот путь.
+# Der Service wird benötigt, um die Weboberfläche zu öffnen: Den Generator erreicht man per Namen
+# über Port-Forwarding — kubectl port-forward svc/fortio 8081:8080 — und geht dann
+# auf localhost:8081. Man kann den Dienst auch ohne Service beschießen, mit
+# kubectl exec deploy/fortio, aber nur dieser Weg liefert das Histogramm im Browser.
 apiVersion: v1
 kind: Service
 metadata:
@@ -76,8 +76,8 @@ metadata:
 spec:
   selector:
     app: fortio
-  # Здесь номер у Service и порт контейнера совпадают — в отличие от остальных
-  # сервисов лабы, где снаружи 80, а внутри 8080. Разница только в удобстве.
+  # Hier stimmen die Nummer beim Service und der Container-Port überein — anders als bei den übrigen
+  # Diensten des Labs, wo außen 80 und innen 8080 ist. Der Unterschied liegt nur in der Bequemlichkeit.
   ports:
     - port: 8080
       targetPort: http

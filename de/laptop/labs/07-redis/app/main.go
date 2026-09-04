@@ -1,35 +1,35 @@
-// Сервис «Пропуск», версия с кешем. Один исполняемый файл, две роли.
+// Der Dienst „Ausweis", Version mit Cache. Eine ausführbare Datei, zwei Rollen.
 //
-//	MODE=hr   — заглушка легаси-справочника сотрудников. Отвечает медленно,
-//	            ровно так, как отвечает настоящий: HR_DELAY по умолчанию 800 мс.
-//	MODE=api  — сам сервис «Пропуск». Ходит в справочник, а если задан REDIS_ADDR,
-//	            сначала смотрит в кеш.
+//	MODE=hr   — ein Platzhalter für das Legacy-Mitarbeiterverzeichnis. Antwortet langsam,
+//	            genau so, wie das echte antwortet: HR_DELAY ist standardmäßig 800 ms.
+//	MODE=api  — der Dienst „Ausweis" selbst. Fragt das Verzeichnis ab, und wenn REDIS_ADDR
+//	            gesetzt ist, schaut er zuerst in den Cache.
 //
-// Одна роль на оба случая, потому что образ должен быть один: два почти одинаковых
-// образа в реестре — это два места, где можно забыть обновить версию.
+// Eine Rolle für beide Fälle, weil es nur ein Image geben soll: zwei fast identische
+// Images in der Registry sind zwei Stellen, an denen man vergessen kann, die Version zu erhöhen.
 //
-// Внешних зависимостей нет, только стандартная библиотека. Клиент Redis здесь
-// свой, на пятьдесят строк, — протокол Redis текстовый и для GET/SET помещается
-// в одну функцию. В бою берут готовую библиотеку; тут важнее, чтобы сборка
-// не ходила в интернет за пакетами.
+// Es gibt keine externen Abhängigkeiten, nur die Standardbibliothek. Der Redis-Client hier
+// ist unser eigener, fünfzig Zeilen lang — das Redis-Protokoll ist textbasiert und passt für GET/SET
+// in eine Funktion. In der Produktion nimmt man eine fertige Bibliothek; hier ist wichtiger, dass
+// der Build nicht ins Internet nach Paketen geht.
 //
-// Читать на Go уметь не нужно: ниже размечено, где что лежит. Сначала мелкие помощники,
-// потом самодельный клиент к Redis, потом две роли — «медленный справочник» и «сам
-// сервис». Главное, ради чего затеяна лаба, происходит в setupAPI, ближе к концу файла.
+// Man muss Go nicht lesen können: unten ist ausgewiesen, wo was liegt. Zuerst die kleinen Helfer,
+// dann der selbstgebaute Redis-Client, dann die zwei Rollen — das „langsame Verzeichnis" und der „Dienst
+// selbst". Das Wichtigste, worum es in der Übung geht, passiert in setupAPI, näher am Ende der Datei.
 //
-// Три соглашения языка, чтобы не спотыкаться при чтении:
+// Drei Konventionen der Sprache, damit man beim Lesen nicht stolpert:
 //
-//	func имя(аргументы) (что вернёт) { ... } — объявление функции;
-//	функция часто возвращает несколько значений сразу, и последнее из них — ошибка:
-//	err == nil читается «обошлось», err != nil — «не обошлось»;
-//	строки, начинающиеся с //, — комментарии, на работу программы они не влияют.
+//	func name(Argumente) (was zurückgegeben wird) { ... } — eine Funktionsdeklaration;
+//	eine Funktion gibt oft mehrere Werte auf einmal zurück, und der letzte davon ist ein Fehler:
+//	err == nil liest sich als „hat geklappt", err != nil — „hat nicht geklappt";
+//	Zeilen, die mit // beginnen, sind Kommentare, sie beeinflussen die Arbeitsweise des Programms nicht.
 //
-// Собирается файл соседним Dockerfile, на ноутбуке: docker build ... app/ — см. README.
+// Die Datei wird vom benachbarten Dockerfile gebaut, auf dem Laptop: docker build ... app/ — siehe README.
 package main
 
-// Список библиотек, которыми пользуется файл. Все до одной — стандартные, из поставки Go.
-// Ни одной сторонней строки: сборка не ходит в интернет и не сломается оттого, что
-// чей-то чужой пакет удалили из публичного репозитория.
+// Die Liste der Bibliotheken, die die Datei verwendet. Jede einzelne ist Standard, aus der Go-Distribution.
+// Keine einzige Drittanbieter-Zeile: der Build geht nicht ins Internet und bricht nicht deshalb ab, weil
+// jemandes fremdes Paket aus einem öffentlichen Repository entfernt wurde.
 import (
 	"bufio"
 	"encoding/json"
@@ -47,11 +47,11 @@ import (
 	"time"
 )
 
-// ---------------------------------------------------------------- окружение
+// ---------------------------------------------------------------- Umgebung
 
-// env читает переменную окружения и, если та пуста или не задана, возвращает запасное
-// значение. Отсюда свойство, которое вы видите в манифестах: поведение приложения
-// меняется строчкой в YAML и перезапуском пода, а не пересборкой образа.
+// env liest eine Umgebungsvariable und gibt, wenn sie leer oder nicht gesetzt ist, den Ersatzwert
+// zurück. Daher die Eigenschaft, die man in den Manifesten sieht: das Verhalten der Anwendung
+// ändert sich mit einer Zeile in YAML und einem Pod-Neustart, nicht mit einem Neubau des Images.
 func env(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
@@ -59,9 +59,9 @@ func env(key, fallback string) string {
 	return fallback
 }
 
-// envInt — то же самое для чисел. Если в переменной оказалась не цифра, приложение не
-// падает: пишет в лог и берёт запасное значение. Опечатка в манифесте не должна класть
-// сервис — она должна быть заметна в логе.
+// envInt — dasselbe für Zahlen. Wenn die Variable sich als keine Zahl herausstellt, stürzt die Anwendung nicht
+// ab: sie schreibt ins Log und nimmt den Ersatzwert. Ein Tippfehler im Manifest darf den
+// Dienst nicht lahmlegen — er muss im Log sichtbar sein.
 func envInt(key string, fallback int) int {
 	if v := os.Getenv(key); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
@@ -74,16 +74,16 @@ func envInt(key string, fallback int) int {
 
 // ---------------------------------------------------------------- Redis
 
-// Ошибка, которую прислал сам Redis (строка, начинающаяся с «-»): например
-// NOAUTH или WRONGTYPE. Отличать её от сетевой важно: переподключение
-// от неверного пароля не спасает, а попытки только маскируют причину.
+// Ein Fehler, den Redis selbst gesendet hat (eine Zeile, die mit „-" beginnt): zum Beispiel
+// NOAUTH oder WRONGTYPE. Ihn von einem Netzwerkfehler zu unterscheiden ist wichtig: ein Neuverbinden
+// behebt kein falsches Passwort, und Wiederholungen verschleiern nur die Ursache.
 type redisError struct{ msg string }
 
 func (e *redisError) Error() string { return "redis: " + e.msg }
 
-// redisClient — одно постоянное TCP-соединение до кеша плюс замок mu, чтобы два
-// одновременных запроса не писали в это соединение вперемешку. Соединение держим
-// открытым: устанавливать новое на каждый запрос дороже, чем сам запрос.
+// redisClient — eine dauerhafte TCP-Verbindung zum Cache plus ein Lock mu, damit zwei
+// gleichzeitige Anfragen nicht vermischt in diese Verbindung schreiben. Wir halten die Verbindung
+// offen: für jede Anfrage eine neue aufzubauen kostet mehr als die Anfrage selbst.
 type redisClient struct {
 	addr     string
 	password string
@@ -93,9 +93,9 @@ type redisClient struct {
 	rd   *bufio.Reader
 }
 
-// connectLocked открывает соединение и, если пароль задан, тут же представляется
-// командой AUTH. Суффикс Locked в имени означает «вызывать только тогда, когда замок mu
-// уже взят» — это договорённость между этими функциями, а не свойство языка.
+// connectLocked öffnet die Verbindung und stellt sich, wenn ein Passwort gesetzt ist, sofort mit dem
+// AUTH-Befehl vor. Das Suffix Locked im Namen bedeutet „nur dann aufrufen, wenn das Lock mu
+// bereits gehalten wird" — das ist eine Vereinbarung zwischen diesen Funktionen, keine Eigenschaft der Sprache.
 func (r *redisClient) connectLocked() error {
 	c, err := net.DialTimeout("tcp", r.addr, 3*time.Second)
 	if err != nil {
@@ -120,10 +120,10 @@ func (r *redisClient) closeLocked() {
 	r.rd = nil
 }
 
-// do выполняет команду и один раз переподключается, если оборвалось соединение.
-// Возвращает значение, признак «значение есть» и ошибку.
-// Попыток ровно две, не десять: если Redis отвечает отказом, повторы только задержат
-// ответ пользователю и размажут причину по логам.
+// do führt einen Befehl aus und verbindet einmal neu, wenn die Verbindung abgebrochen ist.
+// Gibt den Wert, ein „Wert vorhanden"-Flag und einen Fehler zurück.
+// Es gibt genau zwei Versuche, nicht zehn: wenn Redis mit einer Ablehnung antwortet, verzögern Wiederholungen nur
+// die Antwort an den Benutzer und verschmieren die Ursache über die Logs.
 func (r *redisClient) do(args ...string) (string, bool, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -142,16 +142,16 @@ func (r *redisClient) do(args ...string) (string, bool, error) {
 		lastErr = err
 		var re *redisError
 		if errors.As(err, &re) {
-			return "", false, err // ответил сам Redis — повтор не поможет
+			return "", false, err // Redis selbst hat geantwortet — eine Wiederholung hilft nicht
 		}
-		r.closeLocked() // сеть: рвём и пробуем ещё раз
+		r.closeLocked() // Netzwerk: abbrechen und noch einmal versuchen
 	}
 	return "", false, lastErr
 }
 
-// commandLocked отправляет команду в том виде, в каком её понимает Redis: сначала
-// сколько дальше идёт кусков, потом длина и содержимое каждого. Дедлайн в три секунды —
-// чтобы зависший кеш не задержал ответ дольше, чем поход в сам справочник.
+// commandLocked sendet den Befehl in der Form, die Redis versteht: zuerst
+// wie viele Stücke folgen, dann Länge und Inhalt jedes einzelnen. Die Frist von drei Sekunden ist
+// dafür, dass ein hängender Cache die Antwort nicht länger verzögert als ein Gang zum Verzeichnis selbst.
 func (r *redisClient) commandLocked(args ...string) (string, bool, error) {
 	var b strings.Builder
 	fmt.Fprintf(&b, "*%d\r\n", len(args))
@@ -167,9 +167,9 @@ func (r *redisClient) commandLocked(args ...string) (string, bool, error) {
 	return r.readReplyLocked()
 }
 
-// readReplyLocked разбирает ответ. Первый символ строки говорит, что именно пришло,
-// и вся функция — это разбор пяти случаев. Отдельно важен «$-1»: это не поломка,
-// а «такого ключа нет», то есть обычный промах кеша.
+// readReplyLocked zerlegt die Antwort. Das erste Zeichen der Zeile sagt, was genau angekommen ist,
+// und die ganze Funktion ist die Behandlung von fünf Fällen. Besonders wichtig ist „$-1": das ist kein Defekt,
+// sondern „so einen Schlüssel gibt es nicht", also ein gewöhnlicher Cache-Fehltreffer.
 func (r *redisClient) readReplyLocked() (string, bool, error) {
 	line, err := r.rd.ReadString('\n')
 	if err != nil {
@@ -180,19 +180,19 @@ func (r *redisClient) readReplyLocked() (string, bool, error) {
 		return "", false, errors.New("redis: пустой ответ")
 	}
 	switch line[0] {
-	case '+', ':': // простая строка или число
+	case '+', ':': // eine einfache Zeichenkette oder eine Zahl
 		return line[1:], true, nil
-	case '-': // ошибка от сервера
+	case '-': // ein Fehler vom Server
 		return "", false, &redisError{msg: line[1:]}
-	case '$': // строка известной длины; -1 означает «ключа нет»
+	case '$': // eine Zeichenkette bekannter Länge; -1 bedeutet „kein Schlüssel"
 		n, err := strconv.Atoi(line[1:])
 		if err != nil {
 			return "", false, err
 		}
 		if n < 0 {
-			return "", false, nil // промах кеша — это не ошибка
+			return "", false, nil // ein Cache-Fehltreffer ist kein Fehler
 		}
-		buf := make([]byte, n+2) // +2 на завершающие \r\n
+		buf := make([]byte, n+2) // +2 für das abschließende \r\n
 		if _, err := io.ReadFull(r.rd, buf); err != nil {
 			return "", false, err
 		}
@@ -202,30 +202,30 @@ func (r *redisClient) readReplyLocked() (string, bool, error) {
 	}
 }
 
-// Get и SetTTL — весь набор команд, которым пользуется сервис. Больше от кеша ничего
-// не требуется, поэтому и клиент здесь помещается на страницу.
+// Get und SetTTL — der ganze Satz an Befehlen, den der Dienst verwendet. Mehr wird vom
+// Cache nicht verlangt, weshalb der Client hier auf eine Seite passt.
 func (r *redisClient) Get(key string) (string, bool, error) { return r.do("GET", key) }
 
-// SetTTL кладёт значение и сразу назначает срок жизни. Одной командой, а не
-// SET плюс EXPIRE: между двумя командами соединение может оборваться, и ключ
-// останется в кеше навсегда.
+// SetTTL legt den Wert ab und weist sofort eine Lebensdauer zu. Mit einem Befehl, nicht
+// SET plus EXPIRE: zwischen zwei Befehlen kann die Verbindung abbrechen, und der Schlüssel
+// bliebe für immer im Cache.
 func (r *redisClient) SetTTL(key, val string, ttlSeconds int) error {
 	_, _, err := r.do("SET", key, val, "EX", strconv.Itoa(ttlSeconds))
 	return err
 }
 
-// ---------------------------------------------------------------- данные
+// ---------------------------------------------------------------- Daten
 
-// employee — то, что сервис отдаёт наружу и кладёт в кеш. Пометки `json:"id"` справа
-// задают имена полей в JSON: в Go поля видны снаружи только с большой буквы, а в JSON
-// принято с маленькой, и эти пометки их связывают.
+// employee — das, was der Dienst nach außen zurückgibt und in den Cache legt. Die `json:"id"`-Tags rechts
+// legen die Feldnamen in JSON fest: in Go sind Felder von außen nur mit Großbuchstaben sichtbar, während in JSON
+// üblicherweise Kleinbuchstaben verwendet werden, und diese Tags verbinden sie miteinander.
 type employee struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 	Dept string `json:"dept"`
 }
 
-// Данные выдуманные. Настоящих кадровых сведений в учебном стенде нет и быть не должно.
+// Die Daten sind erfunden. Es gibt keine echten Personaldaten in einem Schulungsstand, und es darf keine geben.
 var surnames = []string{
 	"Иванов И. И.", "Петрова А. С.", "Сидоров П. Н.", "Кузнецова М. В.",
 	"Смирнов Д. А.", "Попова Е. К.", "Волков С. Ю.", "Морозова Н. Г.",
@@ -236,8 +236,8 @@ var departments = []string{
 	"Логистика", "Отдел кадров", "Административный отдел",
 }
 
-// Данные выдуманные, но одинаковые для одного и того же идентификатора:
-// иначе по ответу нельзя было бы понять, кеш это или поход в справочник.
+// Die Daten sind erfunden, aber gleich für denselben Bezeichner:
+// sonst könnte man an der Antwort nicht erkennen, ob es der Cache ist oder ein Gang zum Verzeichnis.
 func personFor(id string) employee {
 	h := 7
 	for _, c := range id {
@@ -253,9 +253,9 @@ func personFor(id string) employee {
 	}
 }
 
-// writeJSON отдаёт ответ: заголовок с типом содержимого, код ответа и тело.
-// SetEscapeHTML(false) нужен, чтобы русские буквы и кавычки не превращались
-// в \u-последовательности, — иначе ответ придётся расшифровывать глазами.
+// writeJSON sendet die Antwort: den Header mit dem Inhaltstyp, den Antwortcode und den Body.
+// SetEscapeHTML(false) wird gebraucht, damit russische Buchstaben und Anführungszeichen sich nicht
+// in \u-Sequenzen verwandeln — sonst müsste man die Antwort mit dem Auge entschlüsseln.
 func writeJSON(w http.ResponseWriter, code int, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(code)
@@ -266,9 +266,9 @@ func writeJSON(w http.ResponseWriter, code int, v any) {
 	}
 }
 
-// employeeID достаёт ?id= из строки запроса. Пустой идентификатор превращаем в «0»,
-// чтобы у ключа в кеше всегда была определённая форма и не заводилось ключа
-// «employee:» без хвоста.
+// employeeID zieht ?id= aus dem Query-String. Ein leerer Bezeichner wird in „0" verwandelt,
+// damit der Schlüssel im Cache immer eine bestimmte Form hat und kein Schlüssel
+// „employee:" ohne Schwanz angelegt wird.
 func employeeID(r *http.Request) string {
 	id := r.URL.Query().Get("id")
 	if id == "" {
@@ -277,28 +277,28 @@ func employeeID(r *http.Request) string {
 	return id
 }
 
-// ---------------------------------------------------------------- главное
+// ---------------------------------------------------------------- main
 
-// main — точка входа: с неё начинается работа программы. Поднимает HTTP-сервер, вешает
-// на него /healthz и, глядя на MODE, одну из двух ролей. Роль выбирается один раз
-// на старте и в течение жизни пода не меняется.
+// main — der Einstiegspunkt: hier beginnt die Arbeit des Programms. Er bringt einen HTTP-Server hoch, hängt
+// /healthz an ihn und, mit Blick auf MODE, eine der zwei Rollen. Die Rolle wird einmal
+// beim Start gewählt und ändert sich während des Lebens des Pods nicht.
 func main() {
 	mode := env("MODE", "api")
 	port := env("PORT", "8080")
 	pod := env("POD_NAME", "неизвестно")
 
 	mux := http.NewServeMux()
-	// /healthz есть в обеих ролях: сюда стучится проба готовности, описанная в манифестах.
-	// Он отвечает всегда и ничего не проверяет — задача пробы здесь в том, чтобы понять,
-	// что процесс поднялся и слушает порт, а не в том, чтобы оценить здоровье системы.
+	// /healthz existiert in beiden Rollen: hierher klopft die Readiness-Probe, die in den Manifesten beschrieben ist.
+	// Sie antwortet immer und prüft nichts — die Aufgabe der Probe ist hier zu erkennen,
+	// dass der Prozess hochgekommen ist und den Port abhört, nicht die Gesundheit des Systems zu bewerten.
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		_, _ = w.Write([]byte("ok\n"))
 	})
 
-	// Развилка на две роли. Неизвестное значение — не повод запуститься «как-нибудь»:
-	// падаем сразу и с внятным сообщением. Молчаливый запуск не в той роли обошёлся бы
-	// часом разглядывания логов.
+	// Die Verzweigung in zwei Rollen. Ein unbekannter Wert ist kein Grund, „irgendwie" zu starten:
+	// wir stürzen sofort und mit einer klaren Nachricht ab. Ein stiller Start in der falschen Rolle würde
+	// eine Stunde Starren auf Logs kosten.
 	switch mode {
 	case "hr":
 		setupHR(mux, pod)
@@ -308,8 +308,8 @@ func main() {
 		log.Fatalf("неизвестный MODE=%q, допустимы hr и api", mode)
 	}
 
-	// ReadHeaderTimeout закрывает соединение, если клиент начал запрос и замолчал. Без него
-	// хватит нескольких таких «клиентов», чтобы занять сервер целиком, ничего не запросив.
+	// ReadHeaderTimeout schließt die Verbindung, wenn ein Client eine Anfrage begonnen hat und verstummt ist. Ohne ihn
+	// reichen ein paar solcher „Clients", um den ganzen Server zu belegen, ohne etwas anzufragen.
 	srv := &http.Server{
 		Addr:              ":" + port,
 		Handler:           mux,
@@ -319,8 +319,8 @@ func main() {
 	log.Fatal(srv.ListenAndServe())
 }
 
-// setupHR — заглушка легаси-справочника. Единственная её особенность в том,
-// что она медленная, и это не случайность, а суть задачи.
+// setupHR — ein Platzhalter für das Legacy-Verzeichnis. Seine einzige Besonderheit ist,
+// dass es langsam ist, und das ist kein Zufall, sondern das Wesen der Aufgabe.
 func setupHR(mux *http.ServeMux, pod string) {
 	delay, err := time.ParseDuration(env("HR_DELAY", "800ms"))
 	if err != nil {
@@ -329,9 +329,9 @@ func setupHR(mux *http.ServeMux, pod string) {
 	}
 	log.Printf("справочник отвечает за %s", delay)
 
-	// Единственный адрес этой роли. time.Sleep и есть вся «легаси-система»: те самые
-	// сотни миллисекунд, ради которых в лабе появляется кеш. Поле source в ответе
-	// показывает, что данные пришли отсюда, а не из кеша.
+	// Die einzige Adresse dieser Rolle. time.Sleep ist das ganze „Legacy-System": genau jene
+	// Hunderte von Millisekunden, um derentwillen in der Übung der Cache erscheint. Das Feld source in der Antwort
+	// zeigt, dass die Daten von hier kamen, nicht aus dem Cache.
 	mux.HandleFunc("/employee", func(w http.ResponseWriter, r *http.Request) {
 		id := employeeID(r)
 		time.Sleep(delay)
@@ -346,16 +346,16 @@ func setupHR(mux *http.ServeMux, pod string) {
 	})
 }
 
-// setupAPI — сам сервис «Пропуск». Здесь живёт логика кеша, и здесь же лежит ответ
-// на вопрос «почему в ответе написано cache: off».
+// setupAPI — der Dienst „Ausweis" selbst. Hier lebt die Cache-Logik, und hier liegt auch die Antwort
+// auf die Frage „warum steht in der Antwort cache: off".
 func setupAPI(mux *http.ServeMux, pod string) {
 	hrURL := env("HR_URL", "http://hr-legacy")
 	ttl := envInt("CACHE_TTL", 60)
 	version := env("APP_VERSION", "v2")
 
-	// Кеш включается самим фактом наличия REDIS_ADDR — той переменной, которую добавляет
-	// cache-patch.yaml. Переменной нет — cache остаётся пустым, все проверки
-	// `if cache != nil` ниже не срабатывают, и сервис работает как работал.
+	// Der Cache wird durch das bloße Vorhandensein von REDIS_ADDR eingeschaltet — der Variable, die
+	// cache-patch.yaml hinzufügt. Keine Variable — cache bleibt leer, alle Prüfungen
+	// `if cache != nil` unten greifen nicht, und der Dienst arbeitet, wie er gearbeitet hat.
 	var cache *redisClient
 	if addr := os.Getenv("REDIS_ADDR"); addr != "" {
 		cache = &redisClient{addr: addr, password: os.Getenv("REDIS_PASSWORD")}
@@ -364,15 +364,15 @@ func setupAPI(mux *http.ServeMux, pod string) {
 		log.Printf("кеш выключен: REDIS_ADDR не задан, каждый запрос пойдёт в справочник")
 	}
 
-	// Отдельный клиент с увеличенным пулом соединений: иначе под нагрузкой
-	// половина времени уйдёт на установку TCP-соединений к справочнику,
-	// и замер покажет не задержку справочника, а нашу собственную неаккуратность.
+	// Ein separater Client mit vergrößertem Verbindungspool: sonst würde unter Last
+	// die halbe Zeit für den Aufbau von TCP-Verbindungen zum Verzeichnis draufgehen,
+	// und die Messung würde nicht die Latenz des Verzeichnisses zeigen, sondern unsere eigene Nachlässigkeit.
 	tr := http.DefaultTransport.(*http.Transport).Clone()
 	tr.MaxIdleConnsPerHost = 64
 	hrClient := &http.Client{Timeout: 10 * time.Second, Transport: tr}
 
-	// Корень «/» — визитка сервиса: версия, под, узел, реестр и режим кеша. По полю cache
-	// сразу видно off или redis, не заглядывая в логи и не разбирая манифест.
+	// Die Wurzel „/" — die Visitenkarte des Dienstes: Version, Pod, Node, Registry und Cache-Modus. Am Feld cache
+	// sieht man sofort off oder redis, ohne in die Logs zu schauen oder das Manifest zu zerlegen.
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{
 			"service":   "passes-api",
@@ -388,27 +388,27 @@ func setupAPI(mux *http.ServeMux, pod string) {
 		})
 	})
 
-	// Главный адрес лабы. Порядок действий: спросить кеш, при промахе сходить в справочник,
-	// положить ответ в кеш. Всё, что вы измеряете в этой лабе, происходит на этих сорока
-	// строках.
+	// Die Hauptadresse der Übung. Die Reihenfolge der Aktionen: den Cache fragen, bei einem Fehltreffer zum Verzeichnis gehen,
+	// die Antwort in den Cache legen. Alles, was man in dieser Übung misst, passiert auf diesen vierzig
+	// Zeilen.
 	mux.HandleFunc("/employee", func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		id := employeeID(r)
-		// Ключ в кеше — «employee:» плюс идентификатор. Приставка нужна, чтобы разные виды
-		// записей не столкнулись: кеш один на всё приложение, а имена в нём плоские.
+		// Der Schlüssel im Cache — „employee:" plus der Bezeichner. Das Präfix wird gebraucht, damit verschiedene Arten
+		// von Einträgen nicht kollidieren: der Cache ist einer für die ganze Anwendung, und die Namen darin sind flach.
 		key := "employee:" + id
 
 		var emp employee
 		fromCache := false
 
-		// Шаг первый: спросить кеш. Три исхода — ошибка, попадание, промах — разбираются
-		// по-разному, и разница между ними тут принципиальная.
+		// Schritt eins: den Cache fragen. Drei Ausgänge — ein Fehler, ein Treffer, ein Fehltreffer — werden
+		// unterschiedlich behandelt, und der Unterschied zwischen ihnen ist hier grundlegend.
 		if cache != nil {
 			raw, found, err := cache.Get(key)
 			switch {
 			case err != nil:
-				// Кеш недоступен — это не повод отдавать ошибку пользователю.
-				// Идём в справочник: медленно, но правильно.
+				// Der Cache ist nicht verfügbar — das ist kein Grund, dem Benutzer einen Fehler zurückzugeben.
+				// Wir gehen zum Verzeichnis: langsam, aber korrekt.
 				log.Printf("кеш недоступен (%v), иду в справочник", err)
 			case found:
 				if json.Unmarshal([]byte(raw), &emp) == nil {
@@ -419,10 +419,10 @@ func setupAPI(mux *http.ServeMux, pod string) {
 			}
 		}
 
-		// Шаг второй: промах или недоступный кеш — идём в справочник. Медленно, но это
-		// единственный источник правды. Ответ кладём в кеш; если положить не вышло,
-		// пользователю об этом знать незачем — он свой ответ уже получил, просто
-		// следующий запрос снова будет медленным.
+		// Schritt zwei: ein Fehltreffer oder ein nicht verfügbarer Cache — wir gehen zum Verzeichnis. Langsam, aber es ist
+		// die einzige Quelle der Wahrheit. Wir legen die Antwort in den Cache; wenn das Ablegen fehlgeschlagen ist,
+		// braucht der Benutzer davon nichts zu wissen — er hat seine Antwort schon bekommen, es ist nur so, dass
+		// die nächste Anfrage wieder langsam sein wird.
 		if !fromCache {
 			fetched, err := fetchEmployee(hrClient, hrURL, id)
 			if err != nil {
@@ -443,9 +443,9 @@ func setupAPI(mux *http.ServeMux, pod string) {
 			}
 		}
 
-		// Поля cached и took_ms — то, ради чего всё затевалось: по ним видно, попал запрос
-		// в кеш или нет и во сколько миллисекунд это обошлось. Их же читает check.sh,
-		// когда решает, засчитывать лабу или нет.
+		// Die Felder cached und took_ms — das, wofür das alles begonnen wurde: an ihnen sieht man, ob die Anfrage
+		// den Cache getroffen hat oder nicht und wie viele Millisekunden es gekostet hat. check.sh liest sie ebenfalls,
+		// wenn es entscheidet, ob die Übung als bestanden gilt oder nicht.
 		writeJSON(w, http.StatusOK, map[string]any{
 			"id":      emp.ID,
 			"name":    emp.Name,
@@ -459,7 +459,7 @@ func setupAPI(mux *http.ServeMux, pod string) {
 	})
 }
 
-// cacheMode переводит внутреннее состояние в одно слово для ответа: off или redis.
+// cacheMode übersetzt den internen Zustand in ein Wort für die Antwort: off oder redis.
 func cacheMode(c *redisClient) string {
 	if c == nil {
 		return "off"
@@ -467,9 +467,9 @@ func cacheMode(c *redisClient) string {
 	return "redis"
 }
 
-// fetchEmployee — поход в справочник по HTTP. Идентификатор экранируется
-// (url.QueryEscape): без этого пробел или «&» внутри id развалили бы адрес запроса.
-// Тело ответа обязательно закрывается (defer), иначе под нагрузкой кончатся соединения.
+// fetchEmployee — ein Gang zum Verzeichnis über HTTP. Der Bezeichner wird escaped
+// (url.QueryEscape): ohne dies würden ein Leerzeichen oder „&" innerhalb von id die Anfrage-URL auseinanderreißen.
+// Der Antwort-Body wird immer geschlossen (defer), sonst würden unter Last die Verbindungen ausgehen.
 func fetchEmployee(c *http.Client, base, id string) (employee, error) {
 	u := strings.TrimRight(base, "/") + "/employee?id=" + url.QueryEscape(id)
 	resp, err := c.Get(u)

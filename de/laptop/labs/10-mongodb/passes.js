@@ -1,28 +1,29 @@
-// Лаба 10 · четыре пропуска четырёх разных форм в коллекции passes.
+// Lab 10 · vier Ausweise in vier verschiedenen Formen in der Collection passes.
 //
-// Это не файл настроек, а программа для mongosh — оболочки MongoDB, которая
-// понимает JavaScript. Выполняется на ноутбуке, в лабораторном кластере, короткой
-// командой `mo` из README (она запускает mongosh внутри рабочего пода):
+// Dies ist keine Konfigurationsdatei, sondern ein Programm für mongosh — die MongoDB-Shell,
+// die JavaScript versteht. Es läuft auf Ihrem Laptop, im Lab-Cluster, mit dem kurzen
+// Befehl `mo` aus der README (er startet mongosh innerhalb des Arbeits-Pods):
 //     cd labs/10-mongodb && mo < passes.js
-// В ответ вы увидите строку «документов в коллекции: 4».
+// Als Antwort sehen Sie die Zeile «документов в коллекции: 4».
 //
-// Запустите файл дважды — документов станет восемь: insertMany только добавляет.
+// Führen Sie die Datei zweimal aus, und es werden acht Dokumente: insertMany fügt nur hinzu.
 
-// db — база, к которой вы подключены; passes — коллекция в ней (ближайший аналог
-// таблицы); insertMany — «добавь эти документы». Ни одной таблицы заранее создавать
-// не нужно и описывать поля негде: коллекция появляется в момент первой вставки,
-// а мнения о том, какие поля бывают у документа, у базы по умолчанию нет.
-// Поэтому четыре документа ниже имеют разный набор полей и при этом лежат рядом,
-// в одной коллекции. Ради этого документная модель и существует: ни пустых колонок,
-// ни четырёх таблиц под четыре типа пропуска, ни пятой, которая их связывает.
+// db ist die Datenbank, mit der Sie verbunden sind; passes ist eine Collection darin (das
+// nächste Analogon einer Tabelle); insertMany bedeutet «füge diese Dokumente hinzu». Sie
+// müssen keine Tabelle im Voraus anlegen, und es gibt keinen Ort, um die Felder zu
+// beschreiben: die Collection entsteht im Moment der ersten Einfügung, und die Datenbank hat
+// standardmäßig keine Meinung darüber, welche Felder ein Dokument haben darf.
+// Deshalb haben die vier Dokumente unten unterschiedliche Feldsätze und liegen dennoch
+// nebeneinander, in einer Collection. Genau dafür existiert das Dokumentmodell: keine leeren
+// Spalten, keine vier Tabellen für vier Ausweistypen, keine fünfte, die sie verbindet.
 db.passes.insertMany([
   {
-    // Разовый пропуск — самая короткая форма: шесть полей, все простые значения.
-    // В обычной таблице это была бы обычная строка.
-    // ISODate(...) — не строка, а именно дата. MongoDB хранит документы в двоичном
-    // формате BSON, где у значения есть тип: дата, целое, дробное, логическое.
-    // По дате можно сравнивать и сортировать, по строке «2026-09-01» — только если
-    // повезло с форматом записи.
+    // Einmal-Ausweis — die kürzeste Form: sechs Felder, alle einfache Werte.
+    // In einer gewöhnlichen Tabelle wäre das eine gewöhnliche Zeile.
+    // ISODate(...) ist keine Zeichenkette, sondern eben ein Datum. MongoDB speichert Dokumente
+    // im binären BSON-Format, wo ein Wert einen Typ hat: Datum, Ganzzahl, Fließkomma, Boolean.
+    // Nach dem Datum kann man vergleichen und sortieren, nach der Zeichenkette «2026-09-01» nur,
+    // wenn man mit dem Format der Aufzeichnung Glück hatte.
     type: "разовый",
     guest: "Иванов Иван Иванович",
     host: "petrov@corp.ru",
@@ -31,13 +32,13 @@ db.passes.insertMany([
     purpose: "собеседование"
   },
   {
-    // Недельный пропуск. Вместо valid_on — пара valid_from и valid_to, вместо
-    // одного входа список entrances прямо в поле. В таблице для такого списка
-    // понадобилась бы либо отдельная таблица «пропуск — вход», либо строка
-    // с запятыми, по которой потом нормально не поискать.
-    // Появилось поле badge_returned, которого у разового пропуска нет вовсе:
-    // не NULL и не пусто, а именно нет такого поля в том документе. Это разные
-    // вещи, и ищутся они по-разному.
+    // Wochen-Ausweis. Statt valid_on gibt es ein Paar valid_from und valid_to, statt eines
+    // einzelnen Eingangs eine Liste entrances direkt im Feld. In einer Tabelle würde eine solche
+    // Liste entweder eine separate Tabelle «Ausweis — Eingang» oder eine Zeichenkette mit
+    // Kommas erfordern, nach der man dann nicht mehr richtig suchen kann.
+    // Ein Feld badge_returned ist aufgetaucht, das der Einmal-Ausweis gar nicht hat:
+    // nicht NULL und nicht leer, sondern eben kein solches Feld in jenem Dokument. Das sind
+    // verschiedene Dinge, und sie werden unterschiedlich gesucht.
     type: "недельный",
     guest: "Сидорова Анна Петровна",
     host: "petrov@corp.ru",
@@ -48,9 +49,9 @@ db.passes.insertMany([
     badge_returned: false
   },
   {
-    // Автомобильный пропуск. Всё, что относится к машине, лежит внутри одного поля
-    // car. Это не строка с JSON внутри, а полноценная вложенная структура:
-    // по car.plate можно искать и строить по нему индекс.
+    // Fahrzeug-Ausweis. Alles, was das Auto betrifft, liegt innerhalb eines einzigen Feldes
+    // car. Das ist keine Zeichenkette mit JSON darin, sondern eine vollwertige verschachtelte
+    // Struktur: nach car.plate kann man suchen und darauf einen Index aufbauen.
     type: "автомобильный",
     guest: "Кузнецов Виктор Сергеевич",
     host: "logistics@corp.ru",
@@ -65,12 +66,13 @@ db.passes.insertMany([
     parking: "P2"
   },
   {
-    // Групповой пропуск. Здесь список объектов: у каждого участника свои поля,
-    // длина списка произвольная.
-    // И главное — поля guest у этого документа нет совсем: вместо гостя
-    // организация и контактное лицо. Форма отличается от остальных не одним полем,
-    // а по сути. Дальше по лабе это отзовётся: правило проверки документов не
-    // сможет требовать guest от всех, иначе законный групповой пропуск не пройдёт.
+    // Gruppen-Ausweis. Hier eine Liste von Objekten: jeder Teilnehmer hat seine eigenen Felder,
+    // die Länge der Liste ist beliebig.
+    // Und das Wichtigste — dieses Dokument hat gar kein Feld guest: statt eines Gastes
+    // eine Organisation und eine Kontaktperson. Die Form unterscheidet sich von den übrigen
+    // nicht durch ein Feld, sondern im Wesen. Weiter im Lab wird das nachhallen: die
+    // Dokument-Prüfregel wird guest nicht von allen verlangen können, sonst käme ein
+    // legitimer Gruppen-Ausweis nicht durch.
     type: "групповой",
     organization: "Гимназия № 1",
     contact: "Смирнова Ольга Владимировна",
@@ -86,8 +88,8 @@ db.passes.insertMany([
   }
 ]);
 
-// countDocuments({}) — посчитать документы, подходящие под условие; пустое условие
-// означает «все». Печать нужна, чтобы у файла был видимый результат: сам insertMany
-// отвечает списком выданных идентификаторов, и в нём легко не разглядеть, сколько
-// документов реально легло.
+// countDocuments({}) — zählt die Dokumente, die eine Bedingung erfüllen; eine leere Bedingung
+// bedeutet «alle». Die Ausgabe ist nötig, damit die Datei ein sichtbares Ergebnis hat: insertMany
+// selbst antwortet mit einer Liste der ausgegebenen Bezeichner, und darin kann man leicht
+// übersehen, wie viele Dokumente tatsächlich abgelegt wurden.
 print("документов в коллекции: " + db.passes.countDocuments({}));

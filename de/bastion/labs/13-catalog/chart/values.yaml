@@ -1,42 +1,42 @@
-# Лаба 13. Значения по умолчанию для чарта «Пропуска».
+# Lab 13. Standardwerte für den Chart „Pässe".
 #
-# Это ответы на вопросы, которые чарт задаёт при разворачивании: сколько копий, какой
-# текст на странице, нужен ли адрес снаружи. Здесь они записаны на случай «ничего не
-# выбирали». Тот, кто заказывает приложение, их переопределяет: в дашборде — полями формы,
-# в терминале — ключом `--set replicas=5` или своим файлом `helm install ... -f my.yaml`.
-# Правка этого файла меняет умолчания для будущих заказов, а не для уже развёрнутых.
+# Dies sind die Antworten auf die Fragen, die der Chart beim Deployment stellt: wie viele Kopien, welcher
+# Text auf der Seite, ob eine Adresse von außen nötig ist. Sie sind hier für den Fall „nichts
+# ausgewählt" hinterlegt. Wer die Anwendung bestellt, überschreibt sie: im Dashboard — mit Formularfeldern,
+# im Terminal — mit dem Flag `--set replicas=5` oder einer eigenen Datei `helm install ... -f my.yaml`.
+# Das Bearbeiten dieser Datei ändert die Standardwerte für künftige Bestellungen, nicht für bereits ausgerollte.
 #
-# Как значения отсюда превращаются в форму заказа в дашборде:
-#   тип        — какое поле показать: {int} число, {bool} переключатель,
-#                {string} строка ввода, {struct} вложенная группа полей;
-#   Описание   — подпись поля и подсказка под ней;
-#   =значение  — что уже стоит в поле, когда форму открыли;
-#   обязательность — задаётся списком required в схеме. Здесь его нет: у каждого
-#                параметра есть значение по умолчанию, поэтому пропустить можно любое поле.
-# Поэтому описания пишутся по-английски: их читает не только автор чарта, но и любой,
-# кто заказывает приложение в дашборде.
+# Wie die Werte von hier zu einem Bestellformular im Dashboard werden:
+#   Typ        — welches Feld angezeigt wird: {int} Zahl, {bool} Umschalter,
+#                {string} Eingabezeile, {struct} verschachtelte Feldgruppe;
+#   Beschreibung — Feldbeschriftung und der Hinweis darunter;
+#   =Wert      — was bereits im Feld steht, wenn das Formular geöffnet wird;
+#   Pflichtangabe — wird durch die required-Liste im Schema festgelegt. Hier gibt es keine: jeder
+#                Parameter hat einen Standardwert, daher kann jedes Feld übersprungen werden.
+# Deshalb werden die Beschreibungen auf Englisch geschrieben: sie werden nicht nur vom Chart-Autor gelesen, sondern von jedem,
+# der die Anwendung im Dashboard bestellt.
 
-## Комментарии вида `## @param` — не украшение. По ним генератор Cozystack
-## (cozyvalues-gen) собирает values.schema.json и таблицу параметров в README.
-## Формат: ## @param {тип} имя=значение-по-умолчанию - Описание.
+## Kommentare der Form `## @param` sind keine Dekoration. Aus ihnen erzeugt der Cozystack-Generator
+## (cozyvalues-gen) values.schema.json und die Parametertabelle in der README.
+## Format: ## @param {Typ} Name=Standardwert - Beschreibung.
 
-# Сколько копий приложения держать запущенными. Одна копия — простой на время
-# перезапуска узла, две переживают потерю любой из них.
+# Wie viele Kopien der Anwendung laufen sollen. Eine Kopie bedeutet Ausfall während eines
+# Knoten-Neustarts; zwei überstehen den Verlust einer beliebigen davon.
 ## @param {int} replicas=2 - Number of application replicas.
 replicas: 2
 
-# Текст на главной странице. Вынесен в параметры, потому что у каждой дочерней компании
-# он свой, а собирать ради этого отдельный образ никто не станет.
+# Text auf der Hauptseite. Als Parameter herausgezogen, weil jede Tochtergesellschaft
+# ihren eigenen hat und niemand nur dafür ein separates Image bauen wird.
 ## @param {string} greeting=Order a pass for your guest - Text shown on the main page.
 greeting: "Order a pass for your guest"
 
-# Нужен ли приложению адрес за пределами кластера. Соглашение каталога Cozystack:
-# поле с именем external означает у всех приложений одно и то же — внешний доступ.
+# Ob die Anwendung eine Adresse außerhalb des Clusters braucht. Die Cozystack-Katalog-Konvention:
+# ein Feld namens external bedeutet bei allen Anwendungen dasselbe — externer Zugriff.
 ## @param {bool} external=false - Enable external access from outside the cluster.
 external: false
 
-# Размер одной копии. Вынесен отдельной группой полей, чтобы в форме заказа это
-# выглядело как один блок «ресурсы», а не как два несвязанных поля.
+# Die Größe einer Kopie. Als separate Feldgruppe zusammengefasst, damit sie im Bestellformular
+# wie ein einzelner Block „Ressourcen" aussieht und nicht wie zwei unabhängige Felder.
 ## @typedef {struct} Resources - CPU and memory for each replica.
 ## @field {quantity} cpu - CPU available to each replica.
 ## @field {quantity} memory - Memory (RAM) available to each replica.

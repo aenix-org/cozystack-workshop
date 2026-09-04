@@ -1,53 +1,53 @@
-# Лаба 10 · заказ базы MongoDB под пропуска разной формы.
-# Описание того, что вы хотите получить; собирает и настраивает сервис платформа.
-# То же самое, что вы закажете мышкой в дашборде — только текстом.
-# Применяется НЕ в лабораторный кластер, а в тенант на управляющем кластере:
+# Lab 10 · Bestellung einer MongoDB-Datenbank für Ausweise unterschiedlicher Art.
+# Eine Beschreibung dessen, was Sie erhalten möchten; die Plattform baut und konfiguriert den Dienst.
+# Dasselbe, was Sie mit der Maus im Dashboard bestellen würden — nur als Text.
+# Wird NICHT auf den Lab-Cluster angewendet, sondern auf einen Tenant im Management-Cluster:
 #   kubectl --kubeconfig="$HOME/.kube/config" apply -f mongodb.yaml
 #
-# ПЕРЕД ПРИМЕНЕНИЕМ: замените tenant-workshopXX на свой namespace,
-# а ЗдесьВашПароль — на пароль, который вы придумаете.
+# VOR DEM ANWENDEN: Ersetzen Sie tenant-workshopXX durch Ihren eigenen Namespace
+# und ЗдесьВашПароль durch ein Passwort Ihrer Wahl.
 apiVersion: apps.cozystack.io/v1alpha1
 kind: MongoDB
 metadata:
   name: passes
   namespace: tenant-workshopXX
 spec:
-  # Одна копия. MongoDB рассчитана на набор реплик из трёх: они голосуют, кто
-  # главный, и переживают потерю одной. С одной копией голосовать не с кем,
-  # и чарт включает для этого отдельный «небезопасный» режим. Для лабы годится,
-  # для прода — нет.
+  # Eine einzelne Kopie. MongoDB ist für ein Replica-Set aus drei Knoten ausgelegt: sie stimmen ab,
+  # welcher der primäre ist, und überstehen den Ausfall eines Knotens. Mit einer einzelnen Kopie gibt es
+  # niemanden zum Abstimmen, und der Chart aktiviert dafür einen separaten „unsicheren“ Modus. Für ein Lab
+  # in Ordnung, für die Produktion nicht.
   replicas: 1
-  # Диск под данные. Четырём учебным документам хватит и мегабайта, но том потом
-  # проще взять с запасом, чем расширять.
+  # Festplatte für die Daten. Für vier Übungsdokumente würde ein Megabyte reichen, aber es ist
+  # einfacher, ein Volume mit etwas Reserve zu nehmen, als es später zu erweitern.
   size: 5Gi
-  # replicated — тома, у которых есть копия на другом узле кластера: узел выпал,
-  # данные остались.
+  # replicated — Volumes, die eine Kopie auf einem anderen Knoten des Clusters haben: fällt ein Knoten aus,
+  # bleiben die Daten erhalten.
   storageClass: replicated
-  # Процессор и память, выделенные поду базы. Для четырёх документов с избытком.
+  # CPU und Speicher, die dem Datenbank-Pod zugewiesen werden. Für vier Dokumente mehr als genug.
   resourcesPreset: s1.small
-  # Ветка MongoDB. Менять её задним числом на живой базе нельзя без обновления.
+  # MongoDB-Zweig. Ihn nachträglich an einer laufenden Datenbank zu ändern, ist ohne Upgrade nicht möglich.
   version: v8
-  # false — база доступна только изнутри кластера, наружу порт не выставляется.
-  # Ходить в неё вы будете из рабочего пода, запущенного рядом.
+  # false — die Datenbank ist nur von innerhalb des Clusters erreichbar, nach außen wird kein Port freigegeben.
+  # Sie greifen von einem daneben laufenden Arbeits-Pod darauf zu.
   external: false
-  # Шардирование разрезает данные между несколькими наборами серверов. Нужно, когда
-  # данные не помещаются на один сервер; четыре пропуска помещаются.
+  # Sharding teilt die Daten auf mehrere Server-Sätze auf. Nötig, wenn
+  # die Daten nicht auf einen einzelnen Server passen; vier Ausweise passen.
   sharding: false
-  # Пользователь базы и его пароль. Пароль придумайте свой и запомните: он нужен
-  # рабочему поду (в строке подключения MONGO_URI) и скрипту проверки
-  # (переменная MONGO_PASSWORD). Учётная запись заводится в служебной базе admin —
-  # поэтому в строке подключения обязателен authSource=admin.
+  # Der Datenbank-Benutzer und sein Passwort. Wählen Sie Ihr eigenes Passwort und merken Sie es sich: es wird vom
+  # Arbeits-Pod (in der Verbindungszeichenfolge MONGO_URI) und vom Prüfskript benötigt
+  # (die Variable MONGO_PASSWORD). Das Konto wird in der Dienstdatenbank admin angelegt —
+  # weshalb authSource=admin in der Verbindungszeichenfolge zwingend erforderlich ist.
   users:
     passapp:
       password: ЗдесьВашПароль
-  # База passes и права в ней: пользователю passapp выдана роль admin этой базы,
-  # то есть он может читать, писать, строить индексы и менять настройки коллекций.
-  # Права на другие базы это не даёт.
+  # Die Datenbank passes und die Rechte darin: dem Benutzer passapp wird die Rolle admin dieser
+  # Datenbank erteilt, das heißt, er kann lesen, schreiben, Indizes erstellen und Sammlungseinstellungen ändern.
+  # Rechte an anderen Datenbanken gewährt dies nicht.
   databases:
     passes:
       roles:
         admin:
           - passapp
-  # Резервные копии в объектное хранилище. На учебном стенде выключены.
+  # Backups in den Objektspeicher. Auf dem Übungsstand deaktiviert.
   backup:
     enabled: false

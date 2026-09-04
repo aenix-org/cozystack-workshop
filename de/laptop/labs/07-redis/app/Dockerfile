@@ -1,59 +1,59 @@
-# Лаба 7 · рецепт сборки образа сервиса «Пропуск», версия v2.
+# Lab 7 · Build-Rezept für das Image des Dienstes «Пропуск», Version v2.
 #
-# Dockerfile — это список шагов, по которым из исходников получается образ: неизменяемый
-# слепок файловой системы вместе с командой запуска. Ближайший знакомый вам аналог —
-# шаблон виртуальной машины, но собирается он не мышкой, а вот этим текстом, лежит
-# в реестре и версионируется тегом.
+# Ein Dockerfile ist eine Liste von Schritten, die aus Quelltexten ein Image machen: ein unveränderliches
+# Abbild eines Dateisystems zusammen mit einem Startbefehl. Die nächstliegende vertraute Analogie ist
+# eine Vorlage für eine virtuelle Maschine, nur wird es nicht mit der Maus gebaut, sondern mit genau diesem Text, es liegt
+# in einer Registry und wird über ein Tag versioniert.
 #
-# Собирают его на ноутбуке, не в кластере (см. шаг про сборку в README):
+# Gebaut wird es auf dem Laptop, nicht im Cluster (siehe den Build-Schritt in der README):
 #   docker build --platform linux/amd64 -t <ваш-harbor>/passes/passes-api:v2 app/
 #   docker push  <ваш-harbor>/passes/passes-api:v2
 #
-# --platform linux/amd64 обязателен на Mac с Apple Silicon: без него образ соберётся
-# под ARM, запушится без единой жалобы и упадёт в кластере с «exec format error».
+# --platform linux/amd64 ist auf einem Mac mit Apple Silicon zwingend: ohne es wird das Image
+# für ARM gebaut, ohne die geringste Beschwerde gepusht und stürzt im Cluster mit «exec format error» ab.
 #
-# Двухэтапная сборка.
+# Ein zweistufiger Build.
 #
-# Первый этап — сборочный: сюда нужен весь компилятор Go, а это примерно 350 МБ.
-# Второй этап — то, что поедет в кластер: туда попадает только готовый бинарник.
-# Так итоговый образ получается около 10 МБ вместо 350, и внутри него нет ни
-# компилятора, ни исходников, ни пакетного менеджера — то есть нечем
-# воспользоваться тому, кто в контейнер всё-таки попал.
+# Die erste Stufe ist die Build-Stufe: sie braucht den ganzen Go-Compiler, und das sind etwa 350 MB.
+# Die zweite Stufe ist das, was in den Cluster geht: dorthin gelangt nur das fertige Binary.
+# So endet das finale Image bei etwa 10 MB statt 350, und in ihm gibt es weder
+# einen Compiler noch Quelltexte noch einen Paketmanager — das heißt, es gibt nichts, womit
+# derjenige, der es doch in den Container geschafft hat, etwas anfangen könnte.
 
-# FROM — с какого готового образа начинаем. Здесь берём официальный образ с компилятором
-# Go на базе Alpine. AS build даёт этому этапу имя, чтобы во втором этапе забрать из него
-# результат. Версия зафиксирована (1.23), а не latest: иначе завтрашняя сборка того же
-# исходника может дать другой бинарник.
+# FROM — von welchem vorgefertigten Image wir starten. Hier nehmen wir das offizielle Image mit dem Go-
+# Compiler auf Alpine-Basis. AS build gibt dieser Stufe einen Namen, damit die zweite Stufe das
+# Ergebnis daraus entnehmen kann. Die Version ist festgenagelt (1.23), nicht latest: sonst kann der Build desselben
+# Quelltexts von morgen ein anderes Binary erzeugen.
 FROM golang:1.23-alpine AS build
-# WORKDIR — рабочая папка внутри образа. Все следующие команды выполняются в ней.
+# WORKDIR — das Arbeitsverzeichnis innerhalb des Images. Alle folgenden Befehle werden darin ausgeführt.
 WORKDIR /src
-# COPY кладёт файлы с ноутбука внутрь образа. Двумя строками, а не одной: go.mod меняется
-# редко, main.go — часто, а docker кеширует каждый шаг отдельно. Тронули только main.go —
-# шаг с go.mod возьмётся из кеша.
+# COPY legt Dateien vom Laptop in das Image. In zwei Zeilen, nicht in einer: go.mod ändert sich
+# selten, main.go — oft, und docker cacht jeden Schritt einzeln. Nur main.go angefasst —
+# der go.mod-Schritt kommt aus dem Cache.
 COPY go.mod ./
 COPY main.go ./
-# RUN — выполнить команду прямо во время сборки; её результат остаётся в образе.
-# CGO_ENABLED=0 — собрать статически, без привязки к системным библиотекам.
-# Без этого бинарник потребует glibc, которой в конечном образе не будет.
-# -trimpath убирает из бинарника пути с вашего ноутбука, -ldflags="-s -w" выбрасывает
-# отладочную информацию — образ меньше, а в лог не утекают имена ваших папок.
+# RUN — einen Befehl direkt während des Builds ausführen; sein Ergebnis bleibt im Image.
+# CGO_ENABLED=0 — statisch bauen, ohne Bindung an Systembibliotheken.
+# Ohne das würde das Binary glibc benötigen, die im finalen Image nicht vorhanden sein wird.
+# -trimpath entfernt Pfade von deinem Laptop aus dem Binary, -ldflags="-s -w" wirft
+# Debug-Informationen weg — das Image ist kleiner, und deine Ordnernamen gelangen nicht ins Log.
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/passes-api .
 
-# Второй FROM начинает образ заново, с чистого листа. Всё, что было в этапе build,
-# на этом месте выбрасывается, и в итоговый образ попадёт только то, что мы явно
-# скопируем следующей командой COPY --from=build.
+# Das zweite FROM beginnt das Image von vorn, mit einem sauberen Blatt. Alles, was in der Build-Stufe war,
+# wird an dieser Stelle verworfen, und in das finale Image gelangt nur das, was wir mit dem nächsten
+# Befehl COPY --from=build explizit kopieren.
 FROM alpine:3.21
-# Приложение работает не от root. В правильно настроенном кластере под от root
-# не пустят вовсе, и это не придирка, а стандартное требование безопасности.
+# Die Anwendung läuft nicht als root. In einem korrekt konfigurierten Cluster wird ein Pod, der als root läuft,
+# gar nicht erst zugelassen, und das ist keine Kleinlichkeit, sondern eine übliche Sicherheitsanforderung.
 RUN adduser -D -u 10001 app
-# Единственное, что переезжает из сборочного этапа, — один файл: готовый бинарник.
+# Das Einzige, was aus der Build-Stufe herüberzieht, ist eine einzige Datei: das fertige Binary.
 COPY --from=build /out/passes-api /usr/local/bin/passes-api
-# USER — от кого запускать процесс. Указан номер, а не имя: kubernetes проверяет
-# в манифесте именно номер (runAsNonRoot смотрит на uid), и они должны сходиться.
+# USER — als welcher Benutzer der Prozess laufen soll. Angegeben ist eine Nummer, kein Name: kubernetes prüft
+# im Manifest genau die Nummer (runAsNonRoot schaut auf die uid), und sie müssen übereinstimmen.
 USER 10001
-# EXPOSE — пометка «внутри слушают этот порт». Ничего не открывает и не пробрасывает,
-# это документация для того, кто будет писать манифест.
+# EXPOSE — ein Vermerk, dass «auf diesem Port intern gelauscht wird». Es öffnet nichts und leitet nichts weiter,
+# das ist Dokumentation für denjenigen, der das Manifest schreiben wird.
 EXPOSE 8080
-# ENTRYPOINT — что запускается, когда контейнер стартует. Процесс здесь один и он
-# главный: закончится он — закончится контейнер, и кластер поднимет новую копию.
+# ENTRYPOINT — was gestartet wird, wenn der Container startet. Es gibt hier einen einzigen Prozess und er ist
+# der Hauptprozess: endet er, endet der Container, und der Cluster bringt eine neue Kopie hoch.
 ENTRYPOINT ["/usr/local/bin/passes-api"]

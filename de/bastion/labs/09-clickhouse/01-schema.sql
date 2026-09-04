@@ -1,59 +1,59 @@
--- Лаба 9 · таблица журнала проходов: по строке на каждую отметку турникета.
+-- Lab 9 · Tabelle des Durchgangsprotokolls: eine Zeile pro Drehkreuz-Erfassung.
 --
--- Где выполняется: на виртуалке, в лабораторном кластере, короткой командой `ch`
--- из README — она отправляет SQL в ClickHouse телом обычного POST-запроса:
+-- Wo es läuft: auf der VM, im Lab-Cluster, über den kurzen Befehl `ch`
+-- aus der README — er sendet SQL an ClickHouse als Body einer gewöhnlichen POST-Anfrage:
 --     cd labs/09-clickhouse && ch < 01-schema.sql
--- Ответ у CREATE TABLE пустой — это и есть успех.
+-- Die Antwort bei CREATE TABLE ist leer — genau das bedeutet Erfolg.
 --
--- Ни CREATE DATABASE, ни CREATE USER здесь нет: базу и пользователя завёл сам
--- сервис при заказе (дашборд или файл clickhouse.yaml в этой же папке).
+-- Weder CREATE DATABASE noch CREATE USER stehen hier: Datenbank und Benutzer hat der
+-- Dienst selbst bei der Bestellung angelegt (das Dashboard oder die Datei clickhouse.yaml im selben Ordner).
 
--- IF NOT EXISTS — не ругаться, если таблица уже создана. Файл можно применить дважды.
+-- IF NOT EXISTS — nicht meckern, wenn die Tabelle bereits erstellt ist. Die Datei kann zweimal angewendet werden.
 CREATE TABLE IF NOT EXISTS passes
 (
-    -- Номер пропуска. UInt64 и UInt16 — беззнаковые целые на 8 и на 2 байта.
-    -- Размер типа в ClickHouse выбирают осознанно: на миллиарде строк каждый лишний
-    -- байт в колонке превращается в лишний гигабайт на диске.
+    -- Ausweisnummer. UInt64 und UInt16 — vorzeichenlose Ganzzahlen mit 8 und 2 Byte.
+    -- Die Größe eines Typs wählt man in ClickHouse bewusst: bei einer Milliarde Zeilen wird jedes zusätzliche
+    -- Byte in einer Spalte zu einem zusätzlichen Gigabyte auf der Festplatte.
     pass_id      UInt64,
-    -- Когда человек прошёл турникет. Вокруг этой колонки построен весь отчёт.
+    -- Wann die Person durch das Drehkreuz gegangen ist. Um diese Spalte herum ist der gesamte Bericht aufgebaut.
     created_at   DateTime,
-    -- Имя гостя. Почти у каждой строки своё, поэтому обычный String.
+    -- Name des Gastes. Fast jede Zeile hat einen eigenen, daher ein gewöhnlicher String.
     guest_name   String,
-    -- Три колонки ниже — LowCardinality(String): строка, у которой мало разных
-    -- значений (отделов пять, проходных три, типов пропуска четыре). ClickHouse
-    -- держит для такой колонки словарь и пишет на диск номера, а не повторённые
-    -- миллион раз слова.
-    -- Правило: до нескольких тысяч разных значений — LowCardinality, больше —
-    -- обычный String. Обернуть так guest_name было бы хуже, чем не оборачивать:
-    -- словарь из миллиона уникальных имён окажется больше самих данных.
+    -- Die drei Spalten unten sind LowCardinality(String): eine Zeichenkette mit wenigen verschiedenen
+    -- Werten (fünf Abteilungen, drei Eingänge, vier Ausweistypen). ClickHouse
+    -- hält für eine solche Spalte ein Wörterbuch und schreibt Nummern auf die Festplatte statt der eine
+    -- Million Mal wiederholten Wörter.
+    -- Regel: bis zu einigen Tausend verschiedenen Werten — LowCardinality, mehr —
+    -- ein gewöhnlicher String. guest_name so zu umhüllen wäre schlechter, als es nicht zu tun:
+    -- ein Wörterbuch aus einer Million einzigartiger Namen würde größer als die Daten selbst.
     host_dept    LowCardinality(String),
     entrance     LowCardinality(String),
     pass_type    LowCardinality(String),
-    -- Сколько минут гость пробыл внутри. Двух байт хватает с большим запасом.
+    -- Wie viele Minuten der Gast drinnen war. Zwei Byte reichen mit großem Spielraum.
     duration_min UInt16
 )
--- Движок таблицы — то, как ClickHouse хранит данные на диске. В привычных базах
--- такого выбора нет, здесь он есть и делается при создании таблицы.
--- MergeTree: каждая вставка кладёт на диск новый кусок, куски в фоне сливаются
--- в большие. Отсюда практическое правило — вставлять пачками по многу строк.
--- Миллион вставок по одной строке создадут миллион кусков и уложат сервер.
+-- Die Tabellen-Engine — die Art, wie ClickHouse die Daten auf der Festplatte speichert. In gewohnten Datenbanken
+-- gibt es diese Wahl nicht, hier gibt es sie und sie wird beim Erstellen der Tabelle getroffen.
+-- MergeTree: jede Einfügung legt ein neues Stück auf die Festplatte, die Stücke verschmelzen im Hintergrund
+-- zu größeren. Daher die praktische Regel — in Stapeln mit vielen Zeilen einfügen.
+-- Eine Million Einfügungen zu je einer Zeile würden eine Million Stücke erzeugen und den Server lahmlegen.
 ENGINE = MergeTree
--- Самая важная строка файла, и выбирают её до того, как в таблицу попадут данные.
--- ORDER BY задаёт порядок, в котором строки физически лежат на диске, и он же
--- работает единственным настоящим индексом: ClickHouse хранит отметки через каждые
--- несколько тысяч строк и по ним понимает, какие куски файла можно не читать вовсе.
+-- Die wichtigste Zeile der Datei, und sie wird ausgewählt, bevor Daten in die Tabelle gelangen.
+-- ORDER BY legt die Reihenfolge fest, in der die Zeilen physisch auf der Festplatte liegen, und dient zugleich
+-- als einziger echter Index: ClickHouse speichert Markierungen alle
+-- paar Tausend Zeilen und erkennt daran, welche Stücke der Datei gar nicht gelesen werden müssen.
 --
--- Следствие: «сколько проходов было в марте» превращается в чтение одного отрезка
--- файла, а «найти пропуск с номером 424242» — в чтение всей колонки pass_id,
--- потому что pass_id в сортировочном ключе нет. Это не недоделка, а устройство.
+-- Folge: „wie viele Durchgänge es im März gab“ wird zum Lesen eines einzigen Abschnitts
+-- der Datei, während „den Ausweis mit der Nummer 424242 finden“ zum Lesen der gesamten Spalte pass_id wird,
+-- weil pass_id nicht im Sortierschlüssel steht. Das ist kein Mangel, sondern die Bauart.
 --
--- Из знакомого мира: то же решение, что и в бумажном архиве, — раскладывать
--- пропуска по датам или по фамилиям. Разложили по датам — подшивка за март
--- достаётся мгновенно, а конкретный Иванов ищется перебором. И перекладывать
--- миллион бумажек задним числом никто не станет.
+-- Aus der vertrauten Welt: dieselbe Entscheidung wie in einem Papierarchiv — die
+-- Ausweise nach Datum oder nach Nachnamen abzulegen. Nach Datum abgelegt — die März-Mappe
+-- ist sofort zur Hand, während ein bestimmter Ivanov durch Durchsuchen gefunden wird. Und eine
+-- Million Blätter nachträglich umzusortieren wird niemand.
 --
--- PARTITION BY в файле нет намеренно. Партиция — отдельный набор кусков (обычно
--- за месяц), который можно выбросить одной командой; это удобно для правила
--- «храним два года и не больше». На восьми месяцах учебных данных партиции дали бы
--- лишние куски без пользы, а отсекать лишнее чтение здесь умеет сортировочный ключ.
+-- PARTITION BY steht absichtlich nicht in der Datei. Eine Partition ist ein separater Satz von Stücken (meist
+-- für einen Monat), den man mit einem einzigen Befehl verwerfen kann; das ist praktisch für die Regel
+-- „wir bewahren zwei Jahre auf und nicht mehr“. Bei acht Monaten Lerndaten würden Partitionen
+-- überflüssige Stücke ohne Nutzen bringen, und überflüssiges Lesen abzuschneiden kann hier der Sortierschlüssel.
 ORDER BY (created_at, entrance)

@@ -1,65 +1,65 @@
-// Лаба 10 · правило проверки документов (валидатор схемы) для коллекции passes.
+// Lab 10 · eine Regel zur Dokumentvalidierung (Schema-Validator) für die Collection passes.
 //
-// Программа для mongosh — оболочки MongoDB. Выполняется на виртуалке,
-// в лабораторном кластере, короткой командой `mo` из README:
+// Ein Programm für mongosh — die MongoDB-Shell. Es läuft auf der VM,
+// im Lab-Cluster, mit dem kurzen Befehl `mo` aus der README:
 //     cd labs/10-mongodb && mo < validator.js
-// В ответ вы увидите строку «правило установлено».
+// Als Antwort sehen Sie die Zeile «правило установлено».
 //
-// Что такое схема проверки. По умолчанию у коллекции схемы нет: база принимает
-// документ любой формы и опечатку в имени поля («tipe» вместо «type») кладёт молча —
-// такой пропуск охрана на проходной не найдёт. Валидатор — описание того, каким
-// обязан быть документ. С момента применения база проверяет каждую вставку и каждое
-// изменение сама.
+// Was ein Validierungsschema ist. Standardmäßig hat eine Collection kein Schema: die Datenbank akzeptiert
+// ein Dokument beliebiger Form und speichert einen Tippfehler in einem Feldnamen («tipe» statt «type») stillschweigend —
+// eine Lücke, die der Wächter am Kontrollpunkt nicht bemerkt. Ein Validator ist eine Beschreibung dessen, wie
+// ein Dokument aussehen muss. Ab dem Moment der Anwendung prüft die Datenbank jede Einfügung und jede
+// Änderung selbst.
 //
-// Что будет с документом, который правилу не соответствует: он не запишется,
-// а операция вернёт ошибку MongoServerError: Document failed validation. Документы,
-// которые уже лежат в коллекции, при установке правила не проверяются и не
-// переписываются — но их последующая правка начнёт отвергаться. Поэтому мусор
-// (документы без поля type) убирают до применения этого файла, а не после.
+// Was mit einem Dokument geschieht, das der Regel nicht entspricht: es wird nicht geschrieben,
+// und die Operation gibt einen Fehler MongoServerError: Document failed validation zurück. Dokumente,
+// die bereits in der Collection liegen, werden bei der Installation der Regel nicht geprüft und nicht
+// neu geschrieben — aber ihre spätere Bearbeitung beginnt abgelehnt zu werden. Deshalb wird der Müll
+// (Dokumente ohne Feld type) vor dem Anwenden dieser Datei entfernt, nicht danach.
 
-// runCommand — отправить базе команду напрямую, минуя привычные db.<коллекция>.<...>.
-// collMod — «измени настройки существующей коллекции». Правило навешивается на живую
-// коллекцию задним числом: останавливать базу и переливать данные не требуется.
+// runCommand — sende einen Befehl direkt an die Datenbank und umgehe das übliche db.<collection>.<...>.
+// collMod — «ändere die Einstellungen einer bestehenden Collection». Die Regel wird nachträglich an eine lebende
+// Collection angehängt: es ist nicht nötig, die Datenbank zu stoppen und die Daten neu zu laden.
 db.runCommand({
   collMod: "passes",
-  // validator — само правило. $jsonSchema — способ описать форму документа:
-  // какие поля обязательны, какого они типа и какие значения допустимы.
+  // validator — die Regel selbst. $jsonSchema — eine Möglichkeit, die Form eines Dokuments zu beschreiben:
+  // welche Felder erforderlich sind, welchen Typ sie haben und welche Werte erlaubt sind.
   validator: {
     $jsonSchema: {
-      // Сам документ верхнего уровня — объект.
+      // Das Dokument der obersten Ebene selbst — ein Objekt.
       bsonType: "object",
-      // Поля, без которых документ не примут. Обратите внимание, чего в списке НЕТ:
-      // guest. У группового пропуска вместо гостя организация, и правило обязано
-      // быть достаточно широким, чтобы законная форма документа через него
-      // проходила. Ограничение чувствуется сразу: чем разнообразнее документы,
-      // тем меньше можно потребовать от всех сразу.
+      // Die Felder, ohne die ein Dokument nicht akzeptiert wird. Beachten Sie, was NICHT in der Liste steht:
+      // guest. Ein Gruppenausweis hat eine Organisation anstelle eines Gastes, und die Regel muss
+      // breit genug sein, damit die legitime Form des Dokuments durch sie
+      // hindurchkommt. Die Einschränkung ist sofort spürbar: je vielfältiger die Dokumente,
+      // desto weniger kann von allen gleichzeitig verlangt werden.
       required: ["type", "host"],
-      // Требования к отдельным полям. Поле, которого здесь нет, не проверяется
-      // никак — незнакомое поле в документ пройдёт. Запретить это можно
-      // (additionalProperties: false), но тогда каждое новое поле потребует правки
-      // правила, и вы вернётесь к миграции схемы на каждый чих. Где провести черту —
-      // ваше решение, и оно всегда компромисс.
+      // Anforderungen an einzelne Felder. Ein hier nicht aufgeführtes Feld wird in keiner Weise
+      // geprüft — ein unbekanntes Feld gelangt in das Dokument. Das kann verboten werden
+      // (additionalProperties: false), aber dann erfordert jedes neue Feld eine Änderung
+      // der Regel, und Sie sind wieder bei einer Schema-Migration für jede Kleinigkeit. Wo die Grenze zu ziehen ist —
+      // ist Ihre Entscheidung, und sie ist immer ein Kompromiss.
       properties: {
-        // Тип пропуска — только одно из четырёх перечисленных значений. Пятый тип
-        // потребует изменить это правило, и это хорошо: изменение станет осознанным.
+        // Der Ausweistyp — nur einer der vier aufgeführten Werte. Ein fünfter Typ
+        // erfordert eine Änderung dieser Regel, und das ist gut: die Änderung wird bewusst.
         type: {
           enum: ["разовый", "недельный", "автомобильный", "групповой"],
           description: "тип пропуска, только из списка"
         },
-        // Кто из сотрудников заказал пропуск. Поле обязательное, и оно должно быть
-        // строкой.
+        // Welcher Mitarbeiter den Ausweis bestellt hat. Das Feld ist erforderlich, und es muss eine
+        // Zeichenkette sein.
         host: {
           bsonType: "string",
           description: "кто из сотрудников заказал"
         },
-        // guest есть в properties, но нет в required: если поле в документе есть,
-        // оно обязано быть строкой; если его нет — документ всё равно законен.
+        // guest ist in properties, aber nicht in required: wenn das Feld im Dokument vorhanden ist,
+        // muss es eine Zeichenkette sein; wenn es fehlt — ist das Dokument dennoch gültig.
         guest: {
           bsonType: "string"
         },
-        // Правила работают и внутри вложенных объектов. Поля car нет — никаких
-        // требований. Есть — это должен быть объект, и номер машины в нём
-        // обязателен, а прицеп, если указан, — логическое значение, а не строка
+        // Regeln funktionieren auch innerhalb verschachtelter Objekte. Es gibt kein Feld car — keine
+        // Anforderungen. Wenn es eines gibt — muss es ein Objekt sein, und das Kennzeichen des Autos darin
+        // ist erforderlich, während der Anhänger, falls angegeben, — ein boolescher Wert ist, keine Zeichenkette
         // «нет».
         car: {
           bsonType: "object",
@@ -71,8 +71,8 @@ db.runCommand({
             weight_kg: { bsonType: ["int", "long", "double"] }
           }
         },
-        // И внутри списков. items описывает, каким должен быть каждый элемент
-        // списка участников: имя обязательно, возраст — если указан — целое число.
+        // Und innerhalb von Listen. items beschreibt, wie jedes Element der
+        // members-Liste sein muss: name ist erforderlich, age — falls angegeben — eine ganze Zahl.
         members: {
           bsonType: "array",
           items: {
@@ -87,18 +87,18 @@ db.runCommand({
       }
     }
   },
-  // strict — проверять все вставки и все изменения. Мягкий вариант moderate
-  // проверяет новые документы и правки тех, что правилу уже соответствуют, а старый
-  // разнобой оставляет в покое. Именно с moderate включают проверку на коллекции,
-  // в которой уже накопился мусор: сначала перестаём портить дальше, потом чиним
-  // старое, потом переходим на strict.
+  // strict — alle Einfügungen und alle Änderungen prüfen. Die weichere Variante moderate
+  // prüft neue Dokumente und Bearbeitungen jener, die der Regel bereits entsprechen, und lässt das alte
+  // Durcheinander in Ruhe. Gerade mit moderate schaltet man die Validierung an einer Collection ein,
+  // in der sich bereits Müll angesammelt hat: erst hört man auf, es weiter zu verschlimmern, dann repariert
+  // man das Alte, dann wechselt man zu strict.
   validationLevel: "strict",
-  // error — отвергать неподходящий документ. Вариант warn пишет в журнал и всё равно
-  // принимает: годится, чтобы неделю посмотреть, что прилетает, прежде чем включать
-  // отказ и ломать чей-то работающий код.
+  // error — ein ungeeignetes Dokument ablehnen. Die Variante warn schreibt ins Protokoll und akzeptiert es
+  // trotzdem: gut, um eine Woche lang zu beobachten, was hereinkommt, bevor man die
+  // Ablehnung einschaltet und jemandes funktionierenden Code kaputt macht.
   validationAction: "error"
 });
 
-// runCommand отвечает объектом, в котором успех выглядит как { ok: 1 }. Печатаем
-// свою строку, чтобы результат применения файла читался с одного взгляда.
+// runCommand antwortet mit einem Objekt, in dem Erfolg wie { ok: 1 } aussieht. Wir drucken
+// unsere eigene Zeile, damit das Ergebnis der Anwendung der Datei auf einen Blick lesbar ist.
 print("правило установлено");

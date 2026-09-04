@@ -6,7 +6,7 @@
 #     kubectl apply -f flux/
 #
 # ACHTUNG: ERSETZEN Sie die url durch die Adresse IHRES eigenen Repositorys, bevor Sie anwenden: die Zeile
-# ERSETZEN-MICH ist ein Platzhalter, mit ihr geht Flux zu einer nicht existierenden Adresse und bleibt
+# ЗАМЕНИТЕ-МЕНЯ ist ein Platzhalter, mit ihr geht Flux zu einer nicht existierenden Adresse und bleibt
 # mit einem Fehler stehen. Prüfen Sie auch den Branch: GitHub erstellt neue Repositorys mit dem Branch main.
 #
 # In jedem Objekt: apiVersion — die Version des Beschreibungsschemas, kind — was wir erstellen,
@@ -29,7 +29,7 @@ spec:
   # Die Adresse des Repositorys. Es ist öffentlich, deshalb gibt es hier weder Login noch Schlüssel —
   # das ist eine Vereinfachung des Schulungsstands. In der Produktion ist das Repository privat, und daneben erscheint
   # ein Verweis auf ein Secret mit dem Deploy-Schlüssel (Feld secretRef).
-  url: https://github.com/ERSETZEN-MICH/passes-gitops
+  url: https://github.com/ЗАМЕНИТЕ-МЕНЯ/passes-gitops
   # Welcher Branch als Quelle der Wahrheit gilt. In den Cluster reist, was in main gemergt ist;
   # was in anderen Branches liegt, reist nicht. Daher kommt die Review: eine Änderung
   # lebt zuerst in ihrem eigenen Branch, wo man sie ansehen kann, und erst das Mergen in main

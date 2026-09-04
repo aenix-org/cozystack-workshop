@@ -1,27 +1,27 @@
-# Лаба 1. Всё учебное приложение rickroll одним файлом: настройки nginx, страница,
-# само развёртывание и постоянный адрес к нему. Четыре объекта, разделённые `---`.
+# Lab 1. Die gesamte Lern-App rickroll in einer einzigen Datei: nginx-Einstellungen, die Seite,
+# das Deployment selbst und eine dauerhafte Adresse, um sie zu erreichen. Vier Objekte, getrennt durch `---`.
 #
-# Применяется на вашем учебном кластере `lab`, а не в тенанте на управляющем кластере:
+# Wird auf Ihrem Lern-Cluster `lab` angewendet, nicht in einem Tenant auf dem Management-Cluster:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl apply -f rickroll.yaml
-# Заглушек вроде tenant-workshopXX здесь нет — подставлять свой номер никуда не нужно.
+# Platzhalter wie tenant-workshopXX gibt es hier nicht — Sie müssen Ihre Nummer nirgends einsetzen.
 #
-# Поля, которые повторяются у всех четырёх объектов, разбираем один раз здесь:
-#   apiVersion — раздел API, в котором живёт этот тип объекта;
-#   kind       — сам тип объекта;
-#   metadata.name — имя, по которому объект потом ищут через `kubectl get`.
-# Имя уникально внутри своего типа, поэтому Deployment и Service ниже оба зовутся
-# rickroll и не конфликтуют.
+# Die Felder, die sich über alle vier Objekte wiederholen, werden hier einmal behandelt:
+#   apiVersion — die API-Gruppe, in der dieser Objekttyp lebt;
+#   kind       — der Objekttyp selbst;
+#   metadata.name — der Name, unter dem das Objekt später über `kubectl get` gesucht wird.
+# Ein Name ist innerhalb seines eigenen Typs eindeutig, daher heißen das Deployment und der Service unten beide
+# rickroll und kollidieren nicht.
 ---
-# Настройки nginx. Между версиями страницы не меняются, поэтому вынесены отдельно.
-# ConfigMap — файл настроек, который лежит в кластере сам по себе и подкладывается
-# внутрь контейнера при запуске. Смысл в том, чтобы менять настройки, не пересобирая
-# образ. Ключ `default.conf` станет именем файла в каталоге, куда смонтирован том.
+# nginx-Einstellungen. Sie ändern sich zwischen den Seitenversionen nicht, deshalb werden sie separat gehalten.
+# ConfigMap — eine Einstellungsdatei, die eigenständig im Cluster lebt und beim Start in den
+# Container gelegt wird. Der Sinn ist, Einstellungen zu ändern, ohne das Image neu zu bauen.
+# Der Schlüssel `default.conf` wird zum Dateinamen in dem Verzeichnis, in das das Volume gemountet ist.
 #
-# Всё, что ниже отступа после `|`, — не YAML, а дословное содержимое файла. Строки
-# с решёткой внутри этого блока попадут в конфиг nginx как есть, а не исчезнут при
-# разборе. По той же причине в блок со страницей ниже комментарии не добавлены:
-# там HTML, и решётка в нём была бы видна пользователю на экране.
+# Alles unterhalb der Einrückung nach `|` ist kein YAML, sondern der wortwörtliche Inhalt der Datei. Zeilen
+# mit einer Raute innerhalb dieses Blocks landen unverändert in der nginx-Konfiguration, statt beim
+# Parsen zu verschwinden. Aus demselben Grund wurden im Seitenblock unten keine Kommentare hinzugefügt:
+# es ist HTML, und eine Raute darin wäre für den Benutzer am Bildschirm sichtbar.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -33,8 +33,8 @@ data:
       root /usr/share/nginx/html;
 
       location / {
-        # Вся соль лабы: nginx подставляет имя своего пода прямо в HTML.
-        # $hostname внутри пода — это и есть имя пода.
+        # Der ganze Sinn der Lab: nginx setzt seinen eigenen Pod-Namen direkt in das HTML ein.
+        # $hostname innerhalb des Pods ist genau der Pod-Name.
         sub_filter '__POD__' '$hostname';
         sub_filter_once off;
       }
@@ -45,10 +45,10 @@ data:
       }
     }
 ---
-# Страница, версия 1. Отдельным объектом от настроек — чтобы в лабе 4 переключить
-# приложение на вторую версию, не трогая конфиг nginx и не пересобирая образ.
-# Суффикс -v1 в имени не украшение: рядом появится rickroll-page-v2, и переключение
-# тома между ними и будет выкаткой новой версии.
+# Die Seite, Version 1. Ein separates Objekt von den Einstellungen — damit in Lab 4 die App auf die
+# zweite Version umgeschaltet werden kann, ohne die nginx-Konfiguration anzufassen oder das Image neu zu bauen.
+# Das Suffix -v1 im Namen ist keine Dekoration: rickroll-page-v2 wird daneben erscheinen, und das Umschalten
+# des Volumes zwischen ihnen ist genau das, was ein Rollout einer neuen Version ist.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -80,9 +80,9 @@ data:
     <p class="hint">Обновите страницу. Когда реплик станет больше — имя начнёт меняться.</p>
     </html>
 ---
-# Само приложение. Deployment описывает желаемое состояние — какой образ запускать,
-# сколько копий держать, как их заменять при обновлении. Дальше кластер сам приводит
-# реальность к этому описанию и следит за ней постоянно, а не один раз при создании.
+# Die App selbst. Deployment beschreibt den gewünschten Zustand — welches Image gestartet werden soll,
+# wie viele Kopien gehalten werden, wie sie bei einem Update ersetzt werden. Von da an bringt der Cluster selbst
+# die Realität mit dieser Beschreibung in Einklang und überwacht sie fortlaufend, nicht nur einmal bei der Erstellung.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -90,28 +90,28 @@ metadata:
   labels:
     app: rickroll
 spec:
-  # Сколько копий держать запущенными. Формулировка именно такая: не «запусти одну»,
-  # а «держи одну». Исчезнет копия — кластер создаст новую, не спрашивая. В лабе 3
-  # это же поле начнёт менять автомасштабирование, поэтому руками его больше не трогают.
+  # Wie viele Kopien laufend gehalten werden sollen. Die Formulierung ist genau so: nicht „starte eine“,
+  # sondern „halte eine“. Verschwindet eine Kopie, erstellt der Cluster ungefragt eine neue. In Lab 3
+  # beginnt das Autoscaling, dieses Feld zu ändern, deshalb fasst man es nicht mehr von Hand an.
   replicas: 1
-  # По какой метке Deployment считает поды своими. Метка здесь и метка в template
-  # ниже обязаны совпадать: при расхождении объект не создастся вовсе.
+  # Anhand welchen Labels das Deployment Pods als die seinen betrachtet. Das Label hier und das Label im Template
+  # unten müssen übereinstimmen: bei Abweichung wird das Objekt gar nicht erst erstellt.
   selector:
     matchLabels:
       app: rickroll
-  # Шаблон пода — с него штампуется каждая копия. Правка любого поля внутри template
-  # означает новую ревизию приложения и замену копий по очереди (это и есть лаба 4).
-  # Правка полей вне template (например, replicas) ревизию не создаёт.
+  # Das Pod-Template — jede Kopie wird daraus gestanzt. Das Bearbeiten eines beliebigen Feldes innerhalb von template
+  # bedeutet eine neue Revision der App und das Ersetzen der Kopien nacheinander (das ist genau Lab 4).
+  # Das Bearbeiten von Feldern außerhalb von template (zum Beispiel replicas) erzeugt keine Revision.
   template:
     metadata:
       labels:
-        # Та же метка висит и на самих подах: по ней их находит Service в конце файла.
+        # Dasselbe Label hängt an den Pods selbst: der Service am Ende der Datei findet sie darüber.
         app: rickroll
     spec:
-      # Требования профиля безопасности `restricted` на уровне всего пода: работа
-      # не от root, конкретный UID и стандартный профиль seccomp. В корпоративном
-      # кластере с включённым `restricted` под без этих полей не допустят к запуску,
-      # причём отказ придёт в момент создания пода, а не при apply манифеста.
+      # Anforderungen des `restricted`-Sicherheitsprofils auf Ebene des gesamten Pods: Betrieb
+      # nicht als root, eine bestimmte UID und das Standard-seccomp-Profil. In einem Unternehmens-
+      # Cluster mit aktiviertem `restricted` wird ein Pod ohne diese Felder nicht zum Start zugelassen,
+      # wobei die Ablehnung im Moment der Pod-Erstellung kommt, nicht beim apply des Manifests.
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
@@ -119,77 +119,77 @@ spec:
           type: RuntimeDefault
       containers:
         - name: nginx
-          # Та же строгость, но на уровне контейнера: процессу внутри запрещено
-          # повышать свои права, и у него отобраны все linux-возможности.
+          # Dieselbe Strenge, aber auf Container-Ebene: dem Prozess darin ist es untersagt,
+          # seine Rechte zu erhöhen, und ihm sind alle linux-Capabilities entzogen.
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # Непривилегированный вариант: слушает 8080 и работает не от root.
-          # Одного этого хватает профилю `baseline`, но не `restricted` — тому нужны
-          # явные securityContext у пода и у контейнера, они заданы выше. В
-          # корпоративном кластере обычно включён именно `restricted`.
+          # Eine unprivilegierte Variante: lauscht auf 8080 und läuft nicht als root.
+          # Das allein genügt dem `baseline`-Profil, aber nicht `restricted` — das braucht
+          # explizite securityContext bei Pod und Container, oben gesetzt. In einem
+          # Unternehmens-Cluster ist üblicherweise genau `restricted` aktiviert.
           image: nginxinc/nginx-unprivileged:1.27-alpine
-          # По умолчанию nginx поднимает по рабочему процессу на ядро узла. На учебной
-          # машине с одним ядром это один процесс, а на боевом узле с 64 ядрами — 64,
-          # и под с маленьким лимитом памяти падает с OOMKilled ещё до первого запроса.
-          # Автотюн считает воркеры по лимиту CPU: при 300m это один процесс.
-          # Через переменную окружения, а не через -g: директива уже есть в базовом
-          # конфиге образа, и второе объявление роняет nginx с ошибкой «duplicate».
+          # Standardmäßig startet nginx einen Worker-Prozess pro Kern des Knotens. Auf einer Lern-
+          # Maschine mit einem Kern ist das ein Prozess, aber auf einem Produktionsknoten mit 64 Kernen sind es 64,
+          # und ein Pod mit einem kleinen Speicherlimit stirbt mit OOMKilled noch vor der ersten Anfrage.
+          # Das Autotune zählt die Worker anhand des CPU-Limits: bei 300m ist das ein Prozess.
+          # Über eine Umgebungsvariable, nicht über -g: die Direktive ist bereits in der Basis-
+          # Konfiguration des Images enthalten, und eine zweite Deklaration lässt nginx mit einem „duplicate“-Fehler abstürzen.
           env:
             - name: NGINX_ENTRYPOINT_WORKER_PROCESSES_AUTOTUNE
               value: "1"
-          # Порту дано имя, а не только номер: на `http` ссылаются readinessProbe
-          # ниже и targetPort у Service. Поменяется номер — править надо в одном месте.
+          # Dem Port ist ein Name gegeben, nicht nur eine Nummer: auf `http` verweisen die readinessProbe
+          # unten und der targetPort des Service. Ändert sich die Nummer, bearbeitet man es an einer Stelle.
           ports:
             - containerPort: 8080
               name: http
-          # Две разные вещи, которые постоянно путают. requests — сколько ресурса
-          # зарезервировать гарантированно; по нему планировщик выбирает узел, и от
-          # него же автомасштабирование в лабе 3 считает загрузку в процентах.
-          # limits — потолок, выше которого не дают подняться: по процессору при
-          # упоре замедляют, по памяти убивают контейнер.
+          # Zwei verschiedene Dinge, die ständig verwechselt werden. requests — wie viel einer Ressource
+          # garantiert reserviert werden soll; danach wählt der Scheduler einen Knoten, und daraus
+          # berechnet auch das Autoscaling in Lab 3 die Auslastung in Prozent.
+          # limits — die Obergrenze, über die hinaus nicht gestiegen werden darf: bei der CPU wird bei
+          # Anschlag gedrosselt, beim Speicher wird der Container getötet.
           resources:
-            # Намеренно мизерные: на воркшопе таких приложений будет много.
-            # 20m — это две сотых ядра. Значение низкое сознательно: чем меньше
-            # requests, тем быстрее нагрузка перебивает порог и рост копий в лабе 3
-            # видно за секунды, а не за полчаса.
+            # Bewusst winzig: auf dem Workshop wird es viele solcher Apps geben.
+            # 20m sind zwei Hundertstel eines Kerns. Der Wert ist bewusst niedrig: je kleiner
+            # requests ist, desto schneller überschreitet die Last die Schwelle und das Wachstum der Kopien in Lab 3
+            # ist in Sekunden statt in einer halben Stunde zu sehen.
             requests:
               cpu: 20m
               memory: 32Mi
             limits:
               cpu: 300m
               memory: 128Mi
-          # Проверка готовности. Пока по этому адресу не пришёл ответ, кластер не
-          # пускает на копию трафик. Ради неё в конфиге nginx заведён отдельный
-          # location /healthz с ответом «ok». Этим полем оплачена выкатка без простоя
-          # в лабе 4: старую копию гасят только после того, как новая ответила.
-          # Уберите его — и обновление начнёт ронять запросы.
+          # Bereitschaftsprüfung. Solange an dieser Adresse keine Antwort eingetroffen ist, leitet der Cluster
+          # keinen Traffic auf die Kopie. Ihretwegen ist in der nginx-Konfiguration eine eigene
+          # location /healthz mit der Antwort „ok“ eingerichtet. Mit diesem Feld ist der Rollout ohne Ausfallzeit
+          # in Lab 4 bezahlt: die alte Kopie wird erst abgeschaltet, nachdem die neue geantwortet hat.
+          # Entfernen Sie es — und das Update beginnt, Anfragen fallen zu lassen.
           readinessProbe:
             httpGet:
               path: /healthz
               port: http
-            # Две секунды до первого стука — подобрано опытным путём. Меньше не имеет
-            # смысла, nginx столько стартует; больше — растянет каждую выкатку впустую.
+            # Zwei Sekunden bis zum ersten Klopfen — durch Erfahrung ermittelt. Weniger ergibt keinen
+            # Sinn, so lange braucht nginx zum Starten; mehr würde jeden Rollout unnötig in die Länge ziehen.
             initialDelaySeconds: 2
-          # Куда подложить содержимое ConfigMap внутри контейнера. Каталоги выбраны
-          # не произвольно: из первого nginx отдаёт файлы, из второго читает настройки.
-          # Без этих двух строк оба ConfigMap так и остались бы лежать в кластере,
-          # а nginx показал бы свою стандартную страницу.
+          # Wohin der ConfigMap-Inhalt innerhalb des Containers gelegt wird. Die Verzeichnisse sind
+          # nicht willkürlich gewählt: aus dem ersten liefert nginx Dateien, aus dem zweiten liest es Einstellungen.
+          # Ohne diese zwei Zeilen würden beide ConfigMaps einfach im Cluster liegen bleiben,
+          # und nginx würde seine Standardseite zeigen.
           volumeMounts:
             - name: page
               mountPath: /usr/share/nginx/html
             - name: conf
               mountPath: /etc/nginx/conf.d
-      # Какие ConfigMap подключить к поду. Имя тома здесь связывает его с записью
-      # в volumeMounts выше — совпадать должны именно имена, порядок для связки роли
-      # не играет. А вот для лабы 4 играет, см. предупреждение ниже.
+      # Welche ConfigMaps an den Pod angehängt werden. Der Volume-Name hier verbindet es mit dem Eintrag
+      # in volumeMounts oben — übereinstimmen müssen genau die Namen, die Reihenfolge spielt für die Bindung keine Rolle.
+      # Aber für Lab 4 spielt sie eine, siehe die Warnung unten.
       volumes:
-        # ВНИМАНИЕ: этот том должен быть первым (volumes[0]).
-        # Лаба 4 переключает версию страницы патчем по индексу.
-        # JSON Patch адресует элемент списка номером, а не именем. Переставите тома
-        # местами — патч молча подменит настройки nginx вместо страницы, приложение
-        # сломается, а сообщение об ошибке будет говорить совсем о другом.
+        # ACHTUNG: dieses Volume muss das erste sein (volumes[0]).
+        # Lab 4 schaltet die Seitenversion mit einem Patch nach Index um.
+        # JSON Patch adressiert ein Listenelement über die Nummer, nicht über den Namen. Vertauschen Sie die Volumes,
+        # dann ersetzt der Patch stillschweigend die nginx-Einstellungen statt der Seite, die App
+        # geht kaputt, und die Fehlermeldung wird von etwas ganz anderem sprechen.
         - name: page
           configMap:
             name: rickroll-page-v1
@@ -197,23 +197,23 @@ spec:
           configMap:
             name: rickroll-conf
 ---
-# Постоянный адрес приложения. Копии рождаются и умирают, их адреса меняются, а имя
-# `rickroll` внутри кластера остаётся прежним — по нему приложение и зовут соседи.
-# Список живых копий за этим именем кластер ведёт сам, по меткам.
+# Die dauerhafte Adresse der App. Kopien werden geboren und sterben, ihre Adressen ändern sich, aber der Name
+# `rickroll` innerhalb des Clusters bleibt derselbe — darüber rufen die Nachbarn die App.
+# Die Liste der lebenden Kopien hinter diesem Namen führt der Cluster selbst, anhand von Labels.
 apiVersion: v1
 kind: Service
 metadata:
   name: rickroll
 spec:
-  # Кого поставить за этот адрес: все поды с такой меткой, кем бы они ни были
-  # созданы. Отсюда типичная неприятность — посторонний под с меткой app: rickroll
-  # молча попадёт в балансировку и начнёт отвечать вашим пользователям. Скрипт
-  # check.sh в этой папке отдельно проверяет, что таких самозванцев нет.
+  # Wen man hinter diese Adresse stellt: alle Pods mit einem solchen Label, von wem auch immer sie
+  # erstellt wurden. Daher eine typische Unannehmlichkeit — ein fremder Pod mit dem Label app: rickroll
+  # gerät stillschweigend in den Lastausgleich und beginnt, Ihren Benutzern zu antworten. Das Skript
+  # check.sh in diesem Ordner prüft separat, dass es keine solchen Hochstapler gibt.
   selector:
     app: rickroll
   ports:
-    # port — на каком порту отвечает сам сервис, targetPort — куда он стучится внутрь
-    # пода. Здесь targetPort задан именем порта из контейнера, а не числом: поменяется
-    # номер в контейнере — этот файл править не придётся.
+    # port — auf welchem Port der Service selbst antwortet, targetPort — wohin er in den
+    # Pod hinein klopft. Hier ist targetPort über den Namen des Ports aus dem Container gesetzt, nicht über eine Zahl:
+    # ändert sich die Nummer im Container, muss diese Datei nicht bearbeitet werden.
     - port: 80
       targetPort: http

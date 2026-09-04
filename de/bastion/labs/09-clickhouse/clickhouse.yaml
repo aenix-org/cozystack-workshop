@@ -1,46 +1,46 @@
-# Лаба 9 · заказ базы ClickHouse под аналитику по журналу проходов.
-# Описание того, что вы хотите получить; собирает и настраивает сервис платформа.
-# То же самое, что вы закажете мышкой в дашборде — только текстом.
-# Применяется НЕ в лабораторный кластер, а в тенант на управляющем кластере:
+# Lab 9 · Bestellen einer ClickHouse-Datenbank für die Analyse über das Zutrittsprotokoll.
+# Eine Beschreibung dessen, was Sie erhalten möchten; die Plattform stellt den Dienst zusammen und konfiguriert ihn.
+# Dasselbe, was Sie mit der Maus im Dashboard bestellen würden — nur als Text.
+# Wird NICHT auf den Laborcluster angewendet, sondern auf einen Tenant im Management-Cluster:
 #   kubectl --kubeconfig="$HOME/.kube/config" apply -f clickhouse.yaml
 #
-# ПЕРЕД ПРИМЕНЕНИЕМ: замените tenant-workshopXX на свой namespace,
-# а ЗдесьВашПароль — на пароль, который вы придумаете.
+# VOR DEM ANWENDEN: Ersetzen Sie tenant-workshopXX durch Ihren Namespace
+# und ЗдесьВашПароль durch ein Passwort, das Sie sich ausdenken.
 apiVersion: apps.cozystack.io/v1alpha1
 kind: ClickHouse
 metadata:
   name: analytics
   namespace: tenant-workshopXX
 spec:
-  # Одна копия и один шард. В проде держат минимум две копии, иначе потеря узла
-  # означает недоступность данных, — но нам нужен миллион строк, а не отказо-
-  # устойчивость, и лишняя копия просто съела бы ресурсы стенда.
+  # Eine Kopie und ein Shard. In der Produktion hält man mindestens zwei Kopien, sonst bedeutet der Ausfall eines Knotens,
+  # dass die Daten nicht verfügbar sind — aber wir brauchen eine Million Zeilen, keine Ausfall-
+  # sicherheit, und eine zusätzliche Kopie würde nur die Ressourcen des Stands verbrauchen.
   replicas: 1
   shards: 1
-  # Диск под данные таблиц. Миллион строк из этой лабы займёт десятки мегабайт:
-  # колоночное хранение со словарями сжимает такой журнал очень сильно.
+  # Festplatte für die Tabellendaten. Eine Million Zeilen aus diesem Lab belegen einige zehn Megabyte:
+  # die spaltenorientierte Speicherung mit Wörterbüchern komprimiert ein solches Protokoll sehr stark.
   size: 5Gi
-  # Отдельный диск под системные журналы сервера, включая журнал запросов.
+  # Eine separate Festplatte für die System-Logs des Servers, einschließlich des Query-Logs.
   logStorageSize: 2Gi
-  # Через сколько дней выбрасывать журнал запросов. Мы будем в него смотреть.
+  # Nach wie vielen Tagen das Query-Log verworfen wird. Wir werden hineinschauen.
   logTTL: 15
-  # replicated — тома, у которых есть копия на другом узле кластера: узел выпал,
-  # данные остались.
+  # replicated — Volumes, die eine Kopie auf einem anderen Cluster-Knoten haben: der Knoten ist ausgefallen,
+  # die Daten sind geblieben.
   storageClass: replicated
-  # 1 процессор, 4 ГБ. ClickHouse считает в памяти, и на группировках по
-  # миллиону строк это заметно.
+  # 1 CPU, 4 GB. ClickHouse rechnet im Arbeitsspeicher, und bei Gruppierungen über
+  # eine Million Zeilen ist das spürbar.
   resourcesPreset: u1.small
-  # Пользователь базы и его пароль. Пароль придумайте свой и запомните: он нужен
-  # рабочему поду (переменная CH_AUTH) и скрипту проверки (переменная CH_PASSWORD).
-  # После создания его видно в дашборде, в секрете clickhouse-analytics-credentials.
+  # Der Datenbankbenutzer und sein Passwort. Denken Sie sich Ihr eigenes Passwort aus und merken Sie es sich: es wird benötigt
+  # vom Worker-Pod (Variable CH_AUTH) und vom Prüfskript (Variable CH_PASSWORD).
+  # Nach der Erstellung ist es im Dashboard sichtbar, im Secret clickhouse-analytics-credentials.
   users:
     analyst:
       password: ЗдесьВашПароль
-  # Резервные копии в объектное хранилище. Данные здесь сгенерированные,
-  # восстанавливать нечего — на учебном стенде выключено.
+  # Backups in den Objektspeicher. Die Daten hier sind generiert,
+  # es gibt nichts wiederherzustellen — auf dem Lernstand deaktiviert.
   backup:
     enabled: false
-  # Keeper нужен для согласования между копиями. Копия одна — согласовывать
-  # не с кем, а три пода Keeper заняли бы ресурсы впустую.
+  # Keeper wird für den Abgleich zwischen den Kopien benötigt. Es gibt nur eine Kopie — es gibt niemanden,
+  # mit dem abgeglichen werden könnte, und drei Keeper-Pods würden die Ressourcen umsonst belegen.
   clickhouseKeeper:
     enabled: false

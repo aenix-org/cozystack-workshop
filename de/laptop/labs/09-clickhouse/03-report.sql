@@ -1,42 +1,42 @@
--- Лаба 9 · отчёт, за которым пришло руководство: сколько гостей в каждом месяце,
--- сколько в среднем длится визит, в какой час приходят чаще всего и какая проходная
--- загружена больше.
+-- Lab 9 · der Bericht, nach dem die Geschäftsführung gefragt hat: wie viele Gäste in jedem Monat,
+-- wie lange ein Besuch im Schnitt dauert, zu welcher Stunde sie am häufigsten kommen und welcher Eingang
+-- stärker ausgelastet ist.
 --
--- Где выполняется: на ноутбуке, в лабораторном кластере, короткой командой `ch`
--- из README:
+-- Wo es läuft: auf dem Laptop, im Lab-Cluster, mit dem kurzen Befehl `ch`
+-- aus der README:
 --     cd labs/09-clickhouse && ch < 03-report.sql
--- Перед этим должны быть выполнены 01-schema.sql и 02-generate.sql.
+-- Zuvor müssen 01-schema.sql und 02-generate.sql ausgeführt worden sein.
 --
--- Как читать результат: по строке на каждый месяц, встретившийся в данных (их
--- восемь), месяцы по возрастанию, число гостей от месяца к месяцу растёт.
+-- Wie das Ergebnis zu lesen ist: eine Zeile pro Monat, der in den Daten vorkommt (es sind
+-- acht), die Monate in aufsteigender Reihenfolge, die Gästezahl wächst von Monat zu Monat.
 --
--- Почему миллион строк считается за миллисекунды. ClickHouse хранит каждую колонку
--- отдельным файлом. Этот запрос трогает три колонки из семи — остальные четыре,
--- включая самую тяжёлую guest_name, с диска не читаются вообще. В базе, где строка
--- лежит на диске целиком, пришлось бы поднять все миллион строк со всеми полями,
--- чтобы посчитать по трём из них. Отсюда и разница во времени.
--- Увидеть это в цифрах: допишите в конец запроса строку FORMAT JSON — в ответе
--- появится блок статистики с затраченным временем и объёмом прочитанного.
+-- Warum eine Million Zeilen in Millisekunden gezählt werden. ClickHouse speichert jede Spalte
+-- als separate Datei. Diese Abfrage berührt drei Spalten von sieben — die übrigen vier,
+-- einschließlich der schwersten, guest_name, werden gar nicht von der Festplatte gelesen. In einer Datenbank, in der eine Zeile
+-- vollständig auf der Festplatte liegt, müsste man alle Million Zeilen mit allen Feldern laden,
+-- nur um über drei davon zu rechnen. Daher der Unterschied in der Zeit.
+-- Um es in Zahlen zu sehen: hängen Sie die Zeile FORMAT JSON ans Ende der Abfrage an — in der Antwort
+-- erscheint ein Statistikblock mit der aufgewendeten Zeit und dem gelesenen Volumen.
 --
--- Одна строка отчёта на каждый месяц, который встретился в данных.
+-- Eine Berichtszeile pro Monat, der in den Daten aufgetaucht ist.
 SELECT
-    -- К какому месяцу отнести проход. toStartOfMonth превращает точное время
-    -- в первое число месяца: одно значение, по которому и группируем, и сортируем,
-    -- вместо пары «год плюс месяц».
+    -- Welchem Monat der Durchgang zuzuordnen ist. toStartOfMonth verwandelt die genaue Zeit
+    -- in den ersten Tag des Monats: ein einziger Wert, nach dem gruppiert und sortiert wird,
+    -- statt eines Paares aus "Jahr plus Monat".
     toStartOfMonth(created_at)          AS month,
-    -- Сколько строк попало в группу — это и есть «сколько гостей за месяц».
+    -- Wie viele Zeilen in die Gruppe gefallen sind — das ist "wie viele Gäste pro Monat".
     count()                             AS guests,
-    -- Средняя длительность визита, округлённая до целых минут.
+    -- Durchschnittliche Besuchsdauer, auf ganze Minuten gerundet.
     round(avg(duration_min))            AS avg_minutes,
-    -- Самый частый час прихода — тот самый час пик. topK(1)(x) возвращает массив
-    -- из одного самого частого значения, [1] достаёт его оттуда (счёт с единицы).
+    -- Die häufigste Ankunftsstunde — eben die Stoßzeit. topK(1)(x) gibt ein Array
+    -- aus dem einen häufigsten Wert zurück, und [1] holt ihn dort heraus (Zählung ab eins).
     topK(1)(toHour(created_at))[1]      AS peak_hour,
-    -- Самая загруженная проходная этого месяца, тем же приёмом.
+    -- Der am stärksten ausgelastete Eingang dieses Monats, mit demselben Kniff.
     topK(1)(entrance)[1]                AS busiest_entrance
--- Обратите внимание, чего в запросе нет: подзапросов, временных таблиц и join'ов.
--- Всё считается за один проход по данным.
+-- Beachten Sie, was die Abfrage nicht hat: Unterabfragen, temporäre Tabellen und Joins.
+-- Alles wird in einem einzigen Durchgang über die Daten berechnet.
 FROM passes
--- Схлопнуть все строки одного месяца в одну строку ответа.
+-- Alle Zeilen eines Monats zu einer einzigen Antwortzeile zusammenfalten.
 GROUP BY month
--- Вывести месяцы по возрастанию, чтобы рост читался сверху вниз.
+-- Die Monate in aufsteigender Reihenfolge ausgeben, damit sich das Wachstum von oben nach unten liest.
 ORDER BY month

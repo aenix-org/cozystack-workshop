@@ -1,26 +1,26 @@
 ---
-# Лаба 13. Так будет выглядеть заказ вашего приложения ПОСЛЕ того,
-# как админ применит applicationdefinition.yaml. Применяется в вашем тенанте:
+# Lab 13. So wird die Bestellung Ihrer Anwendung aussehen, NACHDEM
+# der Admin applicationdefinition.yaml angewendet hat. Anwenden in Ihrem Tenant:
 #   kubectl apply -f guestpass-example.yaml
 #
-# ВНИМАНИЕ: tenant-workshopXX — заглушка, а не имя namespace. Замените XX на номер
-# своего тенанта до применения, иначе kubectl откажет: такого namespace нет,
-# а в чужой вас не пустят.
+# ACHTUNG: tenant-workshopXX ist ein Platzhalter, kein Namespace-Name. Ersetzen Sie XX durch
+# Ihre Tenant-Nummer vor dem Anwenden, sonst verweigert kubectl: einen solchen Namespace gibt es nicht,
+# und in einen fremden werden Sie nicht gelassen.
 #
-# Обратите внимание: группа apps.cozystack.io — та же, что у Bucket,
-# VMInstance и остальных приложений каталога. Ваше приложение встанет
-# в один ряд с ними, а не куда-то сбоку.
+# Beachten Sie: die Gruppe apps.cozystack.io ist dieselbe, die von Bucket,
+# VMInstance und den übrigen Anwendungen des Katalogs verwendet wird. Ihre Anwendung reiht sich
+# neben ihnen ein, nicht irgendwo an der Seite.
 #
-# Применить этот файл до того, как админ зарегистрировал определение,
-# нельзя: kubectl ответит `no matches for kind "GuestPass"`.
+# Sie können diese Datei nicht anwenden, bevor der Admin die Definition registriert hat:
+# kubectl antwortet `no matches for kind "GuestPass"`.
 apiVersion: apps.cozystack.io/v1alpha1
 kind: GuestPass
 metadata:
   name: main
   namespace: tenant-workshopXX
-# Поля в spec — это ровно те параметры, что описаны в chart/values.yaml и показаны
-# формой заказа в дашборде. Здесь они выписаны текстом: то же самое, что нажать
-# кнопку в дашборде, но такой файл можно отревьюить, положить в Git и откатить.
+# Die Felder in spec sind genau die Parameter, die in chart/values.yaml beschrieben und
+# vom Bestellformular im Dashboard angezeigt werden. Hier sind sie als Text ausgeschrieben: dasselbe wie das Klicken
+# der Schaltfläche im Dashboard, aber eine solche Datei kann man reviewen, in Git ablegen und zurückrollen.
 spec:
   replicas: 2
   greeting: "Order a pass for your guest"
