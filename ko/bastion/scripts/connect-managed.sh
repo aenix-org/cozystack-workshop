@@ -1,32 +1,32 @@
 #!/bin/bash
-# Переключить мигрированное приложение с legacy hardcoded IP на managed DNS-endpoints.
-# Запускать в app-VM под root ПОСЛЕ netfix-dhcp.sh + ребута (иначе DNS не резолвит).
+# 마이그레이션된 애플리케이션을 legacy 하드코딩 IP에서 managed DNS 엔드포인트로 전환합니다.
+# netfix-dhcp.sh + 재부팅 이후에 app-VM에서 root 권한으로 실행하세요(그렇지 않으면 DNS가 리졸브되지 않습니다).
 set -e
 CONF=/etc/orders/application.properties
 
 # =========================================================================
-# ВСТАВЬТЕ ИМЕНА ВАШИХ managed-сервисов.
-#   Формат Service DNS в вашем тенанте (namespace = tenant-<ваш-логин>):
-#     Postgres: postgres-<имя-postgres>-rw.<namespace>.svc.cozy.local
-#     Kafka:    kafka-<имя-kafka>-kafka-bootstrap.<namespace>.svc.cozy.local
-#   Имена сервисов видны в дашборде: Postgres/Kafka -> ваш инстанс -> Services.
+# 여러분의 managed 서비스 이름을 붙여넣으세요.
+#   테넌트 내 Service DNS 형식 (namespace = tenant-<여러분의-로그인>):
+#     Postgres: postgres-<postgres-이름>-rw.<namespace>.svc.cozy.local
+#     Kafka:    kafka-<kafka-이름>-kafka-bootstrap.<namespace>.svc.cozy.local
+#   서비스 이름은 대시보드에서 확인할 수 있습니다: Postgres/Kafka -> 여러분의 인스턴스 -> Services.
 # =========================================================================
-# значения по умолчанию совпадают с manifests/04-managed.yaml (Postgres=db, Kafka=kafka).
-# Замени только tenant-workshopXX на свой namespace. Если называл Postgres/Kafka иначе —
-# поменяй db/kafka на свои имена.
+# 기본값은 manifests/04-managed.yaml과 일치합니다 (Postgres=db, Kafka=kafka).
+# tenant-workshopXX만 여러분의 namespace로 바꾸세요. Postgres/Kafka를 다른 이름으로 지었다면 —
+# db/kafka를 여러분의 이름으로 변경하세요.
 PG_HOST="postgres-db-rw.tenant-workshopXX.svc.cozy.local"
 KAFKA_HOST="kafka-kafka-kafka-bootstrap.tenant-workshopXX.svc.cozy.local"
 # =========================================================================
 
-echo "== было (legacy hardcoded IP) =="
+echo "== 이전 (legacy 하드코딩 IP) =="
 grep -E 'datasource.url|bootstrap-servers' "$CONF"
 
 sed -i "s#192.168.10.30:5432#${PG_HOST}:5432#; s#192.168.10.40:9092#${KAFKA_HOST}:9092#" "$CONF"
 
-echo "== стало (managed DNS) =="
+echo "== 이후 (managed DNS) =="
 grep -E 'datasource.url|bootstrap-servers' "$CONF"
 
-echo "== перезапускаю приложение =="
+echo "== 애플리케이션을 재시작합니다 =="
 systemctl restart orders-api
 sleep 8
 systemctl is-active orders-api
