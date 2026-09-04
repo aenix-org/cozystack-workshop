@@ -1,40 +1,40 @@
 #!/usr/bin/env bash
-# Проверка лабы 11: сборка Android доехала до конца, а APK — до бакета.
+# Check for lab 11: the Android build ran to completion, and the APK made it to the bucket.
 #
-# Проверяем не «Job создан», а три разных утверждения, и они не равны друг другу:
-#   1) Job завершился успешно,
-#   2) внутри него действительно собрался APK (BUILD SUCCESSFUL),
-#   3) файл действительно уехал в объектное хранилище (маркер APK-UPLOADED).
-# Job может завершиться успешно и не собрать ничего — если кто-то поправил скрипт.
+# We verify not "the Job was created", but three separate claims, and they are not equal to each other:
+#   1) the Job finished successfully,
+#   2) an APK was actually built inside it (BUILD SUCCESSFUL),
+#   3) the file actually went to object storage (the APK-UPLOADED marker).
+# A Job can finish successfully and build nothing — if someone edited the script.
 #
-# Запускается на виртуалке, из папки этой лабы, по доступу к учебному кластеру `lab`
-# (не к тенанту на управляющем кластере — сборка идёт в кластере):
+# Runs on the VM, from this lab's folder, using access to the training cluster `lab`
+# (not the tenant on the management cluster — the build runs in the cluster):
 #     export KUBECONFIG=~/lab.kubeconfig
 #     cd labs/11-android && ./check.sh
 #
-# Скрипт ничего не меняет в кластере — только читает и отправляет HTTP-запросы.
-# Запускать его до уборки: вместе с Job удаляются и его логи, а без логов подтвердить
-# два из трёх утверждений выше нечем.
+# The script changes nothing in the cluster — it only reads and sends HTTP requests.
+# Run it before cleanup: deleting the Job also deletes its logs, and without the logs
+# there is nothing left to confirm two of the three claims above.
 
-# Эти две переменные подхватывает lib.sh — они попадают в заголовок отчёта и в имя
-# файла report-<лаба>-<дата>.md, который скрипт кладёт рядом с собой.
+# These two variables are picked up by lib.sh — they go into the report header and into the
+# file name report-<lab>-<date>.md, which the script places next to itself.
 LAB_NAME="11-android"
-LAB_TITLE="Лаба 11 · Сборка мобильного приложения в кластере"
-# Общая библиотека проверок: отсюда приходят ok / fail / warn / evidence / finish,
-# запрос изнутри кластера и запись отчёта. Путь считается от места, где лежит сам
-# скрипт, поэтому запуск из любого каталога работает одинаково.
+LAB_TITLE="Lab 11 · Building a mobile app in the cluster"
+# Shared check library: ok / fail / warn / evidence / finish, the in-cluster request, and
+# writing the report all come from here. The path is resolved relative to where the script
+# itself lives, so running from any directory works the same.
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
-# Останавливаемся сразу, если KUBECONFIG не задан. Без него kubectl ищет кластер
-# на самом виртуалке, не находит и валит все проверки подряд одной и той же ошибкой,
-# из которой настоящую причину не видно.
+# Stop immediately if KUBECONFIG is not set. Without it kubectl looks for a cluster
+# on the VM itself, doesn't find one, and fails every check in a row with the same error,
+# from which the real cause is invisible.
 need_kubeconfig
 
 JOB=propusk-build
 SECRET=bucket-creds
 
-# Значение ключа секрета. base64 -d есть не везде одинаковый (BSD против GNU),
-# поэтому декодируем питоном — он уже нужен библиотеке проверок.
+# The value of a secret key. base64 -d is not the same everywhere (BSD vs GNU),
+# so we decode with python — the check library already needs it.
 secret_val() {
   kubectl get secret "$SECRET" -o jsonpath="{.data.$1}" 2>/dev/null \
     | python3 -c 'import sys,base64
@@ -42,71 +42,71 @@ d=sys.stdin.read().strip()
 print(base64.b64decode(d).decode("utf-8", "replace") if d else "")' 2>/dev/null
 }
 
-# --- секрет с доступом к бакету -------------------------------------------
-# Проверяем не существование секрета, а то, что в нём заполнены все четыре поля.
-# Секрет создаётся руками, четырьмя --from-literal подряд, и самая частая беда —
-# пустое или пропущенное значение: объект при этом создаётся успешно, а сборка падает
-# на последнем шаге, когда сборка уже прошла. Дешевле узнать сейчас.
+# --- secret with bucket access --------------------------------------------
+# We check not that the secret exists, but that all four fields in it are filled in.
+# The secret is created by hand, with four --from-literal in a row, and the most common
+# trouble is an empty or missing value: the object is created successfully, but the build fails
+# at the last step, after the build has already passed. Cheaper to find out now.
 if kubectl get secret "$SECRET" >/dev/null 2>&1; then
   MISSING=""
   for k in endpoint bucketName accessKey secretKey; do
     [ -z "$(secret_val "$k")" ] && MISSING="$MISSING $k"
   done
   if [ -z "$MISSING" ]; then
-    ok "секрет ${SECRET} на месте, все четыре ключа заполнены"
-    # Значения ключей в отчёт не попадают — только имена полей.
-    evidence "Поля секрета ${SECRET}" "endpoint: $(secret_val endpoint)
+    ok "secret ${SECRET} is in place, all four keys are filled in"
+    # The key values do not go into the report — only the field names.
+    evidence "Fields of secret ${SECRET}" "endpoint: $(secret_val endpoint)
 bucketName: $(secret_val bucketName)
-accessKey: <скрыто>
-secretKey: <скрыто>"
+accessKey: <hidden>
+secretKey: <hidden>"
   else
-    fail "в секрете ${SECRET} не заполнены поля:${MISSING}" \
-         "пересоздайте секрет командой из README, значения берутся в дашборде: Bucket -> builds -> Secrets"
+    fail "secret ${SECRET} has unfilled fields:${MISSING}" \
+         "recreate the secret with the command from the README, values are taken in the dashboard: Bucket -> builds -> Secrets"
   fi
 else
-  fail "в кластере нет секрета ${SECRET}" \
-       "создайте секрет: kubectl create secret generic ${SECRET} --from-literal=endpoint=... (четыре поля)"
+  fail "there is no secret ${SECRET} in the cluster" \
+       "create the secret: kubectl create secret generic ${SECRET} --from-literal=endpoint=... (four fields)"
 fi
 
-# --- доступно ли хранилище изнутри кластера --------------------------------
-# Самая частая причина «Job упал на пятом шаге» — не ключи, а то, что до
-# хранилища из кластера не достучаться. Проверяем это отдельно от сборки.
-# Запрос идёт из пода, а не с виртуалки: у виртуалки своя сеть и свои маршруты,
-# и его успешный ответ ничего не говорил бы о том, дотянется ли туда сборка.
+# --- is storage reachable from inside the cluster --------------------------
+# The most common reason for "the Job failed at step five" is not the keys, but that
+# storage is unreachable from the cluster. We check this separately from the build.
+# The request goes from a pod, not from the VM: the VM has its own network and its own routes,
+# and its successful response would say nothing about whether the build can reach there.
 EP="$(secret_val endpoint)"
 if [ -n "$EP" ]; then
-  # Без -k намеренно: сборка ходит в хранилище с проверкой сертификата, и проверка
-  # обязана падать там же, где упадёт Job, а не выдавать зелёный на протухшем серте.
+  # Deliberately without -k: the build goes to storage with certificate verification, and the check
+  # must fail in the same place the Job fails, not report green on an expired cert.
 CODE="$(in_cluster_curl "https://${EP}/" "-o /dev/null -w %{http_code}")"
   case "$CODE" in
     2*|3*|4*)
-      ok "хранилище ${EP} отвечает изнутри кластера (HTTP ${CODE})"
-      evidence "Ответ хранилища" "GET https://${EP}/ -> HTTP ${CODE}
-Коды 403 и 404 здесь нормальны: анонимный запрос к корню S3 и должен быть отклонён."
+      ok "storage ${EP} responds from inside the cluster (HTTP ${CODE})"
+      evidence "Storage response" "GET https://${EP}/ -> HTTP ${CODE}
+Codes 403 and 404 are normal here: an anonymous request to the S3 root should indeed be rejected."
       ;;
     5*)
-      warn "хранилище ${EP} отвечает ошибкой HTTP ${CODE}" \
-           "сборка может пройти, но выгрузка APK — нет; скажите ведущему"
+      warn "storage ${EP} responds with error HTTP ${CODE}" \
+           "the build may pass, but the APK upload won't; tell the instructor"
       ;;
     *)
-      fail "хранилище ${EP} не отвечает изнутри кластера" \
-           "проверьте поле endpoint в секрете: оно должно быть БЕЗ https:// и без слэша на конце"
+      fail "storage ${EP} does not respond from inside the cluster" \
+           "check the endpoint field in the secret: it must be WITHOUT https:// and without a trailing slash"
       ;;
   esac
 else
-  warn "не проверяю доступность хранилища" \
-       "сначала нужен секрет ${SECRET} с полем endpoint"
+  warn "not checking storage availability" \
+       "the secret ${SECRET} with the endpoint field is needed first"
 fi
 
-# --- сам Job ---------------------------------------------------------------
-# Смотрим на .status.succeeded, а не на факт существования Job: объект создаётся
-# мгновенно и всегда успешно, а успех задачи означает, что под завершился с кодом 0.
-# Состояние пода разбирается отдельно, потому что «ещё идёт» и «висит в Pending» для
-# человека — разные новости: первое означает подождать, второе — что ждать бесполезно
-# и нужно увеличивать узел.
+# --- the Job itself --------------------------------------------------------
+# We look at .status.succeeded, not at the fact that the Job exists: the object is created
+# instantly and always successfully, while task success means the pod finished with code 0.
+# The pod state is examined separately, because "still running" and "stuck in Pending" are
+# different news for a human: the first means wait, the second means waiting is pointless
+# and the node needs to be enlarged.
 if ! kubectl get job "$JOB" >/dev/null 2>&1; then
-  fail "в кластере нет Job ${JOB}" \
-       "запустите сборку: kubectl apply -f android-build.yaml"
+  fail "there is no Job ${JOB} in the cluster" \
+       "start the build: kubectl apply -f android-build.yaml"
 else
   SUCCEEDED="$(kubectl get job "$JOB" -o jsonpath='{.status.succeeded}' 2>/dev/null)"
   FAILED="$(kubectl get job "$JOB" -o jsonpath='{.status.failed}' 2>/dev/null)"
@@ -115,57 +115,57 @@ else
     -o jsonpath='{.items[-1:].status.phase}' 2>/dev/null)"
 
   if [ "${SUCCEEDED:-0}" -ge 1 ] 2>/dev/null; then
-    ok "Job ${JOB} завершился успешно"
+    ok "Job ${JOB} finished successfully"
     evidence "Job" "$(kubectl get job "$JOB" -o wide 2>/dev/null)
-завершён: ${DURATION:-неизвестно}"
+completed: ${DURATION:-unknown}"
   elif [ "$POD_PHASE" = "Pending" ]; then
-    fail "под сборки висит в Pending — он не запустился и сам не запустится" \
-         "смотрите причину: kubectl describe pod -l job-name=${JOB} | grep -A5 Events; при Insufficient memory увеличьте узел до u1.large — как это сделать, написано в README"
-    evidence "События пода сборки" \
+    fail "the build pod is stuck in Pending — it did not start and won't start on its own" \
+         "check the reason: kubectl describe pod -l job-name=${JOB} | grep -A5 Events; on Insufficient memory enlarge the node to u1.large — how to do it is written in the README"
+    evidence "Build pod events" \
       "$(kubectl describe pod -l "job-name=${JOB}" 2>/dev/null | sed -n '/Events:/,$p' | head -20)"
   elif [ "${FAILED:-0}" -ge 1 ] 2>/dev/null; then
-    fail "Job ${JOB} завершился с ошибкой (неудачных попыток: ${FAILED})" \
-         "смотрите последние строки лога: kubectl logs job/${JOB} --tail=40"
-    evidence "Хвост лога упавшей сборки" \
+    fail "Job ${JOB} finished with an error (failed attempts: ${FAILED})" \
+         "look at the last lines of the log: kubectl logs job/${JOB} --tail=40"
+    evidence "Tail of the failed build's log" \
       "$(kubectl logs "job/${JOB}" --tail=30 2>/dev/null)"
   else
-    fail "Job ${JOB} ещё не завершился (состояние пода: ${POD_PHASE:-неизвестно})" \
-         "первая сборка занимает от пары минут до четверти часа, в зависимости от канала; следите: kubectl logs -f job/${JOB}"
+    fail "Job ${JOB} has not finished yet (pod state: ${POD_PHASE:-unknown})" \
+         "the first build takes from a couple of minutes to a quarter of an hour, depending on the connection; follow along: kubectl logs -f job/${JOB}"
   fi
 
-  # --- что именно произошло внутри ----------------------------------------
-  # Успешный Job сам по себе не доказывает ничего, кроме нулевого кода возврата.
-  # Поэтому вскрываем лог и ищем в нём два разных свидетельства: BUILD SUCCESSFUL —
-  # что компиляция дошла до конца, и строку-маркер APK-UPLOADED, которую скрипт печатает
-  # только после копирования файла в бакет. Второе сильнее первого: APK может собраться
-  # и остаться лежать внутри пода, который вот-вот исчезнет.
+  # --- what exactly happened inside ----------------------------------------
+  # A successful Job by itself proves nothing beyond a zero return code.
+  # So we open up the log and look in it for two different pieces of evidence: BUILD SUCCESSFUL —
+  # that compilation ran to completion, and the marker line APK-UPLOADED, which the script prints
+  # only after copying the file to the bucket. The second is stronger than the first: an APK can be built
+  # and stay lying inside a pod that is about to disappear.
   LOGS="$(kubectl logs "job/${JOB}" --tail=-1 2>/dev/null)"
   if [ -z "$LOGS" ]; then
-    warn "логи сборки недоступны" \
-         "под сборки удалён или ещё не создан; без логов нельзя подтвердить, что APK действительно собрался"
+    warn "build logs are unavailable" \
+         "the build pod was deleted or not yet created; without logs you cannot confirm that the APK was actually built"
   else
     if printf '%s' "$LOGS" | grep -q 'BUILD SUCCESSFUL'; then
       GRADLE_LINE="$(printf '%s' "$LOGS" | grep -m1 'BUILD SUCCESSFUL')"
-      ok "APK действительно собрался (${GRADLE_LINE})"
+      ok "the APK was actually built (${GRADLE_LINE})"
     else
-      fail "в логах нет строки BUILD SUCCESSFUL — компиляция не дошла до конца" \
-           "ищите первую строку с FAILURE: kubectl logs job/${JOB} | grep -n -m1 -A20 FAILURE"
+      fail "there is no BUILD SUCCESSFUL line in the logs — compilation did not run to completion" \
+           "look for the first line with FAILURE: kubectl logs job/${JOB} | grep -n -m1 -A20 FAILURE"
     fi
 
     UPLOADED="$(printf '%s' "$LOGS" | grep -m1 '^APK-UPLOADED ' | awk '{print $2}')"
     if [ -n "$UPLOADED" ]; then
-      ok "APK уехал в бакет: ${UPLOADED}"
-      evidence "Содержимое бакета после сборки" \
+      ok "the APK went to the bucket: ${UPLOADED}"
+      evidence "Bucket contents after the build" \
         "$(printf '%s' "$LOGS" | sed -n '/5\/5 кладу APK в бакет/,$p' | grep -v '^APK-UPLOADED ' | head -20)"
     else
-      fail "APK собрался, но в бакет не уехал" \
-           "смотрите хвост лога: kubectl logs job/${JOB} --tail=20; чаще всего виноват bucketName — в нём нужно длинное имя из дашборда, а не 'builds'"
+      fail "the APK was built, but did not go to the bucket" \
+           "look at the tail of the log: kubectl logs job/${JOB} --tail=20; most often bucketName is to blame — it needs the long name from the dashboard, not 'builds'"
     fi
   fi
 fi
 
-# --- хватает ли узлу места под такую сборку --------------------------------
-# Не приговор, а объяснение: если Job не поместился, причина почти всегда здесь.
+# --- does the node have enough room for such a build -----------------------
+# Not a verdict, but an explanation: if the Job didn't fit, the cause is almost always here.
 BIGGEST_MEM="$(kubectl get nodes -o jsonpath='{range .items[*]}{.status.allocatable.memory}{"\n"}{end}' 2>/dev/null \
   | sort -n | tail -1)"
 if [ -n "$BIGGEST_MEM" ]; then
@@ -175,18 +175,18 @@ if [ -n "$BIGGEST_MEM" ]; then
       GB="${BIGGEST_H%Gi}"
       GB_INT="${GB%%.*}"
       if [ "${GB_INT:-0}" -ge 6 ] 2>/dev/null; then
-        ok "самый крупный узел отдаёт ${BIGGEST_H} памяти — сборке хватает"
+        ok "the largest node offers ${BIGGEST_H} of memory — enough for the build"
       else
-        warn "самый крупный узел отдаёт всего ${BIGGEST_H} памяти" \
-             "сборка просит 4Gi только под requests; если Job висит в Pending, увеличьте тип узла до u1.large — как, написано в README"
+        warn "the largest node offers only ${BIGGEST_H} of memory" \
+             "the build requests 4Gi for requests alone; if the Job hangs in Pending, enlarge the node type to u1.large — how, is written in the README"
       fi
       ;;
     *)
-      warn "на узлах меньше гигабайта доступной памяти (${BIGGEST_H})" \
-           "сборка Android туда не поместится, увеличьте тип узла — как, написано в README"
+      warn "nodes have less than a gigabyte of available memory (${BIGGEST_H})" \
+           "an Android build won't fit there, enlarge the node type — how, is written in the README"
       ;;
   esac
-  evidence "Ресурсы узлов" "$(kubectl get nodes -o wide 2>/dev/null)"
+  evidence "Node resources" "$(kubectl get nodes -o wide 2>/dev/null)"
 fi
 
 finish

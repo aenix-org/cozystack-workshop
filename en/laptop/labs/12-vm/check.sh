@@ -1,58 +1,58 @@
 #!/usr/bin/env bash
-# Проверка лабы 12: мигрированная виртуалка опубликована наружу через ingress и домен
-# платформы — ровно так же, как контейнерное приложение.
+# Lab 12 check: the migrated virtual machine is published to the outside through the
+# platform's ingress and domain — exactly like the containerized application.
 #
-# Проверяем не «объекты созданы», а работу по существу:
-#   1) по доменному имени тенанта приходит HTTP 200 и это страница справочника,
-#   2) сама виртуальная машина запущена (Ready),
-#   3) Ingress, который публикует машину, на месте.
-# Первый пункт — главный: он и есть доказательство, что справочник виден снаружи.
+# We check not "objects created", but that the thing actually works:
+#   1) the tenant's domain name returns HTTP 200 and it is the directory page,
+#   2) the virtual machine itself is running (Ready),
+#   3) the Ingress that publishes the machine is in place.
+# The first item is the main one: it is the proof that the directory is visible from outside.
 #
-# Запускается на ноутбуке, из папки этой лабы. Нужен тенантный доступ и номер тенанта:
+# Runs on the laptop, from this lab's folder. Needs tenant access and the tenant number:
 #     export KUBECONFIG=~/.kube/workshop
 #     export COZY_TENANT=workshopXX
 #     cd labs/12-vm && ./check.sh
-# Проверка по домену работает и без доступа к тенанту — ей хватает curl. Без тенантного
-# доступа скрипт не падает: проверки со стороны тенанта он пропустит и скажет об этом.
+# The domain check works even without tenant access — curl is enough for it. Without tenant
+# access the script does not fail: it will skip the tenant-side checks and say so.
 #
-# Скрипт ничего не меняет — только читает и отправляет HTTP-запросы. Запускать до уборки:
-# после удаления машины проверять будет нечего.
+# The script changes nothing — it only reads and sends HTTP requests. Run it before cleanup:
+# once the machine is deleted there will be nothing left to check.
 
-# Эти две переменные подхватывает lib.sh — они попадают в заголовок отчёта и в имя
-# файла report-<лаба>-<дата>.md, который скрипт кладёт рядом с собой.
+# These two variables are picked up by lib.sh — they go into the report header and into the
+# file name report-<lab>-<date>.md, which the script places next to itself.
 LAB_NAME="12-vm"
-LAB_TITLE="Лаба 12 · Виртуалка рядом с контейнерами"
-# Общая библиотека проверок: отсюда приходят ok / fail / warn / evidence / finish.
-# Путь считается от места, где лежит сам скрипт, поэтому запуск из любого каталога
-# работает одинаково.
+LAB_TITLE="Lab 12 · A virtual machine next to the containers"
+# Shared check library: ok / fail / warn / evidence / finish come from here.
+# The path is resolved relative to where the script itself lives, so running from any
+# directory works the same.
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
-# Номер тенанта обязателен: из него складывается и имя namespace, и доменное имя, по
-# которому опубликован справочник. Без него проверять нечего.
+# The tenant number is required: it forms both the namespace name and the domain name at
+# which the directory is published. Without it there is nothing to check.
 need_tenant
 
-# Имена, которые проверяем. VM — имя ЗАКАЗА на машину, то есть объекта VMInstance;
-# по нему и спрашивается `kubectl get vminstance`. Сам запущенный экземпляр называется
-# иначе: платформа разворачивает заказ чартом `vm-instance`, имя чарта склеивается
-# с именем релиза, и получается vm-instance-spravochnik.
+# The names we check. VM is the name of the ORDER for a machine, i.e. of the VMInstance
+# object; it is what `kubectl get vminstance` is asked about. The actual running instance is
+# named differently: the platform deploys the order with the `vm-instance` chart, the chart
+# name is glued to the release name, and you get vm-instance-spravochnik.
 VM=spravochnik
 NS="tenant-${COZY_TENANT}"
-# Домен, на котором ведущий заранее опубликовал справочник через Ingress. Тот же адрес
-# вы открываете в браузере.
+# The domain on which the host published the directory in advance through Ingress. The same
+# address you open in the browser.
 HOST="spravochnik.${COZY_TENANT}.workshop.aenix.io"
 URL="http://${HOST}"
 
-# Доступ к тенанту не обязателен: домен проверяется обычным curl. Если KUBECONFIG задан
-# и тенант отвечает — добавим проверки состояния машины и Ingress.
+# Tenant access is not required: the domain is checked with an ordinary curl. If KUBECONFIG
+# is set and the tenant responds — we add checks of the machine state and Ingress.
 TENANT_OK=0
 if [ -n "${KUBECONFIG:-}" ] && kubectl -n "$NS" get vminstance >/dev/null 2>&1; then
   TENANT_OK=1
 fi
 
-# --- главное: справочник виден снаружи по домену ---------------------------
-# Отдельно берём код ответа и тело: код отличает «за ingress пока никого» (503) от
-# «ведёт не туда» (404) и «домена нет вовсе» (000), а тело подтверждает, что отвечает
-# именно справочник, а не случайная заглушка.
+# --- the main thing: the directory is visible from outside via the domain -------------
+# We take the response code and the body separately: the code distinguishes "no one behind
+# the ingress yet" (503) from "leads to the wrong place" (404) and "no domain at all" (000),
+# and the body confirms that it is exactly the directory answering, not some random stub.
 CODE="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$URL" 2>/dev/null)"
 BODY="$(curl -s --max-time 10 "$URL" 2>/dev/null)"
 
@@ -60,65 +60,66 @@ case "$CODE" in
   200)
     case "$BODY" in
       *"Справочник сотрудников"*)
-        ok "справочник опубликован: ${URL} отвечает 200 и отдаёт страницу справочника"
-        evidence "Ответ по домену" "запрос: ${URL}
-код ответа: ${CODE}
+        ok "directory published: ${URL} responds 200 and serves the directory page"
+        evidence "Response over the domain" "request: ${URL}
+response code: ${CODE}
 $(printf '%s' "$BODY" | head -3)"
         ;;
       *)
-        fail "по ${URL} приходит 200, но это не страница справочника" \
-             "за доменом отвечает что-то другое; проверьте, что на порту 8080 внутри машины слушает именно справочник"
+        fail "${URL} returns 200, but it is not the directory page" \
+             "something else answers behind the domain; check that the directory is exactly what listens on port 8080 inside the machine"
         ;;
     esac
     ;;
   503)
-    fail "домен ${URL} отвечает 503 — за Ingress пока некому отвечать" \
-         "машина ещё грузится или служба справочника на 8080 не поднялась; дождитесь Ready у vminstance и загляните в консоль машины"
+    fail "domain ${URL} returns 503 — no one is behind the Ingress to answer yet" \
+         "the machine is still booting or the directory service on 8080 has not come up; wait for the vminstance to be Ready and look into the machine's console"
     ;;
   000)
-    fail "домен ${URL} не отвечает совсем" \
-         "проверьте сеть; Ingress с этим хостом создаёт ведущий — если домена нет вовсе, спросите у него"
+    fail "domain ${URL} does not respond at all" \
+         "check the network; the Ingress with this host is created by the host — if there is no domain at all, ask them"
     ;;
   *)
-    fail "домен ${URL} отвечает ${CODE}, а не 200" \
-         "404 значит, что Ingress ведёт не на тот сервис; 5xx — что бэкенд не готов отвечать"
+    fail "domain ${URL} responds ${CODE}, not 200" \
+         "404 means the Ingress leads to the wrong service; 5xx means the backend is not ready to answer"
     ;;
 esac
 
-# --- сторона тенанта: сама машина и её публикация --------------------------
+# --- tenant side: the machine itself and its publication --------------------------
 if [ "$TENANT_OK" -eq 0 ]; then
-  warn "проверки со стороны тенанта пропущены: тенант недоступен по KUBECONFIG" \
-       "укажите тенантный доступ: export KUBECONFIG=~/.kube/workshop"
+  warn "tenant-side checks skipped: the tenant is not reachable via KUBECONFIG" \
+       "provide tenant access: export KUBECONFIG=~/.kube/workshop"
 else
-  # Спрашиваем не «есть ли объект», а условие Ready: заказ на машину создаётся за
-  # секунду, а гость поднимается три-пять минут, и всё это время машина существует,
-  # но справочник ещё не отвечает.
+  # We ask not "does the object exist", but the Ready condition: the order for a machine is
+  # created in a second, while the guest comes up in three to five minutes, and all that
+  # time the machine exists but the directory does not answer yet.
   if ! kubectl -n "$NS" get vminstance "$VM" >/dev/null 2>&1; then
-    fail "в тенанте ${NS} нет виртуальной машины ${VM}" \
-         "создайте VM Disk и VM Instance в дашборде или примените staff-directory-vm.yaml"
+    fail "there is no virtual machine ${VM} in tenant ${NS}" \
+         "create a VM Disk and a VM Instance in the dashboard or apply staff-directory-vm.yaml"
   else
     VM_READY="$(kubectl -n "$NS" get vminstance "$VM" \
       -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)"
     if [ "$VM_READY" = "True" ]; then
-      ok "виртуальная машина ${VM} запущена"
+      ok "virtual machine ${VM} is running"
     elif [ -n "$VM_READY" ]; then
-      fail "виртуальная машина ${VM} есть, но не готова (Ready=${VM_READY})" \
-           "смотрите карточку машины в дашборде; первое включение занимает 3-5 минут"
+      fail "virtual machine ${VM} exists, but is not ready (Ready=${VM_READY})" \
+           "look at the machine card in the dashboard; the first boot takes 3-5 minutes"
     else
-      warn "виртуальная машина ${VM} существует, но состояние прочитать не удалось" \
-           "посмотрите её глазами в дашборде: должна быть включена"
+      warn "virtual machine ${VM} exists, but its state could not be read" \
+           "look at it with your own eyes in the dashboard: it should be powered on"
     fi
-    evidence "Виртуальные машины тенанта" "$(kubectl -n "$NS" get vminstance 2>/dev/null)"
+    evidence "Tenant virtual machines" "$(kubectl -n "$NS" get vminstance 2>/dev/null)"
   fi
 
-  # Ingress создаёт ведущий, а не участник. Если домен уже отвечает 200 — он на месте;
-  # проверяем отдельно, чтобы при 503/404 сразу было видно, есть ли вообще публикация.
+  # The Ingress is created by the host, not the participant. If the domain already answers
+  # 200 — it is in place; we check separately so that on 503/404 it is immediately clear
+  # whether there is any publication at all.
   if kubectl -n "$NS" get ingress spravochnik >/dev/null 2>&1; then
-    ok "Ingress spravochnik на месте — справочник опубликован в тенанте"
-    evidence "Ingress тенанта" "$(kubectl -n "$NS" get ingress spravochnik 2>/dev/null)"
+    ok "Ingress spravochnik is in place — the directory is published in the tenant"
+    evidence "Tenant Ingress" "$(kubectl -n "$NS" get ingress spravochnik 2>/dev/null)"
   else
-    warn "Ingress spravochnik в тенанте ${NS} не найден" \
-         "его создаёт ведущий; если домен уже отвечает 200 — беспокоиться не о чем, иначе обратитесь к ведущему"
+    warn "Ingress spravochnik not found in tenant ${NS}" \
+         "it is created by the host; if the domain already answers 200 — nothing to worry about, otherwise ask the host"
   fi
 fi
 

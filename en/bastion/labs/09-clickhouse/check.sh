@@ -1,82 +1,82 @@
 #!/usr/bin/env bash
-# Проверка лабы 9: в ClickHouse лежит журнал проходов и по нему считается отчёт.
+# Check for lab 9: ClickHouse holds a log of entry passes and a report is computed over it.
 #
-# Проверяем не «сервис создан», а суть: таблица есть, строк не меньше миллиона,
-# данные разнообразные и с выраженными пиками, отчёт по месяцам отрабатывает за
-# миллисекунды, а запрос по одной колонке читает малую долю таблицы — то есть
-# колоночность работает, а не заявлена.
+# We check not "the service was created", but the substance: the table exists, has no fewer
+# than a million rows, the data is varied and has pronounced peaks, the monthly report runs in
+# milliseconds, and a query over a single column reads a small fraction of the table — that is,
+# columnar storage actually works, not just claimed.
 #
-# Запуск (в каждом новом окне терминала переменные задаются заново):
+# Run (in every new terminal window the variables must be set again):
 #   export KUBECONFIG=~/lab.kubeconfig
-#   export COZY_TENANT=workshopXX       # свой номер вместо XX
-#   export CH_PASSWORD='пароль пользователя analyst'
+#   export COZY_TENANT=workshopXX       # your number instead of XX
+#   export CH_PASSWORD='password of the analyst user'
 #   cd labs/09-clickhouse && ./check.sh
 #
-# Пароль не печатается и в отчёт не попадает.
-# Скрипт поднимает одноразовые поды с curl, поэтому работает около минуты.
+# The password is not printed and does not end up in the report.
+# The script spins up one-off pods with curl, so it takes about a minute.
 
-# Имя и заголовок нужны общей библиотеке: она подписывает ими отчёт-артефакт.
-# В lib.sh лежат ok/fail/warn/evidence/finish и проверки окружения ниже — чтобы
-# пятнадцать скриптов проверки печатали одинаково, а не каждый по-своему.
+# The name and title are needed by the shared library: it signs the report artifact with them.
+# lib.sh holds ok/fail/warn/evidence/finish and the environment checks below — so that
+# fifteen check scripts print identically, rather than each in its own way.
 LAB_NAME="09-clickhouse"
-LAB_TITLE="Лаба 9 · Аналитика на миллионе строк"
+LAB_TITLE="Lab 9 · Analytics over a million rows"
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
-# Обе проверки останавливают скрипт с внятным сообщением, если не задан файл доступа
-# к кластеру или номер тенанта. Без них дальше сыпались бы ошибки kubectl.
+# Both checks stop the script with a clear message if the cluster access file or the tenant
+# number is not set. Without them kubectl errors would keep piling up further down.
 need_kubeconfig
 need_tenant
 
-# COZY_TENANT участник задаёт как `workshop07`, а namespace называется
-# `tenant-workshop07`. Принимаем оба написания.
+# The participant sets COZY_TENANT as `workshop07`, while the namespace is called
+# `tenant-workshop07`. We accept both spellings.
 NS="$COZY_TENANT"
 case "$NS" in
   tenant-*) ;;
   *) NS="tenant-$NS" ;;
 esac
 
-# Имена по умолчанию — те же, что в лабе. Запись ${X:-значение} означает «взять
-# переменную окружения, а если её нет, подставить значение»: назвали приложение
-# иначе — запустите как CH_APP=имя ./check.sh, править скрипт не нужно.
-# Адрес внутренний, из самого кластера: 8123 — порт HTTP-интерфейса ClickHouse.
+# The default names are the same as in the lab. The form ${X:-value} means "take the
+# environment variable, and if it is missing, substitute the value": named the app
+# differently — run it as CH_APP=name ./check.sh, no need to edit the script.
+# The address is internal, from within the cluster itself: 8123 is the ClickHouse HTTP-interface port.
 CH_APP="${CH_APP:-analytics}"
 CH_USER="${CH_USER:-analyst}"
 CH_TABLE="${CH_TABLE:-passes}"
 CH_HOST="chendpoint-clickhouse-${CH_APP}.${NS}.svc.cozy.local:8123"
 CH_URL="http://${CH_HOST}/"
 
-evidence "Адрес ClickHouse" "$CH_URL"
+evidence "ClickHouse address" "$CH_URL"
 
-# --- 1. сервис вообще отвечает ---------------------------------------------
-# /ping не требует пароля, поэтому это первая и самая дешёвая проверка:
-# отделяет «нет связи» от «связь есть, пароль не тот».
+# --- 1. does the service respond at all -------------------------------------
+# /ping does not require a password, so this is the first and cheapest check:
+# it separates "no connection" from "connection is there, wrong password".
 PING="$(in_cluster_curl "${CH_URL}ping")"
 if printf '%s' "$PING" | grep -qi 'ok'; then
-  ok "ClickHouse отвечает по внутреннему адресу тенанта"
+  ok "ClickHouse responds at the tenant's internal address"
 else
-  fail "ClickHouse не отвечает по адресу ${CH_HOST}" \
-       "проверьте номер тенанта в COZY_TENANT и имя приложения (по умолчанию 'analytics'; иначе CH_APP=имя ./check.sh); в дашборде приложение должно быть в готовом состоянии"
+  fail "ClickHouse does not respond at ${CH_HOST}" \
+       "check the tenant number in COZY_TENANT and the app name (default 'analytics'; otherwise CH_APP=name ./check.sh); in the dashboard the app must be in a ready state"
   finish
   exit $?
 fi
 
-# Всё, что дальше, требует входа в базу. Без пароля скрипт не гадает и не молчит,
-# а честно говорит, что содержимое базы не проверено, и заканчивает отчёт: иначе
-# участник решил бы, что проверка пройдена.
+# Everything below requires logging into the database. Without a password the script does not
+# guess and does not stay silent, but honestly says that the database contents were not checked,
+# and finishes the report: otherwise the participant would decide the check had passed.
 if [ -z "${CH_PASSWORD:-}" ]; then
-  fail "не задана переменная CH_PASSWORD, содержимое базы не проверено" \
-       "export CH_PASSWORD='пароль пользователя ${CH_USER}' и запустите скрипт снова; пароль виден в дашборде, секрет clickhouse-${CH_APP}-credentials"
+  fail "the CH_PASSWORD variable is not set, the database contents were not checked" \
+       "export CH_PASSWORD='password of the ${CH_USER} user' and run the script again; the password is visible in the dashboard, secret clickhouse-${CH_APP}-credentials"
   finish
   exit $?
 fi
 
-# Выполнить SQL со стандартного ввода и вернуть ответ.
-# Отдельная функция, а не in_cluster_curl: запрос уходит телом POST, а телу
-# нужен стандартный ввод, которого у общей функции нет.
-# Пароль уходит в под переменной окружения из временного Secret'а, а не аргументом:
-# всё, что попадает в args, видно любому с `get pods`, лежит в etcd и светится в audit
-# log. Сама лаба про это и говорит — проверять её скриптом, который делает наоборот,
-# было бы двойным стандартом.
+# Run SQL from standard input and return the response.
+# A separate function, not in_cluster_curl: the query goes out as the POST body, and the body
+# needs standard input, which the shared function does not have.
+# The password goes into the pod as an environment variable from a temporary Secret, not as an
+# argument: anything that lands in args is visible to anyone with `get pods`, lives in etcd and
+# shows up in the audit log. The lab itself is about exactly this — checking it with a script that
+# does the opposite would be a double standard.
 ch_query() {
   in_cluster_with_secrets "curlimages/curl:8.11.1" \
     "CH_USER=${CH_USER}
@@ -85,7 +85,7 @@ CH_URL=${CH_URL}" \
     sh -c 'curl -sS --max-time 90 -u "$CH_USER:$CH_PASSWORD" --data-binary @- "$CH_URL?default_format=TSV"'
 }
 
-# Достать число из блока statistics ответа в формате JSON.
+# Pull a number out of the statistics block of a JSON-format response.
 chstat() {
   python3 -c '
 import sys, json
@@ -102,25 +102,25 @@ print(val)
 ' "$1" 2>/dev/null
 }
 
-# --- 2. таблица существует --------------------------------------------------
+# --- 2. the table exists ----------------------------------------------------
 EXISTS="$(printf 'EXISTS TABLE %s' "$CH_TABLE" | ch_query | tr -d '[:space:]')"
 if [ "$EXISTS" = "1" ]; then
-  ok "таблица ${CH_TABLE} существует"
+  ok "table ${CH_TABLE} exists"
 else
   if printf '%s' "$EXISTS" | grep -qi 'auth'; then
-    fail "ClickHouse не принял пароль пользователя ${CH_USER}" \
-         "сверьте пароль в дашборде: приложение ${CH_APP} → Secrets → clickhouse-${CH_APP}-credentials"
+    fail "ClickHouse did not accept the password of the ${CH_USER} user" \
+         "verify the password in the dashboard: app ${CH_APP} → Secrets → clickhouse-${CH_APP}-credentials"
   else
-    fail "таблицы ${CH_TABLE} нет" \
-         "создайте её: ch < 01-schema.sql (разбор схемы — в README)"
+    fail "table ${CH_TABLE} does not exist" \
+         "create it: ch < 01-schema.sql (schema walkthrough — in the README)"
   fi
   finish
   exit $?
 fi
 
-# --- 3. сколько данных и насколько они разнообразны -------------------------
-# Одним запросом вместо шести: каждый вызов ch_query поднимает под, и шесть
-# подов подряд превратили бы проверку в минутное ожидание на ровном месте.
+# --- 3. how much data and how varied it is ----------------------------------
+# One query instead of six: each ch_query call spins up a pod, and six pods in a row would
+# turn the check into a minute-long wait for no reason.
 STATS="$(ch_query <<SQL
 SELECT
     (SELECT count() FROM ${CH_TABLE}),
@@ -150,29 +150,29 @@ for v in ROWS UNIQ_ENT UNIQ_TYPE UNIQ_MONTH PEAK_MAX PEAK_MIN TABLE_BYTES; do
 done
 
 if [ "$ROWS" -ge 1000000 ]; then
-  ok "в таблице ${ROWS} строк — миллион сгенерирован"
+  ok "the table has ${ROWS} rows — a million were generated"
 else
-  fail "в таблице ${ROWS} строк, ожидался миллион" \
-       "запустите генератор: ch < 02-generate.sql (разбор генератора — в README)"
+  fail "the table has ${ROWS} rows, a million was expected" \
+       "run the generator: ch < 02-generate.sql (generator walkthrough — in the README)"
 fi
 
 if [ "$UNIQ_ENT" -ge 2 ] && [ "$UNIQ_TYPE" -ge 3 ] && [ "$UNIQ_MONTH" -ge 3 ]; then
-  ok "данные разнообразные: входов ${UNIQ_ENT}, типов пропуска ${UNIQ_TYPE}, месяцев ${UNIQ_MONTH}"
+  ok "data is varied: entrances ${UNIQ_ENT}, pass types ${UNIQ_TYPE}, months ${UNIQ_MONTH}"
 else
-  fail "данные однообразные: входов ${UNIQ_ENT}, типов ${UNIQ_TYPE}, месяцев ${UNIQ_MONTH}" \
-       "на таких данных отчёт ничего не покажет; перегенерируйте: TRUNCATE TABLE ${CH_TABLE}, затем ch < 02-generate.sql"
+  fail "data is monotonous: entrances ${UNIQ_ENT}, types ${UNIQ_TYPE}, months ${UNIQ_MONTH}" \
+       "on such data the report will show nothing; regenerate: TRUNCATE TABLE ${CH_TABLE}, then ch < 02-generate.sql"
 fi
 
 if [ "$PEAK_MIN" -gt 0 ] && [ "$PEAK_MAX" -ge $((PEAK_MIN * 2)) ]; then
-  ok "в данных есть выраженные пики по часам (самый нагруженный час к самому тихому — не меньше чем вдвое)"
-  evidence "Распределение по часам" "максимум за час: ${PEAK_MAX}
-минимум за час: ${PEAK_MIN}"
+  ok "the data has pronounced hourly peaks (the busiest hour vs the quietest — at least twice as much)"
+  evidence "Hourly distribution" "max per hour: ${PEAK_MAX}
+min per hour: ${PEAK_MIN}"
 else
-  warn "пиков по часам не видно: максимум ${PEAK_MAX}, минимум ${PEAK_MIN}" \
-       "отчёт «когда пики» на таких данных бессмысленный; проверьте, что генератор отработал целиком"
+  warn "no hourly peaks are visible: max ${PEAK_MAX}, min ${PEAK_MIN}" \
+       "the \"when are the peaks\" report is meaningless on such data; check that the generator finished completely"
 fi
 
-# --- 4. отчёт по месяцам считается быстро -----------------------------------
+# --- 4. the monthly report is computed quickly ------------------------------
 REPORT="$(ch_query <<SQL
 SELECT toStartOfMonth(created_at) AS month, count() AS guests
 FROM ${CH_TABLE}
@@ -186,31 +186,31 @@ ELAPSED="$(printf '%s' "$REPORT" | chstat elapsed)"
 READ_ROWS="$(printf '%s' "$REPORT" | chstat rows_read)"
 
 if [ -z "$ELAPSED" ]; then
-  fail "отчёт по месяцам не отработал" \
-       "запустите его вручную: ch < 03-report.sql и посмотрите на текст ошибки"
+  fail "the monthly report did not run" \
+       "run it manually: ch < 03-report.sql and look at the error text"
 else
   MS="$(python3 -c "print(round(float('$ELAPSED') * 1000, 1))" 2>/dev/null)"
-  # Порог держим близко к тому, что обещает лаба. Прежние пять секунд засчитывали
-  # как успех отчёт за четыре секунды — при том что в шапке лабы написано
-  # «считается за миллисекунды». Скрипт не должен подтверждать то, чего не проверил.
+  # We keep the threshold close to what the lab promises. The previous five seconds counted a
+  # four-second report as a success — even though the lab header says "computed in
+  # milliseconds". The script must not confirm what it has not checked.
   FAST="$(python3 -c "print(1 if float('$ELAPSED') < 0.5 else 0)" 2>/dev/null)"
   SLOW="$(python3 -c "print(1 if float('$ELAPSED') > 3 else 0)" 2>/dev/null)"
   if [ "$FAST" = "1" ]; then
-    ok "отчёт по месяцам посчитан за ${MS} мс, прочитано строк: ${READ_ROWS}"
+    ok "the monthly report was computed in ${MS} ms, rows read: ${READ_ROWS}"
   elif [ "$SLOW" = "1" ]; then
-    fail "отчёт по месяцам считался ${MS} мс — это не тот порядок, о котором лаба" \
-         "миллион строк на свободном стенде укладывается в десятки миллисекунд; проверьте, что сервис не занят соседней нагрузкой, и повторите"
+    fail "the monthly report took ${MS} ms — not the order of magnitude the lab is about" \
+         "a million rows on a free stand fit within tens of milliseconds; check that the service is not busy with a neighboring load, and retry"
   else
-    warn "отчёт по месяцам посчитан за ${MS} мс — медленнее ожидаемого, но в пределах разумного" \
-         "на занятом стенде так бывает; на свободном такой отчёт укладывается в десятки миллисекунд"
+    warn "the monthly report was computed in ${MS} ms — slower than expected, but within reason" \
+         "this happens on a busy stand; on a free one such a report fits within tens of milliseconds"
   fi
-  evidence "Отчёт по месяцам" "время: ${MS} мс
-прочитано строк: ${READ_ROWS}"
+  evidence "Monthly report" "time: ${MS} ms
+rows read: ${READ_ROWS}"
 fi
 
-# --- 5. колоночность работает, а не заявлена --------------------------------
-# Запрос трогает одну маленькую колонку. Если хранилище колоночное, прочитано
-# будет заметно меньше, чем весит вся таблица.
+# --- 5. columnar storage works, not just claimed ----------------------------
+# The query touches one small column. If the storage is columnar, the amount read
+# will be noticeably less than the weight of the whole table.
 NARROW="$(ch_query <<SQL
 SELECT count() FROM ${CH_TABLE} WHERE duration_min > 100 FORMAT JSON
 SQL
@@ -220,32 +220,32 @@ case "$NARROW_BYTES" in
   ''|*[!0-9]*) NARROW_BYTES=0 ;;
 esac
 
-# Обе величины НЕСЖАТЫЕ: `bytes_read` в статистике запроса — это распакованный
-# объём, а из system.columns берётся `data_uncompressed_bytes`. Сравнение с
-# `data_compressed_bytes` давало долю от размера на диске и печатало участнику
-# неверное число — на хорошо сжатой таблице она могла перевалить за сто процентов.
+# Both quantities are UNCOMPRESSED: `bytes_read` in the query statistics is the decompressed
+# volume, and from system.columns we take `data_uncompressed_bytes`. Comparing against
+# `data_compressed_bytes` gave a share of the on-disk size and printed the participant a
+# wrong number — on a well-compressed table it could exceed a hundred percent.
 if [ "$NARROW_BYTES" -gt 0 ] && [ "$TABLE_BYTES" -gt 0 ]; then
   SHARE="$(python3 -c "print(round(100 * $NARROW_BYTES / $TABLE_BYTES))" 2>/dev/null)"
-  evidence "Чтение одной колонки" "прочитано байт: ${NARROW_BYTES}
-вся таблица без сжатия, байт: ${TABLE_BYTES}
-доля: ${SHARE}%"
-  # Порог, а не просто «меньше целого». Одна узкая колонка из семи должна дать единицы
-  # процентов; «99% вместо 100%» формально меньше, но ничего не доказывает — а именно
-  # это утверждение лаба и выносит в заголовок.
+  evidence "Reading a single column" "bytes read: ${NARROW_BYTES}
+whole table uncompressed, bytes: ${TABLE_BYTES}
+share: ${SHARE}%"
+  # A threshold, not just "less than the whole". One narrow column out of seven should give
+  # single-digit percent; "99% instead of 100%" is formally less, but proves nothing — and that
+  # is exactly the claim the lab puts in its title.
   if [ "$SHARE" -le 25 ]; then
-    ok "запрос по одной колонке прочитал ${SHARE}% данных таблицы — колоночное хранение работает"
+    ok "the single-column query read ${SHARE}% of the table's data — columnar storage works"
   elif [ "$NARROW_BYTES" -lt "$TABLE_BYTES" ]; then
-    warn "запрос по одной колонке прочитал ${SHARE}% данных таблицы — меньше целого, но выигрыш скромнее ожидаемого" \
-         "ожидались единицы процентов; проверьте, что запрос обращается к одной узкой колонке, а не к нескольким"
+    warn "the single-column query read ${SHARE}% of the table's data — less than the whole, but the gain is more modest than expected" \
+         "single-digit percent was expected; check that the query addresses one narrow column, not several"
   else
-    warn "запрос по одной колонке прочитал не меньше всей таблицы" \
-         "так бывает на очень маленьких таблицах; проверьте, что строк действительно миллион"
+    warn "the single-column query read no less than the whole table" \
+         "this happens on very small tables; check that there really are a million rows"
   fi
 else
-  warn "не удалось измерить, сколько прочитал узкий запрос" \
-       "выполните вручную: SELECT count() FROM ${CH_TABLE} WHERE duration_min > 100 FORMAT JSON и посмотрите bytes_read"
+  warn "could not measure how much the narrow query read" \
+       "run manually: SELECT count() FROM ${CH_TABLE} WHERE duration_min > 100 FORMAT JSON and look at bytes_read"
 fi
 
-# finish печатает итог и складывает отчёт-артефакт в файл; код возврата — ненулевой,
-# если хоть одна проверка провалилась.
+# finish prints the summary and stores the report artifact in a file; the return code is non-zero
+# if at least one check failed.
 finish

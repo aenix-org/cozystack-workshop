@@ -1,16 +1,16 @@
--- Схема orders для managed Postgres (таблица + история-сид).
+-- orders schema for managed Postgres (table + history seed).
 --
--- Роль `orders` и БД `orders` создаёт Postgres-chart (Postgres CR), поэтому здесь
--- НЕТ CREATE USER / CREATE DATABASE — только таблица и немного истории.
+-- The `orders` role and `orders` DB are created by the Postgres chart (Postgres CR),
+-- so there is NO CREATE USER / CREATE DATABASE here — only the table and a bit of history.
 --
--- ВАЖНО (PG 15+): роль orders не может создавать таблицы в схеме public без
--- гранта. Сначала один раз под superuser (secret postgres-db-superuser):
+-- IMPORTANT (PG 15+): the orders role cannot create tables in the public schema without
+-- a grant. First, once, as superuser (secret postgres-db-superuser):
 --     GRANT CREATE,USAGE ON SCHEMA public TO orders;
--- и только потом накатывать этот файл от роли orders. Без таблицы приложение
--- отвечает 500 на POST /api/orders (health при этом 200 — он проверяет лишь
--- коннект к PG, а не наличие таблицы).
+-- and only then apply this file as the orders role. Without the table the application
+-- returns 500 on POST /api/orders (health stays 200 — it only checks the
+-- connection to PG, not the presence of the table).
 --
--- Запуск (с app-VM или любой машины с доступом к managed PG):
+-- Run (from the app-VM or any machine with access to managed PG):
 --     PGPASSWORD='<orders-pw>' psql -h postgres-db-rw -U orders -d orders -f orders-schema.sql
 
 CREATE TABLE IF NOT EXISTS orders (
@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS orders (
     processed_at TIMESTAMPTZ
 );
 
--- немного истории, чтобы список не выглядел пустым на проекторе
+-- a bit of history so the list does not look empty on the projector
 INSERT INTO orders (item, status, created_by, processed_by, created_at, processed_at)
 SELECT '12x rack rails', 'PROCESSED', 'app-1', 'kafka',
        now() - interval '3 days', now() - interval '3 days' + interval '2 seconds'
