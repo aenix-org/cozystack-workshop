@@ -1,43 +1,43 @@
 #!/usr/bin/env bash
-# Проверка лабы 5: состояние кластера приезжает из Git и удерживается сверкой.
+# ラボ5のチェック: クラスタの状態は Git から届き、リコンサイルによって維持される。
 #
-# Запускается на вашем кластере `lab`, из папки лабы, вами же:
+# あなたの `lab` クラスタに対して、ラボのフォルダから、あなた自身が実行する:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     ./check.sh
-# Ничего не меняет — только смотрит и печатает отчёт: что проверено, что прошло,
-# что нет, и приложенные свидетельства.
+# 何も変更しない — ただ確認し、レポートを出力するだけ: 何を確認したか、何が通ったか、
+# 何が通らなかったか、および添付された根拠。
 #
-# Проверяем не «Flux установлен», а «механизм работает»: источник читается, применённое
-# принадлежит Flux, сервис отвечает, сверка не выключена. Установленный, но
-# приостановленный Flux — это самый частый способ пройти лабу мимо смысла.
+# 確認するのは「Flux がインストールされている」ではなく「仕組みが動いている」こと: ソースが読まれ、適用されたものが
+# Flux に属し、サービスが応答し、リコンサイルが無効化されていない。インストール済みだが
+# 一時停止された Flux は、ラボの意味を外したまま合格する最も一般的な方法だ。
 
 LAB_NAME="05-gitops"
-LAB_TITLE="Лаба 5 · Инфраструктура в Git"
-# Общая обвязка всех лаб: из неё берутся ok / fail / warn / evidence / finish и
-# проверки окружения. Путь считается от расположения этого файла, поэтому скрипт
-# можно запускать из любой папки.
+LAB_TITLE="ラボ5 · Git 上のインフラ"
+# すべてのラボ共通の土台: ここから ok / fail / warn / evidence / finish と
+# 環境チェックが提供される。パスはこのファイルの位置から解決されるため、スクリプトは
+# 任意のフォルダから実行できる。
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
-# Без файла доступа к кластеру проверять нечего — выходим сразу и с понятной причиной.
+# クラスタへのアクセスファイルがなければ確認するものはない — 明確な理由とともに直ちに終了する。
 need_kubeconfig
 
-# Имена, которые лаба создаёт. Собраны в одном месте: если участник назвал объекты
-# иначе, править нужно здесь, а не искать имена по всему скрипту.
+# ラボが作成する名前。一箇所にまとめてある: 参加者がオブジェクトを
+# 別の名前で作った場合、スクリプト全体で名前を探すのではなく、ここで修正する。
 NS_APP="passes"
 GITREPO="passes"
 KUSTOMIZATION="passes"
 
-# Читаем поле объекта, не падая, если объекта или CRD нет.
+# オブジェクトや CRD がなくても失敗せずに、オブジェクトのフィールドを読む。
 kget() { kubectl get "$@" 2>/dev/null; }
 
-# --- службы Flux -----------------------------------------------------------
-# Смотрим не «поды существуют», а «копий в состоянии Ready хотя бы одна»: под может
-# висеть в Pending без памяти на узле и при этом присутствовать в выводе get pods.
-# Обе службы обязательны и делят работу: source-controller скачивает репозиторий,
-# kustomize-controller применяет скачанное. Без второй ничего не поедет в кластер.
+# --- Flux のサービス -----------------------------------------------------------
+# 確認するのは「Pod が存在する」ではなく「Ready 状態のレプリカが少なくとも1つある」こと: Pod は
+# ノードにメモリがなくて Pending のままぶら下がっていても、get pods の出力には現れうる。
+# 両方のサービスが必須で、仕事を分担する: source-controller がリポジトリをダウンロードし、
+# kustomize-controller がダウンロードしたものを適用する。後者がなければ何もクラスタに届かない。
 if ! kget namespace flux-system >/dev/null; then
-  fail "в кластере нет пространства имён flux-system" \
-       "Flux не установлен: flux install --components=source-controller,kustomize-controller"
+  fail "クラスタに flux-system 名前空間がありません" \
+       "Flux がインストールされていません: flux install --components=source-controller,kustomize-controller"
 else
   FLUX_BAD=""
   for d in source-controller kustomize-controller; do
@@ -45,24 +45,24 @@ else
     [ "${READY:-0}" -ge 1 ] 2>/dev/null || FLUX_BAD="$FLUX_BAD $d"
   done
   if [ -z "$FLUX_BAD" ]; then
-    ok "службы Flux работают: source-controller и kustomize-controller"
-    evidence "Поды Flux" "$(kget pods -n flux-system -o wide)"
+    ok "Flux のサービスが稼働しています: source-controller と kustomize-controller"
+    evidence "Flux の Pod" "$(kget pods -n flux-system -o wide)"
   else
-    fail "не работают службы Flux:${FLUX_BAD}" \
-         "смотрите kubectl get pods -n flux-system; на маленьком узле им может не хватать памяти"
+    fail "Flux のサービスが稼働していません:${FLUX_BAD}" \
+         "kubectl get pods -n flux-system を確認してください。小さなノードではメモリが不足している可能性があります"
   fi
 fi
 
-# --- источник: GitRepository ------------------------------------------------
-# Три разных исхода, и путать их нельзя: объекта нет вовсе; объект есть, но в нём
-# осталась заглушка адреса; объект есть и адрес настоящий, но Flux не смог прочитать
-# репозиторий. Совет в каждом случае разный, поэтому и ветки разные.
+# --- ソース: GitRepository ------------------------------------------------
+# 3つの異なる結末があり、混同してはならない: オブジェクトがまったく存在しない; オブジェクトはあるが
+# アドレスのプレースホルダが残っている; オブジェクトがあり本物のアドレスもあるが、Flux がリポジトリを
+# 読めなかった。それぞれのケースで助言が異なるため、分岐も異なる。
 #
-# Признак успеха берём из status.conditions — это то, что о себе сообщает сам Flux
-# после попытки сходить в Git, а не наше предположение по наличию объекта.
+# 成功のしるしは status.conditions から取る — これはオブジェクトの存在からの推測ではなく、
+# Git へアクセスを試みた後に Flux 自身が報告するものだ。
 if ! kubectl api-resources --api-group=source.toolkit.fluxcd.io 2>/dev/null | grep -q gitrepositories; then
-  fail "в кластере нет типа GitRepository" \
-       "Flux не установлен или установлен без source-controller"
+  fail "クラスタに GitRepository 型がありません" \
+       "Flux がインストールされていないか、source-controller なしでインストールされています"
 else
   GR_URL="$(kget gitrepository "$GITREPO" -n flux-system -o jsonpath='{.spec.url}')"
   GR_READY="$(kget gitrepository "$GITREPO" -n flux-system \
@@ -72,30 +72,30 @@ else
   GR_REV="$(kget gitrepository "$GITREPO" -n flux-system -o jsonpath='{.status.artifact.revision}')"
 
   if [ -z "$GR_URL" ]; then
-    fail "не найден GitRepository с именем ${GITREPO} в flux-system" \
-         "примените flux/gitrepository.yaml, подставив адрес своего репозитория"
+    fail "flux-system に ${GITREPO} という名前の GitRepository が見つかりません" \
+         "自分のリポジトリのアドレスを差し込んで flux/gitrepository.yaml を適用してください"
   elif printf '%s' "$GR_URL" | grep -q 'ЗАМЕНИТЕ-МЕНЯ'; then
-    fail "в GitRepository остался адрес-заглушка" \
-         "откройте flux/gitrepository.yaml и впишите адрес своего репозитория на GitHub"
+    fail "GitRepository にプレースホルダのアドレスが残っています" \
+         "flux/gitrepository.yaml を開き、自分の GitHub リポジトリのアドレスを記入してください"
   elif [ "$GR_READY" = "True" ]; then
-    ok "Flux читает ваш репозиторий: ${GR_URL}"
-    evidence "Источник в Git" "url: ${GR_URL}
-revision: ${GR_REV:-неизвестна}"
+    ok "Flux があなたのリポジトリを読んでいます: ${GR_URL}"
+    evidence "Git 上のソース" "url: ${GR_URL}
+revision: ${GR_REV:-不明}"
   else
-    fail "Flux не может прочитать репозиторий ${GR_URL}" \
-         "смотрите flux get sources git; чаще всего это опечатка в адресе, приватный репозиторий или другая ветка"
-    evidence "Ошибка источника" "${GR_MSG:-нет сообщения}"
+    fail "Flux がリポジトリ ${GR_URL} を読めません" \
+         "flux get sources git を確認してください。多くの場合、アドレスのタイプミス、プライベートリポジトリ、または別のブランチが原因です"
+    evidence "ソースのエラー" "${GR_MSG:-メッセージなし}"
   fi
 fi
 
-# --- применение: Kustomization ----------------------------------------------
-# Здесь проверяется не факт применения, а три свойства механизма, без которых лаба
-# теряет смысл: применённая ревизия совпадает с Git, сверка не приостановлена и
-# включено удаление исчезнувшего из репозитория.
+# --- 適用: Kustomization ----------------------------------------------
+# ここで確認するのは適用の事実ではなく、それがなければラボが意味を失う仕組みの3つの性質だ:
+# 適用されたリビジョンが Git と一致すること、リコンサイルが一時停止されていないこと、
+# リポジトリから消えたものの削除が有効になっていること。
 KS_READY=""
 if ! kubectl api-resources --api-group=kustomize.toolkit.fluxcd.io 2>/dev/null | grep -q kustomizations; then
-  fail "в кластере нет типа Kustomization" \
-       "Flux установлен без kustomize-controller — переустановите с обоими компонентами"
+  fail "クラスタに Kustomization 型がありません" \
+       "Flux が kustomize-controller なしでインストールされています — 両方のコンポーネントで再インストールしてください"
 else
   KS_READY="$(kget kustomization "$KUSTOMIZATION" -n flux-system \
     -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')"
@@ -107,114 +107,114 @@ else
   KS_INTERVAL="$(kget kustomization "$KUSTOMIZATION" -n flux-system -o jsonpath='{.spec.interval}')"
 
   if [ -z "$KS_REV" ] && [ -z "$KS_READY" ]; then
-    fail "не найден Kustomization с именем ${KUSTOMIZATION} в flux-system" \
-         "примените flux/kustomization.yaml"
+    fail "flux-system に ${KUSTOMIZATION} という名前の Kustomization が見つかりません" \
+         "flux/kustomization.yaml を適用してください"
   elif [ "$KS_READY" = "True" ]; then
-    ok "Flux применил состояние из Git, ревизия ${KS_REV}"
-    evidence "Применённая ревизия" "$KS_REV"
+    ok "Flux が Git の状態を適用しました。リビジョン ${KS_REV}"
+    evidence "適用されたリビジョン" "$KS_REV"
   else
-    fail "Flux не смог применить состояние из Git" \
-         "смотрите flux get kustomizations и kubectl describe kustomization ${KUSTOMIZATION} -n flux-system"
-    evidence "Ошибка применения" "${KS_MSG:-нет сообщения}"
+    fail "Flux が Git の状態を適用できませんでした" \
+         "flux get kustomizations と kubectl describe kustomization ${KUSTOMIZATION} -n flux-system を確認してください"
+    evidence "適用のエラー" "${KS_MSG:-メッセージなし}"
   fi
 
-  # Приостановленный Flux выглядит установленным и не делает ничего. Это главный
-  # способ «сдать» лабу, не получив ни одной её выгоды.
+  # 一時停止された Flux はインストール済みに見えるが、何もしない。これはラボの利点を
+  # 一つも得ないまま「合格」する主な方法だ。
   if [ "$KS_SUSPEND" = "true" ]; then
-    fail "сверка приостановлена (suspend: true) — Flux не следит за кластером" \
-         "включите обратно: flux resume kustomization ${KUSTOMIZATION}"
+    fail "リコンサイルが一時停止されています (suspend: true) — Flux はクラスタを監視していません" \
+         "元に戻してください: flux resume kustomization ${KUSTOMIZATION}"
   else
-    ok "сверка активна: расхождение с Git будет устранено само, интервал ${KS_INTERVAL:-по умолчанию}"
+    ok "リコンサイルが有効です: Git との差分は自動的に修正されます。間隔 ${KS_INTERVAL:-デフォルト}"
   fi
 
-  # Это warn, а не fail: без prune кластер всё равно управляется из Git, лаба пройдена.
-  # Но описание становится односторонним — удаление файла ничего не удаляет в кластере.
+  # これは fail ではなく warn だ: prune がなくてもクラスタは Git から管理され、ラボは合格する。
+  # ただし記述が一方向になる — ファイルを削除してもクラスタでは何も削除されない。
   if [ "$KS_PRUNE" = "true" ]; then
-    ok "включено удаление того, что исчезло из Git (prune)"
+    ok "Git から消えたものの削除が有効です (prune)"
   else
-    warn "prune выключен — удалённое из репозитория останется работать в кластере" \
-         "поставьте prune: true в flux/kustomization.yaml, иначе Git описывает состояние только наполовину"
+    warn "prune が無効です — リポジトリから削除されたものはクラスタで稼働し続けます" \
+         "flux/kustomization.yaml に prune: true を設定してください。さもないと Git は状態の半分しか記述しません"
   fi
 fi
 
-# --- объекты в кластере принадлежат Flux, а не были применены руками ---------
-# Это ключевая проверка лабы, и она про происхождение, а не про наличие. Приложение
-# в кластере есть в обоих случаях: и когда его привёз Flux, и когда участник применил
-# те же файлы руками через kubectl apply. Внешне не отличить — Deployment одинаковый.
-# Отличает метка владельца: её ставит только kustomize-controller, когда применяет
-# содержимое репозитория. Руками применённый объект такой метки не получит.
+# --- クラスタ内のオブジェクトは手動で適用されたのではなく Flux に属する ---------
+# これはラボの中核となるチェックで、存在ではなく由来に関するものだ。アプリケーションは
+# どちらの場合もクラスタに存在する: Flux が持ち込んだ場合も、参加者が同じファイルを
+# kubectl apply で手動適用した場合も。外見では区別できない — Deployment は同一だ。
+# 区別するのは所有者ラベル: これはリポジトリの内容を適用するときに kustomize-controller だけが
+# 付与する。手動で適用されたオブジェクトはそのラベルを得ない。
 OWNER="$(kget deployment passes -n "$NS_APP" \
   -o jsonpath='{.metadata.labels.kustomize\.toolkit\.fluxcd\.io/name}')"
 if [ -z "$(kget deployment passes -n "$NS_APP" -o name)" ]; then
-  fail "в пространстве имён ${NS_APP} нет приложения passes" \
-       "положите app/*.yaml в папку apps своего репозитория, сделайте push и дождитесь сверки"
+  fail "名前空間 ${NS_APP} に passes アプリケーションがありません" \
+       "app/*.yaml を自分のリポジトリの apps フォルダに置き、push してリコンサイルを待ってください"
 elif [ "$OWNER" = "$KUSTOMIZATION" ]; then
-  ok "приложение в кластере принадлежит Flux, а не применено руками"
+  ok "クラスタ内のアプリケーションは手動適用ではなく Flux に属しています"
 else
-  fail "приложение passes есть, но его создал не Flux" \
-       "уберите его (kubectl delete ns ${NS_APP}) и дайте Flux развернуть его из Git заново"
+  fail "passes アプリケーションは存在しますが、Flux が作成したものではありません" \
+       "それを削除し (kubectl delete ns ${NS_APP})、Flux に Git から再度デプロイさせてください"
 fi
 
-# --- приложение действительно отвечает --------------------------------------
-# Объект в кластере и работающий сервис — разные вещи: Deployment может быть создан,
-# а поды падать в цикле. Поэтому идём внутрь кластера и запрашиваем сервис по его
-# внутреннему имени — тем же путём, которым к нему обращались бы соседние приложения.
+# --- アプリケーションが実際に応答する --------------------------------------
+# クラスタ内のオブジェクトと稼働中のサービスは別物だ: Deployment が作成されていても、
+# Pod がループでクラッシュしていることがある。だからクラスタ内部に入り、サービスを
+# その内部名で要求する — 隣接するアプリケーションがそれに到達するのと同じ経路で。
 PODS="$(kget pods -n "$NS_APP" -l app=passes --no-headers)"
 PODS_READY="$(printf '%s' "$PODS" | awk '$3=="Running"' | grep -c .)"
 BODY="$(in_cluster_curl "http://passes.${NS_APP}.svc.cluster.local/")"
 
 if printf '%s' "$BODY" | grep -q 'Пропуск'; then
-  ok "сервис «Пропуск» отвечает по HTTP внутри кластера (работающих копий: ${PODS_READY})"
+  ok "«Пропуск» サービスがクラスタ内部で HTTP 応答しています (稼働中のレプリカ: ${PODS_READY})"
 else
-  fail "сервис «Пропуск» не отвечает по адресу passes.${NS_APP}.svc.cluster.local" \
-       "смотрите kubectl get pods -n ${NS_APP} и kubectl logs -n ${NS_APP} deploy/passes"
+  fail "«Пропуск» サービスが passes.${NS_APP}.svc.cluster.local で応答しません" \
+       "kubectl get pods -n ${NS_APP} と kubectl logs -n ${NS_APP} deploy/passes を確認してください"
 fi
 
-# Имя пода в странице должно совпадать с реально запущенной копией: так видно,
-# что отвечает именно тот под, который мы видим в кластере, а не закешированный
-# ответ или чужой сервис, случайно занявший то же имя. Несовпадение — warn, а не
-# fail: копия могла пересоздаться между двумя запросами, и это не ошибка участника.
+# ページ内の Pod 名は実際に稼働しているレプリカと一致すべきだ: これにより、
+# 応答しているのがキャッシュされた回答や偶然同じ名前を取った別のサービスではなく、
+# まさにクラスタで見える Pod だと分かる。不一致は fail ではなく warn だ:
+# レプリカは2つのリクエストの間に再作成されえて、それは参加者の誤りではない。
 SERVED_POD="$(printf '%s' "$BODY" | grep -o 'passes-[a-z0-9]*-[a-z0-9]*' | head -1)"
 if [ -n "$SERVED_POD" ] && printf '%s' "$PODS" | grep -q "$SERVED_POD"; then
-  ok "страницу отдал реально существующий под ${SERVED_POD}"
-  evidence "Копии сервиса" "$(kget pods -n "$NS_APP" -o wide)"
+  ok "ページを返したのは実際に存在する Pod ${SERVED_POD} です"
+  evidence "サービスのレプリカ" "$(kget pods -n "$NS_APP" -o wide)"
 elif [ -n "$SERVED_POD" ]; then
-  warn "под ${SERVED_POD} из ответа не найден среди запущенных" \
-       "скорее всего копия пересоздалась между двумя запросами — запустите проверку ещё раз"
+  warn "応答内の Pod ${SERVED_POD} が稼働中のものの中に見つかりません" \
+       "おそらくレプリカが2つのリクエストの間に再作成されました — もう一度チェックを実行してください"
 fi
 
-# --- история изменений в вашем клоне репозитория ----------------------------
-# Необязательная часть: скрипт не знает, где лежит клон, пока ему не скажут.
-# Проверяется здесь способ отката. Через kubectl rollout undo кластер тоже вернётся
-# к прошлой версии, но Git об этом не узнает, и следующая же сверка вернёт плохое
-# изменение обратно. Поэтому ищем в истории revert — откат сделан там, где живёт
-# истина. И сверяем, что применённая в кластере ревизия совпадает с вашим HEAD:
-# закоммитить и забыть про push — обычное дело, а снаружи это выглядит как «Flux завис».
+# --- あなたのリポジトリのクローンにおける変更履歴 ----------------------------
+# 任意の部分: スクリプトは指示されるまでクローンがどこにあるか知らない。
+# ここで確認するのはロールバックの方法だ。kubectl rollout undo でもクラスタは
+# 以前のバージョンに戻るが、Git はそれを知らず、次のリコンサイルが悪い
+# 変更を戻してしまう。だから履歴の中に revert を探す — ロールバックは真実の宿る
+# 場所で行われる。そしてクラスタに適用されたリビジョンがあなたの HEAD と一致するか確認する:
+# コミットして push を忘れるのはよくあることで、外からは「Flux が固まった」ように見える。
 REPO="${LAB_REPO:-}"
 if [ -z "$REPO" ]; then
-  warn "история репозитория не проверялась: не задана переменная LAB_REPO" \
-       "чтобы проверить и её: export LAB_REPO=~/passes-gitops && ./check.sh"
+  warn "リポジトリの履歴は確認されませんでした: LAB_REPO 変数が設定されていません" \
+       "これも確認するには: export LAB_REPO=~/passes-gitops && ./check.sh"
 elif [ ! -d "$REPO/.git" ]; then
-  warn "в ${REPO} нет клона репозитория" \
-       "укажите папку, в которую вы делали git clone"
+  warn "${REPO} にリポジトリのクローンがありません" \
+       "git clone した先のフォルダを指定してください"
 else
   HEAD_SHA="$(git -C "$REPO" rev-parse HEAD 2>/dev/null | cut -c1-7)"
   LOG="$(git -C "$REPO" log --oneline -20 2>/dev/null)"
 
   if printf '%s' "$LOG" | grep -qi '^[0-9a-f]* *revert'; then
-    ok "в истории есть откат через git revert — плохое изменение отменено там, где живёт истина"
-    evidence "История изменений" "$LOG"
+    ok "履歴に git revert によるロールバックがあります — 悪い変更は真実の宿る場所で取り消されました"
+    evidence "変更履歴" "$LOG"
   else
-    fail "в последних коммитах нет ни одного revert" \
-         "откатите плохое изменение через git revert --no-edit HEAD и сделайте push, а не через kubectl rollout undo"
+    fail "直近のコミットに revert が1つもありません" \
+         "kubectl rollout undo ではなく、git revert --no-edit HEAD で悪い変更をロールバックして push してください"
   fi
 
-  # Применённое в кластере должно совпадать с последним коммитом в ветке.
+  # クラスタに適用されたものはブランチの最新コミットと一致すべきだ。
   if [ -n "$HEAD_SHA" ] && printf '%s' "${KS_REV:-}" | grep -q "$HEAD_SHA"; then
-    ok "в кластере работает ровно то, что лежит в вашей ветке (коммит ${HEAD_SHA})"
+    ok "クラスタではあなたのブランチにあるものがそのまま稼働しています (コミット ${HEAD_SHA})"
   elif [ -n "$HEAD_SHA" ]; then
-    warn "коммит в кластере (${KS_REV:-неизвестен}) отличается от локального HEAD (${HEAD_SHA})" \
-         "проверьте, что локальные коммиты отправлены (git push), и подождите интервал сверки"
+    warn "クラスタのコミット (${KS_REV:-不明}) がローカルの HEAD (${HEAD_SHA}) と異なります" \
+         "ローカルのコミットが送信されている (git push) ことを確認し、リコンサイルの間隔を待ってください"
   fi
 fi
 

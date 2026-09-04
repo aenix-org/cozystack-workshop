@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# Собирает результаты всех лаб в один файл для загрузки в систему сертификации.
+# すべてのラボの結果を1つのファイルにまとめ、認定システムへのアップロード用にする。
 #
-# Важное свойство: скрипт НИЧЕГО НЕ ПЕРЕЗАПУСКАЕТ. Он берёт то, что каждая лаба
-# записала в момент, когда вы её сдавали. Иначе получилось бы вот что: лабы сами
-# велят убирать за собой, а квота тенанта не даёт держать все сервисы неделями —
-# и перепроверка в конце показала бы отказ по работе, честно сделанной три недели
-# назад.
+# 重要な性質: このスクリプトは何も再実行しない。各ラボがあなたが提出した時点で
+# 記録した内容をそのまま取り出す。そうしないと次のようなことが起きる: ラボ自体が
+# 後片付けをするよう指示し、テナントのクォータは全サービスを何週間も維持させて
+# くれない — そのため最後の再チェックでは、3週間前に誠実にやり終えた作業が
+# 失敗と表示されてしまう。
 #
-#   ./bundle.sh                 собрать всё, что найдено
-#   ./bundle.sh --rerun 07-redis  перепройти одну лабу и обновить её результат
+#   ./bundle.sh                 見つかったすべてを収集する
+#   ./bundle.sh --rerun 07-redis  1つのラボをやり直して結果を更新する
 #
 set -uo pipefail
 
@@ -18,23 +18,23 @@ REPO="$(cd "$HERE/.." && pwd)"
 OUT="${1:-$HOME/cozystack-labs-bundle.json}"
 
 if [ "${1:-}" = "--rerun" ]; then
-  lab="${2:?укажите лабу, например: ./bundle.sh --rerun 07-redis}"
-  [ -d "$REPO/labs/$lab" ] || { echo "нет такой лабы: $lab"; exit 1; }
-  echo "перепрохожу $lab…"
+  lab="${2:?ラボを指定してください、例: ./bundle.sh --rerun 07-redis}"
+  [ -d "$REPO/labs/$lab" ] || { echo "そのようなラボはありません: $lab"; exit 1; }
+  echo "$lab をやり直しています…"
   ( cd "$REPO/labs/$lab" && ./check.sh )
-  echo "результат обновлён, теперь запустите ./bundle.sh без ключей"
+  echo "結果を更新しました。オプションなしで ./bundle.sh を実行してください"
   exit 0
 fi
 
 if [ ! -d "$RESULTS_DIR" ] || [ -z "$(ls -A "$RESULTS_DIR" 2>/dev/null)" ]; then
   cat <<'MSG'
-Результатов не найдено.
+結果が見つかりません。
 
-Каждая лаба сохраняет свой результат, когда вы запускаете в ней ./check.sh.
-Пройдите хотя бы одну и запустите проверку — потом возвращайтесь сюда.
+各ラボは、その中で ./check.sh を実行したときに結果を保存します。
+少なくとも1つを完了してチェックを実行してから、ここに戻ってきてください。
 
-Если вы проходили лабы на другой машине, скопируйте оттуда папку
-~/.cozystack-labs/results или укажите путь: COZY_LAB_RESULTS=/путь ./bundle.sh
+別のマシンでラボを実施した場合は、そこから
+~/.cozystack-labs/results フォルダをコピーするか、パスを指定してください: COZY_LAB_RESULTS=/パス ./bundle.sh
 MSG
   exit 1
 fi
@@ -44,9 +44,9 @@ import json, os, sys, glob, datetime
 
 results_dir, out_path, repo = sys.argv[1], sys.argv[2], sys.argv[3]
 
-# Сколько лаб вообще существует — считаем по наличию скрипта проверки.
-# У шестнадцатой ("Что делать в понедельник") скрипта нет: это текстовое
-# упражнение, и в зачёт оно не идёт.
+# ラボが全部でいくつあるか — チェックスクリプトの有無で数える。
+# 16番目（「月曜日に何をするか」）にはスクリプトがない: これはテキストの
+# 演習であり、得点には含まれない。
 all_labs = sorted(
     os.path.basename(os.path.dirname(p))
     for p in glob.glob(os.path.join(repo, "labs", "*", "check.sh"))
@@ -58,10 +58,10 @@ for path in sorted(glob.glob(os.path.join(results_dir, "result-*.json"))):
         with open(path) as fh:
             d = json.load(fh)
     except Exception as exc:
-        problems.append(f"{os.path.basename(path)}: не читается ({exc})")
+        problems.append(f"{os.path.basename(path)}: 読み取れません ({exc})")
         continue
     if d.get("schema_version") != 1:
-        problems.append(f"{os.path.basename(path)}: неизвестная версия формата")
+        problems.append(f"{os.path.basename(path)}: 不明なフォーマットバージョン")
         continue
     labs.append(d)
     if d.get("env", {}).get("cluster_uid"):
@@ -80,46 +80,46 @@ bundle = {
                       .strftime("%Y-%m-%dT%H:%M:%SZ"),
     "labs_total": len(all_labs),
     "labs_passed": len(passed),
-    "cluster_uids": sorted(uids),          # больше одного — проходили на разных кластерах
+    "cluster_uids": sorted(uids),          # 複数ある場合 — 異なるクラスターで実施した
     "kubernetes_versions": sorted(versions),
     "results": labs,
 }
 with open(out_path, "w") as fh:
     json.dump(bundle, fh, ensure_ascii=False, indent=1)
 
-# То же самое обычным текстом — чтобы человек видел, что отправляет.
+# 同じ内容をプレーンテキストで — 人が何を送っているか見えるように。
 txt = out_path.rsplit(".", 1)[0] + ".txt"
 with open(txt, "w") as fh:
-    fh.write("Результаты лабораторных Cozystack\n")
-    fh.write("Собрано: %s\n\n" % bundle["generated_at"])
-    fh.write("Сдано %d из %d лаб\n\n" % (len(passed), len(all_labs)))
+    fh.write("Cozystack ラボ結果\n")
+    fh.write("収集日時: %s\n\n" % bundle["generated_at"])
+    fh.write("%d / %d ラボ 合格\n\n" % (len(passed), len(all_labs)))
     for lab in all_labs:
         rec = next((d for d in labs if d["lab"] == lab), None)
         if rec is None:
-            mark, extra = "—", "результата нет"
+            mark, extra = "—", "結果なし"
         elif rec["verdict"] == "passed":
-            mark = "сдана"
-            extra = "проверок: %d" % len(rec["checks"])
+            mark = "合格"
+            extra = "チェック数: %d" % len(rec["checks"])
         else:
-            mark = "не сдана"
-            extra = "провалено: %d" % rec["totals"]["fail"]
+            mark = "不合格"
+            extra = "失敗: %d" % rec["totals"]["fail"]
         fh.write("  %-20s %-9s %s\n" % (lab, mark, extra))
-    fh.write("\nКластеров: %d. Версии Kubernetes: %s\n"
-             % (len(uids), ", ".join(sorted(versions)) or "не определены"))
-    fh.write("\nВ файл попадают только идентификаторы проверок и их исходы.\n"
-             "Ни адресов, ни имён, ни содержимого логов в нём нет.\n")
+    fh.write("\nクラスター数: %d。Kubernetes バージョン: %s\n"
+             % (len(uids), ", ".join(sorted(versions)) or "不明"))
+    fh.write("\nファイルに入るのはチェックの識別子とその結果だけです。\n"
+             "アドレスも、名前も、ログの内容も含まれていません。\n")
 
-print("Сдано %d из %d лаб." % (len(passed), len(all_labs)))
+print("%d / %d ラボ 合格。" % (len(passed), len(all_labs)))
 if failed:
-    print("Не сдано: %s" % ", ".join(failed))
+    print("不合格: %s" % ", ".join(failed))
 if missing:
-    print("Нет результата: %s" % ", ".join(missing))
+    print("結果なし: %s" % ", ".join(missing))
 if len(uids) > 1:
-    print("\nВнимание: результаты сняты с %d разных кластеров. Это допустимо, "
-          "но при загрузке набор будет помечен." % len(uids))
+    print("\n注意: 結果は %d 個の異なるクラスターから取得されました。これは許容されますが、"
+          "アップロード時にこのセットはフラグ付けされます。" % len(uids))
 for p in problems:
-    print("  проблема: %s" % p)
-print("\nФайл для загрузки: %s" % out_path)
-print("Он же обычным текстом:  %s" % txt)
-print("Посмотрите текстовый файл перед отправкой — в нём видно всё, что уходит.")
+    print("  問題: %s" % p)
+print("\nアップロード用ファイル: %s" % out_path)
+print("同じ内容のプレーンテキスト:  %s" % txt)
+print("送信する前にテキストファイルを確認してください — 送られる内容がすべて見えます。")
 PYEOF

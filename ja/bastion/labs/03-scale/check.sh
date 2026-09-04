@@ -1,90 +1,90 @@
 #!/usr/bin/env bash
-# Проверка лабы 3: автомасштабирование.
+# ラボ3のチェック: オートスケーリング。
 #
-# Проверяем не «hpa.yaml применён», а что механизм живой и способен принимать решения:
-#   - у контейнера есть requests.cpu, иначе процент считать не от чего;
-#   - HPA существует и нацелен именно на наш Deployment;
-#   - коридор задан осмысленно (maxReplicas больше одного, иначе расти некуда);
-#   - метрики РЕАЛЬНО собираются: в статусе есть число, а не <unknown>;
-#   - масштабирование уже срабатывало, то есть нагрузку действительно давали.
+# 「hpa.yaml が適用されているか」ではなく、仕組みが生きていて判断を下せる状態かを確認する:
+#   - コンテナに requests.cpu があること。なければパーセンテージを計算する基準がない;
+#   - HPA が存在し、まさに我々の Deployment を対象にしていること;
+#   - レンジが意味を持って設定されていること（maxReplicas が1より大きい、でなければ増える余地がない）;
+#   - メトリクスが本当に収集されていること: ステータスに <unknown> ではなく数値があること;
+#   - スケーリングが既に発動していること、つまり実際に負荷がかけられたこと。
 #
-# Скрипт ничего не меняет. Одноразовый под поднимается только чтобы проверить,
-# что Fortio отвечает изнутри кластера, и убирает себя сам.
+# スクリプトは何も変更しない。使い捨ての Pod は、Fortio がクラスタ内部から
+# 応答するかを確認するためだけに起動し、自分自身を削除する。
 #
-# Запускается на виртуалке, из папки этой лабы, по доступу к учебному кластеру `lab`
-# (не к тенанту на управляющем кластере):
+# VM上で、このラボのフォルダから、学習用クラスタ `lab` へのアクセスで実行する
+# （管理クラスタ上のテナントに対してではない）:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     cd labs/03-scale && ./check.sh
-# Переменная COZY_TENANT здесь не нужна: вся лаба идёт внутри кластера `lab`.
+# ここでは COZY_TENANT 変数は不要: ラボ全体が `lab` クラスタ内部で進む。
 #
-# Запускать ДО уборки. Часть проверок опирается на следы уже случившегося роста,
-# а они живут вместе с объектом HPA: удалите его — и доказывать будет нечем.
+# 後片付けの前に実行すること。一部のチェックは既に起きた成長の痕跡に依存しており、
+# それらは HPA オブジェクトと一緒に存在する: HPA を削除すると、証明する材料がなくなる。
 
-# Попадают в заголовок отчёта и в имя файла report-<лаба>-<дата>.md рядом со скриптом.
+# レポートのヘッダーと、スクリプトの隣に置かれるファイル名 report-<ラボ>-<日付>.md に入る。
 LAB_NAME="03-scale"
-LAB_TITLE="Лаба 3 · Нагрузка и автомасштабирование"
-# Общая библиотека: ok / fail / warn / evidence / finish, запросы изнутри кластера,
-# запись отчёта. Путь считается от места самого скрипта, а не от текущего каталога.
+LAB_TITLE="ラボ3 · 負荷とオートスケーリング"
+# 共通ライブラリ: ok / fail / warn / evidence / finish、クラスタ内部からのクエリ、
+# レポートの書き出し。パスは現在のディレクトリではなく、スクリプト自身の場所から計算する。
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
-# Без KUBECONFIG kubectl ищет кластер на виртуалке и валит всё подряд одной ошибкой,
-# в которой настоящей причины не разглядеть. Останавливаемся сразу.
+# KUBECONFIG がないと kubectl はVM上でクラスタを探し、本当の原因が読み取れない単一の
+# エラーですべてを落としてしまう。すぐに停止する。
 need_kubeconfig
 
-# Имена вынесены в переменные, чтобы совпадение имени приложения и имени HPA
-# в этой лабе не выглядело как одно и то же имя, случайно написанное дважды.
+# アプリ名と HPA 名がこのラボで一致していることが、うっかり同じ名前を二度書いた
+# ように見えないよう、名前を変数に切り出している。
 APP=rickroll
 HPA=rickroll
 
-# --- цель масштабирования на месте -----------------------------------------
-# Приложение из лабы 1 — то, чем HPA управляет. Если его нет, все дальнейшие
-# проверки посыплются каскадом и участник получит десяток ошибок вместо одной
-# внятной, поэтому здесь единственное место, где скрипт завершается досрочно.
+# --- スケーリング対象が所定の位置にあること -----------------------------------------
+# ラボ1のアプリ — HPA が管理する対象。これがないと、以降のすべての
+# チェックが連鎖的に失敗し、参加者は1つの明確なエラーの代わりに10個ものエラーを受け取る
+# ため、ここがスクリプトが早期終了する唯一の場所。
 if ! kubectl get deployment "$APP" >/dev/null 2>&1; then
-  fail "приложения ${APP} нет в кластере — масштабировать нечего" \
-       "разверните его: kubectl apply -f ../01-deploy/rickroll.yaml"
+  fail "アプリケーション ${APP} がクラスタにありません — スケールする対象がありません" \
+       "デプロイしてください: kubectl apply -f ../01-deploy/rickroll.yaml"
   finish
   exit $?
 fi
-ok "приложение ${APP} на месте"
+ok "アプリケーション ${APP} は所定の位置にあります"
 
-# --- requests.cpu: без него HPA не считает проценты ------------------------
-# Самая частая причина «HPA не работает», и по манифесту её не видно:
-# объект создаётся успешно, а TARGETS навсегда остаётся <unknown>.
+# --- requests.cpu: これがないと HPA はパーセンテージを計算しない ------------------------
+# 「HPA が動かない」の最も多い原因で、マニフェストからは見えない:
+# オブジェクトは正常に作成されるが、TARGETS は永遠に <unknown> のまま。
 REQ_CPU="$(kubectl get deployment "$APP" \
   -o jsonpath='{.spec.template.spec.containers[0].resources.requests.cpu}' 2>/dev/null)"
 LIM_CPU="$(kubectl get deployment "$APP" \
   -o jsonpath='{.spec.template.spec.containers[0].resources.limits.cpu}' 2>/dev/null)"
 
 if [ -n "$REQ_CPU" ]; then
-  ok "у контейнера задан requests.cpu = ${REQ_CPU} — есть от чего считать проценты"
-  evidence "Ресурсы контейнера" "requests.cpu: ${REQ_CPU}
-limits.cpu:   ${LIM_CPU:-не задан}"
+  ok "コンテナに requests.cpu = ${REQ_CPU} が設定されています — パーセンテージを計算する基準があります"
+  evidence "コンテナのリソース" "requests.cpu: ${REQ_CPU}
+limits.cpu:   ${LIM_CPU:-未設定}"
 else
-  fail "у контейнера ${APP} не задан requests.cpu" \
-       "HPA по Utilization без него не работает; примените ../01-deploy/rickroll.yaml заново"
+  fail "コンテナ ${APP} に requests.cpu が設定されていません" \
+       "Utilization ベースの HPA はこれなしでは動きません。../01-deploy/rickroll.yaml を再適用してください"
 fi
 
-# --- сам HPA ---------------------------------------------------------------
-# Проверяем не только наличие объекта, но и на кого он нацелен. HPA с опечаткой
-# в scaleTargetRef создаётся успешно и выглядит в списке как рабочий, но всю лабу
-# управляет несуществующим приложением.
+# --- HPA そのもの ---------------------------------------------------------------
+# オブジェクトの有無だけでなく、何を対象にしているかも確認する。scaleTargetRef に
+# タイプミスがある HPA は正常に作成され、一覧では動作しているように見えるが、ラボ全体で
+# 存在しないアプリケーションを管理してしまう。
 TARGET_KIND="$(kubectl get hpa "$HPA" -o jsonpath='{.spec.scaleTargetRef.kind}' 2>/dev/null)"
 TARGET_NAME="$(kubectl get hpa "$HPA" -o jsonpath='{.spec.scaleTargetRef.name}' 2>/dev/null)"
 
 if [ -z "$TARGET_NAME" ]; then
-  fail "в кластере нет HorizontalPodAutoscaler с именем ${HPA}" \
-       "примените его: kubectl apply -f hpa.yaml (проверку запускайте до уборки)"
-  evidence "Что есть из автомасштабирования" "$(kubectl get hpa 2>&1)"
+  fail "クラスタに ${HPA} という名前の HorizontalPodAutoscaler がありません" \
+       "適用してください: kubectl apply -f hpa.yaml （チェックは後片付けの前に実行）"
+  evidence "オートスケーリング関連で存在するもの" "$(kubectl get hpa 2>&1)"
   finish
   exit $?
 fi
 
 if [ "$TARGET_KIND" = "Deployment" ] && [ "$TARGET_NAME" = "$APP" ]; then
-  ok "HPA ${HPA} нацелен на Deployment/${APP}"
+  ok "HPA ${HPA} は Deployment/${APP} を対象にしています"
 else
-  fail "HPA ${HPA} управляет объектом ${TARGET_KIND}/${TARGET_NAME}, а не Deployment/${APP}" \
-       "поправьте scaleTargetRef в hpa.yaml и примените заново"
+  fail "HPA ${HPA} は Deployment/${APP} ではなく ${TARGET_KIND}/${TARGET_NAME} を管理しています" \
+       "hpa.yaml の scaleTargetRef を修正して再適用してください"
 fi
 
 MINR="$(kubectl get hpa "$HPA" -o jsonpath='{.spec.minReplicas}' 2>/dev/null)"
@@ -92,110 +92,110 @@ MAXR="$(kubectl get hpa "$HPA" -o jsonpath='{.spec.maxReplicas}' 2>/dev/null)"
 [ -z "$MINR" ] && MINR=1
 
 if [ -n "$MAXR" ] && [ "$MAXR" -gt 1 ] 2>/dev/null; then
-  ok "коридор задан: от ${MINR} до ${MAXR} копий — расти есть куда"
+  ok "レンジが設定されています: ${MINR} から ${MAXR} 個まで — 増える余地があります"
 else
-  fail "верхняя граница коридора равна ${MAXR:-не задана} — расти некуда" \
-       "в hpa.yaml должно быть maxReplicas больше единицы"
+  fail "レンジの上限が ${MAXR:-未設定} です — 増える余地がありません" \
+       "hpa.yaml では maxReplicas が1より大きくなければなりません"
 fi
 
-# --- цель по метрике -------------------------------------------------------
-# Здесь warn, а не fail: вариант с AverageValue (порог в миллиядрах) тоже рабочий,
-# лаба разбирает лишь один из двух. Заваливать за него было бы неправдой.
+# --- メトリクスのターゲット -------------------------------------------------------
+# ここは fail ではなく warn: AverageValue の方式（しきい値をミリコアで指定）も動作するもので、
+# ラボは2つのうち片方だけを扱う。これで不合格にするのは正しくない。
 TGT_TYPE="$(kubectl get hpa "$HPA" \
   -o jsonpath='{.spec.metrics[0].resource.target.type}' 2>/dev/null)"
 TGT_VAL="$(kubectl get hpa "$HPA" \
   -o jsonpath='{.spec.metrics[0].resource.target.averageUtilization}' 2>/dev/null)"
 
 if [ "$TGT_TYPE" = "Utilization" ] && [ -n "$TGT_VAL" ]; then
-  ok "порог задан: ${TGT_VAL}% от requests.cpu (${REQ_CPU:-?})"
+  ok "しきい値が設定されています: requests.cpu の ${TGT_VAL}% (${REQ_CPU:-?})"
 else
-  warn "порог задан не в процентах от requests (тип: ${TGT_TYPE:-нет})" \
-       "лаба разбирает вариант Utilization; на работоспособность это не влияет"
+  warn "しきい値が requests に対するパーセンテージで設定されていません（タイプ: ${TGT_TYPE:-なし}）" \
+       "ラボは Utilization 方式を扱います。動作には影響しません"
 fi
 
-# --- ГЛАВНОЕ: метрики реально собираются -----------------------------------
-# Именно здесь видно разницу между «объект создан» и «механизм работает».
+# --- 最重要: メトリクスが本当に収集されていること -----------------------------------
+# まさにここで「オブジェクトが作成された」と「仕組みが動いている」の違いが見える。
 CUR_UTIL="$(kubectl get hpa "$HPA" \
   -o jsonpath='{.status.currentMetrics[0].resource.current.averageUtilization}' 2>/dev/null)"
 SCALING_ACTIVE="$(kubectl get hpa "$HPA" \
   -o jsonpath='{range .status.conditions[?(@.type=="ScalingActive")]}{.status}{end}' 2>/dev/null)"
 
 if [ -n "$CUR_UTIL" ] && [ "$SCALING_ACTIVE" = "True" ]; then
-  ok "метрики собираются: текущая загрузка ${CUR_UTIL}% от requests, HPA принимает решения"
+  ok "メトリクスが収集されています: 現在の負荷は requests の ${CUR_UTIL}%、HPA は判断を下しています"
 elif [ "$SCALING_ACTIVE" = "True" ]; then
-  ok "HPA принимает решения (ScalingActive=True), текущее значение метрики ещё не отдано"
+  ok "HPA は判断を下しています（ScalingActive=True）。現在のメトリクス値はまだ報告されていません"
 else
   REASON="$(kubectl get hpa "$HPA" \
     -o jsonpath='{range .status.conditions[?(@.type=="ScalingActive")]}{.reason}: {.message}{end}' 2>/dev/null)"
-  fail "HPA не получает метрики — в TARGETS будет <unknown>, решать ему не на чем" \
-       "первые две минуты после apply это нормально, подождите и повторите; если не прошло — kubectl top pods и kubectl describe hpa ${HPA}"
-  evidence "Почему HPA не активен" "${REASON:-причина не указана в статусе}"
+  fail "HPA がメトリクスを受け取っていません — TARGETS は <unknown> になり、判断する材料がありません" \
+       "apply 後の最初の2分間はこれが正常です。待ってから再試行してください。解消しない場合は kubectl top pods と kubectl describe hpa ${HPA}"
+  evidence "HPA がアクティブでない理由" "${REASON:-ステータスに理由が示されていません}"
 fi
 
-evidence "Состояние HPA" "$(kubectl get hpa "$HPA" 2>/dev/null)"
+evidence "HPA の状態" "$(kubectl get hpa "$HPA" 2>/dev/null)"
 
-# --- metrics-server отвечает напрямую --------------------------------------
-# Дублирует предыдущую проверку с другой стороны и разделяет две разные поломки:
-# «метрик нет во всём кластере» и «метрики есть, но HPA до них не добрался».
-# Первое чинит администратор кластера, второе — участник в своём манифесте.
+# --- metrics-server が直接応答すること --------------------------------------
+# 前のチェックを別の側面から重ねて確認し、2つの異なる故障を切り分ける:
+# 「クラスタ全体にメトリクスがない」と「メトリクスはあるが HPA が到達できていない」。
+# 前者はクラスタ管理者が、後者は参加者が自分のマニフェストで直す。
 TOP="$(kubectl top pods -l app=${APP} --no-headers 2>&1)"
-# `kubectl top` при отсутствии подов печатает «No resources found» и возвращает 0 —
-# без явной проверки на пустоту это давало зелёный там, где метрик нет вообще.
+# `kubectl top` は Pod がないと「No resources found」を出力して 0 を返す —
+# 空の明示的なチェックがないと、メトリクスが全くない場合でも緑になっていた。
 if [ -z "$TOP" ] || printf '%s' "$TOP" | grep -qiE 'error|not available|No resources found'; then
-  fail "kubectl top не отдаёт потребление подов" \
-       "в кластере нет работающего metrics-server — без него автомасштабирование по CPU невозможно"
-  evidence "Ответ kubectl top" "$TOP"
+  fail "kubectl top が Pod の消費量を返しません" \
+       "クラスタに動作する metrics-server がありません — これなしでは CPU ベースのオートスケーリングは不可能です"
+  evidence "kubectl top の応答" "$TOP"
 else
-  ok "metrics-server отдаёт потребление подов ${APP}"
-  evidence "Потребление копий" "$TOP"
+  ok "metrics-server が ${APP} Pod の消費量を返しています"
+  evidence "各コピーの消費量" "$TOP"
 fi
 
-# --- масштабирование действительно срабатывало -----------------------------
-# lastScaleTime живёт столько же, сколько сам HPA, поэтому проверка не зависит
-# от того, истекли события кластера или нет.
+# --- スケーリングが実際に発動したこと ------------------------------------------------
+# lastScaleTime は HPA 自身と同じだけ存続するため、このチェックはクラスタのイベントが
+# 失効したかどうかに依存しない。
 LAST_SCALE="$(kubectl get hpa "$HPA" -o jsonpath='{.status.lastScaleTime}' 2>/dev/null)"
 CUR_REPL="$(kubectl get hpa "$HPA" -o jsonpath='{.status.currentReplicas}' 2>/dev/null)"
 
-# Одной отметки времени мало: она проставляется и при сокращении копий, то есть
-# появляется даже у того, кто поднял реплики руками и дал HPA убрать лишние. Ищем
-# именно рост ПО НАГРУЗКЕ — событие с превышением порога.
+# タイムスタンプ1つでは不十分: これはスケールダウン時にも設定される、つまり
+# レプリカを手で増やして HPA に余分を削除させた人にも現れる。我々が探すのは
+# まさに負荷による成長 — しきい値を超えたイベント。
 #
-# И наоборот: сама отметка живёт не всегда. На кластере, где нагрузку давали час
-# назад, lastScaleTime может быть пустой, а события ещё живы — поэтому события
-# проверяются ПЕРВЫМИ, иначе выполненная лаба ложно заваливается.
+# その逆に: タイムスタンプ自体が常に残るわけではない。1時間前に負荷をかけた
+# クラスタでは、lastScaleTime が空でイベントがまだ生きていることがある — そのため
+# イベントを先にチェックする、でなければ完了したラボが誤って不合格になる。
 SCALE_UP="$(kubectl get events --field-selector involvedObject.name="$HPA" \
   -o jsonpath='{range .items[*]}{.reason}{" "}{.message}{"\n"}{end}' 2>/dev/null \
   | grep -i 'SuccessfulRescale' | grep -ci 'above target')"
 
 if [ "${SCALE_UP:-0}" -ge 1 ]; then
-  ok "HPA поднимал количество копий из-за нагрузки — событие с превышением порога на месте"
-  evidence "Масштабирование" "событий роста: ${SCALE_UP}
-lastScaleTime: ${LAST_SCALE:-нет}
-currentReplicas: ${CUR_REPL:-неизвестно}"
+  ok "HPA は負荷のためにコピー数を増やしました — しきい値超過のイベントが所定の位置にあります"
+  evidence "スケーリング" "スケールアップのイベント数: ${SCALE_UP}
+lastScaleTime: ${LAST_SCALE:-なし}
+currentReplicas: ${CUR_REPL:-不明}"
 elif [ -n "$LAST_SCALE" ]; then
-  ok "HPA менял количество копий (последний раз: ${LAST_SCALE})"
-  evidence "Отметка о масштабировании" "lastScaleTime: ${LAST_SCALE}
-currentReplicas: ${CUR_REPL:-неизвестно}"
+  ok "HPA はコピー数を変更しました（最後: ${LAST_SCALE}）"
+  evidence "スケーリングのタイムスタンプ" "lastScaleTime: ${LAST_SCALE}
+currentReplicas: ${CUR_REPL:-不明}"
 else
-  fail "следов работы автомасштабирования нет" \
-       "дайте нагрузку из Fortio: URL http://${APP}/, QPS 1200, Connections 80, Duration 90s"
+  fail "オートスケーリングが動作した痕跡がありません" \
+       "Fortio から負荷をかけてください: URL http://${APP}/, QPS 1200, Connections 80, Duration 90s"
 fi
 
-# --- Fortio: нужен в лабе 4 ------------------------------------------------
-# К самой лабе 3 отношения уже не имеет, поэтому warn, а не fail. Смысл в том, чтобы
-# участник узнал о пропаже генератора здесь, а не посреди выкатки под нагрузкой,
-# когда останавливаться и разворачивать его будет некстати.
+# --- Fortio: ラボ4で必要 ------------------------------------------------
+# ラボ3自体にはもう関係ないため、fail ではなく warn。狙いは、参加者が
+# ジェネレーターの不在を負荷をかけた展開の途中ではなくここで知ること。途中で
+# 停止して展開するのは都合が悪いため。
 if kubectl get deployment fortio >/dev/null 2>&1; then
   FBODY="$(in_cluster_curl "http://fortio:8080/fortio/")"
   if printf '%s' "$FBODY" | grep -qi 'fortio'; then
-    ok "генератор нагрузки Fortio работает и отвечает изнутри кластера"
+    ok "負荷ジェネレーター Fortio は動作し、クラスタ内部から応答しています"
   else
-    warn "Fortio развёрнут, но его веб-интерфейс не ответил" \
-         "проверьте: kubectl rollout status deployment/fortio и kubectl logs deploy/fortio"
+    warn "Fortio はデプロイされていますが、Web インターフェイスが応答しませんでした" \
+         "確認してください: kubectl rollout status deployment/fortio と kubectl logs deploy/fortio"
   fi
 else
-  warn "Fortio в кластере нет" \
-       "если собираетесь делать лабу 4, он там понадобится: kubectl apply -f fortio.yaml"
+  warn "Fortio がクラスタにありません" \
+       "ラボ4を行う予定なら、そこで必要になります: kubectl apply -f fortio.yaml"
 fi
 
 finish

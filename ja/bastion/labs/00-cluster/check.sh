@@ -1,100 +1,100 @@
 #!/usr/bin/env bash
-# Проверка лабы 0: учебный кластер поднялся и вы к нему подключились.
+# ラボ0のチェック: 学習用クラスタが起動し、あなたが接続できていること。
 #
-# Проверяем не «объект создан», а что кластер работает по существу:
-#   1) кластер lab отвечает по вашему файлу доступа (KUBECONFIG=~/lab.kubeconfig),
-#   2) хотя бы один узел в состоянии Ready,
-#   3) на узлах есть свободные ресурсы под будущие приложения.
-# Если задан COZY_TENANT — дополнительно смотрим на УПРАВЛЯЮЩЕМ кластере, что заказ
-# Kubernetes/lab дошёл до Ready и что включён сбор метрик (без него лаба 14 пустая).
+# 「オブジェクトが作成された」ではなく、クラスタが実質的に動作していることを確認します:
+#   1) lab クラスタがあなたのアクセスファイル (KUBECONFIG=~/lab.kubeconfig) 経由で応答する、
+#   2) 少なくとも 1 つのノードが Ready 状態である、
+#   3) ノードに今後のアプリケーション用の空きリソースがある。
+# COZY_TENANT が設定されている場合 — さらに管理クラスタ側で、Kubernetes/lab の注文が
+# Ready に達し、メトリクス収集が有効になっていること (これが無いとラボ14 が空になります) を確認します。
 #
-# Запускается на виртуалке, из папки этой лабы:
+# 仮想マシン上で、このラボのフォルダから実行します:
 #     export KUBECONFIG=~/lab.kubeconfig
-#     export COZY_TENANT=workshopXX      # для проверок со стороны тенанта (необязательно)
+#     export COZY_TENANT=workshopXX      # テナント側のチェック用 (任意)
 #     cd labs/00-cluster && ./check.sh
 #
-# Скрипт только читает — состояние кластера не меняет.
+# このスクリプトは読み取りのみ — クラスタの状態は変更しません。
 LAB_NAME="00-cluster"
-LAB_TITLE="Лаба 0 · Свой кластер Kubernetes"
+LAB_TITLE="ラボ0 · 自分の Kubernetes クラスタ"
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
-# Без доступа к самому кластеру lab проверять нечего — это и есть главное
-# доказательство лабы. need_kubeconfig остановит скрипт с понятной подсказкой,
-# если KUBECONFIG не задан или кластер не отвечает.
+# lab クラスタ自体へのアクセスが無ければ確認するものはありません — これこそがラボの主要な
+# 証拠です。KUBECONFIG が設定されていない、またはクラスタが応答しない場合、need_kubeconfig が
+# 分かりやすいヒントとともにスクリプトを停止します。
 need_kubeconfig
 
 COZY_KUBECONFIG="${COZY_KUBECONFIG:-$HOME/.kube/config}"
 cozy() { kubectl --kubeconfig "$COZY_KUBECONFIG" "$@" 2>/dev/null; }
 
-# --- 1) Подключение к кластеру lab -------------------------------------------
-# need_kubeconfig уже убедился, что сервер отвечает. Фиксируем это отдельным
-# результатом и кладём версию сервера в отчёт.
+# --- 1) lab クラスタへの接続 -------------------------------------------------
+# need_kubeconfig はすでにサーバが応答することを確認済みです。これを個別の結果として
+# 記録し、サーバのバージョンをレポートに記載します。
 KVER="$(server_version)"
-ok "кластер lab отвечает — файл доступа рабочий"
-[ -n "$KVER" ] && evidence "Версия сервера кластера lab" "$KVER"
+ok "lab クラスタが応答しています — アクセスファイルは有効です"
+[ -n "$KVER" ] && evidence "lab クラスタのサーババージョン" "$KVER"
 
-# --- 2) Узлы в строю ---------------------------------------------------------
-# Считаем, сколько узлов в состоянии Ready. Пустой список означает, что кластер
-# поднялся, но узловая группа md0 ещё разворачивается.
+# --- 2) ノードが稼働中 -------------------------------------------------------
+# Ready 状態のノードがいくつあるかを数えます。リストが空の場合は、クラスタは起動したが
+# ノードグループ md0 がまだ展開中であることを意味します。
 NODES_WIDE="$(kubectl get nodes -o wide 2>/dev/null)"
 READY_NODES="$(kubectl get nodes \
   -o jsonpath='{range .items[*]}{range .status.conditions[?(@.type=="Ready")]}{.status}{"\n"}{end}{end}' 2>/dev/null \
   | grep -c '^True')"
 TOTAL_NODES="$(kubectl get nodes --no-headers 2>/dev/null | grep -c .)"
 if [ "${READY_NODES:-0}" -ge 1 ]; then
-  ok "узлы в строю: ${READY_NODES} из ${TOTAL_NODES} в состоянии Ready"
-  [ -n "$NODES_WIDE" ] && evidence "Узлы кластера" "$NODES_WIDE"
+  ok "ノードが稼働中: ${TOTAL_NODES} 個中 ${READY_NODES} 個が Ready 状態です"
+  [ -n "$NODES_WIDE" ] && evidence "クラスタのノード" "$NODES_WIDE"
 else
-  fail "ни один узел не в состоянии Ready (узлов всего: ${TOTAL_NODES:-0})" \
-       "подождите пару минут, пока узловая группа md0 развернётся; статус — в дашборде на приложении lab, либо: kubectl get nodes"
-  evidence "Узлы кластера" "${NODES_WIDE:-нет узлов}"
+  fail "Ready 状態のノードが 1 つもありません (ノード総数: ${TOTAL_NODES:-0})" \
+       "ノードグループ md0 が展開されるまで数分お待ちください; 状態は lab アプリケーションのダッシュボード、または: kubectl get nodes で確認できます"
+  evidence "クラスタのノード" "${NODES_WIDE:-ノードがありません}"
 fi
 
-# --- 3) Есть ли место под будущие приложения --------------------------------
-# allocatable первого узла: если ресурсов нет, дальше ничего не запустится.
+# --- 3) 今後のアプリケーション用の空きがあるか ------------------------------
+# 最初のノードの allocatable: リソースが無ければ、これ以降は何も起動しません。
 ALLOC_CPU="$(kubectl get nodes -o jsonpath='{.items[0].status.allocatable.cpu}' 2>/dev/null)"
 ALLOC_MEM="$(kubectl get nodes -o jsonpath='{.items[0].status.allocatable.memory}' 2>/dev/null)"
 if [ -n "$ALLOC_MEM" ]; then
-  ok "на узлах есть ресурсы под приложения (на узле: ${ALLOC_CPU} CPU, $(human_bytes "$ALLOC_MEM") RAM)"
-  evidence "Свободные ресурсы узла (allocatable)" "cpu: ${ALLOC_CPU}, memory: $(human_bytes "$ALLOC_MEM")"
+  ok "ノードにアプリケーション用のリソースがあります (ノード上: ${ALLOC_CPU} CPU, $(human_bytes "$ALLOC_MEM") RAM)"
+  evidence "ノードの空きリソース (allocatable)" "cpu: ${ALLOC_CPU}, memory: $(human_bytes "$ALLOC_MEM")"
 else
-  warn "не удалось прочитать свободные ресурсы узлов" \
-       "обычно это временно — повторите через минуту"
+  warn "ノードの空きリソースを読み取れませんでした" \
+       "通常は一時的なものです — 1 分後に再試行してください"
 fi
 
-# --- 4) Со стороны управляющего кластера (если задан тенант) -----------------
-# Не обязательно для лабы 0: подключение к самому кластеру выше уже всё доказало.
-# Но если тенантный доступ есть — подтвердим заказ и проверим сбор метрик.
+# --- 4) 管理クラスタ側から (テナントが設定されている場合) --------------------
+# ラボ0 には必須ではありません: 上のクラスタ自体への接続がすでにすべてを証明しています。
+# ただしテナントアクセスがある場合 — 注文を確認し、メトリクス収集をチェックします。
 if [ -n "${COZY_TENANT:-}" ]; then
   TENANT_NS="tenant-${COZY_TENANT}"
   if [ ! -r "$COZY_KUBECONFIG" ]; then
-    warn "тенантный доступ ${COZY_KUBECONFIG} не найден — заказ кластера на управляющем не проверялся" \
-         "это не провал лабы; путь задаётся: export COZY_KUBECONFIG=~/.kube/config"
+    warn "テナントアクセス ${COZY_KUBECONFIG} が見つかりません — 管理クラスタ上のクラスタ注文は確認されませんでした" \
+         "これはラボの失敗ではありません; パスは次で設定します: export COZY_KUBECONFIG=~/.kube/config"
   else
     LAB_READY="$(cozy get kubernetes.apps.cozystack.io lab -n "$TENANT_NS" \
       -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')"
     if [ "$LAB_READY" = "True" ]; then
-      ok "на управляющем кластере заказ Kubernetes/lab в состоянии Ready"
+      ok "管理クラスタ上で Kubernetes/lab の注文が Ready 状態です"
     elif [ -n "$LAB_READY" ]; then
-      warn "заказ Kubernetes/lab ещё не Ready (сейчас: ${LAB_READY})" \
-           "кластер уже отвечает, платформа ещё сводит его к заданному; посмотрите: kubectl --kubeconfig ~/.kube/config -n ${TENANT_NS} get kubernetes.apps.cozystack.io lab"
+      warn "Kubernetes/lab の注文がまだ Ready ではありません (現在: ${LAB_READY})" \
+           "クラスタはすでに応答していますが、プラットフォームがまだ目標状態へ調整中です; 次を確認してください: kubectl --kubeconfig ~/.kube/config -n ${TENANT_NS} get kubernetes.apps.cozystack.io lab"
     else
-      warn "не нашёл заказ Kubernetes/lab в тенанте ${TENANT_NS}" \
-           "если кластер вы называли иначе — подставьте своё имя; либо роль в тенанте не даёт эту команду (не ошибка лабы)"
+      warn "テナント ${TENANT_NS} に Kubernetes/lab の注文が見つかりませんでした" \
+           "クラスタに別の名前を付けた場合は — 自分の名前に置き換えてください; またはテナント内のロールがこのコマンドを許可していません (ラボのエラーではありません)"
     fi
-    # Сбор метрик: лаба 14 опирается на данные, которые копятся с момента включения.
+    # メトリクス収集: ラボ14 は有効化した時点から蓄積されるデータに依存します。
     MON="$(cozy get kubernetes.apps.cozystack.io lab -n "$TENANT_NS" \
       -o jsonpath='{.spec.addons.monitoringAgents.enabled}')"
     if [ "$MON" = "true" ]; then
-      ok "сбор метрик включён (понадобится в лабе 14)"
+      ok "メトリクス収集が有効です (ラボ14 で必要になります)"
     elif [ -n "$LAB_READY" ]; then
-      warn "сбор метрик выключен — лаба 14 останется без данных" \
-           "включить: дашборд → приложение lab → Addons → Monitoring agents (задним числом метрики не появятся)"
+      warn "メトリクス収集が無効です — ラボ14 はデータ無しになります" \
+           "有効化: ダッシュボード → lab アプリケーション → Addons → Monitoring agents (メトリクスは遡って現れません)"
     fi
   fi
 else
-  warn "COZY_TENANT не задан — проверки со стороны управляющего кластера пропущены" \
-       "не обязательно для лабы 0; чтобы включить: export COZY_TENANT=workshopXX"
+  warn "COZY_TENANT が設定されていません — 管理クラスタ側のチェックはスキップされました" \
+       "ラボ0 には必須ではありません; 有効化するには: export COZY_TENANT=workshopXX"
 fi
 
 finish

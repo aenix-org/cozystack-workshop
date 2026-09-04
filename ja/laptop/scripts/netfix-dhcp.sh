@@ -1,17 +1,17 @@
 #!/bin/bash
-# Мигрированный CentOS 7 образ несёт статичный VMware IP (ifcfg-eth0 BOOTPROTO=static,
-# IPADDR=192.168.10.x, GATEWAY=192.168.10.1). Из-за этого VM не на pod-NIC и не
-# резолвит managed-сервисы (CoreDNS недоступен). Переключаем eth0 на DHCP.
+# 移行された CentOS 7 イメージには VMware の静的 IP が残っている（ifcfg-eth0 BOOTPROTO=static,
+# IPADDR=192.168.10.x, GATEWAY=192.168.10.1）。そのため VM は pod-NIC 上になく、
+# managed サービスを解決できない（CoreDNS に到達不可）。eth0 を DHCP に切り替える。
 #
-# Запускать в app-VM (CentOS 7) под root, ЗАТЕМ перезапустить VM (дашборд -> Restart).
-# Правка персистентна — переживает перезапуск.
-# ЭТО НЕ netplan (то Ubuntu) — у CentOS 7 сеть в ifcfg-eth0.
+# app-VM（CentOS 7）内で root として実行し、その後 VM を再起動する（ダッシュボード -> Restart）。
+# この変更は永続的で、再起動後も維持される。
+# これは netplan ではない（netplan は Ubuntu）——CentOS 7 ではネットワーク設定は ifcfg-eth0 にある。
 set -e
 IFCFG=/etc/sysconfig/network-scripts/ifcfg-eth0
 
-echo "== было =="; cat "$IFCFG"
+echo "== 変更前 =="; cat "$IFCFG"
 sed -i 's/^BOOTPROTO=.*/BOOTPROTO=dhcp/; /^IPADDR/d; /^GATEWAY/d; /^NETMASK/d; /^PREFIX/d; /^DNS/d' "$IFCFG"
 grep -q '^BOOTPROTO' "$IFCFG" || echo 'BOOTPROTO=dhcp' >> "$IFCFG"
-echo "== стало =="; cat "$IFCFG"
-echo "== eth0 переключён на DHCP. ТЕПЕРЬ перезапустите VM: дашборд -> Restart. =="
-echo "   После ребута: eth0 получит pod-NIC (10.244.x), managed-сервисы начнут резолвиться."
+echo "== 変更後 =="; cat "$IFCFG"
+echo "== eth0 を DHCP に切り替えました。今すぐ VM を再起動してください: ダッシュボード -> Restart。 =="
+echo "   再起動後: eth0 が pod-NIC（10.244.x）を取得し、managed サービスの解決が始まります。"
