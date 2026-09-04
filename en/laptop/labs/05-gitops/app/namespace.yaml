@@ -1,29 +1,29 @@
 ---
-# Лаба 5 · Инфраструктура в Git. Пространство имён под сервис «Пропуск».
+# Lab 5 · Infrastructure in Git. Namespace for the "Passes" service.
 #
-# Руками этот файл в кластер не применяется. Вы кладёте его в свой репозиторий на
-# GitHub, в папку apps/, а в кластер `lab` его переносит Flux — сам, по расписанию:
+# This file is not applied to the cluster by hand. You put it into your repository on
+# GitHub, into the apps/ folder, and Flux carries it into the `lab` cluster — on its own, on a schedule:
 #     cp app/*.yaml ~/passes-gitops/apps/
 #     cd ~/passes-gitops && git add apps && git commit -m "add passes service v1" && git push
 #
-# Как читать любой манифест: apiVersion — версия схемы описания (по ней кластер знает,
-# как его разбирать), kind — что создаём, metadata.name — имя, по которому объект потом
-# искать. Эти три поля есть в каждом объекте и ниже отдельно не поясняются.
+# How to read any manifest: apiVersion — the version of the description schema (the cluster uses it to know
+# how to parse the object), kind — what we are creating, metadata.name — the name by which the object is
+# later found. These three fields are present in every object and are not explained separately below.
 #
-# Пространство имён (namespace) — логическая перегородка внутри одного кластера:
-# своя область видимости имён, свои права, свои квоты. Ближайшее в vSphere — папка
-# в дереве vCenter или resource pool.
+# A namespace is a logical partition inside a single cluster:
+# its own name scope, its own permissions, its own quotas. The closest thing in vSphere is a folder
+# in the vCenter tree or a resource pool.
 #
-# Зачем оно лежит в Git вместе с приложением, а не создано руками: когда сервис уедет
-# из репозитория, Flux уберёт и пространство имён. Не останется пустой перегородки,
-# про которую через полгода никто не вспомнит, зачем она заводилась.
+# Why it lives in Git together with the application instead of being created by hand: when the service leaves
+# the repository, Flux will remove the namespace too. No empty partition will be left behind,
+# the one that six months later nobody remembers why it was created.
 apiVersion: v1
 kind: Namespace
 metadata:
   name: passes
-  # Метка на работу сервиса не влияет — она нужна, чтобы одной командой найти всё,
-  # что относится к «Пропуску»: kubectl get all -A -l app.kubernetes.io/part-of=passes.
-  # Имя part-of взято из общепринятого набора меток Kubernetes, а не придумано нами:
-  # чужие инструменты (мониторинг, выгрузки) ищут именно его.
+  # The label does not affect how the service runs — it is needed so that a single command can find everything
+  # that belongs to "Passes": kubectl get all -A -l app.kubernetes.io/part-of=passes.
+  # The part-of name is taken from the common set of Kubernetes labels, not invented by us:
+  # third-party tools (monitoring, exports) look for exactly this one.
   labels:
     app.kubernetes.io/part-of: passes

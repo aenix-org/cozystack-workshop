@@ -1,74 +1,74 @@
--- Лаба 9 · генератор данных: миллион отметок турникета, придуманных самим ClickHouse.
+-- Lab 9 · data generator: a million turnstile entries, invented by ClickHouse itself.
 --
--- Где выполняется: на ноутбуке, в лабораторном кластере, короткой командой `ch`
--- из README:
+-- Where it runs: on the laptop, in the lab cluster, with the short command `ch`
+-- from the README:
 --     cd labs/09-clickhouse && ch < 02-generate.sql
--- Перед этим должна быть создана таблица — 01-schema.sql.
+-- Before this, the table must already be created — 01-schema.sql.
 --
--- Сколько ждать: миллион строк вычисляется и записывается за несколько секунд,
--- целиком внутри сервера. Данные не идут по сети и не проходят через ваш ноутбук.
--- Ответ у INSERT пустой — это успех. Проверить: echo 'SELECT count() FROM passes' | ch
+-- How long to wait: a million rows are computed and written in a few seconds,
+-- entirely inside the server. The data does not travel over the network and does not pass through your laptop.
+-- The INSERT reply is empty — that means success. To check: echo 'SELECT count() FROM passes' | ch
 --
--- Запустите файл дважды — строк станет два миллиона: INSERT только добавляет и
--- ничего не заменяет. Начать заново: TRUNCATE TABLE passes, затем этот файл снова.
+-- Run the file twice and there will be two million rows: INSERT only appends and
+-- replaces nothing. To start over: TRUNCATE TABLE passes, then run this file again.
 --
--- Ниже одна команда INSERT ... SELECT: строки не приходят снаружи, а вычисляются
--- запросом, который идёт следом.
+-- Below is a single INSERT ... SELECT command: the rows do not come from outside, they are computed
+-- by the query that follows.
 INSERT INTO passes
 SELECT
-    -- Номер пропуска. number уникален в пределах генератора — значит, уникален
-    -- и pass_id.
+    -- Pass number. number is unique within the generator — so pass_id
+    -- is unique too.
     number AS pass_id,
-    -- Время прохода собирается из трёх частей: день, час и минута. Каждая часть —
-    -- своё псевдослучайное число, полученное как cityHash64(number, 'соль').
-    -- cityHash64 — быстрая хеш-функция: от одного и того же входа она всегда даёт
-    -- один и тот же результат, поэтому данные воспроизводимы, а разная «соль»
-    -- ('day', 'hour', 'minute', ...) делает из одного number сколько угодно
-    -- независимых друг от друга случайных величин.
+    -- The entry time is assembled from three parts: day, hour, and minute. Each part is
+    -- its own pseudo-random number, obtained as cityHash64(number, 'salt').
+    -- cityHash64 is a fast hash function: for the same input it always gives
+    -- the same result, so the data is reproducible, while a different 'salt'
+    -- ('day', 'hour', 'minute', ...) turns a single number into as many
+    -- mutually independent random values as you like.
     addMinutes(
         addHours(
             addDays(
-                -- Точка отсчёта — 1 января. Остаток от 57600 даёт число до 57599,
-                -- корень из него — день от 0 до 239, то есть восемь месяцев.
-                -- Квадратный корень здесь не для красоты: он сгущает проходы
-                -- к концу периода. Гостей со временем становится больше — как
-                -- в жизни, и как раз рост руководство и хочет увидеть в отчёте.
+                -- The reference point is January 1st. The remainder modulo 57600 gives a number up to 57599,
+                -- its square root is a day from 0 to 239, that is, eight months.
+                -- The square root here is not for looks: it clusters entries
+                -- toward the end of the period. Over time there are more guests — as
+                -- in real life, and it is exactly this growth that management wants to see in the report.
                 toDateTime('2026-01-01 00:00:00'),
                 toUInt16(sqrt(cityHash64(number, 'day') % 57600))
             ),
-            -- Час прихода берётся не равномерно «от 8 до 18», а из массива, где
-            -- часы повторяются с разной частотой: 10 встречается трижды, 15 трижды,
-            -- 8 — один раз. Получаются два выраженных пика, перед обедом и после;
-            -- их отчёт и должен найти. Хорошо, когда в тестовых данных есть то,
-            -- что мы собираемся в них искать.
-            -- Нумерация массивов в ClickHouse начинается с единицы, отсюда 1 + …
+            -- The arrival hour is taken not uniformly "from 8 to 18", but from an array where
+            -- hours repeat with different frequency: 10 appears three times, 15 three times,
+            -- 8 once. The result is two pronounced peaks, before lunch and after;
+            -- the report should find them. It is good when the test data contains what
+            -- we intend to look for in it.
+            -- Array indexing in ClickHouse starts at one, hence 1 + …
             [8, 9, 9, 10, 10, 10, 11, 11, 12,
              13, 14, 14, 15, 15, 15, 16, 17, 18][1 + cityHash64(number, 'hour') % 18]
         ),
-        -- Минуты внутри часа — ещё одна независимая величина от того же number.
+        -- The minutes within the hour are yet another independent value from the same number.
         cityHash64(number, 'minute') % 60
     ) AS created_at,
-    -- Имя гостя своё у каждой строки: миллион разных значений в одной колонке.
-    -- Чуть дальше по лабе будет видно, что на диске это самая тяжёлая колонка.
+    -- The guest name is unique to each row: a million different values in a single column.
+    -- A bit further into the lab it will be clear that on disk this is the heaviest column.
     concat('Гость № ', toString(number)) AS guest_name,
-    -- Отдел принимающего сотрудника: пять значений, распределены поровну.
+    -- The host employee's department: five values, distributed equally.
     ['Продажи', 'Разработка', 'Бухгалтерия',
      'Кадры', 'Логистика'][1 + cityHash64(number, 'dept') % 5] AS host_dept,
-    -- Проходная. Тот же приём, но распределение неравномерное: «Северная» занимает
-    -- три ячейки из шести и получает половину потока, «Южная» — треть, «Западная» —
-    -- остаток. Равномерные данные в отчёте выглядят неправдоподобно и ничего
-    -- не показывают.
+    -- The entrance. The same trick, but the distribution is uneven: "Северная" takes
+    -- three cells out of six and gets half the flow, "Южная" a third, "Западная"
+    -- the rest. Uniform data looks implausible in a report and shows
+    -- nothing.
     ['Северная', 'Северная', 'Северная',
      'Южная', 'Южная', 'Западная'][1 + cityHash64(number, 'entrance') % 6] AS entrance,
-    -- Тип пропуска: шесть ячеек из десяти отданы разовому, по две недельному,
-    -- по одной автомобильному и групповому — так это и выглядит на проходной.
+    -- Pass type: six cells out of ten go to single-use, two each to weekly,
+    -- one each to vehicle and group — that is how it looks at the entrance.
     ['разовый', 'разовый', 'разовый', 'разовый', 'разовый', 'разовый',
      'недельный', 'недельный',
      'автомобильный', 'групповой'][1 + cityHash64(number, 'type') % 10] AS pass_type,
-    -- Длительность визита от 30 до 329 минут. toUInt16 нужен потому, что колонка
-    -- объявлена как UInt16, а результат арифметики шире и сам не сузится.
+    -- Visit duration from 30 to 329 minutes. toUInt16 is needed because the column
+    -- is declared as UInt16, while the result of the arithmetic is wider and will not narrow itself.
     toUInt16(30 + cityHash64(number, 'duration') % 300) AS duration_min
--- numbers(1000000) — встроенная таблица-генератор: миллион строк с единственной
--- колонкой number со значениями от 0 до 999999. На диске её нет, она вычисляется
--- на лету. Нужно больше или меньше данных — меняется только это число.
+-- numbers(1000000) is a built-in generator table: a million rows with a single
+-- column number holding values from 0 to 999999. It is not on disk, it is computed
+-- on the fly. If you need more or less data, only this number changes.
 FROM numbers(1000000)

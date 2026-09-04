@@ -1,41 +1,42 @@
 ---
-# Лаба 11. Бакет под собранные APK.
+# Lab 11. A bucket for the built APKs.
 #
-# Бакет — именованная область в объектном хранилище: файлы кладут и забирают целиком,
-# по HTTP, и никуда не монтируют. Каталогов внутри нет, слэш в имени объекта рисуется
-# деревом только в интерфейсе.
+# A bucket is a named area in object storage: files are put and fetched whole,
+# over HTTP, and never mounted anywhere. There are no directories inside; the slash
+# in an object name is drawn as a tree only in the interface.
 #
-# Это тенантный объект: он живёт НЕ в кластере `lab`, а в вашем namespace
-# на управляющем кластере. Поэтому kubeconfig здесь нужен тенантный,
-# а не тот, которым вы работаете с кластером `lab`. Так и задумано: артефакты сборки
-# должны пережить кластер, в котором собирались.
+# This is a tenant object: it lives NOT in the `lab` cluster, but in your namespace
+# on the management cluster. That is why the kubeconfig here must be the tenant one,
+# not the one you use to work with the `lab` cluster. This is by design: build artifacts
+# must outlive the cluster they were built in.
 #
-# Перед применением замените tenant-workshopXX на свой namespace, иначе заказ уедет
-# не в ваш тенант и, скорее всего, не пройдёт по правам.
+# Before applying, replace tenant-workshopXX with your own namespace, otherwise the order
+# will go to the wrong tenant and most likely will not pass the permission checks.
 #
 #     export KUBECONFIG=~/.kube/workshop
 #     kubectl apply -f bucket.yaml
 #
-# То же самое делается мышкой в дашборде тенанта (Создать приложение -> Bucket).
-# Результат одинаковый; разница в том, что текст можно отревьюить и положить в Git.
+# The same thing is done with the mouse in the tenant dashboard (Create application -> Bucket).
+# The result is identical; the difference is that text can be reviewed and put into Git.
 #
-# Что произойдёт после применения: платформа поднимет бакет за несколько секунд
-# и выпустит ключи доступа, сложив их в секрет bucket-builds-ci-credentials в том же
-# namespace. Четыре значения оттуда (endpoint, bucketName, accessKey, secretKey)
-# переносятся в кластер `lab` руками — кластеры разные, само ничего не переедет.
+# What happens after applying: the platform brings up the bucket in a few seconds
+# and issues access keys, storing them in the secret bucket-builds-ci-credentials in the same
+# namespace. Four values from there (endpoint, bucketName, accessKey, secretKey)
+# are carried into the `lab` cluster by hand — the clusters are different, nothing moves on its own.
 apiVersion: apps.cozystack.io/v1alpha1
 kind: Bucket
 metadata:
-  # Имя объекта Cozystack, и только его. Настоящее имя бакета в хранилище платформа
-  # выдаёт сама — длинное, вида bucket-a9209f83-... Оно попадёт в поле bucketName
-  # выпущенного секрета, и в сборку подставлять надо именно его, а не `builds`.
+  # The name of the Cozystack object, and only it. The real bucket name in storage is
+  # issued by the platform itself — a long one, like bucket-a9209f83-... It will land in the
+  # bucketName field of the issued secret, and it is exactly that which must be substituted into
+  # the build, not `builds`.
   name: builds
   namespace: tenant-workshopXX
 spec:
   users:
-    # Каждый ключ этой карты — отдельный пользователь S3 со своей парой ключей.
-    # Пустой объект означает «полный доступ на чтение и запись».
-    # Так можно выдать сборщику запись, а мобильной команде — только чтение:
+    # Each key of this map is a separate S3 user with its own key pair.
+    # An empty object means "full read and write access".
+    # This way you can grant the builder write access, and the mobile team — read-only:
     #   ci: {}
     #   mobile:
     #     readonly: true

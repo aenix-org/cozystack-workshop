@@ -1,36 +1,36 @@
-// Лаба 6 · Свой приватный реестр образов. Сервис «Пропуск», учебная версия.
+// Lab 6 · Your own private image registry. The "Pass" service, training version.
 //
-// ЧТО ЭТА ПРОГРАММА ДЕЛАЕТ. Поднимает веб-сервер и отвечает на два адреса.
-// Адрес /healthz отдаёт короткое «ok»: по нему кластер понимает, что копия жива
-// и готова принимать трафик. Адрес / отдаёт небольшой ответ в формате JSON (текст
-// вида «поле: значение»), где перечислено, какая копия и на каком узле обслужила
-// запрос. Больше ничего: ни базы, ни диска, ни состояния. Так и задумано — в этой лабе
-// интересен не код, а путь, которым он попадает в кластер:
-// исходник -> образ -> свой реестр -> кластер.
+// WHAT THIS PROGRAM DOES. It starts a web server and answers on two addresses.
+// The /healthz address returns a short "ok": from it the cluster understands that the
+// replica is alive and ready to accept traffic. The / address returns a small response in
+// JSON format (text of the form "field: value"), where it lists which replica and on which
+// node served the request. Nothing more: no database, no disk, no state. That is by design — in
+// this lab the interesting part is not the code, but the path by which it gets into the cluster:
+// source -> image -> your own registry -> cluster.
 //
-// Читать этот файл на Go уметь не нужно, достаточно понимать, что здесь происходит;
-// комментарии ниже расставлены с расчётом на то, что вы видите Go впервые.
+// You do not need to be able to read this Go file, it is enough to understand what happens here;
+// the comments below are written on the assumption that you are seeing Go for the first time.
 //
-// Внешних зависимостей нет: используется только стандартная библиотека, которая
-// приезжает вместе с компилятором. Поэтому сборка не ходит в интернет за
-// библиотеками, и собрать образ можно там, где выход наружу закрыт, — а именно
-// с этого и начинается вся лаба.
+// There are no external dependencies: only the standard library is used, which
+// comes together with the compiler. Therefore the build does not go to the internet for
+// libraries, and you can build the image where outbound access is closed off, — and that
+// is exactly where the whole lab begins.
 //
-// Собирается не напрямую, а через соседний Dockerfile, командой
+// It is built not directly, but through the neighboring Dockerfile, with the command
 // docker build --platform linux/amd64 -t HARBOR-HOST/passes/passes-api:v1 app/
 //
-// package main — так в Go помечают программу, которую можно запустить (в отличие
-// от библиотеки). Точка входа при запуске — функция main в самом низу файла.
+// package main — this is how in Go you mark a program that can be run (as opposed
+// to a library). The entry point when running is the main function at the very bottom of the file.
 package main
 
-// Что берём из стандартной библиотеки:
-//   encoding/json — собрать ответ в формате JSON
-//   log           — писать сообщения; в контейнере они уходят в стандартный вывод,
-//                   откуда их забирает kubectl logs. Файлов с логами внутри нет,
-//                   и заводить их не надо — это норма для контейнеров
-//   net/http      — сам веб-сервер
-//   os            — прочитать переменные окружения
-//   time          — метка времени в ответе и таймаут сервера
+// What we take from the standard library:
+//   encoding/json — assemble the response in JSON format
+//   log           — write messages; in a container they go to standard output,
+//                   from where kubectl logs picks them up. There are no log files inside,
+//                   and there is no need to create them — this is normal for containers
+//   net/http      — the web server itself
+//   os            — read environment variables
+//   time          — timestamp in the response and server timeout
 import (
 	"encoding/json"
 	"log"
@@ -39,12 +39,12 @@ import (
 	"time"
 )
 
-// Форма ответа: набор полей, которые приложение сообщает о себе. Почти все они —
-// то, что приложение узнаёт от кластера: мы их не вычисляем и не угадываем, кластер
-// сам кладёт их в переменные окружения (см. passes.yaml, блок env и downward API).
+// The shape of the response: a set of fields that the application reports about itself. Almost all of them —
+// are what the application learns from the cluster: we do not compute or guess them, the cluster
+// itself puts them into environment variables (see passes.yaml, the env block and downward API).
 //
-// Текст в обратных кавычках справа — имя поля в готовом JSON. Без него поле уехало бы
-// в ответ как Namespace, а не как namespace; проверка в check.sh ищет строчное «pod».
+// The text in backticks on the right is the field name in the final JSON. Without it the field would go
+// into the response as Namespace, not as namespace; the check in check.sh looks for the lowercase "pod".
 type identity struct {
 	Service   string `json:"service"`
 	Version   string `json:"version"`
@@ -55,9 +55,9 @@ type identity struct {
 	Time      string `json:"time"`
 }
 
-// Прочитать переменную окружения, а если её нет или она пустая — вернуть запасное
-// значение. Нужна, чтобы программу можно было запустить и вне кластера, без единой
-// настройки: она не упадёт, а честно напишет в ответе «неизвестно».
+// Read an environment variable, and if it is missing or empty — return a fallback
+// value. It is needed so that the program can be run outside the cluster too, without a single
+// setting: it will not crash, but honestly write "неизвестно" in the response.
 func env(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
@@ -65,27 +65,27 @@ func env(key, fallback string) string {
 	return fallback
 }
 
-// Точка входа: с этой функции начинается работа программы.
+// Entry point: the program's work begins with this function.
 func main() {
-	// На каком порту слушать. Порт можно переопределить переменной PORT, не пересобирая
-	// образ, но по умолчанию это 8080 — то же число, что в passes.yaml (containerPort)
-	// и в Dockerfile (EXPOSE). Разъедутся — Service будет стучаться в закрытую дверь.
+	// Which port to listen on. The port can be overridden with the PORT variable, without rebuilding
+	// the image, but by default it is 8080 — the same number as in passes.yaml (containerPort)
+	// and in the Dockerfile (EXPOSE). If they diverge — the Service will knock on a closed door.
 	port := env("PORT", "8080")
 
-	// Таблица маршрутов: какой адрес какой обработчик обслуживает.
+	// The routing table: which address which handler serves.
 	mux := http.NewServeMux()
 
-	// Проверка готовности. Кластер стучится сюда и не пускает трафик на копию,
-	// пока не получит ответ. Отвечает всегда и быстро, ничего не проверяя:
-	// приложению нечего проверять, у него нет ни базы, ни диска.
+	// Readiness check. The cluster knocks here and does not let traffic onto the replica,
+	// until it gets a response. It answers always and fast, checking nothing:
+	// the application has nothing to check, it has neither a database nor a disk.
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		_, _ = w.Write([]byte("ok\n"))
 	})
 
-	// Основной ответ. Собираем те самые поля и отдаём их одним JSON. Значения читаются
-	// при каждом запросе, поэтому вторая копия сервиса ответит своим именем пода —
-	// по этому имени в лабе и видно, что копий действительно две.
+	// The main response. We assemble those very fields and hand them out as a single JSON. The values are read
+	// on every request, so the second replica of the service will answer with its own pod name —
+	// by that name in the lab you can see that there really are two replicas.
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		body := identity{
 			Service:   "passes-api",
@@ -99,30 +99,30 @@ func main() {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		enc := json.NewEncoder(w)
 		enc.SetIndent("", "  ")
-		// SetEscapeHTML(false), иначе кириллица и символы вроде < уедут в \uXXXX
-		// и ответ станет нечитаемым в терминале.
+		// SetEscapeHTML(false), otherwise Cyrillic and symbols like < would go into \uXXXX
+		// and the response would become unreadable in the terminal.
 		enc.SetEscapeHTML(false)
 		if err := enc.Encode(body); err != nil {
 			log.Printf("не удалось отдать ответ: %v", err)
 		}
 	})
 
-	// Настройки сервера. ReadHeaderTimeout — сколько ждать заголовков запроса, прежде
-	// чем оборвать соединение. Пять секунд стоят не для скорости: без этого таймаута
-	// открытые и брошенные соединения копятся, пока не съедят память контейнера,
-	// а память ограничена лимитом из манифеста.
+	// Server settings. ReadHeaderTimeout — how long to wait for the request headers, before
+	// cutting off the connection. The five seconds are there not for speed: without this timeout
+	// opened and abandoned connections pile up until they eat up the container's memory,
+	// and the memory is limited by the limit from the manifest.
 	srv := &http.Server{
 		Addr:              ":" + port,
 		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
-	// Первое, что вы увидите в kubectl logs. Строка нужна, чтобы отличить «приложение
-	// не запустилось» от «запустилось, но не отвечает» — это разные диагнозы.
+	// The first thing you will see in kubectl logs. The line is needed to distinguish "the application
+	// did not start" from "started, but does not respond" — these are different diagnoses.
 	log.Printf("passes-api %s слушает порт %s, под %s",
 		env("APP_VERSION", "v1"), port, env("POD_NAME", "неизвестно"))
-	// Запускаем сервер и работаем, пока нас не остановят. Если порт занят или сервер
-	// упал — пишем причину и выходим с ошибкой. Кластер увидит завершившийся процесс
-	// и поднимет копию заново; чинить перезапуск внутри программы не нужно.
+	// We start the server and work until we are stopped. If the port is taken or the server
+	// crashed — we write the reason and exit with an error. The cluster will see the finished process
+	// and bring up the replica anew; there is no need to fix the restart inside the program.
 	log.Fatal(srv.ListenAndServe())
 }

@@ -1,11 +1,11 @@
-# Лаба 13. Шаблон Service: постоянный адрес приложения.
+# Lab 13. Service template: a stable address for the application.
 #
-# Копии приложения приходят и уходят, их адреса каждый раз новые. Service даёт имя,
-# которое не меняется, и раскидывает запросы по живым копиям. Из соседнего пода
-# к приложению обращаются по имени релиза.
+# Copies of the application come and go, and their addresses are new every time. Service gives a name
+# that does not change and spreads requests across the live copies. From a neighboring pod
+# the application is reached by the release name.
 #
-# О подстановке в двойных фигурных скобках и о том, откуда берутся имена объектов,
-# написано в templates/deployment.yaml — здесь всё устроено так же.
+# Substitution inside double curly braces and where object names come from is
+# described in templates/deployment.yaml — here everything works the same way.
 apiVersion: v1
 kind: Service
 metadata:
@@ -14,20 +14,20 @@ metadata:
     app.kubernetes.io/name: guest-pass
     app.kubernetes.io/instance: {{ .Release.Name }}
 spec:
-  # Один флаг в values решает, получит приложение адрес за пределами кластера или нет.
-  # Так же устроены штатные приложения Cozystack: поле external.
-  # Конструкция if/else выбирает одно из двух значений при рендере — в готовый манифест
-  # уходит либо LoadBalancer, либо ClusterIP, и ветвления в нём уже не остаётся.
+  # A single flag in values decides whether the application gets an address outside the cluster or not.
+  # Cozystack's built-in applications work the same way: the external field.
+  # The if/else construct picks one of the two values at render time — the finished manifest
+  # gets either LoadBalancer or ClusterIP, with no branching left in it.
   type: {{ if .Values.external }}LoadBalancer{{ else }}ClusterIP{{ end }}
-  # Кому отдавать трафик. Service отбирает поды по меткам, а не по именам, поэтому
-  # ему всё равно, сколько копий и как они называются. Метки те же, что Deployment
-  # ставит своим копиям.
+  # Whom to send traffic to. Service selects pods by labels, not by names, so
+  # it does not care how many copies there are or what they are called. The labels are the same ones the Deployment
+  # puts on its copies.
   selector:
     app.kubernetes.io/name: guest-pass
     app.kubernetes.io/instance: {{ .Release.Name }}
-  # port — на каком порту слушает сам Service, targetPort — куда он стучится внутрь пода.
-  # targetPort записан именем: порт с именем http объявлен в шаблоне Deployment.
-  # Поменяется номер там — здесь править не придётся.
+  # port — which port the Service itself listens on, targetPort — where it knocks inside the pod.
+  # targetPort is written as a name: the port named http is declared in the Deployment template.
+  # If the number changes there, nothing needs fixing here.
   ports:
     - name: http
       port: 80

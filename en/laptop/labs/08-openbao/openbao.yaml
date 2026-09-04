@@ -1,41 +1,41 @@
-# Лаба 8 · заказ хранилища секретов OpenBao.
-# То же самое, что вы закажете мышкой в дашборде — только текстом.
-# Применяется НЕ в лабораторный кластер, а в тенант на управляющем кластере:
+# Lab 8 · ordering an OpenBao secrets store.
+# The same thing you would order with the mouse in the dashboard — only as text.
+# Applied NOT to the lab cluster, but to a tenant on the management cluster:
 #   kubectl --kubeconfig="$HOME/.kube/workshop" apply -f openbao.yaml
 #
-# ПЕРЕД ПРИМЕНЕНИЕМ: замените tenant-workshopXX на свой namespace. XX — заглушка,
-# а не часть имени; свой номер вы получили вместе с паролем. Уйдёт в чужой тенант —
-# получите отказ в доступе, и это лучший из возможных исходов.
+# BEFORE APPLYING: replace tenant-workshopXX with your own namespace. XX is a placeholder,
+# not part of the name; you received your own number together with the password. If it goes
+# into someone else's tenant, you get an access denied — and that is the best possible outcome.
 #
-# kind: OpenBAO — это не встроенный объект Kubernetes, а тип, который добавляет
-# Cozystack. Вы описываете, что вам нужно, платформа сама разворачивает поды, диски
-# и сервисы и дальше сама их обновляет. Ближе всего к заказу услуги по каталогу,
-# а не к установке софта на выданную виртуалку.
+# kind: OpenBAO is not a built-in Kubernetes object, but a type added by
+# Cozystack. You describe what you need, and the platform itself deploys the pods, disks,
+# and services and then keeps them updated on its own. It is closer to ordering a service from
+# a catalog than to installing software on a VM you were handed.
 apiVersion: apps.cozystack.io/v1alpha1
 kind: OpenBAO
 metadata:
-  # Имя влияет не только на карточку в дашборде: внутренний адрес хранилища
-  # собирается из него — openbao-secrets.<namespace>.svc.cozy.local. Переименуете —
-  # правьте адрес в secrets-demo.yaml и в переменной BAO_APP для check.sh.
+  # The name affects more than just the card in the dashboard: the store's internal address
+  # is built from it — openbao-secrets.<namespace>.svc.cozy.local. If you rename it,
+  # fix the address in secrets-demo.yaml and in the BAO_APP variable for check.sh.
   name: secrets
   namespace: tenant-workshopXX
 spec:
-  # Одна копия. В проде ставят три и получают Raft-репликацию: чарт включает
-  # её сам, как только replicas > 1. Переключение туда-обратно требует
-  # переноса данных, поэтому решение принимают до, а не после.
+  # One copy. In production three are used, which gives Raft replication: the chart enables
+  # it itself as soon as replicas > 1. Switching back and forth requires
+  # migrating the data, so the decision is made before, not after.
   replicas: 1
-  # Диск под данные хранилища. Два гигабайта — с запасом: секреты весят байты,
-  # место уходит на историю версий и журнал аудита. Уменьшить том после создания
-  # нельзя, увеличить обычно можно, поэтому мелочиться здесь незачем.
+  # Disk for the store's data. Two gigabytes is plenty: secrets weigh bytes,
+  # the space goes to version history and the audit log. You cannot shrink the volume after
+  # creation, but you can usually grow it, so there is no point being stingy here.
   size: 2Gi
-  # Класс хранения replicated означает, что данные лежат в нескольких копиях на
-  # разных узлах. Отказ узла не уносит с собой все ваши пароли — а восстанавливать
-  # хранилище секретов из бэкапа мероприятие отдельно неприятное.
+  # The replicated storage class means the data is kept in several copies on
+  # different nodes. A node failure does not carry away all your passwords — and restoring
+  # a secrets store from a backup is a separately unpleasant affair.
   storageClass: replicated
-  # Готовый набор «сколько процессора и памяти». Платформа предлагает их списком,
-  # чтобы не заставлять каждого считать запросы и лимиты вручную.
+  # A ready-made "how much CPU and memory" set. The platform offers them as a list,
+  # so as not to force everyone to compute requests and limits by hand.
   resourcesPreset: t1.small
-  # Веб-интерфейс поднимается внутри кластера. Наружу мы его не выставляем:
-  # external: true повесил бы LoadBalancer, а нам он в лабе не нужен.
+  # The web interface comes up inside the cluster. We do not expose it outward:
+  # external: true would attach a LoadBalancer, and we don't need it in the lab.
   ui: true
   external: false

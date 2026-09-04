@@ -1,53 +1,53 @@
-# Лаба 10 · заказ базы MongoDB под пропуска разной формы.
-# Описание того, что вы хотите получить; собирает и настраивает сервис платформа.
-# То же самое, что вы закажете мышкой в дашборде — только текстом.
-# Применяется НЕ в лабораторный кластер, а в тенант на управляющем кластере:
+# Lab 10 · ordering a MongoDB database for passes of different kinds.
+# A description of what you want to get; the platform assembles and configures the service.
+# The same thing you would order with the mouse in the dashboard — only as text.
+# Applied NOT to the lab cluster, but to a tenant on the management cluster:
 #   kubectl --kubeconfig="$HOME/.kube/workshop" apply -f mongodb.yaml
 #
-# ПЕРЕД ПРИМЕНЕНИЕМ: замените tenant-workshopXX на свой namespace,
-# а ЗдесьВашПароль — на пароль, который вы придумаете.
+# BEFORE APPLYING: replace tenant-workshopXX with your namespace,
+# and ЗдесьВашПароль with a password you come up with.
 apiVersion: apps.cozystack.io/v1alpha1
 kind: MongoDB
 metadata:
   name: passes
   namespace: tenant-workshopXX
 spec:
-  # Одна копия. MongoDB рассчитана на набор реплик из трёх: они голосуют, кто
-  # главный, и переживают потерю одной. С одной копией голосовать не с кем,
-  # и чарт включает для этого отдельный «небезопасный» режим. Для лабы годится,
-  # для прода — нет.
+  # A single copy. MongoDB is designed for a replica set of three: they vote on who
+  # is primary and survive the loss of one. With a single copy there is no one to vote
+  # with, and the chart enables a separate "unsafe" mode for this. Fine for a lab,
+  # not for production.
   replicas: 1
-  # Диск под данные. Четырём учебным документам хватит и мегабайта, но том потом
-  # проще взять с запасом, чем расширять.
+  # Disk for data. A megabyte would be enough for four learning documents, but it is
+  # easier to size the volume generously up front than to expand it later.
   size: 5Gi
-  # replicated — тома, у которых есть копия на другом узле кластера: узел выпал,
-  # данные остались.
+  # replicated — volumes that have a copy on another cluster node: a node drops out,
+  # the data remains.
   storageClass: replicated
-  # Процессор и память, выделенные поду базы. Для четырёх документов с избытком.
+  # CPU and memory allocated to the database pod. More than enough for four documents.
   resourcesPreset: s1.small
-  # Ветка MongoDB. Менять её задним числом на живой базе нельзя без обновления.
+  # MongoDB branch. Changing it after the fact on a live database is not possible without an upgrade.
   version: v8
-  # false — база доступна только изнутри кластера, наружу порт не выставляется.
-  # Ходить в неё вы будете из рабочего пода, запущенного рядом.
+  # false — the database is reachable only from inside the cluster, no port is exposed outward.
+  # You will access it from a working pod started alongside it.
   external: false
-  # Шардирование разрезает данные между несколькими наборами серверов. Нужно, когда
-  # данные не помещаются на один сервер; четыре пропуска помещаются.
+  # Sharding splits data across several sets of servers. Needed when
+  # the data does not fit on a single server; four passes do fit.
   sharding: false
-  # Пользователь базы и его пароль. Пароль придумайте свой и запомните: он нужен
-  # рабочему поду (в строке подключения MONGO_URI) и скрипту проверки
-  # (переменная MONGO_PASSWORD). Учётная запись заводится в служебной базе admin —
-  # поэтому в строке подключения обязателен authSource=admin.
+  # The database user and its password. Come up with your own password and remember it: it is needed
+  # by the working pod (in the MONGO_URI connection string) and by the check script
+  # (the MONGO_PASSWORD variable). The account is created in the service database admin —
+  # that is why authSource=admin is mandatory in the connection string.
   users:
     passapp:
       password: ЗдесьВашПароль
-  # База passes и права в ней: пользователю passapp выдана роль admin этой базы,
-  # то есть он может читать, писать, строить индексы и менять настройки коллекций.
-  # Права на другие базы это не даёт.
+  # The passes database and permissions in it: the passapp user is granted the admin role of this database,
+  # meaning it can read, write, build indexes and change collection settings.
+  # This does not grant rights to other databases.
   databases:
     passes:
       roles:
         admin:
           - passapp
-  # Резервные копии в объектное хранилище. На учебном стенде выключены.
+  # Backups to object storage. Disabled on the learning stand.
   backup:
     enabled: false
