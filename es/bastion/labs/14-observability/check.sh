@@ -1,118 +1,118 @@
 #!/usr/bin/env bash
-# Проверка лабы 14: наблюдаемость действительно работает.
+# Verificación del lab 14: la observabilidad realmente funciona.
 #
-# «Участник посмотрел график» проверить нельзя, и притворяться, что можно, нечестно.
-# Поэтому проверяем то, без чего график невозможен:
-#   1) агент сбора метрик работает в кластере,
-#   2) он отправляет собранное в ваш тенант, а не в никуда,
-#   3) сбор логов тоже работает — без него половина лабы бессмысленна,
-#   4) в кластере есть след нагрузки из лабы 3, который в графиках можно найти.
+# «El participante miró un gráfico» no se puede comprobar, y fingir que sí es deshonesto.
+# Por eso comprobamos lo que hace posible un gráfico en primer lugar:
+#   1) el agente de recolección de métricas está en ejecución en el clúster,
+#   2) envía lo que recolecta a tu tenant, no al vacío,
+#   3) la recolección de logs también funciona — sin ella la mitad del lab no tiene sentido,
+#   4) hay un rastro de la carga del lab 3 en el clúster que se puede encontrar en los gráficos.
 
 LAB_NAME="14-observability"
-LAB_TITLE="Лаба 14 · Наблюдаемость: найти свой всплеск в графиках"
+LAB_TITLE="Lab 14 · Observabilidad: encuentra tu propio pico en los gráficos"
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
 need_kubeconfig
 
 MON_NS=cozy-monitoring
 
-# --- namespace сбора --------------------------------------------------------
-# Namespace сам по себе ничего не доказывает: платформа кладёт туда же metrics-server,
-# который ставится любому кластеру с etcd и от дополнения не зависит. Проверяем его
-# наличие только чтобы отличить «кластер недоступен» от «сбор выключен».
+# --- namespace de recolección -----------------------------------------------
+# El namespace por sí solo no prueba nada: la plataforma también coloca allí metrics-server,
+# que se instala en cualquier clúster con etcd y no depende del addon. Comprobamos
+# su presencia solo para distinguir «clúster inaccesible» de «recolección apagada».
 if ! kubectl get ns "$MON_NS" >/dev/null 2>&1; then
-  fail "в кластере нет namespace ${MON_NS} — кластер отвечает не так, как ожидалось" \
-       "включите дополнение: дашборд -> Kubernetes -> lab -> изменить -> Addons -> Monitoring agents. Учтите: записи появятся только с этого момента"
+  fail "el clúster no tiene el namespace ${MON_NS} — el clúster respondió de forma inesperada" \
+       "activa el addon: dashboard -> Kubernetes -> lab -> editar -> Addons -> Monitoring agents. Ten en cuenta: los registros aparecerán solo a partir de este momento"
   finish
   exit $?
 fi
 
-# --- агент метрик -----------------------------------------------------------
+# --- agente de métricas -----------------------------------------------------
 VMAGENT_RUNNING="$(kubectl get pods -n "$MON_NS" --no-headers 2>/dev/null \
   | awk '$1 ~ /^vmagent/ && $3=="Running"' | grep -c . )"
 VMAGENT_TOTAL="$(kubectl get pods -n "$MON_NS" --no-headers 2>/dev/null \
   | awk '$1 ~ /^vmagent/' | grep -c . )"
 
 if [ "$VMAGENT_RUNNING" -ge 1 ]; then
-  ok "агент сбора метрик работает (подов vmagent: ${VMAGENT_RUNNING})"
+  ok "el agente de recolección de métricas está en ejecución (pods vmagent: ${VMAGENT_RUNNING})"
 elif [ "$VMAGENT_TOTAL" -ge 1 ]; then
-  fail "агент сбора метрик есть, но не работает (${VMAGENT_RUNNING} из ${VMAGENT_TOTAL} в Running)" \
-       "смотрите причину: kubectl -n ${MON_NS} describe pod -l app.kubernetes.io/name=vmagent | sed -n '/Events:/,\$p'"
+  fail "el agente de recolección de métricas existe pero no está en ejecución (${VMAGENT_RUNNING} de ${VMAGENT_TOTAL} en Running)" \
+       "mira la causa: kubectl -n ${MON_NS} describe pod -l app.kubernetes.io/name=vmagent | sed -n '/Events:/,\$p'"
 else
-  fail "в ${MON_NS} нет ни одного пода vmagent — дополнение Monitoring agents выключено" \
-       "включите его: дашборд -> Kubernetes -> lab -> изменить -> Addons -> Monitoring agents. Записи начнут копиться только с этого момента, прошлое не вернуть"
+  fail "no hay ni un solo pod vmagent en ${MON_NS} — el addon Monitoring agents está apagado" \
+       "actívalo: dashboard -> Kubernetes -> lab -> editar -> Addons -> Monitoring agents. Los registros empiezan a acumularse solo a partir de este momento, el pasado no se puede recuperar"
 fi
-evidence "Поды сбора в ${MON_NS}" "$(kubectl get pods -n "$MON_NS" 2>/dev/null)"
+evidence "Pods de recolección en ${MON_NS}" "$(kubectl get pods -n "$MON_NS" 2>/dev/null)"
 
-# --- куда именно уезжают метрики -------------------------------------------
-# Работающий агент, который пишет в никуда, выглядит точно так же, как рабочий.
+# --- a dónde van exactamente las métricas -----------------------------------
+# Un agente en ejecución que escribe al vacío se ve exactamente igual que uno que funciona.
 RW_URL="$(kubectl get vmagent -n "$MON_NS" \
   -o jsonpath='{.items[0].spec.remoteWrite[0].url}' 2>/dev/null)"
 if [ -n "$RW_URL" ]; then
   case "$RW_URL" in
     *tenant-*)
       TARGET_NS="$(printf '%s' "$RW_URL" | sed -n 's|.*vminsert-[a-z]*\.\([^.]*\)\..*|\1|p')"
-      ok "метрики отправляются в тенант${TARGET_NS:+ (${TARGET_NS})}"
+      ok "las métricas se están enviando al tenant${TARGET_NS:+ (${TARGET_NS})}"
       ;;
     *)
-      warn "метрики отправляются по адресу, не похожему на тенантный" \
-           "это может быть нормально, если ведущий настроил общее хранилище; адрес в свидетельствах"
+      warn "las métricas se están enviando a una dirección que no parece de tenant" \
+           "esto puede estar bien si el ponente configuró un almacenamiento compartido; la dirección está en las evidencias"
       ;;
   esac
-  evidence "Куда отправляются метрики" "$RW_URL"
+  evidence "A dónde se envían las métricas" "$RW_URL"
 else
-  warn "не удалось прочитать адрес отправки метрик" \
-       "посмотрите руками: kubectl get vmagent -n ${MON_NS} -o yaml"
+  warn "no se pudo leer la dirección de envío de métricas" \
+       "míralo a mano: kubectl get vmagent -n ${MON_NS} -o yaml"
 fi
 
-# --- сбор логов -------------------------------------------------------------
+# --- recolección de logs ----------------------------------------------------
 FB_DESIRED="$(kubectl get ds -n "$MON_NS" --no-headers 2>/dev/null \
   | awk '$1 ~ /fluent-bit/ {print $2; exit}')"
 FB_READY="$(kubectl get ds -n "$MON_NS" --no-headers 2>/dev/null \
   | awk '$1 ~ /fluent-bit/ {print $4; exit}')"
 if [ -n "$FB_DESIRED" ] && [ "${FB_READY:-0}" = "$FB_DESIRED" ] && [ "${FB_READY:-0}" != "0" ]; then
-  ok "сбор логов работает на всех узлах (${FB_READY}/${FB_DESIRED})"
+  ok "la recolección de logs funciona en todos los nodos (${FB_READY}/${FB_DESIRED})"
 elif [ -n "$FB_DESIRED" ]; then
-  fail "сбор логов запущен не на всех узлах (${FB_READY:-0} из ${FB_DESIRED})" \
-       "смотрите: kubectl -n ${MON_NS} get pods | grep fluent-bit — без него шаг с поиском по журналам не сработает"
+  fail "la recolección de logs no está en ejecución en todos los nodos (${FB_READY:-0} de ${FB_DESIRED})" \
+       "mira: kubectl -n ${MON_NS} get pods | grep fluent-bit — sin ella el paso de búsqueda en los registros no funcionará"
 else
-  warn "сборщик логов fluent-bit не найден" \
-       "источник vlogs-generic в Grafana будет пустым; шаг с поиском по журналам выполнить не получится"
+  warn "no se encontró el recolector de logs fluent-bit" \
+       "la fuente vlogs-generic en Grafana estará vacía; el paso de búsqueda en los registros no se podrá completar"
 fi
 
-# --- есть ли что искать в графиках -----------------------------------------
-# Метрики могут собираться идеально, но если нагрузки не было, искать нечего.
+# --- ¿hay algo que buscar en los gráficos? ----------------------------------
+# Las métricas pueden recolectarse perfectamente, pero si no hubo carga, no hay nada que encontrar.
 if kubectl get hpa rickroll >/dev/null 2>&1; then
   LAST_SCALE="$(kubectl get hpa rickroll -o jsonpath='{.status.lastScaleTime}' 2>/dev/null)"
   CUR="$(kubectl get hpa rickroll -o jsonpath='{.status.currentReplicas}' 2>/dev/null)"
   DES="$(kubectl get hpa rickroll -o jsonpath='{.status.desiredReplicas}' 2>/dev/null)"
   if [ -n "$LAST_SCALE" ]; then
-    ok "след нагрузки есть: автомасштабирование срабатывало (последний раз ${LAST_SCALE})"
-    evidence "Состояние автомасштабирования" "$(kubectl get hpa rickroll 2>/dev/null)
-последнее срабатывание: ${LAST_SCALE}
-сейчас копий: ${CUR:-?}, требуется: ${DES:-?}"
+    ok "hay un rastro de carga: el autoescalado se activó (última vez ${LAST_SCALE})"
+    evidence "Estado del autoescalado" "$(kubectl get hpa rickroll 2>/dev/null)
+última activación: ${LAST_SCALE}
+copias ahora: ${CUR:-?}, requeridas: ${DES:-?}"
   else
-    warn "автомасштабирование настроено, но ни разу не срабатывало" \
-         "ступеньку роста копий вы не найдёте; повторите нагрузку из лабы 3 генератором fortio"
+    warn "el autoescalado está configurado pero nunca se activó" \
+         "no encontrarás el escalón de crecimiento de copias; repite la carga del lab 3 con el generador fortio"
   fi
 else
-  warn "в кластере нет HorizontalPodAutoscaler с именем rickroll" \
-       "шаги с графиками в этой лабе опираются на лабу 3; без неё найдёте только всплеск процессора, но не ступеньку"
+  warn "el clúster no tiene un HorizontalPodAutoscaler llamado rickroll" \
+       "los pasos con gráficos de este lab se apoyan en el lab 3; sin él solo encontrarás el pico de CPU, pero no el escalón"
 fi
 
-# --- сами метрики о приложении ----------------------------------------------
-# Косвенно, но по существу: если поды приложения живы, их потребление в графиках есть.
+# --- las propias métricas de la aplicación ----------------------------------
+# Indirecto pero esencial: si los pods de la aplicación están vivos, su consumo está en los gráficos.
 APP_PODS="$(kubectl get pods -l app=rickroll --no-headers 2>/dev/null | grep -c . )"
 if [ "${APP_PODS:-0}" -ge 1 ]; then
-  ok "поды приложения на месте (${APP_PODS} шт.) — их потребление видно в графиках"
-  evidence "Поды приложения" "$(kubectl get pods -l app=rickroll -o wide 2>/dev/null)"
+  ok "los pods de la aplicación están en su sitio (${APP_PODS} en total) — su consumo se ve en los gráficos"
+  evidence "Pods de la aplicación" "$(kubectl get pods -l app=rickroll -o wide 2>/dev/null)"
 else
-  warn "подов приложения rickroll в кластере нет" \
-       "исторические метрики за время лабы 3 при этом сохранились; просто выставьте в Grafana тот диапазон времени"
+  warn "no hay pods de la aplicación rickroll en el clúster" \
+       "las métricas históricas del tiempo del lab 3 se conservan igualmente; solo ajusta ese rango de tiempo en Grafana"
 fi
 
-# --- где искать Grafana -----------------------------------------------------
-# Не проверка, а помощь: адрес Grafana участники ищут дольше всего.
+# --- dónde encontrar Grafana ------------------------------------------------
+# No es una verificación sino una ayuda: la dirección de Grafana es lo que más tardan en buscar los participantes.
 : "${COZY_KUBECONFIG:=$HOME/.kube/config}"
 if [ -n "${COZY_TENANT:-}" ] && [ -r "$COZY_KUBECONFIG" ]; then
   TNS="tenant-${COZY_TENANT}"
@@ -123,21 +123,21 @@ if [ -n "${COZY_TENANT:-}" ] && [ -r "$COZY_KUBECONFIG" ]; then
       -o jsonpath='{range .items[*]}{.spec.rules[0].host}{"\n"}{end}' 2>/dev/null \
       | grep '^grafana\.' | head -1)"
     if [ -n "$GRAF_HOST" ]; then
-      ok "Grafana для ваших метрик: https://${GRAF_HOST}"
+      ok "Grafana para tus métricas: https://${GRAF_HOST}"
       evidence "Grafana" "https://${GRAF_HOST}
-метрики тенанта ${TNS} хранятся в namespace ${MON_TARGET}"
+las métricas del tenant ${TNS} se almacenan en el namespace ${MON_TARGET}"
     else
-      warn "мониторинг вашего тенанта живёт в ${MON_TARGET}, но адрес Grafana прочитать не удалось" \
-           "если ${MON_TARGET} — не ваш namespace, значит Grafana общая: спросите адрес у ведущего"
-      evidence "Мониторинг тенанта" "namespace с мониторингом: ${MON_TARGET}"
+      warn "el monitoreo de tu tenant vive en ${MON_TARGET}, pero no se pudo leer la dirección de Grafana" \
+           "si ${MON_TARGET} no es tu namespace, entonces Grafana es compartida: pídele la dirección al ponente"
+      evidence "Monitoreo del tenant" "namespace con monitoreo: ${MON_TARGET}"
     fi
   else
-    warn "не удалось определить, куда уходят метрики тенанта ${TNS}" \
-         "адрес Grafana спросите у ведущего или найдите в дашборде: приложение Monitoring -> Ingress"
+    warn "no se pudo determinar a dónde van las métricas del tenant ${TNS}" \
+         "pídele la dirección de Grafana al ponente o encuéntrala en el dashboard: aplicación Monitoring -> Ingress"
   fi
 else
-  warn "адрес Grafana не определён" \
-       "задайте COZY_TENANT и COZY_KUBECONFIG, и скрипт найдёт его сам; на сдачу лабы это не влияет"
+  warn "la dirección de Grafana no está determinada" \
+       "define COZY_TENANT y COZY_KUBECONFIG y el script la encontrará por sí mismo; esto no afecta la aprobación del lab"
 fi
 
 finish

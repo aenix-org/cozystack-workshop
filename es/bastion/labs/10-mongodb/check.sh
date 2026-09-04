@@ -1,98 +1,97 @@
 #!/usr/bin/env bash
-# Проверка лабы 10: в MongoDB лежат пропуска разной формы и по ним ищут.
+# Comprobación del lab 10: en MongoDB hay pases de distintas formas y se hacen búsquedas sobre ellos.
 #
-# Проверяем не «сервис создан», а суть: в коллекции есть документы всех четырёх
-# форм, поиск по вложенному полю и внутрь списка работает, на редкое поле
-# построен разреженный индекс, валидатор схемы включён, а документов без типа
-# не осталось.
+# No comprobamos «el servicio está creado», sino el fondo: en la colección hay documentos de las cuatro
+# formas, la búsqueda por un campo anidado y dentro de una lista funciona, sobre un campo raro
+# hay un índice disperso, el validador de esquema está activado, y no quedan documentos sin tipo.
 #
-# Запуск (в каждом новом окне терминала переменные задаются заново):
+# Ejecución (en cada nueva ventana de terminal las variables se definen de nuevo):
 #   export KUBECONFIG=~/lab.kubeconfig
-#   export COZY_TENANT=workshopXX       # свой номер вместо XX
-#   export MONGO_PASSWORD='пароль пользователя passapp'
+#   export COZY_TENANT=workshopXX       # tu número en lugar de XX
+#   export MONGO_PASSWORD='contraseña del usuario passapp'
 #   cd labs/10-mongodb && ./check.sh
 #
-# Пароль не печатается и в отчёт не попадает.
-# Скрипт поднимает одноразовые поды, поэтому работает около минуты.
+# La contraseña no se imprime y no acaba en el informe.
+# El script levanta pods desechables, por eso tarda alrededor de un minuto.
 
-# Имя и заголовок нужны общей библиотеке: она подписывает ими отчёт-артефакт.
-# В lib.sh лежат ok/fail/warn/evidence/finish и проверки окружения ниже — чтобы
-# пятнадцать скриптов проверки печатали одинаково, а не каждый по-своему.
+# El nombre y el título los necesita la biblioteca común: firma con ellos el informe-artefacto.
+# En lib.sh están ok/fail/warn/evidence/finish y las comprobaciones de entorno de abajo — para que
+# los quince scripts de comprobación impriman igual, y no cada uno a su manera.
 LAB_NAME="10-mongodb"
-LAB_TITLE="Лаба 10 · Документное хранилище"
+LAB_TITLE="Lab 10 · Almacén de documentos"
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
-# Обе проверки останавливают скрипт с внятным сообщением, если не задан файл доступа
-# к кластеру или номер тенанта. Без них дальше сыпались бы ошибки kubectl.
+# Ambas comprobaciones detienen el script con un mensaje claro si no está definido el archivo de acceso
+# al clúster o el número de tenant. Sin ellos, más abajo se acumularían errores de kubectl.
 need_kubeconfig
 need_tenant
 
-# COZY_TENANT участник задаёт как `workshop07`, а namespace называется
-# `tenant-workshop07`. Принимаем оба написания.
+# El participante define COZY_TENANT como `workshop07`, mientras que el namespace se llama
+# `tenant-workshop07`. Aceptamos ambas escrituras.
 NS="$COZY_TENANT"
 case "$NS" in
   tenant-*) ;;
   *) NS="tenant-$NS" ;;
 esac
 
-# Имена по умолчанию — те же, что в лабе. Запись ${X:-значение} означает «взять
-# переменную окружения, а если её нет, подставить значение»: назвали приложение
-# иначе — запустите как MONGO_APP=имя ./check.sh, править скрипт не нужно.
-# Адрес внутренний, из самого кластера; rs0 в имени — это набор реплик, в котором
-# наша единственная копия и живёт.
+# Los nombres por defecto son los mismos que en el lab. La notación ${X:-valor} significa «tomar
+# la variable de entorno, y si no existe, sustituir el valor»: si nombraste la aplicación
+# de otra manera — ejecútalo como MONGO_APP=nombre ./check.sh, no hace falta editar el script.
+# La dirección es interna, desde dentro del propio clúster; rs0 en el nombre es el conjunto de réplicas en el que
+# vive nuestra única copia.
 MONGO_APP="${MONGO_APP:-passes}"
 MONGO_USER="${MONGO_USER:-passapp}"
 MONGO_DB="${MONGO_DB:-passes}"
 MONGO_COLL="${MONGO_COLL:-passes}"
 MONGO_HOST="mongodb-${MONGO_APP}-rs0.${NS}.svc.cozy.local:27017"
 
-evidence "Адрес MongoDB" "$MONGO_HOST"
+evidence "Dirección de MongoDB" "$MONGO_HOST"
 
-# --- 1. до порта вообще есть связь -----------------------------------------
-# MongoDB на своём порту отвечает на HTTP-запрос понятной фразой про то, что
-# сюда ходят драйвером, а не браузером. Этого достаточно, чтобы отделить
-# «имя не разрешается / порт закрыт» от «связь есть, реквизиты не те».
+# --- 1. ¿hay conectividad al puerto siquiera? ------------------------------
+# MongoDB en su puerto responde a una petición HTTP con una frase clara sobre que
+# aquí se accede con un driver, no con un navegador. Con eso basta para distinguir
+# «el nombre no se resuelve / el puerto está cerrado» de «hay conectividad, las credenciales no son las correctas».
 PROBE="$(in_cluster_curl "http://${MONGO_HOST}/")"
 if printf '%s' "$PROBE" | grep -qi 'mongodb'; then
-  ok "MongoDB отвечает по внутреннему адресу тенанта"
+  ok "MongoDB responde en la dirección interna del tenant"
 else
-  fail "до MongoDB нет связи по адресу ${MONGO_HOST}" \
-       "проверьте номер тенанта в COZY_TENANT и имя приложения (по умолчанию 'passes'; иначе MONGO_APP=имя ./check.sh); в дашборде приложение должно быть в готовом состоянии"
+  fail "no hay conectividad con MongoDB en la dirección ${MONGO_HOST}" \
+       "revisa el número de tenant en COZY_TENANT y el nombre de la aplicación (por defecto 'passes'; si no, MONGO_APP=nombre ./check.sh); en el panel la aplicación debe estar en estado listo"
   finish
   exit $?
 fi
 
-# Всё, что дальше, требует входа в базу. Без пароля скрипт не гадает и не молчит,
-# а честно говорит, что содержимое базы не проверено, и заканчивает отчёт: иначе
-# участник решил бы, что проверка пройдена.
+# Todo lo que sigue requiere entrar en la base de datos. Sin contraseña el script no adivina ni se calla,
+# sino que dice honestamente que el contenido de la base no se comprobó, y termina el informe: de lo contrario
+# el participante creería que la comprobación pasó.
 if [ -z "${MONGO_PASSWORD:-}" ]; then
-  fail "не задана переменная MONGO_PASSWORD, содержимое базы не проверено" \
-       "export MONGO_PASSWORD='пароль пользователя ${MONGO_USER}' и запустите скрипт снова"
+  fail "no está definida la variable MONGO_PASSWORD, el contenido de la base no se comprobó" \
+       "export MONGO_PASSWORD='contraseña del usuario ${MONGO_USER}' y ejecuta el script de nuevo"
   finish
   exit $?
 fi
 
-# Пароль процентно кодируется: символы @ : / ? # % в нём иначе разваливают строку
-# подключения, и человек получает невнятную ошибку разбора вместо «неверный пароль».
+# La contraseña se codifica en porcentaje: los caracteres @ : / ? # % en ella, de otro modo, rompen la cadena
+# de conexión, y la persona recibe un error de análisis poco claro en lugar de «contraseña incorrecta».
 _pct() { printf %s "$1" | sed -e 's|%|%25|g' -e 's|@|%40|g' -e 's|:|%3A|g' \
                               -e 's|/|%2F|g' -e 's|?|%3F|g' -e 's|#|%23|g'; }
 MONGO_URI="mongodb://${MONGO_USER}:$(_pct "$MONGO_PASSWORD")@${MONGO_HOST}/${MONGO_DB}?authSource=admin&directConnection=true"
 
-# ⚠️ Строка подключения содержит пароль и передаётся аргументом пода. Это осознанный
-# компромисс: см. `in_cluster_with_secrets` в check/lib.sh — безопасный путь есть, но
-# он несовместим с многострочным --eval без переусложнения. Под живёт секунды и
-# удаляется за собой; в отчёт пароль не попадает. В боевых скриптах так не делайте.
+# ⚠️ La cadena de conexión contiene la contraseña y se pasa como argumento del pod. Es un compromiso
+# deliberado: ver `in_cluster_with_secrets` en check/lib.sh — existe una vía segura, pero
+# es incompatible con un --eval multilínea sin sobrecomplicar. El pod vive segundos y
+# se elimina solo; la contraseña no acaba en el informe. En scripts de producción no lo hagas así.
 #
-# Все проверки одним заходом: каждый вызов поднимает под, и десять подов подряд
-# превратили бы проверку в многоминутное ожидание на ровном месте.
-# Наружу отдаётся одна строка JSON, дальше её разбирает python.
-# `--overrides` с securityContext: без него под не создастся в кластере с профилем
-# `restricted`, и лаба провалится по причине, к участнику отношения не имеющей.
-# `--command --` остаётся: kubectl объединяет его с override, где заданы только
-# поля безопасности.
-# Программа для mongosh. Двойные кавычки внутри неё безопасны: наружу текст уходит
-# через python, который сам его закавычит, а имена базы и коллекции подставляются
-# по меткам ниже.
+# Todas las comprobaciones de una sola vez: cada llamada levanta un pod, y diez pods seguidos
+# convertirían la comprobación en una espera de varios minutos sin motivo.
+# Hacia fuera se entrega una única línea JSON, luego la analiza python.
+# `--overrides` con securityContext: sin él el pod no se crearía en un clúster con el perfil
+# `restricted`, y el lab fallaría por una razón ajena al participante.
+# `--command --` se mantiene: kubectl lo combina con el override, donde solo están definidos los
+# campos de seguridad.
+# El programa para mongosh. Las comillas dobles dentro de él son seguras: hacia fuera el texto sale
+# a través de python, que lo entrecomilla él mismo, y los nombres de la base y la colección se sustituyen
+# por las marcas de abajo.
 MONGO_EVAL=$(cat <<'JSEOF'
 
 var out = {};
@@ -126,10 +125,10 @@ JSEOF
 MONGO_EVAL="${MONGO_EVAL//__DB__/$MONGO_DB}"
 MONGO_EVAL="${MONGO_EVAL//__COLL__/$MONGO_COLL}"
 
-# Команда контейнера кладётся ВНУТРЬ override, а не остаётся снаружи в `--command --`.
-# kubectl применяет override как JSON merge patch, а в нём массив containers заменяется
-# целиком: заданный снаружи `--command` до пода не доедет, и вместо mongosh запустился бы
-# штатный процесс образа — то есть сама база. Так же это сделано в check/lib.sh.
+# El comando del contenedor se coloca DENTRO del override, en lugar de quedarse fuera en `--command --`.
+# kubectl aplica el override como un JSON merge patch, y en él el array containers se reemplaza
+# por completo: el `--command` definido fuera no llegaría al pod, y en lugar de mongosh se habría iniciado
+# el proceso por defecto de la imagen — es decir, la propia base. Así se hace también en check/lib.sh.
 MONGO_SC="$(python3 - "$MONGO_URI" "$MONGO_EVAL" <<'PYEOF'
 import json, sys
 uri, script = sys.argv[1], sys.argv[2]
@@ -147,8 +146,8 @@ SUMMARY="$(kubectl run "mongo-check" --rm -i --restart=Never --quiet \
   --pod-running-timeout=90s --overrides="$MONGO_SC" \
   --image=mongo:8.0 </dev/null 2>/dev/null | tr -d '\r' | grep '^{' | tail -1)"
 
-# Достать поле из строки JSON, которую напечатал mongosh. Списки склеиваются через
-# запятую, чтобы их можно было показать участнику как есть.
+# Extraer un campo de la línea JSON que imprimió mongosh. Las listas se unen con
+# coma, para poder mostrarlas al participante tal cual.
 mget() {
   printf '%s' "$SUMMARY" | python3 -c '
 import sys, json
@@ -163,8 +162,8 @@ print(v if not isinstance(v, list) else ", ".join(str(x) for x in v))
 ' "$1" 2>/dev/null
 }
 
-# То же, но для чисел: любое неожиданное значение превращается в 0, иначе сравнение
-# ниже упало бы с ошибкой арифметики вместо понятного FAIL.
+# Lo mismo, pero para números: cualquier valor inesperado se convierte en 0, de lo contrario la comparación
+# de abajo fallaría con un error aritmético en lugar de un FAIL claro.
 num() {
   local v
   v="$(mget "$1")"
@@ -174,108 +173,108 @@ num() {
   esac
 }
 
-# Если ответа нет вовсе или mongosh сообщил об ошибке — дальше проверять нечего.
-# Отказ в аутентификации отделён от прочих ошибок: у него своя частая причина —
-# забытый authSource=admin, и подсказка должна вести именно к ней.
+# Si no hay respuesta alguna o mongosh informó de un error — no hay nada más que comprobar.
+# El fallo de autenticación se separa de los demás errores: tiene su propia causa frecuente —
+# un authSource=admin olvidado, y la pista debe llevar exactamente a ella.
 if [ -z "$SUMMARY" ] || [ "$(mget ok)" != "1" ]; then
   ERR="$(mget error)"
   case "$ERR" in
     *[Aa]uthentication*)
-      fail "MongoDB не приняла реквизиты пользователя ${MONGO_USER}" \
-           "проверьте пароль и то, что в строке подключения есть authSource=admin: пользователь заведён в базе admin, а права выданы в ${MONGO_DB}" ;;
+      fail "MongoDB no aceptó las credenciales del usuario ${MONGO_USER}" \
+           "revisa la contraseña y que la cadena de conexión tenga authSource=admin: el usuario está creado en la base admin, mientras que los permisos se otorgan en ${MONGO_DB}" ;;
     *)
-      fail "не удалось выполнить запрос к базе ${MONGO_DB}${ERR:+: $ERR}" \
-           "проверьте вручную: kubectl exec -it mongo-workbench -- sh -c 'mongosh \"\$MONGO_URI\"'" ;;
+      fail "no se pudo ejecutar la consulta contra la base ${MONGO_DB}${ERR:+: $ERR}" \
+           "comprueba manualmente: kubectl exec -it mongo-workbench -- sh -c 'mongosh \"\$MONGO_URI\"'" ;;
   esac
   finish
   exit $?
 fi
 
-ok "подключение к базе ${MONGO_DB} под пользователем ${MONGO_USER} работает"
+ok "la conexión a la base ${MONGO_DB} con el usuario ${MONGO_USER} funciona"
 
-# --- 2. документы есть ------------------------------------------------------
+# --- 2. hay documentos ------------------------------------------------------
 TOTAL="$(num total)"
 if [ "$TOTAL" -ge 4 ]; then
-  ok "в коллекции ${MONGO_COLL} документов: ${TOTAL}"
+  ok "documentos en la colección ${MONGO_COLL}: ${TOTAL}"
 else
-  fail "в коллекции ${MONGO_COLL} всего ${TOTAL} документов, ожидалось не меньше четырёх" \
-       "загрузите пропуска: mo < passes.js (разбор файла — в README)"
+  fail "la colección ${MONGO_COLL} tiene solo ${TOTAL} documentos, se esperaban al menos cuatro" \
+       "carga los pases: mo < passes.js (el análisis del archivo está en el README)"
 fi
 
-# --- 3. формы действительно разные -----------------------------------------
+# --- 3. las formas realmente son distintas ---------------------------------
 TYPES="$(num types)"
 if [ "$TYPES" -ge 4 ]; then
-  ok "в коллекции ${TYPES} разных типа пропуска"
+  ok "en la colección hay ${TYPES} tipos de pase distintos"
 else
-  fail "разных типов пропуска всего ${TYPES}, ожидалось четыре" \
-       "проверьте, что passes.js загрузился целиком: db.passes.distinct('type')"
+  fail "solo ${TYPES} tipos de pase distintos, se esperaban cuatro" \
+       "comprueba que passes.js se cargó por completo: db.passes.distinct('type')"
 fi
 
 WITH_CAR="$(num withCar)"
 if [ "$WITH_CAR" -ge 1 ]; then
-  ok "есть документы с вложенным объектом (car.plate): ${WITH_CAR}"
+  ok "hay documentos con un objeto anidado (car.plate): ${WITH_CAR}"
 else
-  fail "нет ни одного документа с вложенным объектом car" \
-       "автомобильный пропуск не загрузился; повторите mo < passes.js"
+  fail "no hay ni un solo documento con un objeto anidado car" \
+       "el pase de vehículo no se cargó; repite mo < passes.js"
 fi
 
 WITH_ARRAY="$(num withArray)"
 if [ "$WITH_ARRAY" -ge 2 ]; then
-  ok "есть документы со списками (entrances и members): ${WITH_ARRAY}"
+  ok "hay documentos con listas (entrances y members): ${WITH_ARRAY}"
 else
-  fail "документов со списками ${WITH_ARRAY}, ожидалось не меньше двух" \
-       "недельный и групповой пропуска не загрузились; повторите mo < passes.js"
+  fail "documentos con listas: ${WITH_ARRAY}, se esperaban al menos dos" \
+       "el pase semanal y el de grupo no se cargaron; repite mo < passes.js"
 fi
 
 NESTED="$(num nested)"
 if [ "$NESTED" -ge 1 ]; then
-  ok "поиск внутрь списка объектов (members.name) находит документы"
+  ok "la búsqueda dentro de una lista de objetos (members.name) encuentra documentos"
 else
-  fail "поиск по members.name ничего не нашёл" \
-       "групповой пропуск со списком участников не загрузился; повторите mo < passes.js"
+  fail "la búsqueda por members.name no encontró nada" \
+       "el pase de grupo con la lista de participantes no se cargó; repite mo < passes.js"
 fi
 
-evidence "Состав коллекции" "документов: ${TOTAL}
-разных типов пропуска: ${TYPES}
-с вложенным объектом car: ${WITH_CAR}
-со списками: ${WITH_ARRAY}"
+evidence "Composición de la colección" "documentos: ${TOTAL}
+tipos de pase distintos: ${TYPES}
+con objeto anidado car: ${WITH_CAR}
+con listas: ${WITH_ARRAY}"
 
-# --- 4. индекс на редкое поле ----------------------------------------------
+# --- 4. índice sobre un campo raro -----------------------------------------
 SPARSE="$(mget sparse)"
 IDX="$(mget indexes)"
 if [ -n "$SPARSE" ]; then
-  ok "построен разреженный (или частичный) индекс: ${SPARSE}"
-  evidence "Индексы коллекции" "все: ${IDX}
-разреженные: ${SPARSE}"
+  ok "hay un índice disperso (o parcial) construido: ${SPARSE}"
+  evidence "Índices de la colección" "todos: ${IDX}
+dispersos: ${SPARSE}"
 else
-  fail "разреженного индекса нет — поиск по номеру машины идёт перебором" \
-       "создайте: db.${MONGO_COLL}.createIndex({ 'car.plate': 1 }, { name: 'car_plate', sparse: true })"
-  evidence "Индексы коллекции" "все: ${IDX}"
+  fail "no hay índice disperso — la búsqueda por número de coche va por recorrido completo" \
+       "créalo: db.${MONGO_COLL}.createIndex({ 'car.plate': 1 }, { name: 'car_plate', sparse: true })"
+  evidence "Índices de la colección" "todos: ${IDX}"
 fi
 
-# --- 5. валидатор схемы включён --------------------------------------------
+# --- 5. el validador de esquema está activado ------------------------------
 VALIDATOR="$(num validator)"
 ACTION="$(mget validationAction)"
 if [ "$VALIDATOR" = "1" ]; then
-  ok "валидатор схемы включён (действие при нарушении: ${ACTION:-по умолчанию})"
+  ok "el validador de esquema está activado (acción en caso de infracción: ${ACTION:-por defecto})"
   if [ "$ACTION" = "warn" ]; then
-    warn "валидатор только предупреждает, но документы принимает" \
-         "для боевой коллекции нужен validationAction: error"
+    warn "el validador solo advierte, pero acepta los documentos" \
+         "para una colección de producción hace falta validationAction: error"
   fi
 else
-  fail "валидатор схемы не включён — опечатка в имени поля пройдёт молча" \
-       "включите: mo < validator.js (см. разбор предсказуемой неудачи в README)"
+  fail "el validador de esquema no está activado — un error tipográfico en el nombre de un campo pasaría en silencio" \
+       "actívalo: mo < validator.js (ver el análisis del fallo predecible en el README)"
 fi
 
-# --- 6. испорченные документы убраны ---------------------------------------
+# --- 6. documentos corruptos eliminados ------------------------------------
 TYPELESS="$(num typeless)"
 if [ "$TYPELESS" -eq 0 ]; then
-  ok "документов без поля type не осталось"
+  ok "no quedan documentos sin el campo type"
 else
-  fail "в коллекции ${TYPELESS} документов без поля type — охрана их не увидит" \
-       "найдите и уберите: db.${MONGO_COLL}.deleteMany({ type: { \$exists: false } })"
+  fail "en la colección hay ${TYPELESS} documentos sin el campo type — la seguridad no los verá" \
+       "encuéntralos y elimínalos: db.${MONGO_COLL}.deleteMany({ type: { \$exists: false } })"
 fi
 
-# finish печатает итог и складывает отчёт-артефакт в файл; код возврата — ненулевой,
-# если хоть одна проверка провалилась.
+# finish imprime el resultado y guarda el informe-artefacto en un archivo; el código de retorno es distinto de cero
+# si al menos una comprobación falló.
 finish

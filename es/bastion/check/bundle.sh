@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# Собирает результаты всех лаб в один файл для загрузки в систему сертификации.
+# Reúne los resultados de todas las labs en un único archivo para subirlo al sistema de certificación.
 #
-# Важное свойство: скрипт НИЧЕГО НЕ ПЕРЕЗАПУСКАЕТ. Он берёт то, что каждая лаба
-# записала в момент, когда вы её сдавали. Иначе получилось бы вот что: лабы сами
-# велят убирать за собой, а квота тенанта не даёт держать все сервисы неделями —
-# и перепроверка в конце показала бы отказ по работе, честно сделанной три недели
-# назад.
+# Propiedad importante: el script NO REEJECUTA NADA. Toma lo que cada lab
+# registró en el momento en que la entregaste. De lo contrario ocurriría esto: las
+# propias labs te piden que recojas lo que dejaste, y la cuota del tenant no permite
+# mantener todos los servicios activos durante semanas — así que una reverificación
+# al final mostraría un fallo en un trabajo hecho honestamente hace tres semanas.
 #
-#   ./bundle.sh                 собрать всё, что найдено
-#   ./bundle.sh --rerun 07-redis  перепройти одну лабу и обновить её результат
+#   ./bundle.sh                 reunir todo lo que se encuentre
+#   ./bundle.sh --rerun 07-redis  reejecutar una sola lab y actualizar su resultado
 #
 set -uo pipefail
 
@@ -18,23 +18,23 @@ REPO="$(cd "$HERE/.." && pwd)"
 OUT="${1:-$HOME/cozystack-labs-bundle.json}"
 
 if [ "${1:-}" = "--rerun" ]; then
-  lab="${2:?укажите лабу, например: ./bundle.sh --rerun 07-redis}"
-  [ -d "$REPO/labs/$lab" ] || { echo "нет такой лабы: $lab"; exit 1; }
-  echo "перепрохожу $lab…"
+  lab="${2:?indica una lab, por ejemplo: ./bundle.sh --rerun 07-redis}"
+  [ -d "$REPO/labs/$lab" ] || { echo "no existe esa lab: $lab"; exit 1; }
+  echo "reejecutando $lab…"
   ( cd "$REPO/labs/$lab" && ./check.sh )
-  echo "результат обновлён, теперь запустите ./bundle.sh без ключей"
+  echo "resultado actualizado, ahora ejecuta ./bundle.sh sin opciones"
   exit 0
 fi
 
 if [ ! -d "$RESULTS_DIR" ] || [ -z "$(ls -A "$RESULTS_DIR" 2>/dev/null)" ]; then
   cat <<'MSG'
-Результатов не найдено.
+No se encontraron resultados.
 
-Каждая лаба сохраняет свой результат, когда вы запускаете в ней ./check.sh.
-Пройдите хотя бы одну и запустите проверку — потом возвращайтесь сюда.
+Cada lab guarda su resultado cuando ejecutas ./check.sh en ella.
+Completa al menos una y ejecuta la verificación — luego vuelve aquí.
 
-Если вы проходили лабы на другой машине, скопируйте оттуда папку
-~/.cozystack-labs/results или укажите путь: COZY_LAB_RESULTS=/путь ./bundle.sh
+Si hiciste las labs en otra máquina, copia desde allí la carpeta
+~/.cozystack-labs/results o indica la ruta: COZY_LAB_RESULTS=/ruta ./bundle.sh
 MSG
   exit 1
 fi
@@ -44,9 +44,9 @@ import json, os, sys, glob, datetime
 
 results_dir, out_path, repo = sys.argv[1], sys.argv[2], sys.argv[3]
 
-# Сколько лаб вообще существует — считаем по наличию скрипта проверки.
-# У шестнадцатой ("Что делать в понедельник") скрипта нет: это текстовое
-# упражнение, и в зачёт оно не идёт.
+# Cuántas labs existen en total — se cuentan por la presencia de un script de verificación.
+# La decimosexta ("Qué hacer el lunes") no tiene script: es un ejercicio de
+# texto y no cuenta para la nota.
 all_labs = sorted(
     os.path.basename(os.path.dirname(p))
     for p in glob.glob(os.path.join(repo, "labs", "*", "check.sh"))
@@ -58,10 +58,10 @@ for path in sorted(glob.glob(os.path.join(results_dir, "result-*.json"))):
         with open(path) as fh:
             d = json.load(fh)
     except Exception as exc:
-        problems.append(f"{os.path.basename(path)}: не читается ({exc})")
+        problems.append(f"{os.path.basename(path)}: no se puede leer ({exc})")
         continue
     if d.get("schema_version") != 1:
-        problems.append(f"{os.path.basename(path)}: неизвестная версия формата")
+        problems.append(f"{os.path.basename(path)}: versión de formato desconocida")
         continue
     labs.append(d)
     if d.get("env", {}).get("cluster_uid"):
@@ -80,46 +80,46 @@ bundle = {
                       .strftime("%Y-%m-%dT%H:%M:%SZ"),
     "labs_total": len(all_labs),
     "labs_passed": len(passed),
-    "cluster_uids": sorted(uids),          # больше одного — проходили на разных кластерах
+    "cluster_uids": sorted(uids),          # más de uno — hechas en clústeres distintos
     "kubernetes_versions": sorted(versions),
     "results": labs,
 }
 with open(out_path, "w") as fh:
     json.dump(bundle, fh, ensure_ascii=False, indent=1)
 
-# То же самое обычным текстом — чтобы человек видел, что отправляет.
+# Lo mismo en texto plano — para que una persona vea lo que está enviando.
 txt = out_path.rsplit(".", 1)[0] + ".txt"
 with open(txt, "w") as fh:
-    fh.write("Результаты лабораторных Cozystack\n")
-    fh.write("Собрано: %s\n\n" % bundle["generated_at"])
-    fh.write("Сдано %d из %d лаб\n\n" % (len(passed), len(all_labs)))
+    fh.write("Resultados de las labs de Cozystack\n")
+    fh.write("Recopilado: %s\n\n" % bundle["generated_at"])
+    fh.write("Aprobadas %d de %d labs\n\n" % (len(passed), len(all_labs)))
     for lab in all_labs:
         rec = next((d for d in labs if d["lab"] == lab), None)
         if rec is None:
-            mark, extra = "—", "результата нет"
+            mark, extra = "—", "sin resultado"
         elif rec["verdict"] == "passed":
-            mark = "сдана"
-            extra = "проверок: %d" % len(rec["checks"])
+            mark = "aprobada"
+            extra = "verificaciones: %d" % len(rec["checks"])
         else:
-            mark = "не сдана"
-            extra = "провалено: %d" % rec["totals"]["fail"]
+            mark = "no aprobada"
+            extra = "fallidas: %d" % rec["totals"]["fail"]
         fh.write("  %-20s %-9s %s\n" % (lab, mark, extra))
-    fh.write("\nКластеров: %d. Версии Kubernetes: %s\n"
-             % (len(uids), ", ".join(sorted(versions)) or "не определены"))
-    fh.write("\nВ файл попадают только идентификаторы проверок и их исходы.\n"
-             "Ни адресов, ни имён, ни содержимого логов в нём нет.\n")
+    fh.write("\nClústeres: %d. Versiones de Kubernetes: %s\n"
+             % (len(uids), ", ".join(sorted(versions)) or "sin determinar"))
+    fh.write("\nAl archivo solo llegan los identificadores de las verificaciones y sus resultados.\n"
+             "No contiene direcciones, ni nombres, ni contenido de logs.\n")
 
-print("Сдано %d из %d лаб." % (len(passed), len(all_labs)))
+print("Aprobadas %d de %d labs." % (len(passed), len(all_labs)))
 if failed:
-    print("Не сдано: %s" % ", ".join(failed))
+    print("No aprobadas: %s" % ", ".join(failed))
 if missing:
-    print("Нет результата: %s" % ", ".join(missing))
+    print("Sin resultado: %s" % ", ".join(missing))
 if len(uids) > 1:
-    print("\nВнимание: результаты сняты с %d разных кластеров. Это допустимо, "
-          "но при загрузке набор будет помечен." % len(uids))
+    print("\nAtención: los resultados se tomaron de %d clústeres distintos. Está permitido, "
+          "pero el conjunto se marcará al subirlo." % len(uids))
 for p in problems:
-    print("  проблема: %s" % p)
-print("\nФайл для загрузки: %s" % out_path)
-print("Он же обычным текстом:  %s" % txt)
-print("Посмотрите текстовый файл перед отправкой — в нём видно всё, что уходит.")
+    print("  problema: %s" % p)
+print("\nArchivo para subir: %s" % out_path)
+print("El mismo en texto plano:  %s" % txt)
+print("Revisa el archivo de texto antes de enviarlo — muestra todo lo que se envía.")
 PYEOF
