@@ -1,46 +1,46 @@
 #!/usr/bin/env bash
-# Проверка лабы 7: кеш реально ускоряет, и это видно в цифрах.
+# 实验 7 的检查：缓存确实提升了速度，而且数字能证明这一点。
 #
-# Главная проверка здесь поведенческая, а не структурная. Скрипт сам берёт неиспользованный
-# идентификатор, запрашивает его дважды и смотрит: первый раз должен быть промах на сотни
-# миллисекунд, второй — попадание на единицы. Манифест с правильными переменными окружения
-# такую проверку не пройдёт, если кеш на самом деле не отвечает.
+# 这里的主要检查是行为性的，而非结构性的。脚本自己取一个未使用的
+# 标识符，请求它两次并观察：第一次应当是数百毫秒的未命中，第二次则是
+# 个位数毫秒的命中。如果缓存实际上没有响应，即使清单里的环境变量都正确，
+# 也无法通过这项检查。
 #
-# Два кластера: KUBECONFIG — ваш кластер lab, COZY_KUBECONFIG — управляющий кластер
-# Cozystack, где живёт managed-сервис Redis.
+# 两个集群：KUBECONFIG 是你的 lab 集群，COZY_KUBECONFIG 是 Cozystack
+# 管理集群，托管的 Redis 服务就住在那里。
 
-# LAB_NAME и LAB_TITLE попадают в шапку отчёта. Дальше подключается общая библиотека
-# проверок: из неё берутся ok / warn / fail / evidence / finish и, главное,
-# in_cluster_curl — она поднимает одноразовый под с curl ВНУТРИ кластера. Изнутри,
-# а не с ноутбука: сервисы лабы наружу не выставлены, по имени passes-api их видно
-# только из кластера. need_kubeconfig и need_tenant останавливают скрипт заранее,
-# если доступ или номер тенанта не заданы, — иначе все проверки провалятся разом
-# и по отчёту нельзя будет понять причину.
+# LAB_NAME 和 LAB_TITLE 会进入报告头。随后引入通用检查库：
+# 从中取得 ok / warn / fail / evidence / finish，以及最重要的
+# in_cluster_curl —— 它会在集群内部拉起一个一次性的带 curl 的 pod。是从内部，
+# 而不是从笔记本：实验的服务没有对外暴露，passes-api 只能在集群内部
+# 通过名字访问。need_kubeconfig 和 need_tenant 会提前中止脚本，
+# 如果访问权限或租户号未设置 —— 否则所有检查会一起失败，
+# 而从报告里就无法看出原因。
 LAB_NAME="07-redis"
-LAB_TITLE="Лаба 7 · Кеш перед медленным бэкендом"
+LAB_TITLE="实验 7 · 在慢速后端前面加缓存"
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
 need_kubeconfig
 need_tenant
 
-# Имена и адреса, на которые смотрит вся проверка, собраны в одном месте: искать их
-# по тексту скрипта не придётся. COZY_KUBECONFIG можно переопределить снаружи,
-# если тенантный доступ у вас лежит не по умолчанию.
+# 整个检查所关注的名字和地址都集中在一处：不必在脚本正文里
+# 到处查找。如果你的租户访问权限不在默认位置，可以从外部覆盖
+# COZY_KUBECONFIG。
 APP="passes-api"
 HR="hr-legacy"
 SVC="http://${APP}.default.svc.cluster.local"
 TENANT_NS="tenant-${COZY_TENANT}"
 COZY_KUBECONFIG="${COZY_KUBECONFIG:-$HOME/.kube/workshop}"
 
-# Два сокращения на весь скрипт: kget обращается к кластеру lab (тот, что в KUBECONFIG),
-# cozy — к управляющему кластеру Cozystack. Сообщения об ошибках гасятся намеренно:
-# отсутствие объекта здесь — обычная ситуация, о которой скрипт скажет своими словами
-# и с подсказкой, а не чужим текстом от kubectl.
+# 全脚本使用两个简写：kget 面向 lab 集群（即 KUBECONFIG 里的那个），
+# cozy 面向 Cozystack 管理集群。错误消息被特意屏蔽：
+# 这里对象缺失是常见情况，脚本会用自己的话并附带提示来说明，
+# 而不是抛出 kubectl 别人的文字。
 kget() { kubectl get "$@" 2>/dev/null; }
 cozy() { kubectl --kubeconfig "$COZY_KUBECONFIG" "$@" 2>/dev/null; }
 
-# Достать поле из JSON. Без jq: его нет на голой macOS, а python3 есть везде,
-# где работает остальная библиотека проверок.
+# 从 JSON 中取出一个字段。不用 jq：裸装 macOS 上没有它，而 python3
+# 在其余检查库能运行的地方到处都有。
 jfield() {
   python3 -c 'import sys,json
 try:
@@ -49,24 +49,24 @@ except Exception:
     pass' "$1" 2>/dev/null
 }
 
-# --- managed-сервис Redis на управляющем кластере ----------------------------
-# Redis живёт не в вашем кластере lab, а в тенанте на управляющем кластере: это
-# managed-сервис, платформа держит его сама. Права в тенанте у всех разные, поэтому
-# ни отказ в доступе, ни отсутствие кубконфига лабу не проваливают — работу кеша
-# ниже проверяем напрямую, живыми запросами, а это и есть настоящее доказательство.
+# --- 管理集群上的托管 Redis 服务 --------------------------------------------
+# Redis 不住在你的 lab 集群里，而在管理集群上的一个租户里：这是
+# 托管服务，平台自己维持它运行。租户里每个人的权限各不相同，因此
+# 无论是访问被拒还是 kubeconfig 缺失都不会让实验失败 —— 缓存是否工作
+# 会在下面用实时请求直接检查，那才是真正的证明。
 if [ ! -r "$COZY_KUBECONFIG" ]; then
-  warn "не найден тенантный кубконфиг ${COZY_KUBECONFIG} — состояние Redis не проверялось" \
-       "укажите путь: export COZY_KUBECONFIG=~/.kube/workshop"
+  warn "未找到租户 kubeconfig ${COZY_KUBECONFIG} —— 未检查 Redis 状态" \
+       "指定路径：export COZY_KUBECONFIG=~/.kube/workshop"
 else
   REDIS_ERR="$(kubectl --kubeconfig "$COZY_KUBECONFIG" get redises.apps.cozystack.io \
     -n "$TENANT_NS" --no-headers 2>&1 >/dev/null)"
   REDIS_LIST="$(cozy get redises.apps.cozystack.io -n "$TENANT_NS" --no-headers)"
   if [ -n "$REDIS_ERR" ]; then
-    warn "не удалось посмотреть приложения Redis в тенанте ${TENANT_NS}" \
-         "роль в тенанте может не давать эту команду — это не ошибка лабы; работу кеша проверяем ниже напрямую"
+    warn "无法查看租户 ${TENANT_NS} 中的 Redis 应用" \
+         "你在租户里的角色可能不允许这条命令 —— 这不是实验错误；缓存会在下面直接检查"
   elif [ -z "$REDIS_LIST" ]; then
-    fail "в тенанте ${TENANT_NS} нет ни одного приложения Redis" \
-         "создайте его в дашборде: Создать приложение -> Redis"
+    fail "租户 ${TENANT_NS} 中没有任何 Redis 应用" \
+         "在仪表盘中创建一个：创建应用 -> Redis"
   else
     R_NAME="$(printf '%s' "$REDIS_LIST" | awk 'NR==1{print $1}')"
     R_READY="$(cozy get redises.apps.cozystack.io "$R_NAME" -n "$TENANT_NS" \
@@ -74,22 +74,22 @@ else
     R_REPLICAS="$(cozy get redises.apps.cozystack.io "$R_NAME" -n "$TENANT_NS" \
       -o jsonpath='{.spec.replicas}')"
     if [ "$R_READY" = "True" ]; then
-      ok "managed Redis «${R_NAME}» готов, копий данных: ${R_REPLICAS:-по умолчанию}"
+      ok "托管 Redis «${R_NAME}» 已就绪，数据副本数：${R_REPLICAS:-默认}"
     else
-      warn "Redis «${R_NAME}» есть, но не сообщает о готовности" \
-           "смотрите его состояние в дашборде; поднимается три-пять минут"
+      warn "Redis «${R_NAME}» 存在，但未报告就绪" \
+           "在仪表盘中查看它的状态；启动需要三到五分钟"
     fi
-    evidence "Redis в тенанте" "$REDIS_LIST"
+    evidence "租户中的 Redis" "$REDIS_LIST"
   fi
 fi
 
-# --- медленный справочник на месте и действительно медленный -----------------
-# Без этой проверки сравнение «до и после» ничего не значит: если справочник
-# отвечает мгновенно, ускорять нечего и кеш нечем измерить.
+# --- 慢速目录服务已就位且确实慢 --------------------------------------------
+# 没有这项检查，「前后对比」就毫无意义：如果目录服务
+# 瞬间响应，就没有可加速的对象，缓存也无从测量。
 HR_RUNNING="$(kget pods -l app=hr-legacy --no-headers | awk '$3=="Running"' | grep -c .)"
 if [ "$HR_RUNNING" -lt 1 ]; then
-  fail "справочник ${HR} не работает" \
-       "примените hr-legacy.yaml и посмотрите kubectl describe pod -l app=hr-legacy"
+  fail "目录服务 ${HR} 未运行" \
+       "应用 hr-legacy.yaml 并查看 kubectl describe pod -l app=hr-legacy"
 else
   HR_SEC="$(in_cluster_curl "http://${HR}.default.svc.cluster.local/employee?id=1" \
     "-o /dev/null -w %{time_total}")"
@@ -97,21 +97,21 @@ else
 try: print(int(float(sys.argv[1])*1000))
 except Exception: print(-1)' "${HR_SEC:-0}" 2>/dev/null)"
   if [ "${HR_MS:-0}" -ge 300 ] 2>/dev/null; then
-    ok "справочник отвечает за ${HR_MS} мс — есть что ускорять"
-    evidence "Задержка справочника" "${HR_MS} мс на запрос /employee"
+    ok "目录服务响应耗时 ${HR_MS} 毫秒 —— 有可加速的空间"
+    evidence "目录服务延迟" "每次 /employee 请求 ${HR_MS} 毫秒"
   elif [ "${HR_MS:-0}" -lt 0 ] 2>/dev/null; then
-    fail "справочник ${HR} не ответил на запрос" \
-         "смотрите kubectl logs -l app=hr-legacy"
+    fail "目录服务 ${HR} 未对请求作出响应" \
+         "查看 kubectl logs -l app=hr-legacy"
   else
-    warn "справочник отвечает за ${HR_MS} мс, это слишком быстро для замера" \
-         "проверьте, что в hr-legacy.yaml задано MODE=hr и HR_DELAY=800ms"
+    warn "目录服务响应耗时 ${HR_MS} 毫秒，太快了，无法测量" \
+         "确认 hr-legacy.yaml 中设置了 MODE=hr 和 HR_DELAY=800ms"
   fi
 fi
 
-# --- приложение настроено на кеш ---------------------------------------------
-# Разбираем окружение контейнера питоном, а не jsonpath: фильтры jsonpath по
-# вложенным спискам ведут себя по-разному в разных версиях kubectl, а нам важно,
-# чтобы проверка одинаково работала у всех.
+# --- 应用已配置为使用缓存 --------------------------------------------------
+# 我们用 python 而不是 jsonpath 来解析容器环境：jsonpath 对
+# 嵌套列表的过滤器在不同 kubectl 版本上表现不一致，而我们希望这项检查
+# 对所有人都以相同方式工作。
 DEPLOY_JSON="$(kget deployment "$APP" -o json)"
 readenv() {
   printf '%s' "$DEPLOY_JSON" | python3 -c 'import sys,json
@@ -134,45 +134,45 @@ ENVS="$(readenv --names)"
 REDIS_ADDR="$(readenv REDIS_ADDR)"
 TTL="$(readenv CACHE_TTL)"
 
-# Жалобы разбираются по порядку — от самой общей к самой частной: нет приложения,
-# нет переменной, осталась заглушка вместо адреса. Порядок здесь не косметика:
-# иначе участник получит совет «подставьте адрес Redis» в момент, когда у него
-# ещё не развёрнут сам сервис, и будет искать ошибку не там.
+# 各类问题按顺序处理 —— 从最一般到最具体：没有应用、
+# 没有变量、地址处仍留着占位符。这里的顺序不是装饰性的：
+# 否则参与者会在服务本身尚未部署时收到「填入 Redis 地址」的
+# 建议，从而在错误的地方找问题。
 if [ -z "$(kget deployment "$APP" -o name)" ]; then
-  fail "в кластере lab нет приложения ${APP}" \
-       "примените passes-api.yaml, подставив адрес своего Harbor"
+  fail "lab 集群中没有应用 ${APP}" \
+       "应用 passes-api.yaml，填入你自己的 Harbor 地址"
 elif [ -z "$REDIS_ADDR" ]; then
-  fail "в ${APP} не задана переменная REDIS_ADDR — кеш выключен" \
-       "примените патч: kubectl patch deployment ${APP} --patch-file cache-patch.yaml"
+  fail "${APP} 中未设置 REDIS_ADDR 变量 —— 缓存已关闭" \
+       "应用补丁：kubectl patch deployment ${APP} --patch-file cache-patch.yaml"
 elif printf '%s' "$REDIS_ADDR" | grep -q 'REDIS-ADDR'; then
-  fail "в патче остался адрес-заглушка REDIS-ADDR" \
-       "подставьте адрес своего Redis, например rfrm-redis-cache.${TENANT_NS}.svc.cozy.local"
+  fail "补丁里仍留着占位地址 REDIS-ADDR" \
+       "填入你自己的 Redis 地址，例如 rfrm-redis-cache.${TENANT_NS}.svc.cozy.local"
 else
-  ok "приложение настроено на кеш по адресу ${REDIS_ADDR}, срок жизни записи ${TTL:-по умолчанию} с"
+  ok "应用已配置为使用地址 ${REDIS_ADDR} 处的缓存，条目存活时间 ${TTL:-默认} 秒"
 fi
 
-# Смотрим только на наличие имени переменной, значение не читаем и не печатаем нигде.
-# Отчёт о лабе люди пересылают друг другу и прикладывают к тикетам — попавший туда
-# пароль останется там навсегда.
+# 我们只看变量名是否存在，任何地方都不读取也不打印它的值。
+# 人们会把实验报告互相转发并附到工单里 —— 落到那里的密码
+# 会永远留在那里。
 if printf '%s' "$ENVS" | grep -q '^REDIS_PASSWORD$'; then
-  ok "пароль к Redis приезжает в приложение (значение: <скрыто>)"
+  ok "Redis 密码已送达应用（值：<已隐藏>）"
 else
-  fail "в ${APP} не задана переменная REDIS_PASSWORD" \
-       "Redis требует аутентификации; создайте секрет redis-password и примените cache-patch.yaml"
+  fail "${APP} 中未设置 REDIS_PASSWORD 变量" \
+       "Redis 需要认证；创建 redis-password 密文并应用 cache-patch.yaml"
 fi
 
-# Отсутствие секрета — предупреждение, а не провал: пароль можно доставить в под
-# и другим способом. Проверяемое свойство здесь иное — в манифесте лежит ссылка,
-# а не значение.
+# 密文缺失是警告，而非失败：密码可以用别的方式送进 pod。
+# 这里检查的属性不同 —— 清单里放的是引用，
+# 而不是值。
 if [ -n "$(kget secret redis-password -o name)" ]; then
-  ok "секрет redis-password с паролем от Redis существует"
+  ok "带有 Redis 密码的 redis-password 密文已存在"
 else
-  warn "в кластере нет секрета redis-password" \
-       "создайте: read -rs P && kubectl create secret generic redis-password --from-literal=password=\"\$P\""
+  warn "集群中没有 redis-password 密文" \
+       "创建它：read -rs P && kubectl create secret generic redis-password --from-literal=password=\"\$P\""
 fi
 
-# --- главная проверка: кеш действительно ускоряет ----------------------------
-# Идентификатор берём заведомо новый, чтобы первый запрос гарантированно был промахом.
+# --- 主要检查：缓存确实提升了速度 ------------------------------------------
+# 我们特意取一个全新的标识符，好让第一个请求必定是未命中。
 PROBE_ID="check$$$RANDOM"
 R1="$(in_cluster_curl "${SVC}/employee?id=${PROBE_ID}")"
 R2="$(in_cluster_curl "${SVC}/employee?id=${PROBE_ID}")"
@@ -184,37 +184,37 @@ T2="$(printf '%s' "$R2" | jfield took_ms)"
 MODE="$(printf '%s' "$R2" | jfield cache)"
 
 if [ -z "$C1" ] || [ -z "$C2" ]; then
-  fail "сервис ${APP} не отдал ожидаемый JSON" \
-       "смотрите kubectl logs -l app=passes-api; проверьте, что образ собран из app/ этой лабы (тег v2)"
-  evidence "Что ответил сервис" "первый запрос: ${R1:-пусто}
-второй запрос: ${R2:-пусто}"
+  fail "服务 ${APP} 未返回预期的 JSON" \
+       "查看 kubectl logs -l app=passes-api；确认镜像是从本实验的 app/ 构建的（标签 v2）"
+  evidence "服务的回复内容" "第一个请求：${R1:-空}
+第二个请求：${R2:-空}"
 elif [ "$MODE" != "redis" ]; then
-  fail "приложение сообщает, что кеш выключен (cache: ${MODE})" \
-       "переменная REDIS_ADDR не доехала до работающих подов — проверьте kubectl rollout status deployment/${APP}"
+  fail "应用报告缓存已关闭（cache: ${MODE}）" \
+       "REDIS_ADDR 变量没有送达运行中的 pod —— 查看 kubectl rollout status deployment/${APP}"
 elif [ "$C1" = "True" ]; then
-  warn "первый запрос уже пришёл из кеша — сравнить не с чем" \
-       "маловероятное совпадение по идентификатору; запустите проверку ещё раз"
+  warn "第一个请求就已经来自缓存 —— 没有可对比的对象" \
+       "标识符发生了不太可能的碰撞；请再次运行检查"
 elif [ "$C2" != "True" ]; then
-  fail "второй запрос по тому же идентификатору снова не попал в кеш" \
-       "приложение не может писать в Redis: смотрите kubectl logs -l app=passes-api, обычно там NOAUTH или таймаут"
-  evidence "Ответы сервиса" "первый:  ${R1}
-второй: ${R2}"
+  fail "对同一标识符的第二个请求再次未命中缓存" \
+       "应用无法写入 Redis：查看 kubectl logs -l app=passes-api，通常那里是 NOAUTH 或超时"
+  evidence "服务的回复" "第一个：  ${R1}
+第二个： ${R2}"
 else
-  ok "кеш работает: промах ${T1} мс, попадание ${T2} мс"
+  ok "缓存生效：未命中 ${T1} 毫秒，命中 ${T2} 毫秒"
   SPEEDUP="$(python3 -c 'import sys
 try:
     a, b = float(sys.argv[1]), float(sys.argv[2])
-    print(f"{a/b:.0f}" if b > 0 else "больше чем в 1000")
+    print(f"{a/b:.0f}" if b > 0 else "超过 1000")
 except Exception:
     print("?")' "${T1:-0}" "${T2:-0}" 2>/dev/null)"
-  evidence "Замер на живом сервисе" "идентификатор: ${PROBE_ID}
-первый запрос (промах):   ${T1} мс
-второй запрос (попадание): ${T2} мс
-выигрыш: примерно в ${SPEEDUP} раз
-срок жизни записи: ${TTL:-по умолчанию} с"
+  evidence "在实时服务上的测量" "标识符：${PROBE_ID}
+第一个请求（未命中）：  ${T1} 毫秒
+第二个请求（命中）： ${T2} 毫秒
+收益：约 ${SPEEDUP} 倍
+条目存活时间：${TTL:-默认} 秒"
 
-  # Строгая часть: попадание должно быть на порядок быстрее промаха. Иначе
-  # «кеш работает» означает только, что ключ записался, а выгоды нет.
+  # 严格的部分：命中必须比未命中快一个数量级。否则
+  # 「缓存生效」只意味着键写进去了，但没有收益。
   FASTER="$(python3 -c 'import sys
 try:
     a, b = float(sys.argv[1]), float(sys.argv[2])
@@ -222,23 +222,23 @@ try:
 except Exception:
     print("no")' "${T1:-0}" "${T2:-0}" 2>/dev/null)"
   if [ "$FASTER" = "yes" ]; then
-    ok "выигрыш измерим: попадание примерно в ${SPEEDUP} раз быстрее промаха"
+    ok "收益可测量：命中比未命中约快 ${SPEEDUP} 倍"
   else
-    warn "попадание в кеш не даёт заметного выигрыша (${T1} мс против ${T2} мс)" \
-         "проверьте, что справочник действительно медленный, а Redis находится не на том же поде"
+    warn "缓存命中没有带来明显收益（${T1} 毫秒对比 ${T2} 毫秒）" \
+         "确认目录服务确实很慢，并且 Redis 不在同一个 pod 上"
   fi
 fi
 
-# --- сколько копий сервиса разделяют один кеш --------------------------------
-# Кеш общий для всех копий — это стоит увидеть в отчёте: попадание могло прийти
-# от другого пода, чем промах, и это правильно.
+# --- 有多少个服务副本共享同一个缓存 ----------------------------------------
+# 缓存对所有副本是共享的 —— 这值得在报告里看到：命中可能
+# 来自与未命中不同的 pod，而这是正确的。
 API_PODS="$(kget pods -l app=passes-api --no-headers | awk '$3=="Running"' | grep -c .)"
 if [ "$API_PODS" -ge 1 ]; then
-  ok "копий сервиса работает: ${API_PODS} (кеш у них общий)"
-  evidence "Копии сервиса" "$(kget pods -l app=passes-api -o wide)"
+  ok "运行中的服务副本数：${API_PODS}（它们共享缓存）"
+  evidence "服务副本" "$(kget pods -l app=passes-api -o wide)"
 else
-  fail "нет ни одной работающей копии ${APP}" \
-       "смотрите kubectl describe pod -l app=passes-api"
+  fail "没有任何一个运行中的 ${APP} 副本" \
+       "查看 kubectl describe pod -l app=passes-api"
 fi
 
 finish
