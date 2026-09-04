@@ -1,5 +1,5 @@
-# Перед применением замените tenant-workshopXX на свой namespace.
-# Проще разом по всем файлам: см. README, раздел про подстановку номера.
+# 적용하기 전에 tenant-workshopXX를 자신의 namespace로 교체하세요.
+# 모든 파일에 한 번에 적용하는 것이 더 쉽습니다: README의 번호 치환 섹션을 참고하세요.
 #
 apiVersion: apps.cozystack.io/v1alpha1
 kind: Bucket
