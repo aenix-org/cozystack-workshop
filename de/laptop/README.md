@@ -1,57 +1,59 @@
-# Воркшоп: миграция VMware-VM в Cozystack (со своего ноутбука)
+# Workshop: Migration einer VMware-VM zu Cozystack (vom eigenen Laptop aus)
 
-Берём приложение, которое годами работало на виртуальной машине в VMware, и перевозим
-его в Cozystack. Всё делаете своими руками.
+Wir nehmen eine Anwendung, die jahrelang auf einer virtuellen Maschine in VMware lief, und
+verschieben sie zu Cozystack. Sie erledigen alles mit eigenen Händen.
 
-> Если ведущий выдал вам общую виртуалку (bastion) с готовыми инструментами и доступом —
-> вам нужен второй набор, [`../bastion/`](../bastion/), там всё уже настроено.
+> Wenn die Lehrkraft Ihnen eine gemeinsame VM (den Bastion) mit bereits vorhandenen Werkzeugen
+> und Zugriff gegeben hat — dann brauchen Sie den anderen Satz, [`../bastion/`](../bastion/), dort
+> ist bereits alles eingerichtet.
 
-Этот файл — маршрут: что за чем идёт, какие команды набирать и что должно получиться.
-Объяснения, почему всё устроено именно так, и разборы манифестов и скриптов построчно
-лежат в папке [`chat/`](chat/) — по одному файлу на сообщение. Ссылки стоят в конце
-каждого шага.
+Diese Datei ist die Route: was worauf folgt, welche Befehle einzugeben sind und was am Ende
+herauskommen soll. Die Erklärungen, warum die Dinge so aufgebaut sind, wie sie sind, sowie die
+zeilenweisen Durchläufe der Manifeste und Skripte finden sich im Ordner [`chat/`](chat/) — eine
+Datei pro Nachricht. Die Links stehen am Ende jedes Schritts.
 
-## Маршрут
+## Die Route
 
-Приложение живёт на трёх машинах: само приложение, база данных и очередь сообщений.
-Перевозим только первую — база и очередь останутся в прошлом, вместо них возьмём
-готовые из каталога Cozystack.
+Die Anwendung lebt auf drei Maschinen: die Anwendung selbst, die Datenbank und die
+Nachrichtenwarteschlange. Wir verschieben nur die erste — die Datenbank und die Warteschlange
+bleiben zurück, und an ihrer Stelle nehmen wir fertige aus dem Cozystack-Katalog.
 
-| Фаза | Что делаем | Где |
+| Phase | Was wir tun | Wo |
 |---|---|---|
-| 1 | Заводим хранилище под образ | ноутбук |
-| 2 | Переупаковываем диск из формата VMware в формат KVM | временная машина |
-| 3 | Поднимаем машину на новом месте | ноутбук |
-| 4 | Заказываем базу и очередь из каталога | ноутбук |
-| 5 | Чиним сеть и переключаем приложение на новые адреса | ваша машина |
+| 1 | Speicher für das Image einrichten | auf dem Laptop |
+| 2 | Die Festplatte vom VMware-Format ins KVM-Format umpacken | in einer temporären Maschine |
+| 3 | Die Maschine in ihrer neuen Heimat hochfahren | auf dem Laptop |
+| 4 | Die Datenbank und die Warteschlange aus dem Katalog bestellen | auf dem Laptop |
+| 5 | Das Netzwerk in Ordnung bringen und die Anwendung auf die neuen Adressen umstellen | in Ihrer Maschine |
 
-Дальше — финальная проверка: заказ, созданный в приложении, доезжает до базы и очереди.
+Danach kommt die abschließende Prüfung: Eine in der Anwendung erstellte Bestellung gelangt den
+ganzen Weg bis zur Datenbank und zur Warteschlange.
 
-## Доступы
+## Was die Lehrkraft Ihnen gegeben hat
 
-Выдаёт ведущий:
+Die Lehrkraft gibt Ihnen:
 
-* дашборд https://dashboard.workshop.aenix.io
-* логин `workshopXX`, пароль скажут на месте
-* kubeconfig — в дашборде: `Info` → вкладка `Secrets` → секрет `kubeconfig-tenant-workshopXX`
+* das Dashboard https://dashboard.workshop.aenix.io
+* den Benutzernamen `workshopXX`, das Passwort erhalten Sie vor Ort
+* die kubeconfig — im Dashboard: `Info` → den Tab `Secrets` → das Secret `kubeconfig-tenant-workshopXX`
 
-Везде дальше `workshopXX` меняйте на свой номер.
+Ersetzen Sie überall im Folgenden `workshopXX` durch Ihre eigene Nummer.
 
-## До начала: четыре утилиты
+## Vor dem Start: vier Dienstprogramme
 
-Ставятся на ноутбук один раз, до воркшопа.
+Sie werden einmalig auf Ihrem Laptop installiert, vor dem Workshop.
 
-| Утилита | Зачем | Установка |
+| Dienstprogramm | Wofür | Installation |
 |---|---|---|
-| `kubectl` | применяет файлы, показывает, что в кластере | [chat/04](chat/04-install-kubectl.md) |
-| `virtctl` | консоль виртуальной машины и проброс порта | [chat/05](chat/05-install-virtctl.md) |
-| `kubelogin` | вход через браузер, без него кластер не пустит | [chat/06](chat/06-install-kubelogin.md) |
-| `git` | забрать этот репозиторий | [chat/09](chat/09-install-git.md) |
+| `kubectl` | wendet Dateien an, zeigt, was im Cluster ist | [chat/04](chat/04-install-kubectl.md) |
+| `virtctl` | die Konsole der virtuellen Maschine und das Port-Forwarding | [chat/05](chat/05-install-virtctl.md) |
+| `kubelogin` | Anmeldung über den Browser; ohne es lässt der Cluster Sie nicht hinein | [chat/06](chat/06-install-kubelogin.md) |
+| `git` | um dieses Repository zu holen | [chat/09](chat/09-install-git.md) |
 
-⚠️ **krew для этого воркшопа не нужен** — почему, в [chat/07](chat/07-about-krew.md).
+⚠️ **krew wird für diesen Workshop nicht benötigt** — warum, in [chat/07](chat/07-about-krew.md).
 
-Проверка, что всё встало. Каждая команда печатает версию или справку, а не «команда
-не найдена»:
+Eine Prüfung, dass alles vorhanden ist. Jeder Befehl gibt eine Version oder einen Hilfetext aus,
+nicht „command not found“:
 
 ```bash
 kubectl version --client
@@ -59,11 +61,12 @@ virtctl version --client
 kubectl oidc-login --help
 ```
 
-## Подключаемся к кластеру
+## Verbindung mit dem Cluster
 
-Сохраните kubeconfig из дашборда на диск и укажите на него переменной `KUBECONFIG`.
+Speichern Sie die kubeconfig aus dem Dashboard auf die Festplatte und richten Sie die Variable
+`KUBECONFIG` darauf aus.
 
-**macOS и Linux** — содержимое секрета положите в `~/.kube/workshop`, затем:
+**macOS und Linux** — legen Sie den Inhalt des Secrets in `~/.kube/workshop` ab, dann:
 
 ```bash
 export KUBECONFIG=~/.kube/workshop
@@ -75,22 +78,22 @@ kubectl get vminstance -n tenant-workshopXX
 
 ```powershell
 New-Item -ItemType Directory -Force "$HOME\.kube" | Out-Null
-notepad "$HOME\.kube\workshop"    # вставьте kubeconfig; тип файла — "Все файлы"
+notepad "$HOME\.kube\workshop"    # kubeconfig einfügen; Dateityp — "Alle Dateien"
 [Environment]::SetEnvironmentVariable("KUBECONFIG", "$HOME\.kube\workshop", "User")
 $env:KUBECONFIG = "$HOME\.kube\workshop"
 kubectl get vminstance -n tenant-workshopXX
 ```
 
-При первом обращении откроется браузер — залогиньтесь как `workshopXX`.
+Bei der ersten Anfrage öffnet sich ein Browser — melden Sie sich als `workshopXX` an.
 
-⚠️ **Windows: файл сохранять только в UTF-8.** Блокнот и перенаправление `>` в PowerShell
-пишут UTF-16, и `kubectl` такой файл не прочитает — ответит
-`x509: certificate signed by unknown authority`, хотя с сертификатом всё в порядке.
+⚠️ **Windows: Speichern Sie die Datei nur in UTF-8.** Notepad und die `>`-Umleitung in PowerShell
+schreiben UTF-16, und `kubectl` liest eine solche Datei nicht — es antwortet
+`x509: certificate signed by unknown authority`, obwohl mit dem Zertifikat alles in Ordnung ist.
 
-⚠️ Ошибка `dial tcp [::1]:8080 ... refused` означает, что `kubectl` не нашёл kubeconfig,
-а не что кластер недоступен. Разбор обеих — в [chat/08](chat/08-connect-to-cluster.md).
+⚠️ Der Fehler `dial tcp [::1]:8080 ... refused` bedeutet, dass `kubectl` die kubeconfig nicht gefunden
+hat, nicht dass der Cluster nicht erreichbar ist. Ein Durchlauf zu beiden — in [chat/08](chat/08-connect-to-cluster.md).
 
-## Забираем материалы
+## Die Materialien holen
 
 ```bash
 cd ~
@@ -98,17 +101,17 @@ git clone https://github.com/aenix-org/cozystack-migration-workshop.git
 cd cozystack-migration-workshop/laptop
 ```
 
-⚠️ Хвост `/laptop` обязателен: в этой папке лежат материалы ноутбучного пути с
-манифестами и скриптами; без него команды не найдут ни `manifests`, ни `scripts`.
+⚠️ Das Suffix `/laptop` ist zwingend: Dieser Ordner enthält die Materialien für den Laptop-Weg,
+mit den Manifesten und Skripten; ohne ihn finden die Befehle weder `manifests` noch `scripts`.
 
-Во всех файлах стоит заглушка `tenant-workshopXX`. Подставьте свой номер разом
-(в примере — `workshop03`):
+In jeder Datei gibt es einen Platzhalter `tenant-workshopXX`. Ersetzen Sie ihn auf einen Schlag
+durch Ihre eigene Nummer (im Beispiel — `workshop03`):
 
 ```bash
 # Linux
 find manifests scripts -type f -exec sed -i 's/tenant-workshopXX/tenant-workshop03/g' {} +
 
-# macOS — тот же sed, но требует пустых кавычек после -i
+# macOS — dasselbe sed, aber es verlangt leere Anführungszeichen nach -i
 find manifests scripts -type f -exec sed -i '' 's/tenant-workshopXX/tenant-workshop03/g' {} +
 ```
 
@@ -120,217 +123,218 @@ Get-ChildItem -Path manifests,scripts -File -Recurse | ForEach-Object {
 }
 ```
 
-Проверяем, что не осталось ни одной заглушки:
+Wir prüfen, dass kein einziger Platzhalter übrig bleibt:
 
 ```bash
-grep -rn tenant-workshopXX manifests scripts || echo "чисто, можно продолжать"
+grep -rn tenant-workshopXX manifests scripts || echo "all clean, you can continue"
 ```
 
-Одно место команда не тронет намеренно: в `manifests/03-app-vm.yaml` строка
-`url: "ВСТАВЬТЕ_PRESIGNED_URL"` — эту ссылку вы получите после второй фазы.
+Eine Stelle lässt der Befehl absichtlich unberührt: in `manifests/03-app-vm.yaml` die Zeile
+`url: "ВСТАВЬТЕ_PRESIGNED_URL"` — diesen Link erhalten Sie nach der zweiten Phase.
 
-Подробно: [chat/10](chat/10-clone-and-set-number.md) ·
-карта файлов [chat/11](chat/11-file-map.md)
+Im Detail: [chat/10](chat/10-clone-and-set-number.md) ·
+Dateiübersicht [chat/11](chat/11-file-map.md)
 
 ---
 
-## Фаза 1. Хранилище под образ
+## Phase 1. Speicher für das Image
 
-📍 На ноутбуке.
+📍 Auf dem Laptop.
 
-Переупакованный диск нужно положить туда, откуда его заберёт платформа по сети.
-Заводим бакет — объектное хранилище с S3-интерфейсом.
+Die umgepackte Festplatte muss irgendwo landen, von wo die Plattform sie über das Netzwerk beziehen
+kann. Wir richten einen Bucket ein — Objektspeicher mit einer S3-Schnittstelle.
 
 ```bash
 kubectl apply -f manifests/01-bucket.yaml
 kubectl get buckets.apps.cozystack.io my-images -n tenant-workshopXX
 ```
 
-**Должны увидеть:** `bucket.apps.cozystack.io/my-images created`, затем `READY: True`.
+**Sie sollten sehen:** `bucket.apps.cozystack.io/my-images created`, dann `READY: True`.
 
-⚠️ **Имя типа пишем полностью, не `bucket`.** Слово занято в кластере трижды: наш тип из
-каталога, тип Flux и тип стандарта объектных хранилищ. Какой из трёх подставит `kubectl`
-по короткому имени — заранее не известно, и если чужой, вы получите отказ в правах на
-ресурс, которого не просили: `buckets.source.toolkit.fluxcd.io is forbidden`. Это не
-проблема с доступом, чинить её не надо.
+⚠️ **Schreiben Sie den Typnamen vollständig aus, nicht `bucket`.** Das Wort ist im Cluster dreifach
+belegt: unser Typ aus dem Katalog, der Flux-Typ und der Typ aus dem Objektspeicher-Standard. Welchen
+der drei `kubectl` für den Kurznamen einsetzt, ist im Voraus nicht bekannt, und wenn es der falsche
+ist, erhalten Sie eine Rechteverweigerung auf eine Ressource, die Sie nie angefordert haben:
+`buckets.source.toolkit.fluxcd.io is forbidden`. Das ist kein Zugriffsproblem, und es gibt nichts zu beheben.
 
-⚠️ **Если `apply` падает с `SchemaError … unknown model in reference`** — спотыкается
-проверка на вашей стороне, а не кластер; манифест верный. Обойти:
-`kubectl apply -f manifests/01-bucket.yaml --validate=false`. Флаг снимает только местную
-проверку, сервер всё равно проверит объект у себя.
+⚠️ **Falls `apply` mit `SchemaError … unknown model in reference` fehlschlägt** — es ist die
+clientseitige Validierung, die stolpert, nicht der Cluster; das Manifest ist korrekt. Als Workaround:
+`kubectl apply -f manifests/01-bucket.yaml --validate=false`. Das Flag schaltet nur die lokale Prüfung
+ab; der Server validiert das Objekt weiterhin auf seiner Seite.
 
-**Дальше понадобятся ключи:** дашборд → `Bucket` → `my-images` → вкладка `Secrets` →
-секрет `bucket-my-images-app-credentials`. Оттуда берёте `bucketName`, `accessKey`
-и `secretKey` — впишете их в скрипт на следующей фазе.
+**Als Nächstes brauchen Sie die Schlüssel:** Dashboard → `Bucket` → `my-images` → der Tab `Secrets` →
+das Secret `bucket-my-images-app-credentials`. Von dort nehmen Sie `bucketName`, `accessKey`
+und `secretKey` — die Sie in der nächsten Phase in das Skript eintragen.
 
-Разбор манифеста: [chat/13](chat/13-bucket-manifest.md) ·
-шаг целиком: [chat/14](chat/14-step-1-bucket.md)
+Manifest-Durchlauf: [chat/13](chat/13-bucket-manifest.md) ·
+der ganze Schritt: [chat/14](chat/14-step-1-bucket.md)
 
 ---
 
-## Фаза 2. Переупаковка диска
+## Phase 2. Umpacken der Festplatte
 
-📍 Сначала на ноутбуке, потом внутри временной машины.
+📍 Zuerst auf dem Laptop, dann in der temporären Maschine.
 
-Диск из VMware записан в формате VMDK, а KVM читает QCOW2. Переупаковкой занимается
-`virt-v2v`; ставить его на ноутбук ради одного раза незачем, поэтому поднимаем
-временную машину с уже готовыми инструментами.
+Die Festplatte aus VMware ist im VMDK-Format geschrieben, während KVM QCOW2 liest. `virt-v2v`
+übernimmt das Umpacken; es lohnt sich nicht, es für einen einmaligen Einsatz auf dem Laptop zu
+installieren, deshalb fahren wir eine temporäre Maschine hoch, auf der die Werkzeuge bereits vorhanden sind.
 
 ```bash
 kubectl apply -f manifests/02-conversion-vm.yaml
 kubectl get vminstance convert -n tenant-workshopXX -w
 ```
 
-**Должны увидеть:** две строки с `created`, затем `Running`.
+**Sie sollten sehen:** zwei Zeilen mit `created`, dann `Running`.
 
-⚠️ `Running` означает «включилась», а не «готова»: внутри ещё несколько минут работает
-`cloudInit` — ставит пакеты и качает `mc`. Зайдёте раньше — не найдёте `virt-v2v`.
+⚠️ `Running` bedeutet „eingeschaltet“, nicht „bereit“: Im Inneren arbeitet `cloudInit` noch einige
+Minuten weiter — installiert Pakete und lädt `mc` herunter. Melden Sie sich zu früh an, finden Sie `virt-v2v` nicht.
 
-Заходим внутрь (логин `ubuntu`, пароль `ubuntu`):
+Melden Sie sich an (Benutzername `ubuntu`, Passwort `ubuntu`):
 
 ```bash
 virtctl console --namespace=tenant-workshopXX vm-instance-convert
 ```
 
-Внутри: `nano convert.sh`, вставить текст `scripts/convert.sh`, вписать свои
-`bucketName`, `accessKey` и `secretKey` вместо `ВСТАВЬТЕ_...`, запустить
-`bash convert.sh`.
+Im Inneren: `nano convert.sh`, fügen Sie den Text von `scripts/convert.sh` ein, setzen Sie Ihre
+eigenen `bucketName`, `accessKey` und `secretKey` anstelle von `ВСТАВЬТЕ_...` ein und führen Sie
+`bash convert.sh` aus.
 
-**Должны увидеть:** в конце вывода после слова `Share:` — подписанную ссылку на образ.
-Она понадобится на следующей фазе.
+**Sie sollten sehen:** am Ende der Ausgabe, nach dem Wort `Share:` — einen signierten Link zum Image.
+Sie brauchen ihn in der nächsten Phase.
 
-Разбор манифеста: [chat/15](chat/15-conversion-vm-manifest.md) ·
-разбор скрипта: [chat/17](chat/17-convert-script.md) ·
-шаги целиком: [chat/16](chat/16-step-2-conversion-vm.md),
+Manifest-Durchlauf: [chat/15](chat/15-conversion-vm-manifest.md) ·
+Skript-Durchlauf: [chat/17](chat/17-convert-script.md) ·
+beide Schritte vollständig: [chat/16](chat/16-step-2-conversion-vm.md),
 [chat/18](chat/18-step-3-convert-image.md)
 
 ---
 
-## Фаза 3. Машина на новом месте
+## Phase 3. Die Maschine in ihrer neuen Heimat
 
-📍 На ноутбуке.
+📍 Auf dem Laptop.
 
-⚠️ Сначала погасите машину-конвертер — она своё отработала и держит 8Gi вашей квоты.
-Если её не убрать, новая машина повиснет в `Pending`:
+⚠️ Fahren Sie zuerst die Konverter-Maschine herunter — sie hat ihre Arbeit getan und belegt 8Gi
+Ihrer Quota. Wenn Sie sie nicht entfernen, bleibt die neue Maschine in `Pending` hängen:
 
 ```bash
 kubectl delete vminstance convert --namespace tenant-workshopXX
 kubectl delete vmdisk convert-tools --namespace tenant-workshopXX
 ```
 
-Впишите полученную ссылку в `manifests/03-app-vm.yaml` вместо
-`url: "ВСТАВЬТЕ_PRESIGNED_URL"`, затем:
+Tragen Sie den erhaltenen Link in `manifests/03-app-vm.yaml` anstelle von
+`url: "ВСТАВЬТЕ_PRESIGNED_URL"` ein, dann:
 
 ```bash
 kubectl apply -f manifests/03-app-vm.yaml
 kubectl get vminstance app-1 -n tenant-workshopXX -w
 ```
 
-**Должны увидеть:** две строки с `created`, затем `Running`. Здесь ожидание дольше —
-платформа скачивает образ по вашей ссылке.
+**Sie sollten sehen:** zwei Zeilen mit `created`, dann `Running`. Das Warten dauert hier länger —
+die Plattform lädt das Image von Ihrem Link herunter.
 
-Заходим внутрь (логин `root`, пароль `cozydemo`):
+Melden Sie sich an (Benutzername `root`, Passwort `cozydemo`):
 
 ```bash
 virtctl console --namespace=tenant-workshopXX vm-instance-app-1
 ```
 
-⚠️ **Сети внутри не будет.** Это не поломка стенда — так и должно быть. Чиним
-на пятой фазе.
+⚠️ **Im Inneren gibt es kein Netzwerk.** Das ist keine kaputte Testumgebung — es soll so sein. Wir
+bringen es in Phase fünf in Ordnung.
 
-Разбор манифеста: [chat/20](chat/20-app-vm-manifest.md) ·
-шаг целиком: [chat/21](chat/21-step-4-your-vm.md)
+Manifest-Durchlauf: [chat/20](chat/20-app-vm-manifest.md) ·
+der ganze Schritt: [chat/21](chat/21-step-4-your-vm.md)
 
 ---
 
-## Фаза 4. База и очередь из каталога
+## Phase 4. Die Datenbank und die Warteschlange aus dem Katalog
 
-📍 На ноутбуке.
+📍 Auf dem Laptop.
 
 ```bash
 kubectl apply -f manifests/04-managed.yaml
 kubectl get postgreses.apps.cozystack.io,kafkas.apps.cozystack.io -n tenant-workshopXX
 ```
 
-**Должны увидеть:** `postgres.apps.cozystack.io/db created` и
-`kafka.apps.cozystack.io/kafka created`. Kafka поднимается заметно дольше Postgres.
+**Sie sollten sehen:** `postgres.apps.cozystack.io/db created` und
+`kafka.apps.cozystack.io/kafka created`. Kafka braucht merklich länger zum Hochkommen als Postgres.
 
-Разбор манифеста: [chat/23](chat/23-managed-manifest.md) ·
-шаг целиком: [chat/24](chat/24-step-5-database-and-queue.md)
+Manifest-Durchlauf: [chat/23](chat/23-managed-manifest.md) ·
+der ganze Schritt: [chat/24](chat/24-step-5-database-and-queue.md)
 
 ---
 
-## Фаза 5. Подключаем приложение
+## Phase 5. Die Anwendung anbinden
 
-📍 Внутри вашей виртуальной машины.
+📍 In Ihrer virtuellen Maschine.
 
-Три действия строго по порядку: без сети скрипт не достучится до базы, а без базы
-не примет схему.
+Drei Aktionen in strikter Reihenfolge: ohne Netzwerk erreicht das Skript die Datenbank nicht, und
+ohne die Datenbank nimmt es das Schema nicht an.
 
-| Шаг | Что чиним | Чем |
+| Schritt | Was wir beheben | Womit |
 |---|---|---|
-| 5.1 | машина не в сети | `scripts/netfix-dhcp.sh` |
-| 5.2 | приложение ищет старые адреса | `scripts/connect-managed.sh` |
-| 5.3 | в новой базе нет таблиц | `scripts/orders-schema.sql` |
+| 5.1 | die Maschine hat kein Netzwerk | `scripts/netfix-dhcp.sh` |
+| 5.2 | die Anwendung sucht nach den alten Adressen | `scripts/connect-managed.sh` |
+| 5.3 | die neue Datenbank hat keine Tabellen | `scripts/orders-schema.sql` |
 
-**5.1.** Скрипт меняет `BOOTPROTO=static` на `dhcp` и убирает адрес из сети VMware.
-Набирается руками — сети у машины ещё нет, скачать файл не получится. После этого
-машину нужно **перезагрузить**: CentOS 7 применяет настройки сети при загрузке.
+**5.1.** Das Skript ändert `BOOTPROTO=static` in `dhcp` und entfernt die Adresse aus dem VMware-Netzwerk.
+Sie tippen es von Hand ab — die Maschine hat noch kein Netzwerk, Sie können die Datei also nicht
+herunterladen. Danach braucht die Maschine einen **Neustart**: CentOS 7 wendet Netzwerkeinstellungen beim Booten an.
 
-**5.2.** Скрипт заменяет в `/etc/orders/application.properties` прибитые адреса
-`192.168.10.30` и `192.168.10.40` на имена сервисов и перезапускает приложение.
+**5.2.** Das Skript ersetzt die fest verdrahteten Adressen `192.168.10.30` und `192.168.10.40` in
+`/etc/orders/application.properties` durch Servicenamen und startet die Anwendung neu.
 
-**5.3.** Ставим клиент `psql` и накатываем схему — команды ниже, в финальной проверке.
+**5.3.** Wir installieren den `psql`-Client und wenden das Schema an — die Befehle stehen unten, in
+der abschließenden Prüfung.
 
-Подробно: [chat/25](chat/25-step-6-fix-networking.md) ·
+Im Detail: [chat/25](chat/25-step-6-fix-networking.md) ·
 [chat/26](chat/26-first-check-fails.md) ·
 [chat/27](chat/27-step-7-switch-app.md)
 
 ---
 
-## Финальная проверка: три шага по порядку
+## Die abschließende Prüfung: drei Schritte der Reihe nach
 
-### Шаг 1. Погасить firewalld
+### Schritt 1. firewalld herunterfahren
 
-📍 Внутри вашей машины. Правила остались из старой сети и режут обращения к приложению.
+📍 In Ihrer Maschine. Die Regeln stammen noch aus dem alten Netzwerk und schneiden Anfragen an die Anwendung ab.
 
 ```bash
 systemctl stop firewalld && systemctl disable firewalld
 curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/actuator/health
 ```
 
-**Должны увидеть:** `200`. Если `503` — что-то из базы или очереди не подключилось.
+**Sie sollten sehen:** `200`. Falls `503` — etwas von der Datenbank oder der Warteschlange hat sich
+nicht verbunden.
 
-### Шаг 2. Схема базы
+### Schritt 2. Das Datenbankschema
 
-📍 Внутри вашей машины. Штатному psql из CentOS 7 версия 9.2, он не умеет SCRAM и
-отвечает `SCRAM authentication requires libpq version 10 or above`. Ставим свежий:
+📍 In Ihrer Maschine. Das mitgelieferte psql aus CentOS 7 hat Version 9.2; es beherrscht SCRAM nicht
+und antwortet `SCRAM authentication requires libpq version 10 or above`. Wir installieren ein frisches:
 
 ```bash
-# 1. Репозиторий PGDG — источник пакетов PostgreSQL
+# 1. Das PGDG-Repository — die Quelle der PostgreSQL-Pakete
 yum install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm
 
-# 2. libzstd: в репозиториях CentOS 7 её нет, берём из архива EPEL
+# 2. libzstd: nicht in den CentOS-7-Repositories, deshalb holen wir es aus dem EPEL-Archiv
 yum install -y https://archives.fedoraproject.org/pub/archive/epel/7/x86_64/Packages/l/libzstd-1.5.5-1.el7.x86_64.rpm
 
-# 3. Сам клиент — только из живого репозитория pgdg15
+# 3. Der Client selbst — nur aus dem aktiven pgdg15-Repository
 yum install -y --disablerepo='pgdg*' --enablerepo=pgdg15 postgresql15
 ```
 
-⚠️ Вторая и третья команды не лишние. Без `libzstd` установка падает на
-`Requires: libzstd >= 1.4.0`. Без `--disablerepo`/`--enablerepo` — на
-`HTTPS Error 410 - Gone`: пакет репозитория включает разом все версии PostgreSQL,
-включая снятые с поддержки 12-ю и 13-ю, а `yum` перед установкой обходит каждый
-включённый репозиторий и падает на первом мёртвом.
+⚠️ Der zweite und der dritte Befehl sind nicht überflüssig. Ohne `libzstd` scheitert die Installation
+an `Requires: libzstd >= 1.4.0`. Ohne `--disablerepo`/`--enablerepo` — an `HTTPS Error 410 - Gone`:
+Das Repository-Paket aktiviert jede PostgreSQL-Version auf einmal, einschließlich der abgekündigten
+12 und 13, und vor der Installation durchläuft `yum` jedes aktivierte Repository und scheitert am ersten toten.
 
 ```bash
 psql --version
 ```
 
-Если `command not found` — клиент лёг мимо `PATH`: посмотрите
-`ls /usr/pgsql-*/bin/psql`, затем `export PATH="$PATH:/usr/pgsql-15/bin"`.
+Falls `command not found` — der Client ist außerhalb von `PATH` gelandet: schauen Sie in
+`ls /usr/pgsql-*/bin/psql`, dann `export PATH="$PATH:/usr/pgsql-15/bin"`.
 
-Забираем схему и накатываем:
+Wir holen das Schema und wenden es an:
 
 ```bash
 curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/laptop/scripts/orders-schema.sql
@@ -343,24 +347,24 @@ PGPASSWORD='Orders2019!' psql \
   -h postgres-db-rw.tenant-workshopXX.svc.cozy.local -U orders -d orders -c '\dt'
 ```
 
-**Должны увидеть:** в последней команде — таблицу `orders`.
+**Sie sollten sehen:** beim letzten Befehl — die Tabelle `orders`.
 
-Адрес базы — не IP, а имя: `postgres-db-rw` (сервис `db` на чтение-запись),
-`tenant-workshopXX` (ваш namespace), `svc.cozy.local` (суффикс внутренних имён
-кластера). Пароль задан в `manifests/04-managed.yaml`, искать его нигде не надо.
+Die Adresse der Datenbank ist keine IP, sondern ein Name: `postgres-db-rw` (der Service `db`,
+read-write), `tenant-workshopXX` (Ihr namespace), `svc.cozy.local` (das Suffix für die clusterinternen
+Namen). Das Passwort ist in `manifests/04-managed.yaml` festgelegt, Sie müssen also nirgends danach suchen.
 
-Подробно: [chat/28](chat/28-step-8-why-it-still-fails.md) ·
+Im Detail: [chat/28](chat/28-step-8-why-it-still-fails.md) ·
 [chat/29](chat/29-step-8-apply-schema.md)
 
-### Шаг 3. Проброс порта и проверка снаружи
+### Schritt 3. Port-Forwarding und Prüfen von außen
 
-📍 На ноутбуке.
+📍 Auf dem Laptop.
 
 ```bash
 virtctl port-forward --namespace=tenant-workshopXX vmi/vm-instance-app-1 8080:8080
 ```
 
-Окно не закрывайте — туннель живёт, пока команда работает. Во втором окне:
+Schließen Sie das Fenster nicht — der Tunnel lebt, solange der Befehl läuft. In einem zweiten Fenster:
 
 ```bash
 curl -s http://localhost:8080/actuator/health
@@ -371,50 +375,53 @@ curl -s -X POST http://localhost:8080/api/orders \
 curl -s http://localhost:8080/api/orders
 ```
 
-**Должны увидеть:** заказ в списке. Путь пройден целиком.
+**Sie sollten sehen:** die Bestellung in der Liste. Die ganze Reise ist abgeschlossen.
 
-Подробно: [chat/30](chat/30-step-9-verify-chain.md)
+Im Detail: [chat/30](chat/30-step-9-verify-chain.md)
 
 ---
 
-## Шпаргалка
+## Spickzettel
 
-> **Префикс `vmi/` нужен не везде, и это не опечатка.** У двух команд разный синтаксис
-> цели. `virtctl console` ждёт просто имя и с префиксом отвечает `forbidden`, потому что
-> принимает слово `vmi` за имя машины. `virtctl port-forward` требует `тип/имя` и без
-> префикса отвечает `target must contain type and name separated by '/'`.
+> **Nicht jeder Befehl braucht das Präfix `vmi/`, und das ist kein Tippfehler.** Die beiden Befehle
+> haben eine unterschiedliche Zielsyntax. `virtctl console` erwartet nur den Namen und antwortet mit
+> dem Präfix `forbidden`, weil es das Wort `vmi` für den Namen der Maschine hält. `virtctl port-forward`
+> verlangt `type/name` und antwortet ohne das Präfix
+> `target must contain type and name separated by '/'`.
 
 ```bash
-# зайти в app-VM (root / cozydemo)
+# an der App-VM anmelden (root / cozydemo)
 virtctl console --namespace=tenant-workshopXX vm-instance-app-1
 
-# зайти в conversion-VM (ubuntu / ubuntu)
+# an der Conversion-VM anmelden (ubuntu / ubuntu)
 virtctl console --namespace=tenant-workshopXX vm-instance-convert
 
-# пробросить порт приложения на ноутбук
+# den Port der Anwendung an den Laptop weiterleiten
 virtctl port-forward --namespace=tenant-workshopXX vmi/vm-instance-app-1 8080:8080
 ```
 
-Выйти из консоли — `Ctrl+]`. Если после подключения экран пустой, нажмите Enter.
-То же самое доступно мышкой: кнопка **VNC** на странице машины в дашборде.
+Um die Konsole zu verlassen — `Ctrl+]`. Falls der Bildschirm nach dem Verbinden leer ist, drücken Sie
+Enter. Dasselbe gibt es mit der Maus: die Schaltfläche **VNC** auf der Seite der Maschine im Dashboard.
 
-## На чём легко застрять
+## Wo man leicht steckenbleibt
 
-* Для conversion-VM берите только `ubuntu-20.04`. На 24.04 ядро паникует, на 22.04
-  `virt-v2v` не разбирает старую RPM-базу CentOS 7.
-* VMDisk под каталожный образ должен быть больше самого образа, иначе клон не пройдёт,
-  а диск зависнет в `Terminating`. Для `ubuntu-20.04` хватает 25Gi.
-* На свежей app-VM сначала `netfix`, потом `connect` — иначе приложение не увидит
-  managed-сервисы.
-* Не открывайте `.yaml` в Word или Google Docs: они подменяют кавычки и дефисы, файл
-  перестаёт применяться, а ошибка выглядит необъяснимо.
+* Verwenden Sie für die Conversion-VM nur `ubuntu-20.04`. Auf 24.04 gerät der Kernel in Panic; auf
+  22.04 kann `virt-v2v` die alte CentOS-7-RPM-Datenbank nicht lesen.
+* Die VMDisk für ein Katalog-Image muss größer sein als das Image selbst, sonst geht der Klon nicht
+  durch und die Festplatte bleibt in `Terminating` hängen. Für `ubuntu-20.04` reichen 25Gi.
+* Auf einer frischen App-VM zuerst `netfix`, dann `connect` — sonst sieht die Anwendung die Managed
+  Services nicht.
+* Öffnen Sie `.yaml`-Dateien nicht in Word oder Google Docs: Sie tauschen die Anführungszeichen und
+  Bindestriche aus, die Datei lässt sich nicht mehr anwenden, und der Fehler sieht unerklärlich aus.
 
-Остальные грабли — [chat/31](chat/31-troubleshooting.md).
+Die übrigen Fallstricke — [chat/31](chat/31-troubleshooting.md).
 
-## Для тех, кто разворачивает стенд
+## Für alle, die die Testumgebung aufsetzen
 
-Квоты, порядок создания тенантов и версия платформы — в [REQUIREMENTS.md](../REQUIREMENTS.md).
+Quotas, die Reihenfolge beim Erstellen der Tenants und die Plattformversion — in [REQUIREMENTS.md](../REQUIREMENTS.md).
 
-## Все сообщения по порядку
+## Alle Nachrichten der Reihe nach
 
-Список из 32 сообщений — [chat/README.md](chat/README.md).
+Die Liste der 32 Nachrichten — [chat/README.md](chat/README.md).
+</content>
+</invoke>

@@ -1,23 +1,23 @@
-## 7. Про krew — и почему мы им не пользуемся
+## 7. Über krew — und warum wir es nicht verwenden
 
-**Короткий ответ: не ставьте его сегодня**
+**Kurze Antwort: Installieren Sie es heute nicht**
 
-krew — менеджер плагинов для kubectl, и им можно поставить те же virtctl и kubelogin.
-Но на прошлых воркшопах именно он съел больше всего времени, особенно на Windows.
-Если вы сделали шаги 3 и 4 — **у вас уже всё есть, этот пост пропускайте**.
+krew ist ein Plugin-Manager für kubectl, und damit lassen sich dieselben virtctl und kubelogin installieren.
+Aber bei früheren Workshops war es genau krew, das die meiste Zeit gefressen hat, besonders unter Windows.
+Wenn Sie die Schritte 3 und 4 erledigt haben — **haben Sie bereits alles, überspringen Sie diesen Beitrag**.
 
-Читайте дальше, только если krew у вас уже стоит или очень хочется.
+Lesen Sie nur weiter, wenn Sie krew bereits installiert haben oder es unbedingt möchten.
 
-⚠️ **Три грабли Windows, все встречались вживую:**
-• **PATH не обновился в текущем окне.** Самое частое. Лечится прямо в той же сессии:
+⚠️ **Drei Windows-Stolperfallen, alle in freier Wildbahn gesehen:**
+• **PATH wurde im aktuellen Fenster nicht aktualisiert.** Die häufigste. Direkt in derselben Sitzung behebbar:
   `$env:Path += ";$HOME\.krew\bin"`
-• **krew.exe не доустановился** — SmartScreen или антивирус его прибили. Проверить:
+• **krew.exe wurde nicht fertig installiert** — SmartScreen oder das Antivirenprogramm hat es abgeschossen. Prüfen:
   `Test-Path "$HOME\.krew\bin\kubectl-krew.exe"`
-• **Админское и обычное окно PowerShell — это разные миры.** У них разные `$HOME`
-  и разный пользовательский PATH. Поставили от администратора, запускаете обычным —
-  плагин не найдётся никогда. Ставьте и запускайте в одном и том же обычном окне.
+• **Ein Administrator-PowerShell-Fenster und ein normales sind verschiedene Welten.** Sie haben unterschiedliche `$HOME`
+  und einen unterschiedlichen Benutzer-PATH. Als Administrator installiert, als normaler Benutzer ausgeführt —
+  und das Plugin wird nie gefunden. Installieren und ausführen Sie in ein und demselben normalen Fenster.
 
-**macOS и Linux** — копируйте блок целиком, он сам определит систему:
+**macOS und Linux** — kopieren Sie den ganzen Block, er erkennt das System selbst:
 ```bash
 set -x; cd "$(mktemp -d)" &&
 OS="$(uname | tr '[:upper:]' '[:lower:]')" &&
@@ -26,12 +26,12 @@ curl -fsSLO "https://github.com/kubernetes-sigs/krew/releases/latest/download/kr
 tar zxvf "krew-${OS}_${ARCH}.tar.gz" &&
 ./"krew-${OS}_${ARCH}" install krew
 ```
-Затем добавьте krew в PATH — строчку надо дописать в свой профиль, иначе она забудется
-при следующем запуске терминала:
+Fügen Sie krew dann Ihrem PATH hinzu — die Zeile muss in Ihr Profil geschrieben werden, sonst geht sie
+beim nächsten Start des Terminals verloren:
 ```bash
-echo 'export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"' >> ~/.zshrc   # для zsh, это по умолчанию в macOS
-echo 'export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"' >> ~/.bashrc  # для bash, обычно Linux
-source ~/.zshrc    # или source ~/.bashrc
+echo 'export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"' >> ~/.zshrc   # für zsh, unter macOS der Standard
+echo 'export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"' >> ~/.bashrc  # für bash, meist Linux
+source ~/.zshrc    # oder source ~/.bashrc
 ```
 
 **Windows** (PowerShell)
@@ -42,18 +42,18 @@ $old = [Environment]::GetEnvironmentVariable("Path","User")
 [Environment]::SetEnvironmentVariable("Path", "$old;$HOME\.krew\bin", "User")
 Remove-Item "$HOME\krew.exe"
 ```
-Снова закройте и откройте PowerShell.
+Schließen und öffnen Sie PowerShell erneut.
 
-**Ставим плагины:**
+**Plugins installieren:**
 ```bash
 kubectl krew install virt
 kubectl krew install oidc-login
 ```
 
-⚠️ Важное отличие: при установке через krew команда называется иначе —
-`kubectl virt console …` вместо `virtctl console …`. Дальше в инструкциях я пишу
-`virtctl` — если ставили через krew, мысленно подставляйте `kubectl virt`.
-Чтобы не путаться, можно сделать короткий псевдоним:
+⚠️ Ein wichtiger Unterschied: Bei der Installation über krew heißt der Befehl anders —
+`kubectl virt console …` statt `virtctl console …`. Weiter unten in der Anleitung schreibe ich
+`virtctl` — wenn Sie über krew installiert haben, ersetzen Sie es gedanklich durch `kubectl virt`.
+Um Verwirrung zu vermeiden, können Sie einen kurzen Alias einrichten:
 ```bash
 alias virtctl="kubectl virt"
 ```

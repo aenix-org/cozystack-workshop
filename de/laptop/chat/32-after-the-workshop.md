@@ -1,15 +1,19 @@
-## 32. После воркшопа
+## 32. Nach dem Workshop
 
-**Что остаётся у вас**
+**Was Ihnen bleibt**
 
-• **Окружение — на месяц.** Тенант ваш, ломайте и пересобирайте что угодно.
-  Попробуйте то, на что сегодня не хватило времени: поднять Redis, сделать копию
-  виртуалки, потрогать живую миграцию.
-• **Этот чат — тоже на месяц.** Вопрос через две недели — обычное дело.
-• **Домашние лабораторные и сертификат.** Задания пришлю отдельным сообщением.
-  Сертификат — то, что можно показать руководителю: в компании есть человек,
-  который умеет это руками.
+• **Die Umgebung — für einen Monat.** Der Tenant gehört Ihnen; zerlegen Sie ihn
+  und bauen Sie neu auf, was immer Sie möchten. Probieren Sie das aus, wofür
+  heute die Zeit nicht gereicht hat: Redis hochfahren, eine Kopie einer VM
+  erstellen, die Live-Migration selbst in die Hand nehmen.
+• **Dieser Chat — ebenfalls für einen Monat.** Eine Frage in zwei Wochen ist
+  völlig normal.
+• **Übungslabore für zu Hause und ein Zertifikat.** Die Aufgaben schicke ich in
+  einer separaten Nachricht. Das Zertifikat können Sie Ihrer Führungskraft
+  zeigen: Das Unternehmen hat jemanden, der das tatsächlich mit eigenen Händen
+  kann.
 
-Спасибо за работу. Если захотите разобрать свой парк — напишите мне лично,
-посмотрим, что поедет как есть, что заменится сервисами, а что честно стоит
-оставить на месте.
+Danke für die heutige Arbeit. Wenn Sie Ihren eigenen Serverpark durchgehen
+möchten, schreiben Sie mir direkt, und wir schauen uns an, was unverändert
+läuft, was durch Services ersetzt wird und was ehrlich gesagt dort bleiben
+sollte, wo es ist.

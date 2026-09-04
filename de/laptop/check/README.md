@@ -1,115 +1,119 @@
-# Скрипты проверки
+# Check-Skripte
 
-В каждой папке лабы лежит `check.sh`. Он проверяет, что лаба действительно выполнена —
-не «файл применён», а **работает по сути**.
+In jedem Lab-Ordner liegt eine `check.sh`. Sie prüft, ob das Lab wirklich abgeschlossen ist —
+nicht dass „eine Datei angewendet wurde“, sondern dass es **inhaltlich funktioniert**.
 
-Участник запускает его сам, когда захочет. Результат — отчёт в терминале и файл-артефакт,
-который можно приложить куда угодно: в чат сообщества, в заявку на сертификацию, себе в
-заметки.
+Sie führen es selbst aus, wann immer Sie möchten. Das Ergebnis ist ein Bericht im Terminal und
+eine Artefakt-Datei, die Sie überallhin anhängen können: in den Community-Chat, in einen
+Zertifizierungsantrag, in Ihre eigenen Notizen.
 
-## Как запустить
+## So führen Sie es aus
 
 ```bash
 cd labs/03-scale
 ./check.sh
 ```
 
-### Если у вас Windows
+### Wenn Sie Windows haben
 
-Скрипты написаны на bash и в самом Windows не запустятся. Нужен **WSL** — подсистема
-Linux, которая ставится одной командой в PowerShell от администратора:
+Die Skripte sind in bash geschrieben und laufen auf Windows selbst nicht. Sie brauchen **WSL** —
+ein Linux-Subsystem, das sich mit einem einzigen Befehl in einer PowerShell als Administrator
+installieren lässt:
 
 ```powershell
 wsl --install
 ```
 
-Компьютер попросит перезагрузку, после неё откроется консоль Ubuntu. Дальше всё как у
-всех, только `kubectl` внутри WSL нужен свой:
+Der Computer bittet um einen Neustart; danach öffnet sich eine Ubuntu-Konsole. Von dort an ist
+alles wie bei allen anderen, nur brauchen Sie innerhalb von WSL Ihr eigenes `kubectl`:
 
 ```bash
 sudo snap install kubectl --classic
 ```
 
-Файл доступа к учебному кластеру — тот самый `lab.kubeconfig`, который вы создали в
-лабе 0, — скрипт находит через переменную `KUBECONFIG`. Если вы сохранили его внутри
-WSL, путь обычный:
+Die Zugangsdaten zum lab-Cluster — genau jene `lab.kubeconfig`, die Sie in Lab 0 erstellt haben
+— findet das Skript über die Variable `KUBECONFIG`. Wenn Sie sie innerhalb von WSL gespeichert
+haben, ist der Pfad der übliche:
 
 ```bash
 export KUBECONFIG=~/lab.kubeconfig
 ```
 
-Если сохранили на диск Windows — копировать его в WSL не нужно, диски видны изнутри
-по пути `/mnt/c/...`. Подставьте своё имя пользователя Windows и папку, куда сохранили:
+Wenn Sie sie auf dem Windows-Laufwerk gespeichert haben, müssen Sie sie nicht nach WSL kopieren
+— die Laufwerke sind von innen unter `/mnt/c/...` sichtbar. Setzen Sie Ihren Windows-Benutzernamen
+und den Ordner ein, in dem Sie sie gespeichert haben:
 
 ```bash
-export KUBECONFIG=/mnt/c/Users/<ваше-имя>/lab.kubeconfig
+export KUBECONFIG=/mnt/c/Users/<your-name>/lab.kubeconfig
 ```
 
-⚠️ **Если WSL поставить нельзя** — на корпоративном ноутбуке это частая ситуация — лабы
-всё равно проходятся полностью, кроме автопроверки. Отчёт-артефакт в этом случае не
-получится: попросите коллегу с Linux или macOS прогнать скрипт по вашему кубконфигу либо
-приложите к заявке вывод команд из раздела «Проверка» соответствующей лабы.
+⚠️ **Wenn WSL sich nicht installieren lässt** — auf einem Firmen-Laptop eine häufige Situation —
+lassen sich die Labs trotzdem vollständig durcharbeiten, nur die automatische Prüfung nicht. Den
+Artefakt-Bericht bekommen Sie in diesem Fall nicht: Bitten Sie eine Kollegin oder einen Kollegen
+mit Linux oder macOS, das Skript gegen Ihre kubeconfig laufen zu lassen, oder hängen Sie Ihrem
+Antrag die Befehlsausgabe aus dem Abschnitt „Prüfung“ des jeweiligen Labs an.
 
-Скрипт сам поймёт, куда смотреть, по переменной `KUBECONFIG`. Если её нет — скажет об этом
-и остановится.
+Das Skript findet selbst heraus, wo es suchen muss — über die Variable `KUBECONFIG`. Ist sie
+nicht gesetzt, sagt es Ihnen das und stoppt.
 
-Для лаб, где нужен доступ к тенанту на управляющем кластере, дополнительно нужна
-переменная `COZY_TENANT` — имя вашего тенанта, например `workshop07`:
+Für Labs, die Zugriff auf einen Tenant im Management-Cluster brauchen, benötigen Sie zusätzlich
+die Variable `COZY_TENANT` — den Namen Ihres Tenants, zum Beispiel `workshop07`:
 
 ```bash
 export COZY_TENANT=workshop07
 ./check.sh
 ```
 
-## Что получается на выходе
+## Was dabei herauskommt
 
-В терминале — по строке на проверку:
+Im Terminal — eine Zeile pro Prüfung:
 
 ```
-[  OK  ] приложение развёрнуто и отвечает
-[  OK  ] имя пода подставляется в страницу
-[ FAIL ] автомасштабирование не настроено
-         не найден HorizontalPodAutoscaler для deployment/rickroll
-         подсказка: примените hpa.yaml из этой папки
+[  OK  ] application deployed and responding
+[  OK  ] Pod name is injected into the page
+[ FAIL ] autoscaling is not configured
+         no HorizontalPodAutoscaler found for deployment/rickroll
+         hint: apply hpa.yaml from this folder
 ```
 
-⚠️ **Отчёт кладётся в папку лабы и содержит дату со временем.** Если репозиторий общий или
-вы прогоняли проверку несколько раз, там накопится несколько файлов — смотрите на время в
-имени, чтобы не принять чужой или прошлый прогон за свой.
+⚠️ **Der Bericht wird in den Lab-Ordner geschrieben und trägt Datum und Uhrzeit.** Wenn das
+Repository gemeinsam genutzt wird oder Sie die Prüfung mehrmals ausgeführt haben, sammeln sich
+dort mehrere Dateien an — achten Sie auf die Uhrzeit im Namen, damit Sie keinen fremden oder
+früheren Durchlauf für Ihren eigenen halten.
 
-Рядом появляется файл `report-<лаба>-<дата>.md` — тот же результат в разметке, вместе с
-собранными свидетельствами: версии, вывод команд, имена объектов. Это и есть артефакт.
+Daneben erscheint eine Datei `report-<lab>-<date>.md` — dasselbe Ergebnis in Markdown, zusammen
+mit den gesammelten Nachweisen: Versionen, Befehlsausgaben, Objektnamen. Das ist das Artefakt.
 
-## Требования к автору скрипта
+## Anforderungen an den Autor des Skripts
 
-**Проверяем суть, а не факт применения.** Плохо: «существует объект Deployment». Хорошо:
-«приложение отвечает по HTTP и в ответе есть имя пода».
+**Prüfen Sie die Substanz, nicht die Tatsache der Anwendung.** Schlecht: „Ein Deployment-Objekt
+existiert." Gut: „Die Anwendung antwortet über HTTP, und die Antwort enthält den Namen des Pods.“
 
-**Каждый провал объясняет, что делать.** Строка `FAIL` без подсказки — брак. Читатель
-запускает скрипт именно потому, что застрял.
+**Jeder Fehlschlag erklärt, was zu tun ist.** Eine `FAIL`-Zeile ohne Hinweis ist Ausschuss. Der
+Leser führt das Skript gerade deshalb aus, weil er feststeckt.
 
-**Скрипт не чинит и не создаёт.** Только читает. Единственное исключение — временный под
-для проверки сетевой доступности, который удаляется за собой.
+**Das Skript repariert nichts und erstellt nichts.** Es liest nur. Die einzige Ausnahme ist ein
+temporärer Pod zum Prüfen der Netzwerkerreichbarkeit, der sich selbst wieder aufräumt.
 
-**Работает на macOS и Linux.** Никакого GNU-специфичного `sed -i`, `readlink -f`,
-`date -d`. Проверять на обеих системах.
+**Läuft auf macOS und Linux.** Kein GNU-spezifisches `sed -i`, `readlink -f`, `date -d`. Auf
+beiden Systemen testen.
 
-**Не падает на первой ошибке.** Прогоняет все проверки и показывает полную картину.
-`set -e` не использовать.
+**Bricht nicht beim ersten Fehler ab.** Es führt jede Prüfung aus und zeigt das vollständige
+Bild. `set -e` nicht verwenden.
 
-**Не печатает пароли и токены.** Если значение секретное — писать `<скрыто>`.
+**Gibt keine Passwörter oder Tokens aus.** Ist ein Wert geheim, schreiben Sie `<hidden>`.
 
-**Идемпотентен.** Запуск десять раз подряд не меняет состояние кластера.
+**Idempotent.** Zehnmal hintereinander ausgeführt, ändert es den Zustand des Clusters nicht.
 
-## Общая библиотека
+## Gemeinsame Bibliothek
 
-`check/lib.sh` — общие функции, подключается в начале каждого скрипта:
+`check/lib.sh` — gemeinsame Funktionen, wird am Anfang jedes Skripts eingebunden:
 
-- `ok "текст"` / `fail "текст" "подсказка"` / `warn "текст"` — вывод результата
-- `need_kubeconfig` — проверить, что `KUBECONFIG` задан и кластер отвечает
-- `need_tenant` — проверить, что задан `COZY_TENANT`
-- `evidence "заголовок" "значение"` — добавить свидетельство в артефакт
-- `finish` — подвести итог, записать отчёт, вернуть код возврата
+- `ok "Text"` / `fail "Text" "Hinweis"` / `warn "Text"` — ein Ergebnis ausgeben
+- `need_kubeconfig` — prüfen, dass `KUBECONFIG` gesetzt ist und der Cluster antwortet
+- `need_tenant` — prüfen, dass `COZY_TENANT` gesetzt ist
+- `evidence "Überschrift" "Wert"` — einen Nachweis zum Artefakt hinzufügen
+- `finish` — Fazit ziehen, den Bericht schreiben, den Exit-Code zurückgeben
 
-Код возврата: `0` — всё прошло, `1` — есть провалы. Так скрипт можно использовать
-в автоматике.
+Exit-Code: `0` — alles bestanden, `1` — es gibt Fehlschläge. So lässt sich das Skript in der
+Automatisierung einsetzen.

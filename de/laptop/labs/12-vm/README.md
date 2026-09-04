@@ -1,87 +1,87 @@
-# Лаба 12 · Виртуалка рядом с контейнерами
+# Lab 12 · Eine VM neben den Containern
 
 | | |
 |---|---|
-| **Время** | 30 минут, из них 5–10 — ожидание загрузки машины |
-| **Что доказывает** | Легаси не нужно контейнеризовать, чтобы переехать: мигрированная виртуалка публикуется наружу тем же ingress и доменом, что и контейнерное приложение |
-| **Что понадобится** | Доступ в дашборд тенанта, тенантный `~/.kube/workshop`, `kubectl`, `virtctl` |
+| **Zeit** | 30 Minuten, davon 5–10 für das Warten auf den Start der Maschine |
+| **Was es zeigt** | Legacy muss nicht containerisiert werden, um umzuziehen: eine migrierte VM wird nach außen über denselben Ingress und dieselbe Domain veröffentlicht wie eine containerisierte Anwendung |
+| **Was Sie brauchen** | Zugang zum Tenant-Dashboard, die Tenant-`~/.kube/workshop`, `kubectl`, `virtctl` |
 
-## Зачем это
+## Warum das wichtig ist
 
-Справочник сотрудников — самая старая часть «Пропуска». Приложение 2011 года, написано подрядчиком, которого больше нет. Работает на Windows Server и на версии .NET, которую не обновляли, потому что «оно работает». Исходников нет, документации нет, есть инструкция по восстановлению на четыре страницы, и в ней шаг «позвонить Сергею».
+Das Mitarbeiterverzeichnis ist der älteste Teil von „Propusk“. Eine Anwendung aus dem Jahr 2011, geschrieben von einem Auftragnehmer, den es nicht mehr gibt. Sie läuft auf Windows Server und auf einer Version von .NET, die nie aktualisiert wurde, weil „sie funktioniert“. Es gibt keine Quellen, keine Dokumentation — nur einen vierseitigen Wiederherstellungsleitfaden mit einem Schritt, der lautet „Sergei anrufen“.
 
-Внутри это маленькое веб-приложение: отдаёт по HTTP страницу со списком сотрудников и их телефонами. Люди открывают его в браузере, другие сервисы ходят к нему за данными.
+Im Inneren ist es eine kleine Webanwendung: Sie liefert über HTTP eine Seite mit einer Liste der Mitarbeiter und ihrer Telefonnummern aus. Menschen öffnen sie im Browser; andere Dienste fragen sie nach Daten ab.
 
-Переезжать в контейнер этот справочник не будет. Не «пока», а никогда: контейнеризовать приложение, которое некому пересобрать, невозможно физически. И это не повод отказываться от переезда. Ответ на вопрос «а что делать с тем, что не переносится?» — перевезти как есть, виртуальной машиной.
+Dieses Verzeichnis zieht nicht in einen Container um. Nicht „noch nicht“ — niemals: Man kann eine Anwendung, die niemand neu bauen kann, physisch nicht containerisieren. Und das ist kein Grund, auf den Umzug zu verzichten. Die Antwort auf die Frage „Was tun wir mit den Dingen, die sich nicht portieren lassen?“ lautet: Bringen Sie sie so, wie sie sind, als virtuelle Maschine herüber.
 
-Но переехать мало: справочник должен быть виден снаружи, как и раньше. В этой лабе мы поднимем виртуальную машину рядом с контейнерами и опубликуем её наружу **тем же способом, что и контейнерное приложение** — через ingress и доменное имя платформы. Для платформы виртуалка это ещё одна нагрузка за доменом, и разбираться, контейнер там или целая ОС, ей не нужно.
+Aber umzuziehen reicht nicht: Das Verzeichnis muss von außen sichtbar sein, genau wie zuvor. In diesem Lab stellen wir eine virtuelle Maschine neben den Containern auf und veröffentlichen sie nach außen **auf dieselbe Weise wie eine containerisierte Anwendung** — über den Ingress und den Domainnamen der Plattform. Für die Plattform ist die VM nur eine weitere Workload hinter einer Domain, und es ist ihr gleichgültig, ob dahinter ein Container steckt oder ein ganzes Betriebssystem.
 
-## Словарик
+## Mini-Glossar
 
-| Термин | Что это | Похоже на… но |
+| Begriff | Was es ist | Wie… aber |
 |---|---|---|
-| **VMInstance** | Виртуальная машина как объект кластера | **Виртуальная машина**, но описывается текстом и создаётся тем же `kubectl`, что и приложения |
-| **VMDisk** | Диск, существующий отдельно от машины | **vmdk**, но отдельный объект: переживает машину, подключается к другой |
-| **Instance type** | Готовый размер машины из списка платформы: столько-то vCPU, столько-то памяти | ближе к типам инстансов в облаках, чем к ручной настройке vCPU/RAM |
-| **Instance profile** | Набор устройств и драйверов под гостевую ОС | **Guest OS type**, но влияет на то, какие контроллеры увидит гость |
-| **cloud-init** | Скрипт первичной настройки при первом включении | **Customization Specification**, но обычный YAML внутри манифеста, а не мастер в интерфейсе |
-| **Service** | Один постоянный адрес для группы подов внутри кластера | **Пул балансировщика**, но список участников платформа держит актуальным сама, по метке |
-| **Ingress** | Правило: какой домен вести на какой Service, вместе с HTTPS | **reverse-proxy перед фермой** (nginx, HAProxy), но описывается объектом, а домен и сертификат выдаёт платформа |
-| **домен** | Постоянное имя, по которому сервис виден снаружи по HTTP | **DNS-имя за корпоративным балансировщиком**, но заявку в DNS и на сертификат подавать не нужно |
-| **KubeVirt** | Механизм, которым Kubernetes запускает виртуалки | **Гипервизор**, но это не второй гипервизор: под капотом тот же QEMU/KVM, что и у любого Linux |
+| **VMInstance** | Eine virtuelle Maschine als Cluster-Objekt | **Eine virtuelle Maschine**, aber als Text beschrieben und mit demselben `kubectl` erstellt wie die Anwendungen |
+| **VMDisk** | Ein Datenträger, der getrennt von der Maschine existiert | **Eine vmdk**, aber ein eigenes Objekt: Er überlebt die Maschine und lässt sich an eine andere anhängen |
+| **Instance type** | Eine fertige Maschinengröße aus der Liste der Plattform: so viele vCPU, so viel Arbeitsspeicher | näher an Cloud-Instance-Typen als an manuellem Feintuning von vCPU/RAM |
+| **Instance profile** | Ein Satz von Geräten und Treibern für das Gast-Betriebssystem | **Guest OS type**, aber es beeinflusst, welche Controller der Gast sieht |
+| **cloud-init** | Ein Provisionierungsskript, das beim ersten Einschalten der Maschine ausgeführt wird | **Customization Specification**, aber einfaches YAML im Manifest statt eines Assistenten in der Oberfläche |
+| **Service** | Eine stabile Adresse für eine Gruppe von Pods innerhalb des Clusters | **Ein Load-Balancer-Pool**, aber die Plattform hält die Mitgliederliste selbst aktuell, anhand von Labels |
+| **Ingress** | Eine Regel: welche Domain zu welchem Service führt, zusammen mit HTTPS | **Ein Reverse-Proxy vor einer Farm** (nginx, HAProxy), aber als Objekt beschrieben, wobei Domain und Zertifikat von der Plattform ausgestellt werden |
+| **Domain** | Ein dauerhafter Name, unter dem der Dienst von außen über HTTP sichtbar ist | **Ein DNS-Name hinter einem Unternehmens-Load-Balancer**, aber es muss kein Ticket bei DNS oder für ein Zertifikat eingereicht werden |
+| **KubeVirt** | Der Mechanismus, mit dem Kubernetes VMs betreibt | **Ein Hypervisor**, aber es ist kein zweiter Hypervisor: darunter liegt dasselbe QEMU/KVM, das jedes Linux nutzt |
 
-## Что лежит в папке лабы
+## Was im Lab-Ordner liegt
 
-Все файлы уже у вас — вы забрали их вместе с репозиторием. Создавать и печатать заново ничего не нужно: там, где ниже написано `kubectl apply -f имя.yaml`, файл берётся отсюда.
+Sie haben bereits alle Dateien — Sie haben sie zusammen mit dem Repository erhalten. Es gibt nichts zu erstellen oder abzutippen: Wo unten `kubectl apply -f name.yaml` steht, stammt die Datei von hier.
 
 ```bash
 cd labs/12-vm
 ```
 
-| Файл | Что это | Когда пригодится |
+| Datei | Was es ist | Wann Sie sie brauchen |
 |---|---|---|
-| `staff-directory-vm.yaml` | Виртуальная машина под легаси-справочник сотрудников | применяете **в тенанте** |
-| `check.sh` | Проверка, что справочник опубликован и отвечает по домену | запускаете в конце лабы |
+| `staff-directory-vm.yaml` | Die virtuelle Maschine für das Legacy-Mitarbeiterverzeichnis | Sie wenden sie **im Tenant** an |
+| `check.sh` | Eine Prüfung, dass das Verzeichnis veröffentlicht ist und unter seiner Domain antwortet | Sie führen sie am Ende des Labs aus |
 
-📍 **Ingress создаёт не участник, а ведущий, и заранее.** В каждом тенанте уже лежат `Service spravochnik-http` (переводит порт 80 на 8080 и отбирает поды вашей машины) и `Ingress spravochnik` с хостом `spravochnik.workshopXX.workshop.aenix.io`. Вам не нужно их заводить и не нужно держать их файлы у себя — вам нужно только поднять виртуальную машину с именем `spravochnik`, и публикация подхватит её сама.
+📍 **Der Ingress wird von der Lehrkraft erstellt, nicht vom Teilnehmer, und im Voraus.** Jeder Tenant enthält bereits einen `Service spravochnik-http` (er leitet Port 80 auf 8080 weiter und wählt die Pods Ihrer Maschine aus) und einen `Ingress spravochnik` mit dem Host `spravochnik.workshopXX.workshop.aenix.io`. Sie müssen sie nicht einrichten und ihre Dateien nicht selbst aufbewahren — alles, was Sie brauchen, ist, eine virtuelle Maschine namens `spravochnik` hochzufahren, und die Veröffentlichung greift sie von selbst auf.
 
-## Шаг 1. Поднимаем виртуалку
+## Schritt 1. Die VM hochfahren
 
-📍 **Где:** в браузере, в дашборде тенанта.
+📍 **Wo:** im Browser, im Tenant-Dashboard.
 
-Виртуалка — это managed-сервис Cozystack, она живёт в вашем тенанте. Заводится она в два приёма, и это стоит понять сразу.
+Die VM ist ein von Cozystack verwalteter Dienst; sie lebt in Ihrem Tenant. Sie wird in zwei Zügen erstellt, und das lohnt sich, gleich zu verstehen.
 
-### Сначала диск
+### Zuerst der Datenträger
 
-Тенант → **Создать приложение** → `VM Disk`.
+Tenant → **Anwendung erstellen** → `VM Disk`.
 
-| Поле | Значение | Почему так |
+| Feld | Wert | Warum so |
 |---|---|---|
-| Имя | `spravochnik` | так будет называться и машина |
-| Source | `Image` → `ubuntu-22.04` | берём из готовой коллекции образов платформы |
-| Storage | `20Gi` | образ `ubuntu-22.04` разворачивается в 20Gi, меньше задать нельзя |
-| Storage class | `replicated` | три копии данных на разных узлах |
+| Name | `spravochnik` | so wird auch die Maschine heißen |
+| Source | `Image` → `ubuntu-22.04` | aus der fertigen Image-Sammlung der Plattform genommen |
+| Storage | `20Gi` | das Image `ubuntu-22.04` entpackt sich auf 20Gi, weniger lässt sich nicht angeben |
+| Storage class | `replicated` | drei Kopien der Daten auf verschiedenen Nodes |
 
-**Почему диск — отдельный объект, а не поле внутри машины.** Потому что диск переживает машину. Машину можно удалить целиком, пересоздать с другим типом, другой сетью, другим именем — и подключить тот же диск. В vSphere вы делаете то же самое, отцепляя vmdk от одной VM и цепляя к другой; здесь это выражено в модели явно.
+**Warum der Datenträger ein eigenes Objekt ist und kein Feld innerhalb der Maschine.** Weil der Datenträger die Maschine überlebt. Sie können die ganze Maschine löschen, sie mit einem anderen Typ, einem anderen Netzwerk, einem anderen Namen neu erstellen — und denselben Datenträger anhängen. In vSphere tun Sie dasselbe, wenn Sie eine vmdk von einer VM lösen und an eine andere anhängen; hier ist das im Modell ausdrücklich ausformuliert.
 
-⚠️ **Диск не может быть меньше образа-источника.** `ubuntu-22.04` из коллекции платформы разворачивается в 20Gi, и заказ диска на 10Gi платформа отклонит: клонировать образ в меньший объём некуда. Занизить здесь дороже, чем завысить: расширить диск потом можно, уменьшить — нет.
+⚠️ **Der Datenträger kann nicht kleiner sein als das Quell-Image.** Das `ubuntu-22.04` der Plattform entpackt sich auf 20Gi, und die Plattform lehnt eine Anforderung für einen 10Gi-Datenträger ab: Es gibt keinen Ort, an den das Image in ein kleineres Volume geklont werden könnte. Zu klein zu dimensionieren kostet hier mehr als zu groß: Einen Datenträger können Sie später vergrößern, aber nicht verkleinern.
 
-Дождитесь, пока диск наполнится: платформа скачивает и разворачивает образ, это минута-две.
+Warten Sie, bis sich der Datenträger füllt: Die Plattform lädt das Image herunter und entpackt es, das dauert ein bis zwei Minuten.
 
-### Потом машина
+### Dann die Maschine
 
-Тенант → **Создать приложение** → `VM Instance`.
+Tenant → **Anwendung erstellen** → `VM Instance`.
 
-| Поле | Значение | Почему так |
+| Feld | Wert | Warum so |
 |---|---|---|
-| Имя | `spravochnik` | |
-| Instance type | `u1.medium` | 1 процессор, 4 ГБ — тот же список размеров, что и у узлов кластера |
-| Instance profile | `ubuntu` | набор устройств под гостевую ОС |
-| Run strategy | `Always` | держать включённой; выключится сама — включат снова |
-| Disks | `spravochnik` | тот диск, который вы создали |
-| Cloud init | см. ниже | поднимает справочник на порту 8080 |
+| Name | `spravochnik` | |
+| Instance type | `u1.medium` | 1 CPU, 4 GB — dieselbe Größenliste, die auch die Cluster-Nodes verwenden |
+| Instance profile | `ubuntu` | der Satz von Geräten für das Gast-Betriebssystem |
+| Run strategy | `Always` | am Laufen halten; wenn sie sich selbst herunterfährt, wird sie wieder gestartet |
+| Disks | `spravochnik` | der Datenträger, den Sie erstellt haben |
+| Cloud init | siehe unten | bringt das Verzeichnis auf Port 8080 zum Laufen |
 
-В поле cloud-init:
+Im cloud-init-Feld:
 
 ```yaml
 #cloud-config
@@ -105,33 +105,33 @@ write_files:
 runcmd: [ "systemctl daemon-reload", "systemctl enable --now directory" ]
 ```
 
-Этот cloud-init делает справочник сервером: кладёт HTML-страницу со списком сотрудников и заводит службу, которая отдаёт её по HTTP на порту 8080. `python3` уже есть в образе Ubuntu, ставить ничего не нужно и интернет не требуется. Порт 8080 выбран не наугад: именно на него смотрит `Service spravochnik-http`, который ведущий создал заранее.
+Dieses cloud-init macht aus dem Verzeichnis einen Server: Es legt eine HTML-Seite mit der Mitarbeiterliste ab und richtet einen Dienst ein, der sie über HTTP auf Port 8080 ausliefert. `python3` ist im Ubuntu-Image bereits vorhanden, es muss also nichts installiert werden und kein Internet ist nötig. Port 8080 wurde nicht zufällig gewählt: Genau auf ihn schaut der `Service spravochnik-http`, den die Lehrkraft im Voraus erstellt hat.
 
-⚠️ **Пароль в открытом виде — только для лабы.** На рабочей машине здесь были бы `sshKeys`, а пароля не было бы вовсе. Мы идём коротким путём, чтобы не тратить время воркшопа на обмен ключами.
+⚠️ **Ein Passwort im Klartext — nur für das Lab.** Auf einer echten Maschine stünden hier `sshKeys` und gar kein Passwort. Wir nehmen den kurzen Weg, um keine Workshop-Zeit mit dem Austausch von Schlüsseln zu verbringen.
 
-**То же самое текстом.** Оба объекта, диск и машина, лежат в одном файле `staff-directory-vm.yaml` и создаются одной командой: сначала диск, потом машина. Перед применением откройте файл и замените в нём заглушку `tenant-workshopXX` на имя своего тенанта — иначе объекты уедут не туда.
+**Dasselbe als Text.** Beide Objekte, der Datenträger und die Maschine, liegen in einer Datei, `staff-directory-vm.yaml`, und werden mit einem einzigen Befehl erstellt: zuerst der Datenträger, dann die Maschine. Öffnen Sie die Datei vor dem Anwenden und ersetzen Sie darin den Platzhalter `tenant-workshopXX` durch den Namen Ihres eigenen Tenants — sonst landen die Objekte am falschen Ort.
 
 ```bash
-# KUBECONFIG — переменная, из которой kubectl берёт адрес кластера и данные для входа.
-# Здесь нужен ТЕНАНТНЫЙ файл доступа: виртуалка живёт в тенанте на управляющем кластере.
+# KUBECONFIG ist die Variable, aus der kubectl die Cluster-Adresse und die Anmeldedaten liest.
+# Hier brauchen Sie die TENANT-Zugangsdatei: Die VM lebt im Tenant auf dem Management-Cluster.
 export KUBECONFIG=~/.kube/workshop
-# apply = «приведи кластер к тому, что написано в файле». Нет объектов — создаст,
-# есть — доведёт до описанного состояния.
-#   -f   читать описание из файла
+# apply = "bringe den Cluster in den Zustand, der in der Datei steht". Keine Objekte — es erstellt sie,
+# Objekte vorhanden — es bringt sie in den beschriebenen Zustand.
+#   -f   die Beschreibung aus einer Datei lesen
 kubectl apply -f staff-directory-vm.yaml
 ```
 
-**Что вы должны увидеть:** две строки с `created` — по одной на диск и на машину.
+**Was Sie sehen sollten:** zwei Zeilen mit `created` — eine für den Datenträger und eine für die Maschine.
 
 <details>
-<summary><b>Разбираем staff-directory-vm.yaml построчно</b></summary>
+<summary><b>Genauer betrachtet: was in staff-directory-vm.yaml steckt</b></summary>
 
 ```yaml
 apiVersion: apps.cozystack.io/v1alpha1
 kind: VMDisk
 ```
 
-Та же группа API, в которой живут бакеты, базы и очереди. Виртуальная машина здесь — не отдельная подсистема со своим интерфейсом, а такой же объект каталога, как Redis. Это и есть содержательная часть фразы «в одном интерфейсе и по одному API».
+Dieselbe API-Gruppe, in der Buckets, Datenbanken und Queues leben. Die virtuelle Maschine ist hier kein eigenes Subsystem mit eigener Oberfläche, sondern ein Katalog-Objekt genau wie Redis. Das ist der inhaltliche Kern des Satzes „in einer Oberfläche und über eine API“.
 
 ```yaml
 spec:
@@ -141,7 +141,7 @@ spec:
   storage: 20Gi
 ```
 
-Имя образа из общей коллекции платформы, а не URL: коллекция общая на весь кластер, образ скачивается один раз. `storage` не может быть меньше самого образа — `ubuntu-22.04` разворачивается в 20Gi. Нужен свой образ — там же есть `source.http` со ссылкой и `source.disk` для клонирования существующего диска.
+Ein Image-Name aus der gemeinsamen Sammlung der Plattform, keine URL: Die Sammlung ist über den gesamten Cluster gemeinsam, und das Image wird einmal heruntergeladen. `storage` kann nicht kleiner sein als das Image selbst — `ubuntu-22.04` entpackt sich auf 20Gi. Wenn Sie ein eigenes Image brauchen, gibt es an derselben Stelle `source.http` mit einem Link und `source.disk` zum Klonen eines bestehenden Datenträgers.
 
 ```yaml
 kind: VMInstance
@@ -149,26 +149,26 @@ spec:
   instanceType: u1.medium
 ```
 
-Размер машины берётся из готового списка, а не набирается полями vCPU и RAM. `u1.medium` — это 1 процессор и 4 ГБ. Тот же список используется, когда заказываете узел Kubernetes-кластера, и это не совпадение: узел кластера — такая же VMInstance.
+Die Maschinengröße wird aus einer fertigen Liste genommen, nicht über vCPU- und RAM-Felder eingestellt. `u1.medium` sind 1 CPU und 4 GB. Dieselbe Liste wird verwendet, wenn Sie einen Node für einen Kubernetes-Cluster bestellen, und das ist kein Zufall: Ein Cluster-Node ist genauso eine VMInstance.
 
 ```yaml
   instanceProfile: ubuntu
 ```
 
-Профиль гостевой ОС: какие контроллеры, драйверы и устройства подсунуть машине, чтобы гость их узнал. Ближайший аналог — «Guest OS type» при создании VM в vSphere, и последствия такие же: неправильный профиль даёт машину, которая грузится, но не видит диск.
+Das Profil des Gast-Betriebssystems: welche Controller, Treiber und Geräte der Maschine gereicht werden, damit der Gast sie erkennt. Die nächste Entsprechung ist „Guest OS type“ beim Erstellen einer VM in vSphere, und die Folgen sind dieselben: Das falsche Profil beschert Ihnen eine Maschine, die bootet, aber ihren Datenträger nicht sieht.
 
 ```yaml
   runStrategy: Always
 ```
 
-Желаемое состояние питания. `Always` — держать включённой: если гость выключится изнутри, машину включат снова. `Halted` — выключена. `Manual` — как оставили, никто не вмешивается. Обратите внимание на формулировку, она та же, что у `replicas` в Deployment: не «включи», а «держи включённой».
+Der gewünschte Energiezustand. `Always` — am Laufen halten: Wenn der Gast von innen herunterfährt, wird die Maschine wieder gestartet. `Halted` — ausgeschaltet. `Manual` — so belassen, wie es ist, niemand greift ein. Achten Sie auf die Formulierung, sie ist dieselbe wie `replicas` in einem Deployment: nicht „schalte sie ein“, sondern „halte sie eingeschaltet“.
 
 ```yaml
   disks:
     - name: spravochnik
 ```
 
-Список дисков по именам объектов VMDisk. Второй диск под данные добавляется сюда же второй строкой.
+Eine Liste von Datenträgern nach VMDisk-Objektnamen. Ein zweiter Datenträger für Daten wird genau hier als zweite Zeile hinzugefügt.
 
 ```yaml
   cloudInit: |
@@ -179,176 +179,176 @@ spec:
     runcmd: [ "systemctl daemon-reload", "systemctl enable --now directory" ]
 ```
 
-cloud-init — стандартный механизм первичной настройки, который понимают все облачные образы Linux. Отрабатывает один раз, при первом включении. Здесь он делает три вещи: кладёт HTML-страницу справочника, заводит службу systemd, которая отдаёт эту страницу по HTTP на порту 8080, и запускает службу. Аналог Customization Specification в vSphere, только это текст внутри манифеста, а не мастер в интерфейсе, — значит, лежит в Git и ревьюится вместе с остальным.
+cloud-init ist der Standardmechanismus zur Erstprovisionierung, den jedes Cloud-Linux-Image versteht. Er läuft einmal, beim ersten Einschalten. Hier tut er drei Dinge: legt die HTML-Seite des Verzeichnisses ab, richtet einen systemd-Dienst ein, der diese Seite über HTTP auf Port 8080 ausliefert, und startet den Dienst. Er ist das Gegenstück zu einer Customization Specification in vSphere, nur ist es Text im Manifest statt eines Assistenten in der Oberfläche — was bedeutet, dass er in Git liegt und zusammen mit allem anderen reviewt wird.
 
-Ровно из-за этого блока справочник и станет виден снаружи: `Ingress`, который ведущий создал заранее, ведёт домен на `Service spravochnik-http`, а тот — на порт 8080 внутри машины. Как только служба на 8080 поднялась, публикация подхватывает её сама.
+Gerade wegen dieses Blocks wird das Verzeichnis von außen sichtbar: Der `Ingress`, den die Lehrkraft im Voraus erstellt hat, leitet die Domain zum `Service spravochnik-http` und dieser wiederum zu Port 8080 innerhalb der Maschine. Sobald der Dienst auf 8080 hochkommt, greift die Veröffentlichung ihn von selbst auf.
 
-### Чего в этом манифесте нет и не будет
+### Was dieses Manifest nicht hat und nicht haben wird
 
-**Поля `replicas`.** Его в `VMInstance` нет. Виртуальная машина — это один объект; нужны две машины — заводите два объекта с разными именами.
+**Ein `replicas`-Feld.** `VMInstance` hat keines. Eine virtuelle Maschine ist ein einzelnes Objekt; wenn Sie zwei Maschinen brauchen, erstellen Sie zwei Objekte mit unterschiedlichen Namen.
 
-Это принципиальное отличие от `Deployment`, и оно не недоработка. Копии в Deployment взаимозаменяемы: любая обслужит любой запрос, и потерять одну не страшно. Виртуальные машины не взаимозаменяемы — у каждой своё состояние на своём диске, и «создать ещё одну такую же» означает совсем не то, что для контейнера.
+Das ist ein grundlegender Unterschied zu einem `Deployment`, und es ist kein Mangel. Kopien in einem Deployment sind austauschbar: Jede von ihnen bedient jede Anfrage, und eine zu verlieren ist kein Drama. Virtuelle Maschinen sind nicht austauschbar — jede hat ihren eigenen Zustand auf ihrem eigenen Datenträger, und „mach noch eine genau solche“ bedeutet etwas völlig anderes als bei einem Container.
 
-Практическое следствие: **самолечения, которое вы видели в лабе про удаление пода, у виртуалки нет.** Удалите под — кластер создаст новый за секунды. Удалите VMInstance — машина исчезнет, и вернуть её можно только руками, подцепив уцелевший диск. Здесь вы ровно там же, где были в vSphere, и это надо знать заранее, а не выяснять в процессе.
+Die praktische Folge: **Die Selbstheilung, die Sie im Lab zum Löschen von Pods gesehen haben, gibt es für eine VM nicht.** Löschen Sie einen Pod, und der Cluster erstellt in Sekunden einen neuen. Löschen Sie eine VMInstance, und die Maschine ist weg, und der einzige Weg, sie zurückzuholen, ist von Hand, indem Sie den überlebenden Datenträger anhängen. Hier sind Sie genau an derselben Stelle wie in vSphere, und das sollte man vorab wissen, statt es unterwegs herauszufinden.
 
 </details>
 
-Первое включение идёт 3–5 минут: cloud-init разворачивает файловую систему на весь диск и поднимает службу справочника. Ждать его сложа руки не будем — на следующем шаге как раз проверим, что происходит с публикацией, пока машина ещё грузится.
+Das erste Einschalten dauert 3–5 Minuten: cloud-init dehnt das Dateisystem über den ganzen Datenträger aus und bringt den Verzeichnisdienst zum Laufen. Wir warten nicht untätig darauf — im nächsten Schritt prüfen wir genau, was mit der Veröffentlichung geschieht, während die Maschine noch bootet.
 
-## Шаг 2. Стучимся по домену, пока машина грузится
+## Schritt 2. An die Domain klopfen, während die Maschine bootet
 
-📍 **Где:** на ноутбуке, в отдельном окне терминала. Или прямо в браузере.
+📍 **Wo:** auf Ihrem Laptop, in einem separaten Terminalfenster. Oder direkt im Browser.
 
-Ведущий заранее опубликовал справочник: в вашем тенанте уже есть `Ingress spravochnik` с хостом `spravochnik.workshopXX.workshop.aenix.io` и `Service spravochnik-http`, который ведёт на порт 8080 внутри машины. Публикация готова принять справочник, как только тот начнёт отвечать. Проверим её прямо сейчас, не дожидаясь, пока машина догрузится.
+Die Lehrkraft hat das Verzeichnis im Voraus veröffentlicht: Ihr Tenant hat bereits einen `Ingress spravochnik` mit dem Host `spravochnik.workshopXX.workshop.aenix.io` und einen `Service spravochnik-http`, der zu Port 8080 innerhalb der Maschine führt. Die Veröffentlichung ist bereit, das Verzeichnis in dem Moment aufzunehmen, in dem es zu antworten beginnt. Prüfen wir sie gleich jetzt, ohne zu warten, bis die Maschine fertig geladen hat.
 
 ```bash
-# curl — «сходи по адресу и покажи ответ». XX замените на свой номер тенанта.
-#   --max-time 5   сдаться через 5 секунд, а не ждать долго
+# curl — "geh zur Adresse und zeig die Antwort". XX durch Ihre eigene Tenant-Nummer ersetzen.
+#   --max-time 5   nach 5 Sekunden aufgeben, statt lange zu warten
 curl --max-time 5 http://spravochnik.workshopXX.workshop.aenix.io
 ```
 
-**Что вы увидите:**
+**Was Sie sehen werden:**
 
 ```
 <html><head><title>503 Service Temporarily Unavailable</title></head>
 <body><center><h1>503 Service Temporarily Unavailable</h1></center></body></html>
 ```
 
-> **Остановитесь и подумайте, прежде чем читать дальше.**
+> **Halten Sie inne und denken Sie nach, bevor Sie weiterlesen.**
 >
-> Ingress ведущий создал, домен настроен, машину вы подняли. Почему домен отвечает
-> `503`, а не страницей справочника?
+> Die Lehrkraft hat den Ingress erstellt, die Domain ist konfiguriert, und die Maschine haben Sie hochgefahren.
+> Warum antwortet die Domain mit `503` statt mit der Seite des Verzeichnisses?
 
 <details>
-<summary><b>Ответ и урок шире, чем эта ошибка</b></summary>
+<summary><b>Die Antwort und eine Lehre, die über diesen Fehler hinausgeht</b></summary>
 
-Потому что справочник внутри машины ещё не слушает.
+Weil das Verzeichnis innerhalb der Maschine noch nicht lauscht.
 
-`503` не значит «ingress сломан». Ingress на месте и знает, куда вести трафик: на `Service spravochnik-http`, а тот отбирает поды вашей машины и переводит запрос на порт 8080. Но пока cloud-init разворачивает файловую систему и заводит службу, на 8080 внутри машины ещё никто не отвечает — у сервиса нет ни одного готового бэкенда. Ingress так и сообщает: маршрут есть, отвечать по нему пока некому.
+`503` bedeutet nicht „der Ingress ist kaputt“. Der Ingress ist vorhanden und weiß, wohin er den Verkehr leiten soll: zum `Service spravochnik-http`, der die Pods Ihrer Maschine auswählt und die Anfrage an Port 8080 weiterleitet. Aber während cloud-init das Dateisystem ausdehnt und den Dienst einrichtet, antwortet auf 8080 innerhalb der Maschine noch niemand — der Service hat kein einziges bereites Backend. Und genau das meldet der Ingress: Die Route existiert, aber es ist noch niemand da, der auf ihr antwortet.
 
-Код ответа здесь и есть диагноз:
+Der Antwortcode ist hier die Diagnose selbst:
 
-| Что видите | Что это значит |
+| Was Sie sehen | Was es bedeutet |
 |---|---|
-| `503` | ingress на месте, но за ним нет готового бэкенда |
-| `404` | ingress есть, но правило ведёт не на тот сервис |
-| нет ответа, timeout | ingress с этим хостом не создан вовсе |
+| `503` | der Ingress ist vorhanden, aber dahinter gibt es kein bereites Backend |
+| `404` | der Ingress existiert, aber die Regel führt zum falschen Service |
+| keine Antwort, Timeout | es wurde überhaupt kein Ingress mit diesem Host erstellt |
 
-**Урок шире, чем эта ошибка.** `503` от ingress — это про готовность бэкенда, а не про сам ingress. Тот же `503` вы получите, если приложение за доменом упадёт или его под ещё не прошёл проверку готовности. Публикация наружу и готовность нагрузки — две разные вещи: домен заводится заранее и до поры пустой, а наполняется ровно тогда, когда за ним появляется кто-то готовый отвечать. Для виртуалки это «когда служба на 8080 поднялась», для контейнера — «когда под прошёл readiness». Механизм один, и это и есть смысл фразы «виртуалка публикуется тем же способом, что и контейнерное приложение».
+**Die Lehre reicht über diesen Fehler hinaus.** Ein `503` von einem Ingress betrifft die Bereitschaft des Backends, nicht den Ingress selbst. Denselben `503` bekommen Sie, wenn die Anwendung hinter der Domain abstürzt oder ihr Pod seine Readiness-Prüfung noch nicht bestanden hat. Veröffentlichung nach außen und Bereitschaft der Workload sind zwei verschiedene Dinge: Die Domain wird im Voraus eingerichtet und ist eine Weile leer, und sie füllt sich genau dann, wenn dahinter jemand erscheint, der bereit ist zu antworten. Für eine VM ist das „wenn der Dienst auf 8080 hochkam“; für einen Container ist es „wenn der Pod die Readiness bestanden hat“. Der Mechanismus ist derselbe, und das ist die Bedeutung des Satzes „eine VM wird auf dieselbe Weise veröffentlicht wie eine containerisierte Anwendung“.
 
 </details>
 
-## Шаг 3. Заходим в машину
+## Schritt 3. In die Maschine gelangen
 
-📍 **Где:** в дашборде, в карточке машины `spravochnik`.
+📍 **Wo:** im Dashboard, auf der Karte der Maschine `spravochnik`.
 
-В карточке есть консоль — это тот же экран, что и «Open Console» в vSphere. Откройте её. Логин `ubuntu`, пароль `ubuntu`.
+Die Karte hat eine Konsole — es ist derselbe Bildschirm wie „Open Console“ in vSphere. Öffnen Sie sie. Login `ubuntu`, Passwort `ubuntu`.
 
-⚠️ **Если консоль показывает чёрный экран и мигающий курсор — подождите.** cloud-init ещё не закончил, приглашение появится само. Не перезагружайте машину: перезагрузка посреди cloud-init оставит её в наполовину настроенном состоянии.
+⚠️ **Wenn die Konsole einen schwarzen Bildschirm und einen blinkenden Cursor zeigt — warten Sie.** cloud-init ist noch nicht fertig, und die Eingabeaufforderung erscheint von selbst. Starten Sie die Maschine nicht neu: Ein Neustart mitten in cloud-init lässt sie halb konfiguriert zurück.
 
-**Тот же вход из терминала.** `virtctl` — отдельная команда для работы с виртуальными машинами: консоль, проброс порта, включение и выключение. Ставится одним файлом, как именно — написано в `workshop/README.md`.
+**Derselbe Login vom Terminal aus.** `virtctl` ist ein separater Befehl für die Arbeit mit virtuellen Maschinen: Konsole, Port-Forwarding, Ein- und Ausschalten. Er wird als einzelne Datei installiert; wie genau, steht in `workshop/README.md`.
 
-Одну особенность её синтаксиса стоит разобрать заранее, иначе первая же команда вернёт отказ. Цель у `virtctl` указывается не голым именем, а с префиксом типа: `vmi/<имя>`. `vmi` — это virtual machine instance, **запущенный экземпляр** машины; объект `VMInstance`, который вы создали, и работающий экземпляр — это два разных объекта в API. Под тенантным доступом права выданы на **subresource** `virtualmachineinstances` (`console` и `portforward`), а не на объекты `virtualmachines` целиком, — голое имя бьёт в vm-объект и вернёт `forbidden`. Имя экземпляра платформа складывает из префикса `vm-instance-` и имени вашей машины: `spravochnik` — это экземпляр `vm-instance-spravochnik`.
+Eine Eigenheit ihrer Syntax lohnt sich, vorab durchzugehen, sonst kommt Ihr allererster Befehl mit einer Ablehnung zurück. Das Ziel für `virtctl` wird nicht als bloßer Name angegeben, sondern mit einem Typ-Präfix: `vmi/<name>`. `vmi` ist virtual machine instance, die **laufende Instanz** der Maschine; das `VMInstance`-Objekt, das Sie erstellt haben, und die laufende Instanz sind zwei verschiedene Objekte in der API. Unter Tenant-Zugang sind die Rechte auf die **Subresource** `virtualmachineinstances` (`console` und `portforward`) vergeben, nicht auf die gesamten `virtualmachines`-Objekte — ein bloßer Name trifft das vm-Objekt und kommt mit `forbidden` zurück. Die Plattform bildet den Instanznamen aus dem Präfix `vm-instance-` plus dem Namen Ihrer Maschine: `spravochnik` ist die Instanz `vm-instance-spravochnik`.
 
 ```bash
-# тенантный доступ: машина живёт в тенанте
+# Tenant-Zugang: die Maschine lebt im Tenant
 export KUBECONFIG=~/.kube/workshop
-# console = подключиться к последовательной консоли машины. Это тот же экран, что даёт
-# «Open Console» в vSphere, только текстовый:
-#   --namespace  в каком разделе кластера искать; у вашего тенанта он называется
-#                tenant- плюс ваш логин, XX замените на свой номер
-#   vmi/...      цель: запущенный экземпляр машины, а не описание VMInstance
+# console = mit der seriellen Konsole der Maschine verbinden. Es ist derselbe Bildschirm, den
+# "Open Console" in vSphere gibt, nur textbasiert:
+#   --namespace  in welchem Abschnitt des Clusters zu suchen ist; bei Ihrem Tenant heißt er
+#                tenant- plus Ihr Login, XX durch Ihre eigene Nummer ersetzen
+#   vmi/...      das Ziel: die laufende Instanz der Maschine, nicht die VMInstance-Beschreibung
 virtctl console --namespace=tenant-workshopXX vmi/vm-instance-spravochnik
 ```
 
-Если экран после подключения пустой — нажмите Enter, приглашение на вход появится. Выход из консоли — `Ctrl+]`. Имена всех запущенных экземпляров вашего тенанта покажет `kubectl --kubeconfig ~/.kube/workshop get vminstance -n tenant-workshopXX`.
+Wenn der Bildschirm nach dem Verbinden leer ist — drücken Sie Enter, und die Login-Aufforderung erscheint. Zum Verlassen der Konsole — `Ctrl+]`. Die Namen aller laufenden Instanzen in Ihrem Tenant zeigt `kubectl --kubeconfig ~/.kube/workshop get vminstance -n tenant-workshopXX`.
 
-Изнутри это обычная Ubuntu. Убедитесь, что справочник поднялся:
+Von innen ist es ein gewöhnliches Ubuntu. Vergewissern Sie sich, dass das Verzeichnis hochgekommen ist:
 
 ```bash
-uname -a                       # ядро и архитектура: та же строка, что и на железном сервере
-systemctl status directory     # служба справочника: должна быть active (running)
-curl -s localhost:8080 | head  # та же страница, но запрошенная изнутри самой машины
+uname -a                       # Kernel und Architektur: dieselbe Zeile wie auf einem Bare-Metal-Server
+systemctl status directory     # der Verzeichnisdienst: sollte active (running) sein
+curl -s localhost:8080 | head  # dieselbe Seite, aber von innerhalb der Maschine selbst angefragt
 ```
 
-Если `systemctl status directory` показывает `active (running)`, а `curl` на `localhost:8080` вернул HTML со списком сотрудников — сервер готов, и публикация снаружи вот-вот сменит `503` на страницу. Никаких следов Kubernetes внутри нет и не должно быть: гость не знает, что он в кластере, — ровно как виртуалке в vSphere не нужно знать про vCenter.
+Wenn `systemctl status directory` `active (running)` zeigt und `curl` auf `localhost:8080` das HTML mit der Mitarbeiterliste zurückgab — ist der Server bereit, und die Veröffentlichung nach außen tauscht gleich den `503` gegen die Seite. Von Kubernetes ist innen keine Spur, und das soll auch so sein: Der Gast weiß nicht, dass er in einem Cluster ist — genau wie eine VM in vSphere nichts über vCenter wissen muss.
 
-## Шаг 4. Домен отвечает — справочник опубликован
+## Schritt 4. Die Domain antwortet — das Verzeichnis ist veröffentlicht
 
-📍 **Где:** на ноутбуке. Или в браузере.
+📍 **Wo:** auf Ihrem Laptop. Oder im Browser.
 
-Тот же запрос, что вернул `503`, но теперь служба на 8080 поднялась. Подставьте свой номер.
+Dieselbe Anfrage, die `503` zurückgab, aber jetzt ist der Dienst auf 8080 hochgekommen. Setzen Sie Ihre eigene Nummer ein.
 
 ```bash
 curl http://spravochnik.workshopXX.workshop.aenix.io
 ```
 
-**Что вы должны увидеть** — HTML страницы справочника:
+**Was Sie sehen sollten** — das HTML der Seite des Verzeichnisses:
 
 ```html
 <h1>Справочник сотрудников</h1><ul><li>Иванов И. — 101</li><li>Петров П. — 102</li></ul>
 ```
 
-Откройте этот адрес в браузере — увидите тот же список. Справочник виден снаружи по человеческому доменному имени, с HTTPS от платформы, без единой заявки в сеть и на сертификат.
+Öffnen Sie diese Adresse in einem Browser, und Sie sehen dieselbe Liste. Das Verzeichnis ist von außen unter einem menschenfreundlichen Domainnamen sichtbar, mit HTTPS von der Plattform, ohne ein einziges Ticket an das Netzwerk oder für ein Zertifikat.
 
-**Разберём, что сейчас произошло.**
+**Sehen wir uns an, was gerade passiert ist.**
 
-Виртуальная машина с Ubuntu, которая ничего не знает про Kubernetes, слушает обычный HTTP на обычном порту. Снаружи к ней приходят по домену `spravochnik.workshopXX.workshop.aenix.io`, и запрос доезжает до неё через тот же ingress, что публикует контейнерные приложения. Без агентов внутри гостя, без шлюзов, без «интеграции». Для публикации нет разницы, кто за доменом — под с nginx или целая виртуальная машина: она видит `Service`, за `Service` стоит готовый бэкенд, и этого достаточно.
+Eine virtuelle Maschine mit Ubuntu, die nichts über Kubernetes weiß, lauscht auf gewöhnlichem HTTP auf einem gewöhnlichen Port. Von außen erreicht man sie über die Domain `spravochnik.workshopXX.workshop.aenix.io`, und die Anfrage gelangt zu ihr über denselben Ingress, der containerisierte Anwendungen veröffentlicht. Keine Agenten innerhalb des Gasts, keine Gateways, keine „Integration“. Für die Veröffentlichung macht es keinen Unterschied, wer hinter der Domain steht — ein nginx-Pod oder eine ganze virtuelle Maschine: Sie sieht einen `Service`, hinter dem `Service` steht ein bereites Backend, und das genügt.
 
-Именно это и означает «легаси не надо контейнеризовать». Справочник 2011 года продолжит работать так, как работал, — а снаружи он выглядит так же, как любой новый сервис «Пропуска»: имя, домен, HTTPS.
+Genau das bedeutet „Legacy muss nicht containerisiert werden“. Das Verzeichnis von 2011 wird weiter so funktionieren, wie es immer funktioniert hat — und von außen sieht es aus wie jeder neue „Propusk“-Dienst: ein Name, eine Domain, HTTPS.
 
-## Проверка
+## Überprüfung
 
-📍 **Где:** на ноутбуке, в том же окне терминала, где вы работали с `kubectl`.
+📍 **Wo:** auf Ihrem Laptop, im selben Terminalfenster, in dem Sie mit `kubectl` gearbeitet haben.
 
-Скрипт проверяет не наличие объектов, а работу по существу: по доменному имени приходит `200` и это страница справочника, сама машина запущена, а публикующий её `Ingress` на месте. Проверка по домену работает и без доступа к тенанту — ей хватает `curl`; тенантный доступ добавляет проверки состояния машины.
+Das Skript prüft nicht das Vorhandensein von Objekten, sondern die Funktion im Kern: Der Domainname liefert ein `200` und es ist die Seite des Verzeichnisses, die Maschine selbst läuft, und der `Ingress`, der sie veröffentlicht, ist vorhanden. Die Prüfung über die Domain funktioniert auch ohne Tenant-Zugang — dafür genügt `curl`; der Tenant-Zugang fügt die Prüfungen des Maschinenzustands hinzu.
 
 ```bash
-# тенантный доступ: отсюда скрипт возьмёт саму виртуальную машину и Ingress
+# Tenant-Zugang: von hier nimmt das Skript die VM selbst und den Ingress
 export KUBECONFIG=~/.kube/workshop
-# ваш логин без слова tenant-: из него скрипт соберёт и имя раздела tenant-workshopXX,
-# и доменное имя spravochnik.workshopXX.workshop.aenix.io
+# Ihr Login ohne das Wort tenant-: daraus baut das Skript sowohl den Abschnittsnamen tenant-workshopXX
+# als auch den Domainnamen spravochnik.workshopXX.workshop.aenix.io
 export COZY_TENANT=workshopXX
-# ./ перед именем означает «файл из текущей папки», то есть из labs/12-vm
+# das ./ vor dem Namen bedeutet "die Datei aus dem aktuellen Ordner", also aus labs/12-vm
 ./check.sh
 ```
 
-⚠️ **На Windows скрипт запускается из WSL**, а не из PowerShell — как его поставить, написано в начале лабы 0. Без WSL лабу можно пройти, но отчёта-артефакта не будет.
+⚠️ **Unter Windows wird das Skript aus WSL ausgeführt**, nicht aus PowerShell — wie man es installiert, steht am Anfang von Lab 0. Ohne WSL können Sie das Lab dennoch abschließen, aber es gibt keinen Artefakt-Bericht.
 
-`COZY_TENANT` обязателен — без него скрипт остановится сразу: из него собирается домен. Если тенантный доступ не задан, проверки состояния машины будут пропущены с предупреждением, а главная проверка — ответ по домену — отработает.
+`COZY_TENANT` ist zwingend — ohne ihn stoppt das Skript sofort: Die Domain wird daraus gebaut. Ist der Tenant-Zugang nicht gesetzt, werden die Prüfungen des Maschinenzustands mit einer Warnung übersprungen, während die Hauptprüfung — die Antwort über die Domain — trotzdem läuft.
 
-## Уборка
+## Aufräumen
 
-Виртуальную машину оставьте, если планируете лабу про мониторинг: её потребление тоже видно в графиках, и это хорошая иллюстрация. Если не планируете — удалите машину и диск через дашборд.
+Lassen Sie die virtuelle Maschine stehen, wenn Sie das Monitoring-Lab planen: Ihr Verbrauch taucht auch in den Graphen auf und gibt eine gute Illustration ab. Wenn nicht — löschen Sie die Maschine und den Datenträger über das Dashboard.
 
-⚠️ **Удаляйте в правильном порядке: сначала машину, потом диск.** Диск, подключённый к работающей машине, не удалится, и вы получите объект, висящий в состоянии удаления.
+⚠️ **Löschen Sie in der richtigen Reihenfolge: zuerst die Maschine, dann den Datenträger.** Ein Datenträger, der an eine laufende Maschine angehängt ist, lässt sich nicht löschen, und Sie erhalten ein Objekt, das im Löschzustand hängen bleibt.
 
-`Ingress` и `Service`, которые публикуют справочник, создавал ведущий — их не трогайте, они понадобятся следующему участнику на этом стенде.
+Der `Ingress` und der `Service`, die das Verzeichnis veröffentlichen, wurden von der Lehrkraft erstellt — fassen Sie sie nicht an, sie werden vom nächsten Teilnehmer auf dieser Testumgebung gebraucht.
 
-Стоимость уборки здесь честно выше, чем в остальных лабах: диск с данными — это диск с данными, и мгновенно он не исчезает. Зато создание не потребовало ни заявки на дисковое пространство, ни согласования.
+Die Kosten des Aufräumens sind hier ehrlich gesagt höher als in den anderen Labs: Ein Datenträger mit Daten ist ein Datenträger mit Daten, und er verschwindet nicht augenblicklich. Andererseits erforderte seine Erstellung weder ein Ticket für Speicherplatz noch eine Freigabe.
 
-## Что мы теперь умеем
+## Was wir jetzt können
 
-- Поднимать виртуальную машину в тенанте — мышкой и текстом
-- Объяснять, почему диск и машина это два объекта, и что это даёт
-- Публиковать нагрузку наружу через ingress и домен — тем же способом, что и контейнер
-- Читать `503` от ingress как «за доменом пока некому отвечать», а не как поломку
-- Показать на живом примере, что переезд легаси не требует его переписывания
+- Eine virtuelle Maschine in einem Tenant hochfahren — mit der Maus und als Text
+- Erklären, warum der Datenträger und die Maschine zwei Objekte sind und was das bringt
+- Eine Workload nach außen über Ingress und eine Domain veröffentlichen — auf dieselbe Weise wie einen Container
+- Ein `503` von einem Ingress als „hinter der Domain ist noch niemand da, der antwortet“ lesen, nicht als Störung
+- An einem lebendigen Beispiel zeigen, dass der Umzug von Legacy dessen Umschreiben nicht erfordert
 
-## А в vSphere это было бы
+## Und in vSphere wäre das
 
-Виртуалка в vSphere — это домашняя территория, и делается она там привычно. Разница не в самой машине, а в том, чтобы выставить её наружу по человеческому имени.
+Eine VM in vSphere ist Heimspiel, und sie wird dort auf die vertraute Weise erstellt. Der Unterschied ist nicht die Maschine selbst, sondern sie nach außen unter einem menschenfreundlichen Namen verfügbar zu machen.
 
-Чтобы опубликовать эту машину доменом в vSphere, вам понадобился бы reverse-proxy или балансировщик отдельным продуктом, заявка в сеть на внешний адрес, заявка в DNS на имя и заявка в безопасность на сертификат. Три-четыре команды, три-четыре системы, и общий вопрос «а кто это всё эксплуатирует». Здесь публикация — это объект `Ingress`, который ведущий завёл заранее, и домен, который наполняется в ту секунду, когда машина начинает отвечать.
+Um diese Maschine in vSphere über eine Domain zu veröffentlichen, bräuchten Sie einen Reverse-Proxy oder Load-Balancer als eigenes Produkt, ein Netzwerk-Ticket für eine externe Adresse, ein DNS-Ticket für den Namen und ein Security-Ticket für das Zertifikat. Drei oder vier Befehle, drei oder vier Systeme, und die allgemeine Frage „wer betreibt das alles“. Hier ist die Veröffentlichung ein `Ingress`-Objekt, das die Lehrkraft im Voraus eingerichtet hat, und eine Domain, die sich in der Sekunde füllt, in der die Maschine zu antworten beginnt.
 
-**Где vSphere удобнее, честно.** По части управления самими виртуальными машинами vCenter пока богаче, и делать вид, что это не так, глупо:
+**Wo vSphere ehrlicherweise bequemer ist.** Was das Verwalten der virtuellen Maschinen selbst angeht, ist vCenter noch reichhaltiger, und es hat keinen Sinn, so zu tun, als wäre es anders:
 
-| Что | vSphere | Cozystack |
+| Was | vSphere | Cozystack |
 |---|---|---|
-| Шаблоны и клонирование | зрелые, с кастомизацией гостя | есть клонирование диска, мастера кастомизации нет |
-| Снапшоты | привычные, с деревом | есть, но экосистема вокруг них моложе |
-| Живая миграция | vMotion, отлаженный годами | есть, но применяется реже и проверена меньше |
-| Права на папку с VM | гранулярные | права на уровне тенанта, папок нет |
-| Консоль и инструменты гостя | VMware Tools со всей телеметрией | qemu-guest-agent, данных меньше |
+| Vorlagen und Klonen | ausgereift, mit Gast-Anpassung | Datenträger-Klonen gibt es, einen Anpassungsassistenten nicht |
+| Snapshots | vertraut, mit Baum | vorhanden, aber das Ökosystem darum herum ist jünger |
+| Live-Migration | vMotion, über Jahre verfeinert | vorhanden, aber seltener genutzt und weniger erprobt |
+| Rechte auf einen VM-Ordner | granular | Rechte auf Tenant-Ebene, keine Ordner |
+| Konsole und Gast-Tools | VMware Tools mit voller Telemetrie | qemu-guest-agent, weniger Daten |
 
-Если вам нужны **только** виртуальные машины — честный ответ состоит в том, что переезд ради переезда смысла не имеет. Выигрыш появляется там, где рядом с виртуалками нужно что-то ещё: кластеры, базы, очереди, реестры, объектное хранилище, публикация доменом. Тогда вместо пяти продуктов с пятью моделями прав у вас один каталог, и справочник 2011 года стоит в нём рядом с остальным.
+Wenn Sie **nur** virtuelle Maschinen brauchen — die ehrliche Antwort ist, dass ein Umzug um des Umzugs willen keinen Sinn ergibt. Der Gewinn zeigt sich dort, wo Sie neben den VMs noch etwas anderes brauchen: Cluster, Datenbanken, Queues, Registries, Objektspeicher, Veröffentlichung über eine Domain. Dann haben Sie statt fünf Produkten mit fünf Berechtigungsmodellen einen Katalog, und das Verzeichnis von 2011 steht darin neben allem anderen.

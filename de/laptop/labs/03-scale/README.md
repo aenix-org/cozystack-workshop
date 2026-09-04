@@ -1,86 +1,78 @@
-# Лаба 3 · Нагрузка и автомасштабирование
+# Lab 3 · Last und Autoskalierung
 
 | | |
 |---|---|
-| **Время** | 30 минут |
-| **Что доказывает** | Количество копий может определять нагрузка, а не заявка в сервис-деск |
-| **Что понадобится** | Кластер из лабы 0, `rickroll` из лабы 1, три окна терминала, браузер |
+| **Zeit** | 30 Minuten |
+| **Was es beweist** | Die Anzahl der Repliken kann durch Last bestimmt werden, nicht durch ein Service-Desk-Ticket |
+| **Was Sie brauchen** | Der Cluster aus Lab 0, `rickroll` aus Lab 1, drei Terminalfenster, ein Browser |
 
-## Зачем это
+## Warum das wichtig ist
 
-Сервис «Пропуск», ради которого всё затевается, будет вести себя неровно. В восемь утра
-охрана и половина офиса открывают его одновременно, в три часа дня им не пользуется никто.
-Считать мощность по пику означает девять часов в сутки топить воздух, а считать по среднему —
-получить очередь на проходной.
+Der Dienst „Zutrittsausweis“, um den sich das Ganze dreht, wird sich ungleichmäßig verhalten. Um acht Uhr morgens öffnen ihn die Wachleute und das halbe Büro gleichzeitig; um drei Uhr nachmittags rührt ihn niemand an. Die Kapazität nach der Spitze zu bemessen heißt, neun Stunden am Tag die Luft zu heizen; sie nach dem Durchschnitt zu bemessen heißt, eine Schlange am Eingang zu bekommen.
 
-Проверим на кошках, как выглядит третий вариант: количество копий назначает не человек, а
-сама нагрузка. Мы дадим приложению настоящий трафик и посмотрим, как копий станет шесть, а
-потом снова одна.
+Probieren wir die dritte Variante aus: Die Anzahl der Repliken bestimmt nicht ein Mensch, sondern die Last selbst. Wir geben der Anwendung echten Traffic und sehen zu, wie sie auf sechs Repliken anwächst und dann wieder auf eine schrumpft.
 
-Заодно разберёмся с тем, обо что здесь спотыкаются чаще всего, — с разницей между «сколько
-просим» и «сколько разрешаем».
+Unterwegs klären wir das, worüber hier die meisten stolpern — den Unterschied zwischen „wie viel wir anfordern“ und „wie viel wir erlauben“.
 
-## Словарик
+## Mini-Glossar
 
-| Термин | Что это | Похоже на… но |
+| Begriff | Was es ist | Ähnlich wie… aber |
 |---|---|---|
-| **HPA** | Объект, меняющий число копий по метрике | **DRS плюс ручное добавление ВМ**, но меняет количество экземпляров, а не раскладывает их по хостам |
-| **metrics-server** | Служба, собирающая текущее потребление подов | **Сбор статистики vCenter**, но хранит только последние минуты, истории нет совсем |
-| **requests** | Сколько ресурса гарантированно резервируем | **Reservation**, но по нему считается загрузка в процентах, и он же решает, куда влезет под |
-| **limits** | Выше чего не даём подняться | **Limit**, но процессор при упоре замедляют, память — убивают под |
-| **Utilization** | Потребление в процентах от `requests` | **«CPU Usage %» на графике**, но может быть 600% и это не ошибка |
-| **Fortio** | Генератор нагрузки с веб-интерфейсом | **HCIBench**, но живёт внутри кластера как обычное приложение |
+| **HPA** | Ein Objekt, das die Replikenzahl anhand einer Metrik ändert | **DRS plus manuelles Hinzufügen von VMs**, ändert aber die Anzahl der Instanzen, statt sie über Hosts zu verteilen |
+| **metrics-server** | Ein Dienst, der den aktuellen Verbrauch der Pods erfasst | **Statistikerfassung von vCenter**, behält aber nur die letzten Minuten — gar keine Historie |
+| **requests** | Wie viel einer Ressource wir garantiert reservieren | **Reservation**, aber daraus wird die Auslastung in Prozent berechnet, und sie entscheidet auch, wo ein Pod hineinpasst |
+| **limits** | Die Obergrenze, über die ein Pod nicht hinaus kann | **Limit**, aber an der Obergrenze wird die CPU gedrosselt, während Speicher den Pod tötet |
+| **Utilization** | Verbrauch in Prozent von `requests` | **„CPU Usage %“ im Diagramm**, kann aber 600% betragen, und das ist kein Fehler |
+| **Fortio** | Ein Lastgenerator mit Weboberfläche | **HCIBench**, lebt aber innerhalb des Clusters als gewöhnliche Anwendung |
 
-## Что лежит в папке лабы
+## Was im Lab-Ordner liegt
 
-Все файлы уже у вас — вы забрали их вместе с репозиторием. Создавать и печатать заново
-ничего не нужно: там, где ниже написано `kubectl apply -f имя.yaml`, файл берётся отсюда.
+Sie haben bereits alle Dateien — Sie haben sie zusammen mit dem Repository erhalten. Es gibt nichts zu erstellen oder neu einzutippen: Wo unten `kubectl apply -f name.yaml` steht, stammt die Datei von hier.
 
 ```bash
-# Все команды лабы выполняются из этой папки — иначе имена файлов в них не найдутся.
+# Jeder Befehl in diesem Lab wird aus diesem Ordner ausgeführt — sonst werden die darin genannten Dateinamen nicht gefunden.
 cd labs/03-scale
 ```
 
-| Файл | Что это | Когда пригодится |
+| Datei | Was es ist | Wann es nützlich ist |
 |---|---|---|
-| `hpa.yaml` | Правило автомасштабирования: растить копии по загрузке процессора | применяете на своём кластере `lab` |
-| `fortio.yaml` | Генератор нагрузки с веб-интерфейсом — им и разгоняем | применяете туда же |
-| `check.sh` | Проверка, что копии выросли под нагрузкой и сжались после | запускаете в конце лабы |
+| `hpa.yaml` | Die Autoskalierungs-Regel: Repliken anhand der CPU-Last wachsen lassen | Sie wenden sie auf Ihrem eigenen Cluster `lab` an |
+| `fortio.yaml` | Ein Lastgenerator mit Weboberfläche — damit erzeugen wir die Last | Sie wenden ihn am selben Ort an |
+| `check.sh` | Prüft, dass die Repliken unter Last gewachsen und danach geschrumpft sind | Sie führen es am Ende des Labs aus |
 
-## Шаг 1. Убеждаемся, что стартуем с одной копии
+## Schritt 1. Bestätigen, dass wir mit einer einzigen Replik starten
 
-📍 **Где:** на ноутбуке.
+📍 **Wo:** auf dem Laptop.
 
-Вся лаба построена на том, что копий станет заметно больше. Значит, начать надо с одной —
-иначе рост будет не с чем сравнить. Смотрим, сколько копий работает сейчас.
+Das ganze Lab beruht darauf, dass die Replikenzahl merklich wächst. Also müssen wir bei eins beginnen — sonst gibt es nichts, womit sich das Wachstum vergleichen ließe. Sehen wir nach, wie viele Repliken gerade laufen.
 
 ```bash
-# KUBECONFIG — путь к файлу с адресом кластера и данными для входа.
-# Пока переменная не задана, kubectl ищет кластер на самом ноутбуке и не находит его.
+# KUBECONFIG ist der Pfad zur Datei mit der Adresse des Clusters und den Anmeldedaten.
+# Solange die Variable nicht gesetzt ist, sucht kubectl den Cluster auf dem Laptop selbst und findet ihn nicht.
 export KUBECONFIG=~/lab.kubeconfig
 
-# Колонка READY читается как «готово / заказано»: 1/1 — одна копия заказана и работает.
+# Die Spalte READY liest sich als "bereit / angefordert": 1/1 bedeutet eine Replik angefordert und laufend.
 kubectl get deployment rickroll
 ```
 
-Должно быть `1/1`. Если больше — верните одну, иначе рост будет не так заметен:
+Es sollte `1/1` anzeigen. Ist es mehr, setzen Sie es auf eins zurück, sonst ist das Wachstum nicht so gut sichtbar:
 
 ```bash
-# scale правит ровно одно поле в записи о приложении — количество копий.
-# Лишние копии кластер погасит сам, за секунды.
+# scale ändert genau ein Feld im Datensatz der Anwendung — die Replikenzahl.
+# Die überzähligen Repliken entfernt der Cluster von selbst, innerhalb von Sekunden.
 kubectl scale deployment rickroll --replicas=1
 ```
 
-## Шаг 2. Читаем, что просит приложение
+## Schritt 2. Lesen, was die Anwendung anfordert
 
-Прежде чем настраивать автомасштабирование, надо понять, от чего оно будет считать проценты.
+Bevor Sie die Autoskalierung konfigurieren, müssen Sie verstehen, wovon sie die Prozente berechnet.
 
 ```bash
-# У объекта в кластере полей сотни, в таблице их не видно. jsonpath достаёт из ответа
-# ровно одно место. Путь читается сверху вниз: spec.template — шаблон, по которому
-# создаются копии, containers[0] — первый контейнер в нём, resources — его заявка
-# и потолок по процессору и памяти. Хвост {"\n"} — перевод строки, чтобы ответ
-# не слипся со следующим приглашением командной строки.
+# Ein Objekt im Cluster hat Hunderte von Feldern; die Tabelle zeigt sie nicht. jsonpath holt
+# genau eine Stelle aus der Antwort heraus. Lesen Sie den Pfad von oben nach unten: spec.template ist die Vorlage,
+# aus der die Repliken erzeugt werden, containers[0] ist der erste Container darin, resources ist seine
+# Anforderung und Obergrenze für CPU und Speicher. Das Anhängsel {"\n"} ist ein Zeilenumbruch, damit die Antwort
+# nicht mit der nächsten Eingabeaufforderung verschmilzt.
 kubectl get deployment rickroll \
   -o jsonpath='{.spec.template.spec.containers[0].resources}{"\n"}'
 ```
@@ -89,39 +81,26 @@ kubectl get deployment rickroll \
 {"limits":{"cpu":"300m","memory":"128Mi"},"requests":{"cpu":"20m","memory":"32Mi"}}
 ```
 
-Две пары чисел, и путают их постоянно. Разберём на процессоре.
+Zwei Zahlenpaare, und sie werden ständig verwechselt. Gehen wir es an der CPU durch.
 
-**`requests: cpu: 20m`** — «двадцать миллипроцессоров», то есть две сотых ядра. Это заявка:
-столько кластер обязуется держать за подом всегда. По этому числу планировщик решает, влезет
-ли под на узел: сумма заявок всех подов узла не может превысить его мощность. Ближайший
-аналог — reservation в vSphere.
+**`requests: cpu: 20m`** — „zwanzig Millicpu“, also zwei Hundertstel eines Kerns. Das ist die Anforderung: die Menge, die der Cluster jederzeit für den Pod bereitzuhalten verspricht. Anhand dieser Zahl entscheidet der Scheduler, ob der Pod auf einen Node passt: Die Summe der Anforderungen aller Pods auf einem Node darf dessen Kapazität nicht überschreiten. Das nächste Pendant ist eine Reservation in vSphere.
 
-**`limits: cpu: 300m`** — потолок. Больше трёх десятых ядра поду не дадут, даже если узел
-простаивает. Аналог — limit в vSphere.
+**`limits: cpu: 300m`** — die Obergrenze. Dem Pod werden nicht mehr als drei Zehntel eines Kerns gegeben, selbst wenn der Node im Leerlauf ist. Das Pendant ist ein Limit in vSphere.
 
-Между ними разница в пятнадцать раз, и это сделано намеренно: под может брать много, когда
-процессор свободен, но гарантировано ему мало.
+Zwischen ihnen liegt ein fünfzehnfacher Abstand, und das ist Absicht: Ein Pod kann viel nehmen, wenn die CPU frei ist, garantiert ist ihm aber nur wenig.
 
-⚠️ **Процессор и память ведут себя при упоре в limit по-разному, и это важнее, чем кажется.**
-Упёрлись в процессорный limit — приложение начинает работать медленнее (throttling).
-Упёрлись в лимит по памяти — ядро убивает контейнер, вы видите статус `OOMKilled`, и под
-пересоздаётся. Первое неприятно, второе — авария. В vSphere память тоже нельзя превысить, но
-там гость получает своп и деградирует, а не умирает.
+⚠️ **CPU und Speicher verhalten sich beim Anschlag an ihr Limit unterschiedlich, und das ist wichtiger, als es scheint.** Stößt es an das CPU-Limit, läuft die Anwendung einfach langsamer (Throttling). Stößt es an das Speicher-Limit, tötet der Kernel den Container: Sie sehen den Status `OOMKilled`, und der Pod wird neu erstellt. Das Erste ist unangenehm, das Zweite ein Ausfall. In vSphere lässt sich Speicher auch nicht überschreiten, aber dort erhält der Gast Swap und wird langsamer, statt zu sterben.
 
-**А теперь главное для этой лабы.** HPA считает загрузку не от лимита, не от мощности узла и
-не от того, сколько ядер видит приложение внутри. Он считает **от `requests`**. Порог 50% при
-`requests: 20m` означает 10 миллипроцессоров на копию.
+**Und nun das Wichtigste für dieses Lab.** HPA berechnet die Last nicht vom Limit, nicht von der Kapazität des Nodes und nicht davon, wie viele Kerne die Anwendung in sich selbst sieht. Er berechnet sie **aus `requests`**. Ein Schwellwert von 50% bei `requests: 20m` bedeutet 10 Millicpu pro Replik.
 
-Отсюда следствие, из-за которого автомасштабирование чаще всего не работает у тех, кто
-настраивает его в первый раз: **если у контейнера не указан `requests.cpu`, считать не от
-чего, и HPA не заработает вообще.** Не выдаст ошибку — будет молча показывать `<unknown>`.
+Daraus folgt das, woran die Autoskalierung am häufigsten scheitert, wenn man sie zum ersten Mal einrichtet: **Ist bei einem Container kein `requests.cpu` angegeben, gibt es nichts, wovon gerechnet werden könnte, und HPA funktioniert überhaupt nicht.** Er wirft keinen Fehler — er zeigt stillschweigend weiter `<unknown>` an.
 
-## Шаг 3. Включаем автомасштабирование
+## Schritt 3. Autoskalierung einschalten
 
-В папке лежит `hpa.yaml`. Разберём его, а потом применим.
+Die Datei `hpa.yaml` liegt im Ordner. Gehen wir sie durch und wenden sie dann an.
 
 <details>
-<summary><b>Разбираем hpa.yaml построчно</b></summary>
+<summary><b>Genauer betrachtet: was in hpa.yaml steckt</b></summary>
 
 ```yaml
 apiVersion: autoscaling/v2
@@ -130,10 +109,7 @@ metadata:
   name: rickroll
 ```
 
-`autoscaling/v2` — не украшение. В старой версии `v1` можно было задать только цель по
-процессору и нельзя было управлять скоростью роста. Всё, что ниже блока `metrics`, в `v1`
-недоступно. Если видите в интернете пример на `autoscaling/v1` — он не устарел смертельно,
-но половину нужного вам не покроет.
+`autoscaling/v2` ist keine Dekoration. In der alten Version `v1` konnte man nur ein CPU-Ziel setzen und nicht die Wachstumsgeschwindigkeit steuern. Alles unterhalb des `metrics`-Blocks ist in `v1` nicht verfügbar. Wenn Sie im Internet ein Beispiel auf `autoscaling/v1` sehen — es ist nicht tödlich veraltet, deckt aber die Hälfte dessen nicht ab, was Sie brauchen.
 
 ```yaml
 spec:
@@ -143,25 +119,18 @@ spec:
     name: rickroll
 ```
 
-За кем следим и кого крутим. HPA не управляет подами напрямую — он меняет поле `replicas` у
-Deployment, а дальше работает та же цепочка, что в лабе про самолечение: Deployment передаёт
-число в ReplicaSet, ReplicaSet создаёт недостающие копии.
+Wen wir beobachten und wen wir steuern. HPA verwaltet die Pods nicht direkt — er ändert das Feld `replicas` am Deployment, und von dort greift dieselbe Kette wie im Lab zur Selbstheilung: Das Deployment gibt die Zahl an das ReplicaSet weiter, das ReplicaSet erzeugt die fehlenden Repliken.
 
-Из этого вытекает практическое правило: **пока HPA существует, менять `replicas` руками
-бессмысленно.** Вы поставите три, HPA через пятнадцать секунд поставит своё. Два механизма
-на одно поле — это всегда спор, и выигрывает в нём HPA.
+Daraus ergibt sich eine praktische Regel: **Solange HPA existiert, ist es sinnlos, `replicas` von Hand zu ändern.** Sie setzen drei, und fünfzehn Sekunden später setzt HPA seinen eigenen Wert. Zwei Mechanismen auf einem Feld sind immer ein Streit, und HPA gewinnt ihn.
 
 ```yaml
   minReplicas: 1
   maxReplicas: 6
 ```
 
-Коридор. Нижняя граница защищает от «нагрузки нет, выключим всё» — HPA не умеет опускаться
-до нуля. Верхняя защищает бюджет и узел: без неё внезапный всплеск (или ошибка в приложении,
-съевшая процессор) размножит копии, пока не кончится место на узлах.
+Ein Korridor. Die Untergrenze schützt vor „es gibt keine Last, schalten wir alles ab“ — HPA kann nicht auf null herunterskalieren. Die Obergrenze schützt das Budget und den Node: Ohne sie würde ein plötzlicher Ausschlag (oder ein Bug in der Anwendung, der die CPU auffrisst) die Repliken vervielfachen, bis auf den Nodes kein Platz mehr ist.
 
-Шесть выбрано под учебный узел `u1.medium`. Шесть копий по 20m заявки — это 120m, узел такое
-переживёт спокойно.
+Sechs wurde für den Schulungs-Node `u1.medium` gewählt. Sechs Repliken mit je 20m Anforderung sind 120m — das bewältigt der Node mühelos.
 
 ```yaml
   metrics:
@@ -173,21 +142,17 @@ Deployment, а дальше работает та же цепочка, что в
           averageUtilization: 50
 ```
 
-Правило: держать **среднюю** загрузку по всем копиям на уровне 50% от их `requests`, то есть
-10m на копию.
+Die Regel: die **durchschnittliche** Last über alle Repliken bei 50% ihrer `requests` halten, also 10m pro Replik.
 
-Слово «средняя» здесь ключевое, и от него зависит вся арифметика. HPA считает так:
+Das Wort „durchschnittlich“ ist hier entscheidend, und die ganze Arithmetik hängt davon ab. HPA rechnet so:
 
 ```
-нужно копий = ceil( сейчас копий × текущая загрузка ÷ целевая загрузка )
+benötigte Repliken = ceil( aktuelle Repliken × aktuelle Last ÷ Ziel-Last )
 ```
 
-Одна копия при загрузке 645% и цели 50% даёт `ceil(1 × 645 / 50) = 13`. Тринадцать больше
-шести, поэтому HPA упрётся в `maxReplicas`.
+Eine Replik bei 645% Last und einem Ziel von 50% ergibt `ceil(1 × 645 / 50) = 13`. Dreizehn ist mehr als sechs, deshalb stößt HPA an `maxReplicas`.
 
-Почему цель именно 50, а не 80: при 80% рост начинается тогда, когда приложению уже плохо.
-Половина оставляет запас на то время, пока новые копии поднимаются. Для настоящих сервисов
-это число подбирают по тому, сколько секунд занимает старт.
+Warum das Ziel 50 ist und nicht 80: Bei 80% beginnt das Wachstum erst, wenn es der Anwendung schon schlecht geht. Die Hälfte lässt einen Puffer für die Zeit, die neue Repliken zum Hochfahren brauchen. Bei echten Diensten wird diese Zahl danach eingestellt, wie viele Sekunden der Start dauert.
 
 ```yaml
   behavior:
@@ -199,81 +164,66 @@ Deployment, а дальше работает та же цепочка, что в
           periodSeconds: 15
 ```
 
-Скорость роста. По умолчанию Kubernetes перед увеличением смотрит на историю метрик за
-некоторое окно, чтобы не дёргаться на случайный всплеск. На лабе это выглядит как «ничего не
-происходит», поэтому окно обнулено: реагируем на первое же измерение.
+Die Wachstumsgeschwindigkeit. Standardmäßig betrachtet Kubernetes vor dem Hochskalieren die Metrik-Historie über ein gewisses Fenster, um nicht bei einem zufälligen Ausschlag zu zucken. In einem Lab sieht das aus wie „es passiert nichts“, deshalb wird das Fenster auf null gesetzt: Wir reagieren auf die allererste Messung.
 
-`Pods: 2 / 15s` — добавлять не больше двух копий каждые пятнадцать секунд. Поэтому путь
-наверх будет ступеньками: 1 → 3 → 5 → 6.
+`Pods: 2 / 15s` — höchstens zwei Repliken alle fünfzehn Sekunden hinzufügen. Deshalb verläuft der Weg nach oben in Stufen: 1 → 3 → 5 → 6.
 
-⚠️ **Указав `policies`, вы заменяете стандартные, а не дополняете их.** Стандартная политика
-роста (удвоение каждые 15 секунд) здесь больше не действует.
+⚠️ **Indem Sie `policies` angeben, ersetzen Sie die Standard-Policies, statt sie zu ergänzen.** Die Standard-Wachstums-Policy (Verdopplung alle 15 Sekunden) gilt hier nicht mehr.
 
 ```yaml
     scaleDown:
       stabilizationWindowSeconds: 60
 ```
 
-А вниз — наоборот, с задержкой. HPA смотрит на максимум запросов за последнюю минуту и
-уменьшает число копий, только если весь этот интервал нагрузка была низкой. Иначе на любой
-паузе между всплесками копии начнут исчезать и появляться заново.
+Nach unten hingegen mit Verzögerung. HPA betrachtet das Maximum der angeforderten Anzahlen über die letzte Minute und verringert die Replikenzahl nur, wenn die Last dieses gesamte Intervall über niedrig war. Sonst würden bei jeder Pause zwischen den Ausschlägen Repliken zu verschwinden und wieder aufzutauchen beginnen.
 
-Стандартное значение здесь — **300 секунд**, пять минут. Мы сократили до минуты, чтобы вы
-успели увидеть возврат за время лабы. В бою пять минут — разумнее.
+Der Standardwert hier ist **300 Sekunden**, fünf Minuten. Wir haben ihn auf eine Minute gekürzt, damit Sie den Rückgang innerhalb des Labs noch sehen. Im Produktivbetrieb sind fünf Minuten sinnvoller.
 
 </details>
 
-Применяем:
+Wenden Sie sie an:
 
 ```bash
-# apply = «приведи кластер к тому, что описано в файле». Объект HPA появится сразу,
-# а вот считать он начнёт не сразу — на этом мы споткнёмся на следующем шаге.
+# apply = "bringe den Cluster in den in der Datei beschriebenen Zustand". Das HPA-Objekt erscheint sofort,
+# zu rechnen beginnt es aber nicht sofort — darüber stolpern wir im nächsten Schritt.
 kubectl apply -f hpa.yaml
 ```
 
-## Шаг 4. Проверка, которая не пройдёт
+## Schritt 4. Die Prüfung, die nicht durchgeht
 
-Смотрим, что получилось:
+Sehen wir, was dabei herausgekommen ist:
 
 ```bash
-# hpa — сокращение для horizontalpodautoscaler, kubectl понимает оба написания.
-# Колонка TARGETS читается как «текущая загрузка / целевая», REPLICAS — сколько
-# копий заказано прямо сейчас.
+# hpa ist die Kurzform für horizontalpodautoscaler; kubectl versteht beide Schreibweisen.
+# Die Spalte TARGETS liest sich als "aktuelle Last / Ziel", REPLICAS ist, wie viele
+# Repliken gerade angefordert sind.
 kubectl get hpa rickroll
 ```
 
-**Что вы увидите:**
+**Was Sie sehen werden:**
 
 ```
 NAME       REFERENCE             TARGETS              MINPODS   MAXPODS   REPLICAS   AGE
 rickroll   Deployment/rickroll   cpu: <unknown>/50%   1         6         1          10s
 ```
 
-В колонке `TARGETS` вместо загрузки — `<unknown>`. Автомасштабирование не знает, сколько
-процессора ест приложение, а значит и решать ему не на чем.
+In der Spalte `TARGETS` steht statt der Last `<unknown>`. Die Autoskalierung weiß nicht, wie viel CPU die Anwendung verbraucht, und hat somit nichts, worauf sie eine Entscheidung stützen könnte.
 
-⚠️ **А может быть, вы сразу увидите процент** — например, `cpu: 5%/50%`. Это не значит, что
-у вас что-то иначе: сборщик метрик в вашем кластере уже проработал какое-то время и успел
-опросить поды. `<unknown>` появляется на кластере, поднятом только что. Если у вас
-сразу цифра — прочитайте разбор ниже всё равно, потому что причину `<unknown>` вы однажды
-встретите, и лучше узнать её заранее, чем в тот момент, когда она вам помешает.
+⚠️ **Vielleicht sehen Sie aber auch sofort einen Prozentwert** — zum Beispiel `cpu: 5%/50%`. Das bedeutet nicht, dass bei Ihnen etwas anders ist: Der Metrik-Sammler in Ihrem Cluster läuft bereits eine Weile und hatte Zeit, die Pods abzufragen. `<unknown>` erscheint auf einem gerade erst hochgefahrenen Cluster. Wenn bei Ihnen sofort eine Zahl steht — lesen Sie die Erläuterung unten trotzdem, denn der Ursache von `<unknown>` begegnen Sie eines Tages, und es ist besser, sie im Voraus zu lernen als in dem Moment, in dem sie Ihnen in die Quere kommt.
 
-> **Остановитесь и подумайте, прежде чем читать дальше.**
+> **Halten Sie inne und denken Sie nach, bevor Sie weiterlesen.**
 >
-> Манифест применился без ошибок, объект создан, `requests` у контейнера есть — мы только
-> что смотрели. Значит дело не в том, что чего-то не хватает в описании.
+> Das Manifest wurde ohne Fehler angewendet, das Objekt ist erstellt, der Container hat `requests` — wir haben eben nachgesehen. Es liegt also nicht daran, dass in der Beschreibung etwas fehlt.
 >
-> Подсказка: откуда автомасштабирование вообще узнаёт текущую загрузку? Кто-то должен ему
-> эту цифру сообщить — и этот кто-то опрашивает поды не непрерывно, а раз в несколько
-> десятков секунд.
+> Hinweis: Woher erfährt die Autoskalierung die aktuelle Last überhaupt? Jemand muss ihr diese Zahl melden — und dieser Jemand fragt die Pods nicht kontinuierlich ab, sondern einmal alle paar Dutzend Sekunden.
 
 <details>
-<summary><b>Ответ и урок шире, чем эта ошибка</b></summary>
+<summary><b>Die Antwort und eine Lehre, die über diesen Fehler hinausgeht</b></summary>
 
-Не хватает времени. Подождите полторы-две минуты и посмотрите ещё раз:
+Es fehlt an Zeit. Warten Sie anderthalb bis zwei Minuten und sehen Sie erneut nach:
 
 ```bash
-# Та же команда, что и выше. Смотрим ту же колонку TARGETS.
+# Derselbe Befehl wie oben. Wir betrachten dieselbe Spalte TARGETS.
 kubectl get hpa rickroll
 ```
 
@@ -282,17 +232,14 @@ NAME       REFERENCE             TARGETS         MINPODS   MAXPODS   REPLICAS   
 rickroll   Deployment/rickroll   cpu: 0%/50%     1         6         1          2m
 ```
 
-**Это не поломка и чинить тут нечего.** Загрузку подов собирает отдельная служба,
-`metrics-server`. Она опрашивает узлы примерно раз в пятнадцать секунд и усредняет
-результат по короткому окну. Пока у неё нет двух измерений подряд, отдавать ей нечего, и
-HPA честно пишет «не знаю».
+**Das ist kein Defekt, und hier gibt es nichts zu reparieren.** Die Last der Pods erfasst ein separater Dienst, `metrics-server`. Er fragt die Nodes etwa alle fünfzehn Sekunden ab und mittelt das Ergebnis über ein kurzes Fenster. Solange er nicht zwei Messungen hintereinander hat, hat er nichts weiterzugeben, und HPA schreibt ehrlich „ich weiß es nicht“.
 
-Проверить, что метрики поехали, можно напрямую:
+Dass die Metriken fließen, können Sie direkt prüfen:
 
 ```bash
-# top = «сколько ресурсов эти поды едят прямо сейчас». Цифры команда берёт
-# у того же metrics-server, что кормит и автомасштабирование: отвечает top —
-# значит источник данных жив, и дело только во времени.
+# top = "wie viele Ressourcen diese Pods gerade verbrauchen". Die Zahlen stammen von
+# demselben metrics-server, der auch die Autoskalierung speist: Antwortet top, dann ist die
+# Datenquelle am Leben, und es ist nur eine Frage der Zeit.
 kubectl top pods -l app=rickroll
 ```
 
@@ -301,54 +248,41 @@ NAME                        CPU(cores)   MEMORY(bytes)
 rickroll-6f4b9c8d57-p9wqt   1m           4Mi
 ```
 
-Если через пять минут всё ещё `<unknown>`, а `kubectl top` отвечает `error: Metrics API not
-available` — вот тогда это действительно поломка, и причина одна из двух: `metrics-server` не
-установлен в кластере, либо у контейнера не задан `requests.cpu` (тогда `kubectl top` работает,
-а HPA всё равно не считает — процент не от чего брать).
+Ist es nach fünf Minuten immer noch `<unknown>` und `kubectl top` antwortet `error: Metrics API not available` — dann ist es wirklich ein Defekt, und die Ursache ist eine von zweien: `metrics-server` ist nicht im Cluster installiert, oder beim Container ist kein `requests.cpu` gesetzt (dann funktioniert `kubectl top`, HPA kann aber trotzdem nicht rechnen — es gibt nichts, wovon der Prozentwert genommen werden könnte).
 
-`metrics-server` ставится в кластер сам, вместе с ним — отдельно включать его не нужно.
-Живёт он в пространстве имён `cozy-monitoring`, проверить можно так:
+`metrics-server` installiert sich zusammen mit dem Cluster von selbst — Sie müssen ihn nicht separat aktivieren. Er lebt im namespace `cozy-monitoring`, prüfen können Sie so:
 
 ```bash
-# -n = в каком пространстве имён искать. Пространство имён — это раздел кластера,
-# по умолчанию kubectl смотрит в default и служебных подов там не видит.
-# deploy — сокращение для deployment.
+# -n = in welchem namespace gesucht wird. Ein namespace ist ein Abschnitt des Clusters;
+# standardmäßig sucht kubectl in default und sieht die System-Pods dort nicht.
+# deploy ist die Kurzform für deployment.
 kubectl -n cozy-monitoring get deploy metrics-server
 ```
 
-Не путайте его с галочкой **Monitoring agents** из лабы 0: та отвечает за сбор метрик в
-хранилище и графики (лаба про наблюдаемость), а `metrics-server` — за текущие цифры для
-`kubectl top` и автомасштабирования. Разные механизмы, и живут они независимо.
+Verwechseln Sie ihn nicht mit dem Kontrollkästchen **Monitoring agents** aus Lab 0: Dieses ist für das Sammeln von Metriken in den Speicher und für die Diagramme zuständig (das Lab zur Beobachtbarkeit), während `metrics-server` für die aktuellen Zahlen für `kubectl top` und die Autoskalierung zuständig ist. Unterschiedliche Mechanismen, und sie leben unabhängig voneinander.
 
-Точную причину скажет:
+Die genaue Ursache verrät:
 
 ```bash
-# describe = развёрнутая карточка объекта: все поля, события и условия,
-# в отличие от get, который печатает несколько колонок таблицы.
+# describe = die vollständige Karte des Objekts: alle Felder, Ereignisse und Conditions,
+# anders als get, das nur ein paar Tabellenspalten ausgibt.
 kubectl describe hpa rickroll
 ```
 
-В самом низу, в `Conditions`, будет строка `ScalingActive` с человеческим объяснением.
+Ganz unten, unter `Conditions`, steht eine Zeile `ScalingActive` mit einer menschenlesbaren Erklärung.
 
-**Урок шире, чем эта ошибка.** В Kubernetes «применено» и «работает» разделены во времени.
-Команда `apply` только записывает ваше намерение в кластер. Дальше его подхватывают
-контроллеры, и у каждого свой темп: HPA пересчитывает раз в пятнадцать секунд, метрики
-опаздывают на минуту, сборщик мусора приходит раз в несколько минут. Привычка из vCenter —
-«диалог закрылся, значит сделано» — здесь подводит. Смотреть надо не на код возврата команды,
-а на `status` объекта.
+**Die Lehre reicht über diesen Fehler hinaus.** In Kubernetes sind „angewendet“ und „funktioniert“ zeitlich getrennt. Der Befehl `apply` schreibt nur Ihre Absicht in den Cluster. Von dort greifen die Controller sie auf, und jeder hat sein eigenes Tempo: HPA rechnet alle fünfzehn Sekunden neu, die Metriken hinken eine Minute hinterher, der Garbage Collector kommt alle paar Minuten vorbei. Die Gewohnheit aus vCenter — „der Dialog ist zu, also ist es erledigt“ — lässt Sie hier im Stich. Beobachten sollten Sie nicht den Rückgabewert des Befehls, sondern den `status` des Objekts.
 
 </details>
 
-## Шаг 5. Поднимаем генератор нагрузки
+## Schritt 5. Den Lastgenerator hochfahren
 
-Нагружать приложение с ноутбука через `port-forward` бессмысленно: узким местом станет ваш
-домашний интернет и сам туннель, а не приложение. Генератор должен стоять внутри кластера,
-рядом с целью.
+Die Anwendung vom Laptop aus über `port-forward` zu belasten ist sinnlos: Zum Engpass werden Ihr Heim-Internet und der Tunnel selbst, nicht die Anwendung. Der Generator muss innerhalb des Clusters stehen, direkt neben dem Ziel.
 
-В папке лежит `fortio.yaml`.
+Die Datei `fortio.yaml` liegt im Ordner.
 
 <details>
-<summary><b>Разбираем fortio.yaml построчно</b></summary>
+<summary><b>Genauer betrachtet: was in fortio.yaml steckt</b></summary>
 
 ```yaml
 kind: Deployment
@@ -356,9 +290,7 @@ metadata:
   name: fortio
 ```
 
-Fortio — обычное приложение в кластере, разворачивается тем же Deployment, что и всё
-остальное. Никакой особой «инфраструктуры для тестирования» здесь нет, и это само по себе
-показательно.
+Fortio ist eine gewöhnliche Anwendung im Cluster, ausgerollt mit demselben Deployment wie alles andere. Es gibt hier keine besondere „Test-Infrastruktur“, und das allein ist schon bezeichnend.
 
 ```yaml
         - name: fortio
@@ -366,14 +298,9 @@ Fortio — обычное приложение в кластере, развор
           args: ["server"]
 ```
 
-Образ Fortio умеет два режима. `fortio load ...` — разовый прогон из командной строки.
-`fortio server` — постоянно работающая служба с веб-интерфейсом, где нагрузку запускают
-кнопкой, а результат видно тут же графиком. Мы берём второй: на воркшопе смотреть на
-гистограмму задержек в браузере понятнее, чем читать столбик чисел в терминале.
+Das Fortio-Image kann in zwei Modi laufen. `fortio load ...` ist ein einmaliger Durchlauf von der Kommandozeile. `fortio server` ist ein dauerhaft laufender Dienst mit Weboberfläche, bei dem man die Last per Knopfdruck startet und das Ergebnis gleich dort als Diagramm sieht. Wir nehmen den zweiten: In einem Workshop ist es anschaulicher, ein Latenz-Histogramm im Browser zu betrachten, als eine Zahlenkolonne im Terminal zu lesen.
 
-⚠️ **Тег `latest` в манифесте — то, чего в бою делать не надо.** Сегодня он один образ,
-через месяц другой, и вы не сможете повторить свой же тест. Для учебного генератора это
-терпимо, для чего-либо ещё — нет.
+⚠️ **Der Tag `latest` in einem Manifest ist etwas, das Sie im Produktivbetrieb nicht tun sollten.** Heute ist es das eine Image, in einem Monat ein anderes, und Sie können Ihren eigenen Test nicht mehr reproduzieren. Für einen Schulungsgenerator ist das vertretbar, für alles andere nicht.
 
 ```yaml
           ports:
@@ -381,8 +308,7 @@ Fortio — обычное приложение в кластере, развор
               name: http
 ```
 
-Веб-интерфейс Fortio слушает 8080 и живёт по пути `/fortio/`. Имя `http` понадобится ниже,
-в Service.
+Die Weboberfläche von Fortio lauscht auf 8080 und liegt unter dem Pfad `/fortio/`. Der Name `http` wird weiter unten im Service gebraucht.
 
 ```yaml
           resources:
@@ -394,12 +320,9 @@ Fortio — обычное приложение в кластере, развор
               memory: 256Mi
 ```
 
-Обратите внимание: генератору выделено больше, чем цели. Заявка 100m против 20m у `rickroll`,
-потолок — целое ядро против 300m.
+Beachten Sie: Dem Generator ist mehr zugeteilt als dem Ziel. Eine Anforderung von 100m gegenüber den 20m von `rickroll`, eine Obergrenze von einem ganzen Kern gegenüber 300m.
 
-Это не щедрость, а обязательное условие корректного теста. Если генератору не хватит
-процессора, он упрётся в собственный потолок, и вы будете измерять не приложение, а Fortio.
-Симптом такой ошибки узнаваем: задержки растут, а загрузка цели стоит на месте.
+Das ist keine Großzügigkeit, sondern eine zwingende Voraussetzung für einen korrekten Test. Geht dem Generator die CPU aus, stößt er an seine eigene Obergrenze, und Sie messen dann Fortio, nicht die Anwendung. Das Symptom dieses Fehlers ist erkennbar: Die Latenzen steigen, während die Last des Ziels unverändert bleibt.
 
 ```yaml
 kind: Service
@@ -411,105 +334,95 @@ spec:
       targetPort: http
 ```
 
-Постоянный адрес для веб-интерфейса. Изнутри кластера он теперь доступен как
-`http://fortio:8080/`, снаружи — через `port-forward`, что мы сейчас и сделаем.
+Eine stabile Adresse für die Weboberfläche. Von innerhalb des Clusters ist sie jetzt als `http://fortio:8080/` erreichbar, von außen über `port-forward`, was wir als Nächstes tun.
 
 </details>
 
-Применяем и ждём:
+Anwenden und warten:
 
 ```bash
-# В файле два объекта сразу: Deployment с генератором и Service — постоянный адрес
-# для его веб-интерфейса.
+# In der Datei stehen gleich zwei Objekte: das Deployment mit dem Generator und ein Service — eine
+# stabile Adresse für seine Weboberfläche.
 kubectl apply -f fortio.yaml
 
-# rollout status держит терминал и печатает ход дела, пока копия не станет готова.
-# Ждём здесь намеренно: пока генератор не поднялся, нагружать нечем.
+# rollout status hält das Terminal und gibt den Fortschritt aus, bis die Replik bereit ist.
+# Wir warten hier bewusst: Solange der Generator nicht oben ist, gibt es nichts, womit sich Last erzeugen ließe.
 kubectl rollout status deployment/fortio
 ```
 
-## Шаг 6. Открываем Fortio в браузере
+## Schritt 6. Fortio im Browser öffnen
 
-📍 **Окно 1** — туннель до Fortio. Порт `8081` выбран, чтобы не столкнуться с `8080`, если
-у вас ещё открыт туннель до `rickroll` из лабы 1:
+📍 **Fenster 1** — der Tunnel zu Fortio. Der Port `8081` wurde gewählt, um nicht mit `8080` zu kollidieren, falls bei Ihnen noch der Tunnel zu `rickroll` aus Lab 1 offen ist:
 
 ```bash
 export KUBECONFIG=~/lab.kubeconfig
 
-# port-forward прокидывает туннель с вашего ноутбука внутрь кластера.
-#   svc/fortio    к чему подключаемся: Service с именем fortio
-#   8081:8080     читается как «порт у вас : порт в кластере» — обращение
-#                 на localhost:8081 уходит на порт 8080 этого Service
+# port-forward legt einen Tunnel von Ihrem Laptop in den Cluster.
+#   svc/fortio    wozu wir uns verbinden: der Service namens fortio
+#   8081:8080     liest sich als "Port auf Ihrer Seite : Port im Cluster" — eine Anfrage
+#                 an localhost:8081 geht an Port 8080 dieses Service
 kubectl port-forward svc/fortio 8081:8080
 ```
 
-Команда не завершается — она держит туннель. Пока она работает, откройте
-<http://localhost:8081/fortio/>.
+Der Befehl endet nicht — er hält den Tunnel offen. Während er läuft, öffnen Sie <http://localhost:8081/fortio/>.
 
-⚠️ **Косая черта в конце пути обязательна.** По адресу `http://localhost:8081/fortio` без
-неё Fortio отвечает 404, и это выглядит так, будто он не запустился.
+⚠️ **Der abschließende Schrägstrich im Pfad ist zwingend.** Unter `http://localhost:8081/fortio` ohne ihn antwortet Fortio mit 404, und es sieht so aus, als wäre er nicht gestartet.
 
-## Шаг 7. Готовим второе окно, чтобы увидеть рост
+## Schritt 7. Ein zweites Fenster vorbereiten, um das Wachstum zu sehen
 
-Смысл лабы — не в цифрах отчёта Fortio, а в том, что происходит с копиями. Это надо видеть
-одновременно с нагрузкой, а не после неё.
+Der Sinn des Labs sind nicht die Zahlen im Bericht von Fortio, sondern das, was mit den Repliken geschieht. Das müssen Sie gleichzeitig mit der Last sehen, nicht danach.
 
-📍 **Окно 2** — оставьте открытым до конца лабы.
+📍 **Fenster 2** — lassen Sie es bis zum Ende des Labs offen.
 
-Следить будем ключом `-w` (watch). Он означает не «обновлять экран», а «печатать новую
-строку при каждом изменении». Вывод получается журналом событий, а не таблицей. Это важное
-отличие от `watch kubectl get pods`, где вы видите только срез «сейчас» и легко пропускаете
-промежуточные состояния.
+Beobachten werden wir mit dem Flag `-w` (watch). Es bedeutet nicht „den Bildschirm aktualisieren“, sondern „bei jeder Änderung eine neue Zeile ausgeben“. Die Ausgabe ist ein Ereignisprotokoll statt einer Tabelle. Das ist ein wichtiger Unterschied zu `watch kubectl get pods`, wo Sie nur die Momentaufnahme „jetzt“ sehen und die Zwischenzustände leicht verpassen.
 
 ```bash
 export KUBECONFIG=~/lab.kubeconfig
 
-# Следим за копиями rickroll: каждая новая строка — изменение состояния одной из них.
-# Команда не завершается; выйти — Ctrl+C, на сами копии это никак не влияет.
+# Wir beobachten die Repliken von rickroll: Jede neue Zeile ist ein Zustandswechsel einer von ihnen.
+# Der Befehl endet nicht; zum Beenden Ctrl+C — auf die Repliken selbst hat das keine Auswirkung.
 kubectl get pods -l app=rickroll -w
 ```
 
-Если у вас есть третье окно, положите туда ещё и это — так виден сам процесс принятия решения:
+Wenn Sie ein drittes Fenster haben, legen Sie auch dies hinein — so sehen Sie den Entscheidungsprozess selbst:
 
 ```bash
-# То же слежение, но за решениями автомасштабирования: в TARGETS видно, как меняется
-# загрузка, в REPLICAS — сколько копий оно заказало в ответ.
+# Dieselbe Beobachtung, aber der Autoskalierungs-Entscheidungen: TARGETS zeigt, wie sich die Last
+# ändert, REPLICAS zeigt, wie viele Repliken sie daraufhin angefordert hat.
 kubectl get hpa rickroll -w
 ```
 
-## Шаг 8. Даём нагрузку
+## Schritt 8. Die Last aufbringen
 
-📍 **Где:** в браузере, на вкладке Fortio.
+📍 **Wo:** im Browser, auf dem Fortio-Tab.
 
-Заполняем форму:
+Füllen Sie das Formular aus:
 
-| Поле | Значение | Почему так |
+| Feld | Wert | Warum so |
 |---|---|---|
-| URL | `http://rickroll/` | имя Service; Fortio стоит в кластере и видит его напрямую |
-| QPS | `1200` | тысяча двести запросов в секунду |
-| Duration | `90s` | полторы минуты: хватает и на рост, и на то, чтобы разглядеть |
-| Connections | `80` | восемьдесят параллельных соединений |
+| URL | `http://rickroll/` | der Service-Name; Fortio ist im Cluster und sieht ihn direkt |
+| QPS | `1200` | zwölfhundert Anfragen pro Sekunde |
+| Duration | `90s` | anderthalb Minuten: genug sowohl für das Wachstum als auch, um es zu erkennen |
+| Connections | `80` | achtzig parallele Verbindungen |
 
-Нажимаем **Start**.
+Drücken Sie **Start**.
 
-⚠️ **Если в вашей версии Fortio поля называются иначе** (например, число соединений
-подписано `Threads`), ориентируйтесь по смыслу: URL, частота запросов, длительность,
-параллельность. Ту же нагрузку можно дать и командой, минуя браузер:
+⚠️ **Falls die Felder in Ihrer Version von Fortio anders heißen** (zum Beispiel ist die Anzahl der Verbindungen mit `Threads` beschriftet), richten Sie sich nach der Bedeutung: URL, Anfragerate, Dauer, Parallelität. Dieselbe Last können Sie auch per Befehl aufbringen, am Browser vorbei:
 
 ```bash
-# exec запускает команду внутри уже работающего пода, а не у вас на ноутбуке.
-#   deploy/fortio   в поде этого приложения; какой именно под — kubectl выберет сам
-#   --              всё, что после этого разделителя, — команда для пода
-#   -qps 1200       тысяча двести запросов в секунду
-#   -c 80           восемьдесят параллельных соединений
-#   -t 90s          держать нагрузку полторы минуты
-# Последний аргумент — цель: имя Service нашего приложения.
+# exec führt einen Befehl innerhalb eines bereits laufenden Pods aus, nicht auf Ihrem Laptop.
+#   deploy/fortio   in einem Pod dieser Anwendung; welcher Pod genau — kubectl wählt selbst
+#   --              alles nach diesem Trenner ist der Befehl für den Pod
+#   -qps 1200       zwölfhundert Anfragen pro Sekunde
+#   -c 80           achtzig parallele Verbindungen
+#   -t 90s          die Last anderthalb Minuten halten
+# Das letzte Argument ist das Ziel: der Service-Name unserer Anwendung.
 kubectl exec deploy/fortio -- fortio load -qps 1200 -c 80 -t 90s http://rickroll/
 ```
 
-## Шаг 9. Смотрим, что происходит
+## Schritt 9. Beobachten, was geschieht
 
-📍 **Окно 2**, секунд через двадцать после старта:
+📍 **Fenster 2**, etwa zwanzig Sekunden nach dem Start:
 
 ```
 NAME                        READY   STATUS              AGE
@@ -521,12 +434,12 @@ rickroll-6f4b9c8d57-mn4kd   1/1     Running             3s
 rickroll-6f4b9c8d57-t8zxc   1/1     Running             3s
 ```
 
-Дальше ещё две, потом ещё одна. Через минуту копий шесть.
+Dann noch zwei, dann noch eine. Innerhalb einer Minute sind es sechs Repliken.
 
-📍 **Смотрим HPA** — что он видит и что решил:
+📍 **Sehen Sie sich den HPA an** — was er sieht und was er entschieden hat:
 
 ```bash
-# TARGETS — текущая средняя загрузка против цели, REPLICAS — сколько копий заказано.
+# TARGETS ist die aktuelle durchschnittliche Last gegenüber dem Ziel, REPLICAS ist, wie viele Repliken angefordert sind.
 kubectl get hpa rickroll
 ```
 
@@ -535,49 +448,33 @@ NAME       REFERENCE             TARGETS         MINPODS   MAXPODS   REPLICAS   
 rickroll   Deployment/rickroll   cpu: 645%/50%   1         6         6          8m
 ```
 
-**645%.** На стенде, где эта лаба обкатывалась, получилось именно столько; у вас будет свой
-порядок цифр, но точно сотни процентов.
+**645%.** Auf der Testumgebung, auf der dieses Lab erprobt wurde, kam genau dieser Wert heraus; bei Ihnen wird es eine andere Größenordnung sein, aber ganz sicher Hunderte von Prozent.
 
-Число выглядит абсурдным, пока не вспомнить, от чего оно считается. Не от мощности узла,
-а от **заявки** копии, а заявка у нас 20m — две сотых ядра. Копия берёт в несколько раз
-больше заявленного, и это разрешено: `requests` — гарантированный минимум, а не потолок.
-Потолком служит `limits`, и до него ещё далеко.
+Die Zahl wirkt absurd, bis man sich erinnert, wovon sie berechnet wird. Nicht von der Kapazität des Nodes, sondern von der **Anforderung** der Replik, und unsere Anforderung ist 20m — zwei Hundertstel eines Kerns. Eine Replik nimmt ein Mehrfaches des Angeforderten, und das ist erlaubt: `requests` ist ein garantiertes Minimum, keine Obergrenze. Die Obergrenze ist `limits`, und die ist noch weit entfernt.
 
-Узел при этом далеко не свободен: `u1.medium` — это одно ядро, и на нём в эту минуту
-работают и копии приложения, и сам генератор нагрузки. Высокий процент берётся не от
-избытка мощности, а от маленького знаменателя.
+Der Node ist dabei alles andere als frei: `u1.medium` ist ein Kern, und in dieser Minute laufen darauf sowohl die Repliken der Anwendung als auch der Lastgenerator selbst. Der hohe Prozentwert kommt nicht von einem Überfluss an Kapazität, sondern von einem kleinen Nenner.
 
-**Проценты больше ста здесь — норма, а не тревога.** Это главное, что ломает интуицию,
-принесённую из vCenter: там «CPU Usage 645%» означало бы катастрофу, потому что процент
-считался от выданного. Здесь он считается от заявленного минимума, а между заявкой и
-потолком у нас пятнадцатикратный зазор.
+**Prozentwerte über hundert sind hier die Norm, kein Alarm.** Das ist das Wichtigste, was die aus vCenter mitgebrachte Intuition zerbricht: Dort würde „CPU Usage 645%“ eine Katastrophe bedeuten, weil der Prozentwert vom Zugeteilten berechnet wurde. Hier wird er vom angeforderten Minimum berechnet, und zwischen Anforderung und Obergrenze liegt ein fünfzehnfacher Abstand.
 
-Проверьте арифметику HPA сами:
+Prüfen Sie die Arithmetik des HPA selbst nach:
 
 ```bash
-# Потребление каждой копии по отдельности. CPU(cores) печатается в миллипроцессорах:
-# 100m — это сотая доля ядра, 1000m — целое ядро.
+# Der Verbrauch jeder Replik einzeln. CPU(cores) wird in Millicpu ausgegeben:
+# 100m ist ein Hundertstel eines Kerns, 1000m ist ein ganzer Kern.
 kubectl top pods -l app=rickroll
 ```
 
-Среднее по копиям — это и есть то число, которое HPA сравнивает с порогом: 50% от заявки
-в 20m, то есть 10m. Сумма по всем копиям упрётся в ядро узла — на этом рост и остановится,
-даже если нагрузку поднять ещё.
+Der Durchschnitt über die Repliken ist genau die Zahl, die HPA mit dem Schwellwert vergleicht: 50% der Anforderung von 20m, also 10m. Die Summe über alle Repliken stößt an den Kern des Nodes — und dort hört das Wachstum auf, selbst wenn Sie die Last weiter erhöhen.
 
-📍 **В браузере на вкладке Fortio** тем временем рисуется гистограмма задержек. Досмотрите
-прогон до конца: в конце появится строка вида `Code 200 : 108000 (100.0 %)`. Ошибок ноль —
-приложение справилось. Запомните, где эта строка: в лабе 4 она будет главным доказательством.
+📍 **Im Browser auf dem Fortio-Tab** wird derweil ein Latenz-Histogramm gezeichnet. Sehen Sie sich den Durchlauf bis zum Ende an: Am Ende erscheint eine Zeile wie `Code 200 : 108000 (100.0 %)`. Null Fehler — die Anwendung hat es bewältigt. Merken Sie sich, wo diese Zeile steht: In Lab 4 wird sie das wichtigste Beweisstück sein.
 
-## Шаг 10. Смотрим, как копии уезжают обратно
+## Schritt 10. Beobachten, wie die Repliken wieder zurückfahren
 
-Нагрузка кончилась. Ничего не делайте, смотрите в окно 2.
+Die Last ist vorbei. Tun Sie nichts, beobachten Sie Fenster 2.
 
-Первые полторы-две минуты не произойдёт ничего. Пауза складывается из трёх
-задержек: метрики опаздывают примерно на минуту, `stabilizationWindowSeconds: 60` требует,
-чтобы нагрузка была низкой всю последнюю минуту, и сам HPA пересчитывает раз в пятнадцать
-секунд.
+In den ersten anderthalb bis zwei Minuten geschieht nichts. Die Pause setzt sich aus drei Verzögerungen zusammen: Die Metriken hinken etwa eine Minute hinterher, `stabilizationWindowSeconds: 60` verlangt, dass die Last die gesamte letzte Minute über niedrig war, und HPA selbst rechnet alle fünfzehn Sekunden neu.
 
-Потом строки посыплются разом:
+Dann rieseln die Zeilen auf einmal herein:
 
 ```
 rickroll-6f4b9c8d57-t8zxc   1/1     Terminating   4m
@@ -585,91 +482,65 @@ rickroll-6f4b9c8d57-mn4kd   1/1     Terminating   4m
 ...
 ```
 
-Пять копий уходят, остаётся одна — `minReplicas`.
+Fünf Repliken gehen, eine bleibt — `minReplicas`.
 
-**Обратите внимание на асимметрию.** Наверх мы шли ступеньками по две копии, вниз ушли одним
-движением. Так задумано: ошибиться в сторону «слишком много копий» дорого только для кошелька,
-ошибиться в сторону «слишком мало» — значит уронить сервис. Поэтому растут агрессивно, а
-сокращают осторожно.
+**Beachten Sie die Asymmetrie.** Nach oben ging es in Stufen von zwei Repliken; nach unten in einem einzigen Zug. Das ist so gewollt: Ein Fehler in Richtung „zu viele Repliken“ kostet nur den Geldbeutel, ein Fehler in Richtung „zu wenige“ bedeutet, den Dienst lahmzulegen. Deshalb wachsen sie aggressiv und schrumpfen vorsichtig.
 
-## Проверка
+## Prüfung
 
-📍 **Где:** на ноутбуке, в том же окне терминала, где вы работали с `kubectl`.
+📍 **Wo:** auf dem Laptop, im selben Terminalfenster, in dem Sie mit `kubectl` gearbeitet haben.
 
-Скрипт проверяет не факт применения манифеста, а то, что механизм действительно живой: HPA
-существует и нацелен на нужный Deployment, у контейнера есть `requests.cpu`, от которого
-считается процент, `metrics-server` реально отдаёт цифры (в `TARGETS` не `<unknown>`), и в
-статусе HPA осталась отметка о том, что масштабирование уже срабатывало.
+Das Skript prüft nicht die Tatsache, dass das Manifest angewendet wurde, sondern dass der Mechanismus wirklich lebendig ist: dass der HPA existiert und auf das richtige Deployment zielt, dass der Container ein `requests.cpu` hat, von dem der Prozentwert berechnet wird, dass `metrics-server` tatsächlich Zahlen liefert (`TARGETS` ist nicht `<unknown>`) und dass der Status des HPA noch eine Markierung trägt, dass die Skalierung bereits ausgelöst hat.
 
-⚠️ **Запускайте проверку до уборки** — после удаления HPA проверять будет нечего.
+⚠️ **Führen Sie die Prüfung vor dem Aufräumen aus** — sobald der HPA gelöscht ist, gibt es nichts mehr zu prüfen.
 
-⚠️ **На Windows скрипт запускается из WSL**, а не из PowerShell — как его поставить,
-написано в начале лабы 0. Без WSL лабу можно пройти, но отчёта-артефакта не будет.
+⚠️ **Unter Windows wird das Skript aus WSL ausgeführt**, nicht aus PowerShell — wie man es installiert, steht am Anfang von Lab 0. Ohne WSL können Sie das Lab abschließen, aber es gibt kein Bericht-Artefakt.
 
 ```bash
-# ./ означает «файл из текущей папки», а не команду из системного PATH.
-# Скрипт ничего в кластере не меняет: он только читает и печатает отчёт.
+# ./ bedeutet "eine Datei aus dem aktuellen Ordner", nicht ein Befehl aus dem System-PATH.
+# Das Skript ändert nichts im Cluster: Es liest nur und gibt einen Bericht aus.
 ./check.sh
 ```
 
-## Уборка
+## Aufräumen
 
-**HPA удаляем.** В лабе 4 мы будем выкатывать новую версию под нагрузкой, и лишний механизм,
-который в это же время меняет количество копий, только запутает картину:
+**Löschen Sie den HPA.** In Lab 4 rollen wir eine neue Version unter Last aus, und ein zusätzlicher Mechanismus, der gleichzeitig die Replikenzahl ändert, würde das Bild nur trüben:
 
 ```bash
-# delete -f = «убери из кластера то, что описано в этом файле». Приложение останется:
-# в файле описан только HPA. Количество копий после удаления замрёт на текущем.
+# delete -f = "entferne aus dem Cluster, was in dieser Datei beschrieben ist". Die Anwendung bleibt:
+# In der Datei ist nur der HPA beschrieben. Nach dem Löschen friert die Replikenzahl beim aktuellen Wert ein.
 kubectl delete -f hpa.yaml
 ```
 
-**Fortio оставляем** — он понадобится в лабе 4 как источник нагрузки. Если лаба 4 у вас не
-планируется, уберите и его:
+**Behalten Sie Fortio** — es wird in Lab 4 als Lastquelle gebraucht. Wenn Sie Lab 4 nicht planen, entfernen Sie es ebenfalls:
 
 ```bash
-# Уберёт оба объекта из файла — и Deployment генератора, и его Service.
+# Entfernt beide Objekte aus der Datei — das Deployment des Generators und seinen Service.
 kubectl delete -f fortio.yaml
 ```
 
-Приложение `rickroll` не трогаем.
+Rühren Sie die Anwendung `rickroll` nicht an.
 
-Всё, что вы освободили, вернулось в общий пул узла в тот же момент, когда контейнеры
-завершились. Здесь нет «выделенного и не отданного» — заявка живёт ровно столько, сколько
-живёт под.
+Alles, was Sie freigegeben haben, kehrte in dem Moment in den gemeinsamen Pool des Nodes zurück, als die Container endeten. Es gibt hier kein „zugeteilt und nicht zurückgegeben“ — eine Anforderung lebt genau so lange, wie der Pod lebt.
 
-## Что мы теперь умеем
+## Was wir jetzt können
 
-- Объяснять разницу между `requests` и `limits` и предсказывать, что будет при упоре в каждый
-- Понимать, почему HPA считает проценты от `requests` и почему без них он не работает
-- Читать формулу HPA и заранее говорить, сколько копий он закажет
-- Отличать «манифест применён» от «механизм заработал» и знать, где смотреть статус
-- Давать приложению настоящую нагрузку изнутри кластера, а не с ноутбука
+- Den Unterschied zwischen `requests` und `limits` erklären und vorhersagen, was beim Anschlag an jedes von beiden geschieht
+- Verstehen, warum HPA die Prozente aus `requests` berechnet und warum er ohne sie nicht funktioniert
+- Die HPA-Formel lesen und im Voraus sagen, wie viele Repliken er anfordern wird
+- „Das Manifest ist angewendet“ von „der Mechanismus hat zu arbeiten begonnen“ unterscheiden und wissen, wo man den Status ansieht
+- Einer Anwendung echte Last von innerhalb des Clusters geben, nicht vom Laptop
 
-## А в vSphere это было бы
+## Und in vSphere wäre das
 
-В vSphere масштабируют вверх: hot-add процессоров и памяти работающей машине. Это делает
-человек по графику или по алерту, и на этом всё — размножать экземпляры приложения vCenter
-не умеет, для этого нужен балансировщик, шаблон машины и чья-то работа руками. DRS решает
-другую задачу: он перекладывает существующие машины между хостами, но их количество не
-меняет.
+In vSphere skaliert man nach oben: Hot-Add von CPU und Speicher zu einer laufenden Maschine. Ein Mensch tut das nach Zeitplan oder auf einen Alert hin, und das war's — vCenter kann keine Anwendungsinstanzen vervielfachen; dafür braucht man einen Load Balancer, eine Maschinenvorlage und die Handarbeit von jemandem. DRS löst ein anderes Problem: Es verschiebt vorhandene Maschinen zwischen Hosts, ändert aber deren Anzahl nicht.
 
-Здесь количество копий — это следствие нагрузки, описанное двадцатью строками текста.
+Hier ist die Anzahl der Repliken eine Folge der Last, beschrieben in zwanzig Zeilen Text.
 
-**Где vSphere удобнее, честно.** Три вещи, и все существенные.
+**Wo vSphere ehrlich gesagt praktischer ist.** Drei Dinge, und alle bedeutsam.
 
-Во-первых, hot-add работает с любым приложением, включая то, которое писали в 2009 году и
-которое существует строго в одном экземпляре. HPA требует, чтобы приложение умело работать в
-нескольких копиях одновременно: без общего состояния, без записи в локальный файл, без
-привязки сессии к экземпляру. Если оно так не умеет, автомасштабирование вам недоступно, и
-Kubernetes эту проблему не решит — он её обнажит. Ровно здесь и проходит настоящая граница
-миграции, а не в манифестах.
+Erstens funktioniert Hot-Add mit jeder Anwendung, auch mit einer, die 2009 geschrieben wurde und strikt als einzelne Instanz existiert. HPA verlangt, dass die Anwendung in mehreren Repliken gleichzeitig laufen kann: ohne gemeinsamen Zustand, ohne Schreiben in eine lokale Datei, ohne an eine Instanz gebundene Sitzung. Kann sie das nicht, ist die Autoskalierung für Sie nicht verfügbar, und Kubernetes löst dieses Problem nicht — es legt es bloß. Genau hier verläuft die wahre Grenze der Migration, nicht in den Manifesten.
 
-Во-вторых, метрики. vCenter хранит статистику месяцами, и вопрос «а что было в прошлый
-вторник» решается графиком. `metrics-server` держит последние минуты и больше ничего — он
-предназначен ровно для того, чтобы кормить HPA. За историей придётся ставить Prometheus,
-и это отдельная работа (лаба 14).
+Zweitens die Metriken. vCenter bewahrt Statistiken monatelang auf, und die Frage „was war letzten Dienstag“ beantwortet ein Diagramm. `metrics-server` hält die letzten Minuten und nichts weiter — er ist genau dafür ausgelegt, HPA zu speisen. Für die Historie müssen Sie Prometheus aufsetzen, und das ist eine eigene Aufgabe (Lab 14).
 
-В-третьих, предсказуемость счёта. Машина с четырьмя ядрами стоит столько-то, и это известно
-заранее. Автомасштабирование означает, что в плохой день вы получите в шесть раз больше
-потребления, чем в обычный. `maxReplicas` — это не тонкая настройка производительности, это
-ваш предохранитель по деньгам, и относиться к нему надо соответственно.
+Drittens die Kalkulierbarkeit der Kosten. Eine Maschine mit vier Kernen kostet einen bestimmten Betrag, und das ist im Voraus bekannt. Autoskalierung bedeutet, dass Sie an einem schlechten Tag sechsmal mehr Verbrauch bekommen als an einem normalen. `maxReplicas` ist kein feiner Regler zur Leistungsoptimierung, es ist Ihre Sicherung fürs Geld, und entsprechend sollte man damit umgehen.

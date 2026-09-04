@@ -1,66 +1,66 @@
-# Лаба 2 · Самолечение: убить копию и посмотреть, что будет
+# Lab 2 · Selbstheilung: eine Kopie töten und sehen, was passiert
 
 | | |
 |---|---|
-| **Время** | 25 минут |
-| **Что доказывает** | Копия возвращается сама за секунды, но само по себе это не отказоустойчивость |
-| **Что понадобится** | Кластер из лабы 0, `rickroll` из лабы 1, `kubectl`, два окна терминала |
+| **Zeit** | 25 Minuten |
+| **Was es zeigt** | Eine Kopie kommt innerhalb von Sekunden von selbst zurück, aber das allein ist keine Fehlertoleranz |
+| **Was Sie brauchen** | Der Cluster aus Lab 0, `rickroll` aus Lab 1, `kubectl`, zwei Terminalfenster |
 
-## Зачем это
+## Warum das wichtig ist
 
-Скоро вам придётся отвечать за сервис «Пропуск»: охрана смотрит на список гостей в семь
-утра, и «мы перезагружаем, подождите» там не принимают. Прежде чем брать на себя такое
-обещание, стоит выяснить на кошках, что именно кластер делает сам, а что придётся делать вам.
+Bald werden Sie für den Dienst „Gate Pass“ geradestehen müssen: Die Sicherheit sieht sich die Gästeliste um sieben
+Uhr morgens an, und „wir starten gerade neu, einen Moment“ zählt dort nicht. Bevor Sie ein solches Versprechen
+eingehen, lohnt es sich herauszufinden — dort, wo nichts auf dem Spiel steht —, was genau der Cluster von selbst erledigt und was Sie selbst tun müssen.
 
-Разберёмся с самым громким обещанием Kubernetes — самолечением. Мы удалим работающую
-копию приложения и засечём по часам, сколько её не будет. А потом удалим кое-что другое —
-и увидим, что копия не вернулась. Разница между этими двумя случаями и есть содержание лабы.
+Nehmen wir uns das lauteste Versprechen von Kubernetes vor — die Selbstheilung. Wir löschen eine laufende Kopie der
+Anwendung und messen mit der Uhr, wie lange sie verschwunden bleibt. Danach löschen wir etwas anderes —
+und sehen, dass die Kopie nicht zurückkommt. Der Unterschied zwischen diesen beiden Fällen ist der Inhalt dieses Labs.
 
-## Словарик
+## Mini-Glossar
 
-| Термин | Что это | Похоже на… но |
+| Begriff | Was es ist | Ähnlich wie … aber |
 |---|---|---|
-| **Желаемое состояние** | Запись в кластере «должно быть вот так» | **Настройки кластера в vCenter**, но кластер не выполняет её один раз, а бесконечно приводит реальность к ней |
-| **Контроллер** | Процесс в управляющем слое кластера, который сверяет «как заказано» с «как есть» | **vSphere HA**, но работает постоянно и по всем объектам, а не просыпается по отказу хоста |
-| **ReplicaSet** | Объект, следящий, чтобы копий было ровно столько, сколько заказано | **Правило «держать N экземпляров»**, но он не чинит сломанное, а создаёт новое взамен исчезнувшего |
-| **ownerReferences** | Пометка внутри объекта: «меня создал вот этот» | по ней удаление родителя автоматически уносит всех детей |
-| **Терминация** | Пауза между «удалить» и «процесс убит» | **Guest Shutdown вместо Power Off**, но по умолчанию 30 секунд, потом убивают жёстко |
-| **EndpointSlice** | Список живых адресов, стоящих за Service | **Список членов пула на балансировщике**, но составляется сам по меткам и готовности, руками туда не пишут |
+| **Gewünschter Zustand** | Ein Eintrag im Cluster: „so soll es aussehen“ | **Cluster-Einstellungen in vCenter**, aber der Cluster wendet ihn nicht einmalig an — er gleicht die Realität endlos daran an |
+| **Controller** | Ein Prozess im Control Plane des Clusters, der „wie bestellt“ mit „wie es ist“ abgleicht | **vSphere HA**, aber er läuft ständig und über alle Objekte, statt beim Ausfall eines Hosts aufzuwachen |
+| **ReplicaSet** | Ein Objekt, das dafür sorgt, dass es genau so viele Kopien gibt, wie bestellt wurden | **Eine Regel „N Instanzen halten“**, aber es repariert nichts Kaputtes — es erstellt eine neue als Ersatz für die verschwundene |
+| **ownerReferences** | Eine Markierung im Objekt: „dieses hier hat mich erstellt“ | dadurch nimmt das Löschen eines Elternobjekts automatisch alle seine Kinder mit |
+| **Termination** | Die Pause zwischen „löschen“ und „Prozess beendet“ | **Guest Shutdown statt Power Off**, aber standardmäßig 30 Sekunden, danach wird hart beendet |
+| **EndpointSlice** | Eine Liste der aktiven Adressen hinter einem Service | **Die Mitgliederliste eines Pools auf einem Load Balancer**, aber sie wird automatisch aus Labels und Bereitschaft aufgebaut — man trägt nicht von Hand hinein |
 
-## Что лежит в папке лабы
+## Was im Lab-Ordner liegt
 
-Все файлы уже у вас — вы забрали их вместе с репозиторием. Создавать и печатать заново
-ничего не нужно: там, где ниже написано `kubectl apply -f имя.yaml`, файл берётся отсюда.
+Sie haben bereits alle Dateien — Sie haben sie zusammen mit dem Repository erhalten. Es gibt nichts neu zu erstellen
+oder abzutippen: Wo unten `kubectl apply -f name.yaml` steht, wird die Datei von hier genommen.
 
 ```bash
-# Все команды лабы выполняются из этой папки — иначе относительные пути в них не сойдутся.
+# Alle Befehle des Labs werden aus diesem Ordner ausgeführt — sonst stimmen die relativen Pfade darin nicht überein.
 cd labs/02-selfheal
 ```
 
-| Файл | Что это | Когда пригодится |
+| Datei | Was es ist | Wann es nützlich ist |
 |---|---|---|
-| `check.sh` | Проверка, что кластер восстановил удалённые копии сам | запускаете в конце лабы |
-| — | Отдельных манифестов у лабы нет: работаем с приложением из лабы 1, файл берётся оттуда — `../01-deploy/rickroll.yaml` | |
+| `check.sh` | Prüft, ob der Cluster die gelöschten Kopien von selbst wiederhergestellt hat | führen Sie am Ende des Labs aus |
+| — | Das Lab hat keine eigenen Manifeste: Wir arbeiten mit der Anwendung aus Lab 1, und die Datei wird von dort genommen — `../01-deploy/rickroll.yaml` | |
 
-## Шаг 1. Смотрим, что у нас есть
+## Schritt 1. Ansehen, was wir haben
 
-📍 **Где:** на ноутбуке.
+📍 **Wo:** auf dem Laptop.
 
-Приложение `rickroll` уже работает. Прежде чем что-то ломать, посмотрим, из каких объектов
-оно состоит: одной командой спрашиваем кластер сразу о трёх типах сущностей.
+Die Anwendung `rickroll` läuft bereits. Bevor wir etwas kaputt machen, sehen wir uns an, aus welchen Objekten
+sie besteht: Mit einem einzigen Befehl fragen wir den Cluster gleichzeitig nach drei Arten von Entitäten.
 
 ```bash
-# KUBECONFIG — путь к файлу с адресом кластера и данными для входа.
-# Пока переменная не задана, kubectl ищет кластер на самом ноутбуке и не находит его.
+# KUBECONFIG — der Pfad zur Datei mit der Adresse des Clusters und Ihren Anmeldedaten.
+# Solange die Variable nicht gesetzt ist, sucht kubectl einen Cluster auf dem Laptop selbst und findet keinen.
 export KUBECONFIG=~/lab.kubeconfig
 
-# get = «покажи, что есть». Через запятую перечислены три типа объектов сразу.
-#   -l app=rickroll   показать только помеченные меткой app=rickroll, то есть наше
-#                     приложение, а не всё содержимое кластера
+# get = "zeig mir, was da ist". Durch Kommas getrennt sind gleich drei Arten von Objekten aufgeführt.
+#   -l app=rickroll   nur die mit dem Label app=rickroll anzeigen — also unsere
+#                     Anwendung, nicht den gesamten Inhalt des Clusters
 kubectl get deployment,replicaset,pods -l app=rickroll
 ```
 
-**Что вы должны увидеть** — по строке на каждый из трёх объектов:
+**Was Sie sehen sollten** — je eine Zeile für jedes der drei Objekte:
 
 ```
 NAME                       READY   UP-TO-DATE   AVAILABLE   AGE
@@ -73,407 +73,400 @@ NAME                             READY   STATUS    AGE
 pod/rickroll-6f4b9c8d57-xk2mp    1/1     Running   14m
 ```
 
-⚠️ **Строк с `replicaset` может быть больше одной.** Каждая выкатка новой версии
-оставляет прежний набор в истории — с нулями в колонках. Живой тот, где стоят
-единицы; остальные держатся, чтобы было куда откатываться.
+⚠️ **Es kann mehr als eine `replicaset`-Zeile geben.** Jeder Rollout einer neuen Version hinterlässt den
+vorherigen Satz in der Historie — mit Nullen in den Spalten. Der aktive ist der mit den Einsen; die
+übrigen bleiben erhalten, damit es etwas gibt, wohin man zurückrollen kann.
 
-Объектов три, хотя в манифесте лабы 1 вы описывали один Deployment. Остальные два кластер
-создал сам, и это не мелочь оформления — от этой цепочки зависит всё дальнейшее.
+Es sind drei Objekte, obwohl Sie im Manifest von Lab 1 einen einzigen Deployment beschrieben haben. Die
+anderen beiden hat der Cluster selbst erstellt, und das ist keine Formsache — alles Weitere hängt von dieser Kette ab.
 
 <details>
-<summary><b>Разбираем цепочку: кто кого создал и зачем</b></summary>
+<summary><b>Die Kette entschlüsseln: wer wen erstellt hat und warum</b></summary>
 
-Посмотрите на имена. Имя пода — это имя ReplicaSet плюс пять случайных символов, а имя
-ReplicaSet — имя Deployment плюс хеш. Так и устроена цепочка.
+Sehen Sie sich die Namen an. Der Name eines Pods ist der Name des ReplicaSet plus fünf zufällige Zeichen, und der
+Name des ReplicaSet ist der Name des Deployment plus ein Hash. So ist die Kette aufgebaut.
 
-**Deployment** хранит ваше намерение целиком: какой образ, сколько копий, как обновлять.
-Он не следит за подами напрямую — он следит за ReplicaSet.
+**Deployment** hält Ihre Absicht vollständig fest: welches Image, wie viele Kopien, wie zu aktualisieren ist. Es
+überwacht die Pods nicht direkt — es überwacht das ReplicaSet.
 
-**ReplicaSet** хранит одну-единственную мысль: «подов с меткой `app=rickroll` должно быть
-ровно столько-то». Всё. Он ничего не знает ни про образы, ни про версии.
+**ReplicaSet** hält einen einzigen Gedanken fest: „es soll genau so viele Pods mit dem Label
+`app=rickroll` geben". Das ist alles. Es weiß nichts über Images oder Versionen.
 
-**Под** — запущенная копия.
+**Ein Pod** ist eine laufende Kopie.
 
-Убедиться, что это не догадки, можно так:
+Dass das keine Vermutung ist, können Sie so bestätigen:
 
 ```bash
-# Обычная таблица kubectl поле ownerReferences не показывает — его надо спросить явно.
-#   -o jsonpath=...   «достань из ответа сервера вот эти поля и напечатай их так»
-# Внутри выражения: range .items[*] — пройти по всем найденным подам, .metadata.name —
-# имя пода, ownerReferences[0].kind и .name — тип и имя того, кто его создал.
+# Die normale kubectl-Tabelle zeigt das Feld ownerReferences nicht — man muss es explizit anfordern.
+#   -o jsonpath=...   "hol diese Felder aus der Antwort des Servers und gib sie so aus"
+# Innerhalb des Ausdrucks: range .items[*] — jeden gefundenen Pod durchlaufen, .metadata.name —
+# der Name des Pods, ownerReferences[0].kind und .name — Art und Name dessen, was ihn erstellt hat.
 kubectl get pods -l app=rickroll -o jsonpath='{range .items[*]}{.metadata.name}{"  <- "}{.metadata.ownerReferences[0].kind}{"/"}{.metadata.ownerReferences[0].name}{"\n"}{end}'
 ```
 
-Вывод:
+Ausgabe:
 
 ```
 rickroll-6f4b9c8d57-xk2mp  <- ReplicaSet/rickroll-6f4b9c8d57
 ```
 
-Поле `ownerReferences` — это запись «меня создал вот этот объект». Такая же запись есть и
-у ReplicaSet, только там указан Deployment.
+Das Feld `ownerReferences` ist der Eintrag „dieses Objekt hat mich erstellt“. Das ReplicaSet hat denselben
+Eintrag, nur zeigt er dort auf das Deployment.
 
-Зачем эта трёхэтажность вместо одного объекта: этажи отвечают за разное. Когда в лабе 4 мы
-будем выкатывать новую версию, Deployment создаст **второй** ReplicaSet под новую версию и
-начнёт переливать копии из старого в новый, по одной. Старый ReplicaSet при этом никуда не
-денется — именно он и позволит откатиться одной командой.
+Warum drei Ebenen statt einem Objekt: Die Ebenen sind für Verschiedenes zuständig. Wenn wir in Lab 4 eine neue
+Version ausrollen, erstellt das Deployment ein **zweites** ReplicaSet für die neue Version und beginnt, die Kopien
+einzeln vom alten Satz in den neuen zu verschieben. Das alte ReplicaSet verschwindet währenddessen nicht — genau es
+ermöglicht das Zurückrollen mit einem einzigen Befehl.
 
-Побочный факт, который стоит запомнить: удаление родителя уносит детей. Удалите ReplicaSet
-руками — Deployment создаст новый через секунду. Удалите Deployment — исчезнет всё. Второе
-мы проверим в конце лабы.
+Eine Randtatsache, die man sich merken sollte: Das Löschen eines Elternobjekts nimmt seine Kinder mit. Löschen Sie
+das ReplicaSet von Hand — das Deployment erstellt innerhalb einer Sekunde ein neues. Löschen Sie das Deployment —
+alles verschwindet. Den zweiten Fall testen wir am Ende des Labs.
 
 </details>
 
-## Шаг 2. Убиваем копию и засекаем время
+## Schritt 2. Eine Kopie töten und die Zeit messen
 
-Сейчас мы удалим под. Не выключим, не перезагрузим — удалим совсем, как если бы кто-то
-нажал Delete from Disk на виртуальной машине.
+Jetzt löschen wir einen Pod. Nicht ausschalten, nicht neu starten — vollständig löschen, als hätte jemand bei einer
+virtuellen Maschine auf Delete from Disk geklickt.
 
-**Что сейчас произойдёт:** команда ниже запомнит имя текущей копии, удалит её, а потом
-будет раз в секунду спрашивать кластер, не появилась ли копия с **другим** именем в
-состоянии Running. Как только появится — напечатает, сколько это заняло.
+**Was jetzt passiert:** Der Befehl unten merkt sich den Namen der aktuellen Kopie, löscht sie und fragt dann
+einmal pro Sekunde den Cluster, ob eine Kopie mit einem **anderen** Namen im Zustand Running aufgetaucht ist. Sobald
+eine auftaucht, gibt er aus, wie lange das gedauert hat.
 
 ```bash
-# items[0].metadata.name — имя первого пода из списка. Запоминаем его в переменную POD:
-# без этого потом не отличить старую копию от новой.
+# items[0].metadata.name — der Name des ersten Pods in der Liste. Wir speichern ihn in der Variable POD:
+# ohne das könnten wir später die alte Kopie nicht von der neuen unterscheiden.
 POD=$(kubectl get pods -l app=rickroll -o jsonpath='{.items[0].metadata.name}')
-echo "убиваем: $POD"
+echo "killing: $POD"
 
-# date +%s — текущее время в секундах. Это наш секундомер: засекли до удаления,
-# в самом конце вычтем из нового замера.
+# date +%s — die aktuelle Zeit in Sekunden. Das ist unsere Stoppuhr: vor dem Löschen notiert
+# und ganz am Ende von einem frischen Messwert abgezogen.
 START=$(date +%s)
 
-# delete pod — удалить копию насовсем.
-#   --wait=false   не ждать, пока под окончательно исчезнет, а сразу вернуть управление:
-#                  считать секунды надо с этого момента, а не после
+# delete pod — die Kopie endgültig löschen.
+#   --wait=false   nicht warten, bis der Pod vollständig verschwunden ist, sondern sofort die Kontrolle zurückgeben:
+#                  die Sekunden müssen ab diesem Moment gezählt werden, nicht danach
 kubectl delete pod "$POD" --wait=false
 
-# Раз в секунду перечитываем список подов и ищем в нём строку, где одновременно:
-#   $1!=old        имя не совпадает со старым — значит это уже другая копия
-#   $2=="1/1"      готов один контейнер из одного
-#   $3=="Running"  под запущен
-#   --no-headers   не печатать шапку таблицы, чтобы awk видел только данные
-#   2>/dev/null    спрятать сообщения об ошибках на те секунды, пока подов нет вообще
+# Einmal pro Sekunde lesen wir die Pod-Liste neu und suchen eine Zeile, in der all das gleichzeitig zutrifft:
+#   $1!=old        der Name stimmt nicht mit dem alten überein — also ist dies eine andere Kopie
+#   $2=="1/1"      ein Container von einem ist bereit
+#   $3=="Running"  der Pod läuft
+#   --no-headers   die Tabellenüberschrift nicht ausgeben, damit awk nur Daten sieht
+#   2>/dev/null    Fehlermeldungen in den Sekunden verbergen, in denen es überhaupt keine Pods gibt
 while true; do
   NEW=$(kubectl get pods -l app=rickroll --no-headers 2>/dev/null \
         | awk -v old="$POD" '$1!=old && $2=="1/1" && $3=="Running" {print $1; exit}')
   [ -n "$NEW" ] && break
   sleep 1
 done
-echo "новая копия $NEW готова через $(( $(date +%s) - START )) с"
+echo "new copy $NEW ready in $(( $(date +%s) - START ))s"
 ```
 
-**Что вы должны увидеть:**
+**Was Sie sehen sollten:**
 
 ```
-убиваем: rickroll-6f4b9c8d57-xk2mp
+killing: rickroll-6f4b9c8d57-xk2mp
 pod "rickroll-6f4b9c8d57-xk2mp" deleted
-новая копия rickroll-6f4b9c8d57-p9wqt готова через 4 с
+new copy rickroll-6f4b9c8d57-p9wqt ready in 4s
 ```
 
-Четыре секунды. Разброс на учебном стенде — от двух до пятнадцати, в зависимости от того, чем
-занят узел. Образ уже лежит на узле, скачивать нечего, поэтому всё упирается в запуск
-процесса и в проверку готовности.
+Vier Sekunden. Auf der Testumgebung liegt die Streuung zwischen zwei und fünfzehn, je nachdem, wie ausgelastet der
+Node ist. Das Image liegt bereits auf dem Node, es gibt nichts herunterzuladen, deshalb hängt alles am Starten des
+Prozesses und an der Bereitschaftsprüfung.
 
-**Обратите внимание на имя.** Хвост поменялся: `xk2mp` стал `p9wqt`. Это не тот же под,
-который перезапустился, — это другой под. Старого больше нет нигде, его нельзя починить,
-поднять из корзины или посмотреть, что было у него на диске.
+**Achten Sie auf den Namen.** Das Ende hat sich geändert: `xk2mp` wurde zu `p9wqt`. Das ist nicht derselbe Pod, der
+neu gestartet wurde — es ist ein anderer Pod. Den alten gibt es nirgends mehr; man kann ihn nicht reparieren, aus
+einem Papierkorb wiederherstellen oder ansehen, was auf seiner Disk war.
 
-Никто ничего не «восстанавливал». ReplicaSet раз в доли секунды сверяет «заказано: 1» с
-«есть: 0» и при расхождении создаёт недостающее. Копия исчезла — расхождение появилось —
-копия создана. Тот же механизм сработал бы, если бы под выселили с узла ради более важной
-нагрузки, если бы упал сам узел или если бы приложение внутри пода умерло от нехватки памяти.
+Niemand hat irgendetwas „wiederhergestellt“. Mehrmals pro Sekunde gleicht das ReplicaSet „bestellt: 1“ mit
+„vorhanden: 0“ ab und erstellt bei einer Abweichung das Fehlende. Die Kopie verschwand — eine Abweichung entstand —
+eine Kopie wurde erstellt. Derselbe Mechanismus hätte gegriffen, wenn der Pod zugunsten einer wichtigeren Last vom
+Node verdrängt worden wäre, wenn der Node selbst ausgefallen wäre oder wenn die Anwendung im Pod an Speichermangel gestorben wäre.
 
-## Шаг 3. Проверяем, была ли при этом отказоустойчивость
+## Schritt 3. Prüfen, ob dabei Fehlertoleranz bestand
 
-Копия вернулась за четыре секунды. Значит ли это, что сервис не прерывался?
+Die Kopie kam in vier Sekunden zurück. Bedeutet das, dass der Dienst nicht unterbrochen wurde?
 
-Проверим. Нам понадобятся **два окна терминала**.
+Prüfen wir das. Wir brauchen **zwei Terminalfenster**.
 
-📍 **Окно 1** — запускаем внутри кластера крошечный под, который раз в секунду дёргает наше
-приложение через Service и рисует точку на успех, `X` на ошибку:
+📍 **Fenster 1** — innerhalb des Clusters starten wir einen winzigen Pod, der unsere Anwendung einmal pro Sekunde
+über den Service anstößt und bei Erfolg einen Punkt, bei einem Fehler ein `X` zeichnet:
 
 ```bash
 export KUBECONFIG=~/lab.kubeconfig
 
-# run = создать одиночный под прямо из командной строки, без манифеста.
-#   --rm             удалить под, как только вы прервёте команду
-#   -it              вывод пода идёт к вам на экран, Ctrl+C останавливает его
-#   --restart=Never  копия одна и пересоздавать её не надо: это инструмент, а не сервис
-#   --image          busybox — образ в несколько мегабайт, в котором есть wget
-# Всё, что после --, выполняется внутри пода. Адрес http://rickroll — это имя Service,
-# внутри кластера оно само превращается в адрес приложения.
-#   -q               не печатать статистику загрузки
-#   -T 2             ждать ответа не дольше двух секунд, иначе считаем это отказом
-#   -O /dev/null     тело ответа выбросить, нам важен только сам факт ответа
+# run = einen einzelnen Pod direkt von der Kommandozeile erstellen, ohne Manifest.
+#   --rm             den Pod löschen, sobald Sie den Befehl abbrechen
+#   -it              die Ausgabe des Pods kommt auf Ihren Bildschirm, Ctrl+C stoppt ihn
+#   --restart=Never  es gibt eine einzige Kopie und keinen Grund, sie neu zu erstellen: das ist ein Werkzeug, kein Dienst
+#   --image          busybox — ein Image von wenigen Megabyte, das wget enthält
+# Alles nach -- läuft im Pod. Die Adresse http://rickroll ist der Name des Service;
+# innerhalb des Clusters wird sie von selbst zur Adresse der Anwendung.
+#   -q               keine Download-Statistik ausgeben
+#   -T 2             nicht länger als zwei Sekunden auf eine Antwort warten, sonst zählen wir es als Ausfall
+#   -O /dev/null     den Antwortkörper verwerfen, uns interessiert nur die Tatsache einer Antwort
 kubectl run pinger --rm -it --restart=Never --image=busybox:1.36 -- \
   sh -c 'while true; do wget -q -T 2 -O /dev/null http://rickroll/healthz \
          && echo "$(date +%T) ." || echo "$(date +%T) X"; sleep 1; done'
 ```
 
-Каждая строка — со временем: так вы увидите не только сам провал, но и **сколько секунд**
-он длился, а это и есть цифра, ради которой лаба затевалась.
+Jede Zeile trägt einen Zeitstempel: So sehen Sie nicht nur den Ausfall selbst, sondern auch **wie viele Sekunden**
+er dauerte — und das ist die Zahl, um die es in diesem ganzen Lab geht.
 
-⚠️ **Нужен второй терминал, а не фоновый запуск.** Смысл упражнения в том, чтобы видеть
-провал **в тот момент**, когда вы удаляете копию в другом окне: строчка с крестиком должна
-появиться у вас на глазах. Читать это потом в `kubectl logs` можно, но тогда пропадает
-главное — связь между вашим действием и его последствием.
+⚠️ **Sie brauchen ein zweites Terminal, keinen Hintergrundlauf.** Der Sinn der Übung ist es, den
+Ausfall **in dem Moment** zu sehen, in dem Sie im anderen Fenster die Kopie löschen: Die Zeile mit dem Kreuz soll
+vor Ihren Augen erscheinen. Sie können das später in `kubectl logs` nachlesen, aber dann geht das Wichtigste
+verloren — die Verbindung zwischen Ihrer Handlung und ihrer Folge.
 
-Почему изнутри кластера, а не с ноутбука: `port-forward` цепляется к конкретному поду и
-умирает вместе с ним, так что провал он бы показал в любом случае — даже там, где его нет.
-А `wget` из соседнего пода ходит через Service, то есть ровно так, как ходил бы настоящий
-клиент.
+Warum von innerhalb des Clusters und nicht vom Laptop: `port-forward` klammert sich an einen bestimmten Pod und
+stirbt mit ihm, sodass es in jedem Fall einen Ausfall zeigen würde — selbst dort, wo es keinen gibt. `wget` aus
+einem benachbarten Pod dagegen geht über den Service, also genau so, wie es ein echter Client täte.
 
-Подождите, пока побегут точки.
+Warten Sie, bis die Punkte zu laufen beginnen.
 
-📍 **Окно 2** — убиваем копию:
+📍 **Fenster 2** — die Kopie töten:
 
 ```bash
 export KUBECONFIG=~/lab.kubeconfig
 
-# Имя пода не указано, вместо него метка: удалить все копии с меткой app=rickroll.
-# Сейчас она одна, так что уйдёт именно та, которую опрашивает pinger.
+# Es wird kein Pod-Name angegeben, stattdessen ein Label: jede Kopie mit dem Label app=rickroll löschen.
+# Im Moment gibt es nur eine, also geht genau die, die der pinger abfragt.
 kubectl delete pod -l app=rickroll
 ```
 
-📍 **Смотрим в окно 1.** Вы увидите примерно это:
+📍 **Sehen Sie in Fenster 1.** Sie werden etwa Folgendes sehen:
 
 ```
 .........XXXXX.........
 ```
 
-Несколько секунд сервис отвечал ошибкой — у нас вышло пять, на загруженном узле бывает и
-пятнадцать. Копия вернулась быстро, но пока её не было — отвечать было некому.
+Ein paar Sekunden lang antwortete der Dienst mit einem Fehler — bei uns waren es fünf, auf einem ausgelasteten Node
+können es fünfzehn sein. Die Kopie kam schnell zurück, aber solange sie fehlte, war niemand da, der antworten konnte.
 
-**Вот честная формулировка того, что мы наблюдали.** Самолечение — это не отказоустойчивость.
-Самолечение возвращает систему в норму без человека. Отказоустойчивость означает, что клиент
-вообще ничего не заметил. Одна копия даёт первое и не даёт второго.
+**So lautet die ehrliche Formulierung dessen, was wir beobachtet haben.** Selbstheilung ist keine Fehlertoleranz.
+Selbstheilung bringt das System ohne Menschen wieder in den Normalzustand. Fehlertoleranz bedeutet, dass der Client
+überhaupt nichts bemerkt hat. Eine einzige Kopie gibt Ihnen das Erste und nicht das Zweite.
 
-Не останавливайте pinger, он пригодится прямо сейчас.
+Stoppen Sie den pinger nicht, Sie brauchen ihn gleich.
 
-## Шаг 4. Делаем то же самое, но с тремя копиями
+## Schritt 4. Dasselbe tun, aber mit drei Kopien
 
-📍 **Окно 2.** Заказываем три копии вместо одной и дожидаемся, пока все три будут готовы.
+📍 **Fenster 2.** Wir bestellen drei Kopien statt einer und warten, bis alle drei bereit sind.
 
 ```bash
-# scale правит ровно одно поле в записи о приложении — количество копий.
+# scale ändert genau ein Feld im Eintrag der Anwendung — die Anzahl der Kopien.
 kubectl scale deployment rickroll --replicas=3
 
-# rollout status держит терминал и печатает ход дела, пока все заказанные копии
-# не станут готовы. Команда завершится сама — вручную опрашивать get pods не нужно.
+# rollout status hält das Terminal und gibt den Fortschritt aus, bis alle bestellten Kopien
+# bereit sind. Der Befehl endet von selbst — man muss get pods nicht von Hand abfragen.
 kubectl rollout status deployment/rickroll
 ```
 
-Мы поменяли ровно одно число в желаемом состоянии. Дальше всё делает тот же ReplicaSet:
-видит «заказано 3, есть 1», создаёт две недостающие копии. Занимает это те же секунды.
+Wir haben genau eine Zahl im gewünschten Zustand geändert. Von da an erledigt dasselbe ReplicaSet alles:
+Es sieht „bestellt 3, vorhanden 1“ und erstellt die zwei fehlenden Kopien. Das dauert die gleichen Sekunden wie zuvor.
 
-Убедитесь, что копий стало три и все они попали за Service:
+Vergewissern Sie sich, dass es jetzt drei Kopien gibt und dass sie alle hinter dem Service gelandet sind:
 
 ```bash
-# EndpointSlice — тот самый список живых адресов, который Service ведёт за вас.
-#   -l kubernetes.io/service-name=rickroll   взять список, принадлежащий Service rickroll
-#   -o jsonpath=...                          из каждой записи вывести только сам адрес,
-#                                            по одному в строке
+# EndpointSlice — genau jene Liste aktiver Adressen, die der Service für Sie führt.
+#   -l kubernetes.io/service-name=rickroll   die Liste nehmen, die zum Service rickroll gehört
+#   -o jsonpath=...                          aus jedem Eintrag nur die Adresse selbst ausgeben,
+#                                            eine pro Zeile
 kubectl get endpointslices -l kubernetes.io/service-name=rickroll \
   -o jsonpath='{range .items[*].endpoints[*]}{.addresses[0]}{"\n"}{end}'
 ```
 
-Три адреса. Никто их туда не вписывал — Service собрал список сам, по метке `app=rickroll`
-и по готовности каждой копии. Это и есть та разница с пулом на балансировщике, о которой
-шла речь в лабе 1: там адреса заносят, здесь описывают условие.
+Drei Adressen. Niemand hat sie dort eingetragen — der Service hat die Liste selbst zusammengestellt, aus dem Label
+`app=rickroll` und der Bereitschaft jeder Kopie. Genau das ist der Unterschied zum Pool auf einem Load Balancer, von
+dem in Lab 1 die Rede war: Dort trägt man die Adressen ein, hier beschreibt man eine Bedingung.
 
-Теперь убиваем одну копию из трёх:
+Jetzt töten wir eine der drei Kopien:
 
 ```bash
-# Берём имя первой копии из трёх — какой именно, роли не играет.
+# Wir nehmen den Namen der ersten der drei Kopien — welche genau, spielt keine Rolle.
 POD=$(kubectl get pods -l app=rickroll -o jsonpath='{.items[0].metadata.name}')
 
-# И удаляем её. Здесь без --wait=false: команда вернётся, когда под уже исчез.
+# Und löschen sie. Hier ohne --wait=false: der Befehl kehrt zurück, wenn der Pod bereits weg ist.
 kubectl delete pod "$POD"
 ```
 
-📍 **Смотрим в окно 1:**
+📍 **Sehen Sie in Fenster 1:**
 
 ```
 ...........................
 ```
 
-Ни одного `X`. Копию убили, она пересоздалась, клиент не заметил.
+Kein einziges `X`. Die Kopie wurde getötet, sie wurde neu erstellt, der Client hat es nicht bemerkt.
 
-Разница между проверкой с одной копией и проверкой с тремя копиями — одно число в манифесте. **Отказоустойчивость здесь не
-функция, которую включают, а следствие того, что копий больше одной.** Ровно поэтому в
-Kubernetes нет галочки «включить HA»: включать нечего, есть только `replicas`.
+Der Unterschied zwischen dem Test mit einer Kopie und dem mit drei Kopien ist eine einzige Zahl im Manifest. **Fehlertoleranz ist hier keine
+Funktion, die man einschaltet, sondern eine Folge davon, dass es mehr als eine Kopie gibt.** Genau deshalb gibt es in
+Kubernetes kein Kästchen „HA aktivieren“: Es gibt nichts zu aktivieren, es gibt nur `replicas`.
 
-Остановите pinger в окне 1 нажатием `Ctrl+C`. Если под остался висеть — уберите его:
+Stoppen Sie den pinger in Fenster 1 mit `Ctrl+C`. Falls der Pod hängen bleibt, entfernen Sie ihn:
 `kubectl delete pod pinger`.
 
-## Шаг 5. Проверка, которая не пройдёт
+## Schritt 5. Ein Test, der nicht bestehen wird
 
-Механизм понятен: удаляем копию — она возвращается. Проверим его ещё раз, но теперь удалим
-не копию, а само приложение:
+Der Mechanismus ist klar: Kopie löschen, sie kommt zurück. Testen wir ihn noch einmal, aber diesmal löschen wir
+nicht eine Kopie, sondern die Anwendung selbst:
 
 ```bash
-# Удаляем не копию, а саму запись о приложении. Подтверждения не будет,
-# в корзину объект не попадёт — восстанавливать его будет неоткуда, кроме файла.
+# Wir löschen nicht eine Kopie, sondern den Eintrag der Anwendung selbst. Es gibt keine Bestätigung,
+# das Objekt landet in keinem Papierkorb — es gibt nichts, woraus man es wiederherstellen könnte, außer der Datei.
 kubectl delete deployment rickroll
 ```
 
-Ждём несколько секунд и смотрим, вернулись ли копии:
+Wir warten ein paar Sekunden und sehen nach, ob die Kopien zurückgekommen sind:
 
 ```bash
-# Ищем поды по метке приложения. Пустой ответ здесь — тоже ответ.
+# Wir suchen die Pods über das Label der Anwendung. Eine leere Antwort ist hier auch eine Antwort.
 kubectl get pods -l app=rickroll
 ```
 
-**Что вы увидите:**
+**Was Sie sehen werden:**
 
 ```
 No resources found in default namespace.
 ```
 
-Копии не вернулись. Ни через пять секунд, ни через минуту.
+Die Kopien kamen nicht zurück. Nicht nach fünf Sekunden, nicht nach einer Minute.
 
-> **Остановитесь и подумайте, прежде чем читать дальше.**
+> **Halten Sie inne und denken Sie nach, bevor Sie weiterlesen.**
 >
-> Почему раньше, когда вы убивали копию, она появлялась снова, а сейчас — нет? Мы ведь ничего
-> не отключали.
+> Warum tauchte die Kopie früher wieder auf, als Sie sie getötet haben, jetzt aber nicht? Wir haben doch nichts abgeschaltet.
 
 <details>
-<summary><b>Ответ и урок шире, чем эта ошибка</b></summary>
+<summary><b>Die Antwort und eine Lehre, die über diesen Fehler hinausgeht</b></summary>
 
-Раньше вы удаляли **копию** — то есть факт. Запись «копий должно быть три» осталась на
-месте, реальность разошлась с ней, и контроллер расхождение устранил.
+Früher haben Sie eine **Kopie** gelöscht — also eine Tatsache. Der Eintrag „es soll drei Kopien geben“ blieb
+bestehen, die Realität wich davon ab, und der Controller beseitigte die Abweichung.
 
-Сейчас вы удалили **саму запись**. Расходиться стало не с чем: желаемое состояние — «этого
-приложения не существует», реальное — «этого приложения не существует». Они совпадают,
-контроллеру нечего делать. Заодно по цепочке `ownerReferences` вместе с Deployment уехали
-и ReplicaSet, и все три пода.
+Diesmal haben Sie den **Eintrag selbst** gelöscht. Es gibt nichts mehr, wovon abgewichen werden könnte: Der
+gewünschte Zustand ist „diese Anwendung existiert nicht“, der tatsächliche Zustand ist „diese Anwendung existiert
+nicht". Sie stimmen überein, und der Controller hat nichts zu tun. Nebenbei sind entlang der `ownerReferences`-Kette
+das ReplicaSet und alle drei Pods zusammen mit dem Deployment verschwunden.
 
-**Урок шире, чем эта ошибка.** Правило, которое стоит унести из лабы целиком:
+**Die Lehre reicht über diesen Fehler hinaus.** Die Regel, die man aus dem Lab als Ganzes mitnehmen sollte:
 
-> Kubernetes защищает от потери **факта**, но никак не защищает от потери **намерения**.
+> Kubernetes schützt Sie vor dem Verlust einer **Tatsache**, tut aber nichts, um Sie vor dem Verlust der **Absicht** zu schützen.
 
-Всё самолечение работает ровно до тех пор, пока цела запись о том, как должно быть. Если
-запись изменили или удалили — кластер добросовестно и очень быстро приведёт реальность к
-новому желаемому состоянию, каким бы оно ни было. Он не спросит «вы уверены?» и не оставит
-корзину.
+Die gesamte Selbstheilung funktioniert genau so lange, wie der Eintrag darüber, wie es sein soll, intakt ist. Wird
+der Eintrag geändert oder gelöscht, gleicht der Cluster die Realität gewissenhaft und sehr schnell an den neuen
+gewünschten Zustand an, welcher auch immer das sein mag. Er fragt nicht „sind Sie sicher?“ und hinterlässt keinen Papierkorb.
 
-Практических следствий два, и оба неприятны ровно один раз.
+Es gibt zwei praktische Folgen, und beide sind genau einmal unangenehm.
 
-**Первое: удаление здесь тише, чем в vSphere.** Снести Deployment — одна строка, никакого
-подтверждения, никакого «Delete from Disk?» с красной иконкой. Восстановить его из кластера
-нельзя: удалённый объект не хранится нигде.
+**Erstens: Das Löschen ist hier leiser als in vSphere.** Ein Deployment abzureißen ist eine Zeile — keine
+Bestätigung, kein „Delete from Disk?“ mit rotem Symbol. Aus dem Cluster kann man es nicht wiederherstellen: Ein
+gelöschtes Objekt wird nirgends gespeichert.
 
-**Второе: единственная настоящая защита — держать намерение вне кластера.** Если манифест
-лежит в Git, а в кластер его приносит автоматика, то случайное удаление лечится тем, что
-автоматика через минуту вернёт объект обратно из репозитория. Это и есть GitOps, и в лабе 5
-мы его включим. Пока же ваш `rickroll.yaml` — единственная копия намерения. Хорошо, что она
-лежит в файле: его можно отревьюить, положить в Git и применить заново.
+**Zweitens: Der einzige echte Schutz besteht darin, die Absicht außerhalb des Clusters zu halten.** Wenn das
+Manifest in Git liegt und die Automatik es in den Cluster bringt, dann heilt sich ein versehentliches Löschen
+dadurch, dass die Automatik das Objekt eine Minute später aus dem Repository zurückbringt. Das ist GitOps, und in Lab 5
+schalten wir es ein. Vorerst ist Ihre `rickroll.yaml` die einzige Kopie der Absicht. Gut, dass sie in einer Datei
+liegt: Sie können sie durchsehen, in Git ablegen und erneut anwenden.
 
-Кстати, промежуточное звено проверяется отдельно и ведёт себя по-другому. Верните приложение
-(следующий шаг), а потом попробуйте удалить не Deployment, а ReplicaSet:
+Übrigens lohnt es sich, das mittlere Glied getrennt zu testen, und es verhält sich anders. Stellen Sie die Anwendung
+wieder her (der nächste Schritt) und versuchen Sie dann, nicht das Deployment, sondern das ReplicaSet zu löschen:
 
 ```bash
-# rs — сокращение для replicaset, kubectl понимает оба написания.
-# Удаляем промежуточное звено, оставляя Deployment на месте.
+# rs — Kurzform für replicaset; kubectl versteht beide Schreibweisen.
+# Wir löschen das mittlere Glied und lassen das Deployment an seinem Platz.
 kubectl delete rs -l app=rickroll
 
-# И сразу смотрим, что осталось: сравните имя набора с тем, что было до удаления.
+# Und sehen sofort nach, was übrig ist: Vergleichen Sie den Namen des Satzes mit dem vor dem Löschen.
 kubectl get rs -l app=rickroll
 ```
 
-Набор появится снова за секунду — и **с тем же именем**. Хеш в имени считается от шаблона
-пода, а шаблон мы не трогали: то же имя означает, что кластер восстановил ровно то же самое,
-а не создал что-то новое. Запись «должно быть такое приложение» осталась цела — за неё
-отвечает Deployment, и он пережил удаление набора.
+Der Satz taucht innerhalb einer Sekunde wieder auf — und **mit demselben Namen**. Der Hash im Namen wird aus dem
+Pod-Template berechnet, und das Template haben wir nicht angetastet: Derselbe Name bedeutet, dass der Cluster genau
+dasselbe wiederhergestellt hat, statt etwas Neues zu erstellen. Der Eintrag „es soll diese Anwendung geben“ blieb
+intakt — dafür ist das Deployment zuständig, und es hat das Löschen des Satzes überlebt.
 
 </details>
 
-## Шаг 6. Возвращаем приложение
+## Schritt 6. Die Anwendung zurückbringen
 
-Намерение у вас есть, оно лежит в файле. Восстановление — одна команда:
+Sie haben die Absicht, sie liegt in einer Datei. Das Wiederherstellen ist ein einziger Befehl:
 
 ```bash
-# apply = «приведи кластер к тому, что описано в файле». Объекта нет — он будет создан.
-#   -f ../01-deploy/rickroll.yaml   файл лежит в папке лабы 1, отсюда путь через ../
+# apply = "bring den Cluster in den in der Datei beschriebenen Zustand". Das Objekt existiert nicht — es wird erstellt.
+#   -f ../01-deploy/rickroll.yaml   die Datei liegt im Ordner von Lab 1, daher der Pfad über ../
 kubectl apply -f ../01-deploy/rickroll.yaml
 
-# Ждём, пока копия поднимется и станет готова принимать запросы.
+# Wir warten, bis die Kopie hochgekommen und bereit ist, Anfragen anzunehmen.
 kubectl rollout status deployment/rickroll
 ```
 
-Заметьте, чего здесь **не** было: ни бэкапа, ни снапшота, ни выгрузки из vCenter. Вы
-восстановили приложение из текстового файла на десять килобайт, и получилось буквально то
-же самое, что было. С виртуальной машиной этот номер не проходит: её описание и её
-содержимое неразделимы.
+Beachten Sie, was es hier **nicht** gab: kein Backup, keinen Snapshot, keinen Export aus vCenter. Sie haben die
+Anwendung aus einer zehn Kilobyte großen Textdatei wiederhergestellt, und heraus kam buchstäblich dasselbe wie
+zuvor. Bei einer virtuellen Maschine funktioniert dieser Trick nicht: Ihre Beschreibung und ihr Inhalt sind untrennbar.
 
-## Проверка
+## Überprüfung
 
-📍 **Где:** на ноутбуке, в том же окне терминала, где вы работали с `kubectl`.
+📍 **Wo:** auf dem Laptop, im selben Terminalfenster, in dem Sie mit `kubectl` gearbeitet haben.
 
-Скрипт проверит не то, что вы запускали команды, а то, что осталось в кластере: приложение
-снова обслуживает запросы через Service, подставляет в страницу имя своей копии, и это имя
-принадлежит реально работающему поду. Отдельно он поищет следы пересоздания копий — по
-возрасту подов и по событиям кластера.
+Das Skript prüft nicht, dass Sie die Befehle ausgeführt haben, sondern was im Cluster übrig ist: dass die Anwendung
+wieder Anfragen über den Service bedient, den Namen ihrer Kopie in die Seite einsetzt und dieser Name zu einem
+tatsächlich laufenden Pod gehört. Gesondert sucht es nach Spuren des Neuerstellens von Kopien — anhand des Alters
+der Pods und anhand der Events des Clusters.
 
-⚠️ **На Windows скрипт запускается из WSL**, а не из PowerShell — как его поставить,
-написано в начале лабы 0. Без WSL лабу можно пройти, но отчёта-артефакта не будет.
+⚠️ **Unter Windows wird das Skript aus WSL ausgeführt**, nicht aus PowerShell — wie man es installiert, steht am
+Anfang von Lab 0. Ohne WSL können Sie das Lab absolvieren, aber es gibt keinen Artefakt-Bericht.
 
 ```bash
-# ./ означает «файл из текущей папки», а не команду из системного PATH.
-# Скрипт ничего в кластере не меняет: он только читает и печатает отчёт.
+# ./ bedeutet "eine Datei aus dem aktuellen Ordner", nicht einen Befehl aus dem System-PATH.
+# Das Skript ändert nichts im Cluster: es liest nur und gibt einen Bericht aus.
 ./check.sh
 ```
 
-## Уборка
+## Aufräumen
 
-Приложение `rickroll` понадобится в лабах 3 и 4 — не удаляем.
+Die Anwendung `rickroll` wird in Lab 3 und Lab 4 gebraucht — wir löschen sie nicht.
 
-Убирать здесь нечего, и это стоит заметить отдельно. Вы восстановили приложение из файла,
-а в файле заказана одна копия — лишние две кластер погасил сам, ещё на предыдущем шаге, не
-спрашивая и не дожидаясь вашей команды. Убедиться:
+Hier gibt es nichts aufzuräumen, und das ist für sich genommen bemerkenswert. Sie haben die Anwendung aus der Datei
+wiederhergestellt, und die Datei bestellt eine Kopie — die überzähligen zwei hat der Cluster selbst heruntergefahren,
+schon im vorherigen Schritt, ohne zu fragen und ohne auf Ihren Befehl zu warten. Zur Bestätigung:
 
 ```bash
-# В колонке READY должно быть 1/1.
+# In der Spalte READY sollte 1/1 stehen.
 kubectl get deployment rickroll
 ```
 
-Ресурсы узла освободились в тот же момент, когда завершились контейнеры. Никакой
-«дефрагментации» и возврата места по расписанию здесь нет: контейнер закончился — его
-память и процессорное время немедленно доступны соседям.
+Die Ressourcen des Nodes wurden in dem Moment freigegeben, in dem die Container endeten. Es gibt hier keine
+„Defragmentierung“ und keine planmäßige Rückgewinnung von Platz: Ein Container ist fertig — sein Speicher und seine
+CPU-Zeit stehen sofort seinen Nachbarn zur Verfügung.
 
-## Что мы теперь умеем
+## Was wir jetzt können
 
-- Объяснять цепочку Deployment → ReplicaSet → Pod и понимать, зачем в ней три этажа
-- Отличать самолечение (копия вернулась) от отказоустойчивости (клиент не заметил)
-- Менять количество копий одним числом и видеть, как Service подхватывает их сам
-- Понимать, что кластер защищает факт, но не намерение, и где намерению место
+- Die Kette Deployment → ReplicaSet → Pod erklären und verstehen, warum sie drei Ebenen hat
+- Selbstheilung (die Kopie kam zurück) von Fehlertoleranz (der Client hat nichts bemerkt) unterscheiden
+- Die Anzahl der Kopien mit einer einzigen Zahl ändern und zusehen, wie der Service sie von selbst aufnimmt
+- Verstehen, dass der Cluster eine Tatsache schützt, aber nicht die Absicht, und wohin die Absicht gehört
 
-## А в vSphere это было бы
+## Und in vSphere wäre das
 
-vSphere HA перезапускает виртуалку после отказа хоста: сначала кластер должен убедиться,
-что хост действительно потерян (это десятки секунд), потом машина загружается с нуля —
-ядро, службы, приложение. Минуты. VM Monitoring по потере heartbeat работает по той же
-схеме и с тем же порядком времени.
+vSphere HA startet eine VM nach einem Host-Ausfall neu: Zuerst muss der Cluster sicherstellen, dass der Host
+wirklich verloren ist (das sind Dutzende Sekunden), dann bootet die Maschine von Grund auf — Kernel, Dienste,
+Anwendung. Minuten. VM Monitoring anhand verlorener Heartbeats funktioniert genauso und in derselben Größenordnung der Zeit.
 
-Здесь — секунды, и не только по отказу хоста: тот же механизм срабатывает, когда копию
-выселили, когда её убил OOM, когда вы удалили её сами.
+Hier sind es Sekunden, und nicht nur bei einem Host-Ausfall: Derselbe Mechanismus greift, wenn eine Kopie verdrängt
+wird, wenn OOM sie tötet, wenn Sie sie selbst löschen.
 
-**Где vSphere удобнее, честно.** Три вещи.
+**Wo vSphere ehrlich gesagt bequemer ist.** Drei Dinge.
 
-Во-первых, vSphere HA возвращает **ту же самую машину** со всем, что было у неё на диске.
-Под возвращается пустым: всё, что не лежало в постоянном томе, потеряно навсегда. Для
-приложения без состояния это плюс, для legacy-сервиса, который годами писал что-то себе в
-`/var` — источник очень неприятных сюрпризов.
+Erstens bringt vSphere HA **genau dieselbe Maschine** zurück, mit allem, was auf ihrer Disk war. Ein Pod kommt leer
+zurück: Alles, was nicht auf einem persistenten Volume lag, ist endgültig verloren. Für eine zustandslose Anwendung
+ist das ein Vorteil; für einen Legacy-Dienst, der jahrelang etwas in sein eigenes `/var` geschrieben hat, ist es
+eine Quelle sehr unangenehmer Überraschungen.
 
-Во-вторых, у vSphere есть Fault Tolerance: две машины в lock-step и нулевой простой при
-отказе хоста, без всякой переделки приложения. Прямого аналога в Kubernetes нет и быть не
-может — здесь нулевой простой достигается тем, что копий несколько, а значит приложение
-обязано уметь работать в нескольких копиях. Если оно не умеет, Kubernetes вам эту проблему
-не решит, а обнажит.
+Zweitens hat vSphere Fault Tolerance: zwei Maschinen im Gleichschritt und null Ausfallzeit bei einem Host-Ausfall,
+ganz ohne Umbau der Anwendung. In Kubernetes gibt es kein direktes Gegenstück, und es kann keines geben — hier wird
+null Ausfallzeit dadurch erreicht, dass es mehrere Kopien gibt, was bedeutet, dass die Anwendung in mehreren Kopien
+laufen können muss. Kann sie das nicht, löst Kubernetes dieses Problem nicht für Sie — es legt es offen.
 
-В-третьих, разбор полётов. В vCenter причина перезапуска машины видна одной записью в
-событиях кластера, и она там останется. В Kubernetes события живут около часа, а потом
-исчезают, и восстанавливать картину придётся по логам нескольких компонентов. Пока вы не
-поставили сбор логов и событий (лаба 14), «почему оно перезапустилось ночью» — вопрос без
-ответа.
+Drittens die Fehleranalyse. In vCenter ist der Grund, warum eine Maschine neu gestartet ist, als einzelner Eintrag
+in den Events des Clusters sichtbar, und er bleibt dort. In Kubernetes leben Events etwa eine Stunde und verschwinden
+dann, und Sie müssen das Bild aus den Logs mehrerer Komponenten rekonstruieren. Solange Sie die Sammlung von Logs
+und Events nicht eingerichtet haben (Lab 14), ist „warum ist es über Nacht neu gestartet“ eine Frage ohne Antwort.

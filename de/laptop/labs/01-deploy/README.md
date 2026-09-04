@@ -1,108 +1,109 @@
-# Лаба 1 · Первое приложение
+# Lab 1 · Ihre erste Anwendung
 
 | | |
 |---|---|
-| **Время** | 25 минут |
-| **Что доказывает** | Приложение описывается текстом, разворачивается за секунды, и вы никого не просите |
-| **Что понадобится** | Кластер из лабы 0, `kubectl`, файл `~/lab.kubeconfig` |
+| **Zeit** | 25 Minuten |
+| **Was es beweist** | Eine Anwendung wird als Text beschrieben, ist in Sekunden ausgerollt, und Sie fragen niemanden um Erlaubnis |
+| **Was Sie brauchen** | Der Cluster aus Lab 0, `kubectl`, die Datei `~/lab.kubeconfig` |
 
-## Зачем это
+## Warum das wichtig ist
 
-Прежде чем браться за рабочую задачу, потренируемся на безобидном. Развернём крошечное
-приложение, которое ничего не делает, кроме одного: показывает **имя своей копии**.
+Bevor wir uns an eine echte Aufgabe machen, üben wir an etwas Harmlosem. Wir rollen eine winzige
+Anwendung aus, die nichts weiter tut als eines: Sie zeigt **den Namen ihrer eigenen Kopie**.
 
-Звучит бессмысленно, но именно это имя будет главным героем следующих трёх лаб. По нему
-вы увидите, как копия умирает и рождается заново, как их становится шесть, и как старая
-версия сменяется новой.
+Klingt sinnlos, aber genau dieser Name ist die Hauptfigur der nächsten drei Labs. An ihm werden Sie
+sehen, wie eine Kopie stirbt und neu geboren wird, wie sie sich auf sechs vermehren, und wie eine
+alte Version einer neuen weicht.
 
-Разворачивать будем текстом: одним файлом и одной командой. Мышки в этой лабе не будет,
-и на то есть причина — с неё и начнём.
+Ausrollen werden wir sie als Text: eine Datei und ein Befehl. In diesem Lab gibt es keine Maus, und
+das hat einen Grund — damit fangen wir an.
 
-## Словарик
+## Kleines Glossar
 
-| Термин | Что это | Похоже на… но |
+| Begriff | Was es ist | Ähnlich wie… aber |
 |---|---|---|
-| **Под (pod)** | Запущенная копия приложения | **Виртуальная машина**, но под одноразовый. Его не чинят и не бэкапят — удаляют, и создаётся новый |
-| **Образ (image)** | Слепок приложения со всем нужным для запуска | **Шаблон VM**, но неизменяемый. Внутрь не зайти и не поправить — собирают новый |
-| **Deployment** | Описание: какой образ, сколько копий, как обновлять | **vApp**, но хранит не ссылки на конкретные VM, а желаемое количество |
-| **Service** | Постоянный адрес, за которым стоят копии | **Пул балансировщика**, но имя не меняется, даже когда все копии за ним пересоздались |
-| **ConfigMap** | Файл с настройками, лежащий в кластере | **Файл на диске VM**, но живёт отдельно от приложения и подкладывается внутрь при запуске |
-| **Манифест** | Файл, описывающий желаемое состояние | прямого аналога нет, и в этом весь смысл |
+| **Pod** | Eine laufende Kopie einer Anwendung | Eine **virtuelle Maschine**, aber der Pod ist wegwerfbar. Er wird nicht repariert und nicht gesichert — Sie löschen ihn, und ein neuer wird erstellt |
+| **Image** | Ein Abbild der Anwendung mit allem, was sie zum Laufen braucht | Eine **VM-Vorlage**, aber unveränderlich. Sie können nicht hineingehen und es korrigieren — Sie bauen ein neues |
+| **Deployment** | Eine Beschreibung: welches Image, wie viele Kopien, wie sie aktualisiert werden | Eine **vApp**, aber es hält eine gewünschte Anzahl an Kopien statt Verweisen auf konkrete VMs |
+| **Service** | Eine dauerhafte Adresse, hinter der die Kopien stehen | Ein **Load-Balancer-Pool**, aber der Name ändert sich nicht, selbst wenn jede Kopie dahinter neu erstellt wurde |
+| **ConfigMap** | Eine Einstellungsdatei, die im Cluster liegt | Eine **Datei auf der Festplatte einer VM**, aber sie lebt getrennt von der Anwendung und wird beim Start hineingeschoben |
+| **Manifest** | Eine Datei, die den gewünschten Zustand beschreibt | Ein direktes Gegenstück gibt es nicht, und genau darum geht es |
 
-## Что лежит в папке лабы
+## Was im Lab-Ordner liegt
 
-Все файлы уже у вас — вы забрали их вместе с репозиторием. Создавать и печатать заново
-ничего не нужно: там, где ниже написано `kubectl apply -f имя.yaml`, файл берётся отсюда.
+Alle Dateien haben Sie bereits — Sie haben sie zusammen mit dem Repository geholt. Es gibt nichts
+zu erstellen oder abzutippen: Wo unten `kubectl apply -f name.yaml` steht, wird die Datei von hier
+genommen.
 
 ```bash
-# путь отсчитывается от корня репозитория, который вы забрали в лабе 0
+# Der Pfad wird relativ zur Wurzel des Repositorys angegeben, das Sie in Lab 0 geholt haben
 cd labs/01-deploy
 ```
 
-| Файл | Что это | Когда пригодится |
+| Datei | Was es ist | Wann Sie es brauchen |
 |---|---|---|
-| `rickroll.yaml` | Приложение целиком: настройки nginx, само развёртывание и точка входа к нему | применяете на своём кластере `lab` |
-| `check.sh` | Проверка, что приложение отвечает и отдаёт имя пода | запускаете в конце лабы |
+| `rickroll.yaml` | Die Anwendung als Ganzes: nginx-Einstellungen, das Deployment selbst und der Einstiegspunkt dazu | Sie wenden es auf Ihrem eigenen Cluster `lab` an |
+| `check.sh` | Eine Prüfung, dass die Anwendung antwortet und den Pod-Namen zurückgibt | Sie führen es am Ende des Labs aus |
 
-## Шаг 1. Где кончается дашборд и начинается ваш кластер
+## Schritt 1. Wo das Dashboard endet und Ihr Cluster beginnt
 
-📍 **Где:** на ноутбуке.
+📍 **Wo:** auf dem Laptop.
 
-Дашборд Cozystack показывает то, что вы **заказываете у платформы**: кластеры Kubernetes,
-базы, очереди, виртуальные машины — позиции каталога. Кластер `lab` виден там одной
-позицией: заказан и работает.
+Das Cozystack-Dashboard zeigt, was Sie **bei der Plattform bestellen**: Kubernetes-Cluster,
+Datenbanken, Warteschlangen, virtuelle Maschinen — Katalogpositionen. Der Cluster `lab` erscheint
+dort als eine einzige Position: bestellt und in Betrieb.
 
-Внутрь него дашборд не смотрит и смотреть не может. Ваш кластер — отдельный API-сервер
-со своим адресом и своим файлом доступа, тем самым `~/lab.kubeconfig`; управляющий
-дашборд обращается не к нему. Своей графической консоли у кластера `lab` тоже нет: среди
-дополнений, которые к нему можно подключить, такой не значится.
+In sein Inneres schaut das Dashboard nicht, und es kann es auch nicht. Ihr Cluster ist ein eigener
+API-Server mit eigener Adresse und eigener Zugangsdatei — eben jener `~/lab.kubeconfig`; das
+Management-Dashboard spricht nicht mit ihm. Auch eine eigene grafische Konsole hat der Cluster `lab`
+nicht: Unter den Add-ons, die Sie an ihn anhängen können, ist keine solche aufgeführt.
 
-Отсюда граница ответственности, и её стоит запомнить: **платформа отвечает за то, что вы
-заказали, а за то, что внутри заказанного, отвечаете вы.** Внутри кластера работа идёт
-через `kubectl` — команду, которая отправляет описания объектов его API-серверу и
-показывает, что там сейчас есть.
+Daher die Verantwortungsgrenze, und die sollte man sich merken: **Die Plattform ist verantwortlich
+für das, was Sie bestellt haben, und für das, was innerhalb des Bestellten liegt, sind Sie
+verantwortlich.** Innerhalb des Clusters läuft die Arbeit über `kubectl` — den Befehl, der
+Objektbeschreibungen an seinen API-Server sendet und Ihnen zeigt, was dort gerade vorhanden ist.
 
-Подключаемся:
+Verbinden wir uns:
 
 ```bash
-# KUBECONFIG — переменная, из которой kubectl узнаёт, какой файл доступа брать.
-# Здесь это доступ к кластеру lab, а не к тенанту: файлы разные, кластеры разные.
+# KUBECONFIG — die Variable, aus der kubectl abliest, welche Zugangsdatei zu verwenden ist.
+# Hier ist das der Zugang zum lab-Cluster, nicht zum Tenant: unterschiedliche Dateien, unterschiedliche Cluster.
 export KUBECONFIG=~/lab.kubeconfig
-# get nodes = «покажи узлы». Ответ подтверждает, что kubectl обращается туда, куда надо.
+# get nodes = "zeige die Nodes". Die Antwort bestätigt, dass kubectl mit dem richtigen Ort spricht.
 kubectl get nodes
 ```
 
-**Что вы должны увидеть:** строку с вашим узлом и статусом `Ready`. Если вместо неё ошибка
-подключения — проверьте `echo $KUBECONFIG`: переменную нужно задавать в каждом новом окне
-терминала.
+**Was Sie sehen sollten:** eine Zeile mit Ihrem Node und dem Status `Ready`. Erhalten Sie
+stattdessen einen Verbindungsfehler — prüfen Sie `echo $KUBECONFIG`: Die Variable muss in jedem
+neuen Terminalfenster gesetzt werden.
 
-## Шаг 2. Разворачиваем приложение
+## Schritt 2. Die Anwendung ausrollen
 
-📍 **Где:** на ноутбуке.
+📍 **Wo:** auf dem Laptop.
 
-Перейдите в папку этой лабы — репозиторий вы забрали в лабе 0:
+Wechseln Sie in den Ordner dieses Labs — das Repository haben Sie in Lab 0 geholt:
 
 ```bash
-# путь отсчитывается от папки, в которую вы клонировали репозиторий
+# Der Pfad wird relativ zum Ordner angegeben, in den Sie das Repository geklont haben
 cd labs/01-deploy
 ```
 
-Если репозитория ещё нет:
+Falls Sie das Repository noch nicht haben:
 
 ```bash
-# clone = скачать репозиторий целиком; рядом появится папка с тем же именем
+# clone = das gesamte Repository herunterladen; ein Ordner mit demselben Namen erscheint neben Ihnen
 git clone https://github.com/aenix-org/cozystack-migration-workshop.git
 cd labs/01-deploy
 ```
 
-В папке лежит `rickroll.yaml`. Прежде чем применять — разберём, что в нём.
+Im Ordner liegt `rickroll.yaml`. Bevor wir es anwenden — sehen wir uns an, was darin steht.
 
 <details>
-<summary><b>Разбираем манифест построчно</b></summary>
+<summary><b>Genauer betrachtet: Was in rickroll.yaml steckt</b></summary>
 
-В файле четыре объекта, разделённых строкой `---`. Идём по порядку.
+In der Datei stehen vier Objekte, getrennt durch eine `---`-Zeile. Gehen wir sie der Reihe nach durch.
 
-### Первый: настройки веб-сервера
+### Erstes: die Webserver-Einstellungen
 
 ```yaml
 kind: ConfigMap
@@ -120,18 +121,19 @@ data:
     }
 ```
 
-`ConfigMap` — способ положить файл настроек в кластер отдельно от приложения. Внутри —
-обычный конфиг nginx (nginx — веб-сервер, он и будет отдавать нашу страницу), такой же,
-как лежал бы в `/etc/nginx/conf.d/` на виртуалке.
+`ConfigMap` ist eine Möglichkeit, eine Einstellungsdatei getrennt von der Anwendung in den Cluster
+zu legen. Darin steckt eine gewöhnliche nginx-Konfiguration (nginx ist ein Webserver, und er ist es,
+der unsere Seite ausliefert), dieselbe, wie sie auf einer VM in `/etc/nginx/conf.d/` läge.
 
-Ключевая строка — `sub_filter '__POD__' '$hostname'`. Она говорит nginx: в отдаваемой
-странице заменяй текст `__POD__` на имя машины, на которой ты работаешь. Внутри пода имя
-машины — это имя самого пода. Так страница и узнаёт, кто её отдал.
+Die entscheidende Zeile ist `sub_filter '__POD__' '$hostname'`. Sie sagt nginx: Ersetze in der
+ausgelieferten Seite den Text `__POD__` durch den Namen der Maschine, auf der du läufst. Innerhalb
+eines Pods ist der Maschinenname der Name des Pods selbst. So erfährt die Seite, wer sie ausgeliefert
+hat.
 
-Зачем настройки отдельным объектом, а не внутри образа: чтобы менять их, не пересобирая
-образ. Мы этим воспользуемся в лабе про выкатку версий.
+Warum die Einstellungen ein eigenes Objekt sind und nicht ins Image eingebacken: damit Sie sie
+ändern können, ohne das Image neu zu bauen. Das nutzen wir im Lab über das Ausrollen von Versionen.
 
-### Второй: сама страница
+### Zweites: die Seite selbst
 
 ```yaml
 kind: ConfigMap
@@ -142,10 +144,11 @@ data:
     ...<div class="pod">вас обслужил под<b>__POD__</b></div>...
 ```
 
-Тот самый `__POD__`, который подменит nginx. Имя `-v1` не случайно: в лабе про выкатку версий
-появится `-v2`, и переключение между ними будет выкаткой новой версии.
+Eben jenes `__POD__`, das nginx ersetzen wird. Das `-v1` im Namen ist kein Zufall: Im Lab über das
+Ausrollen von Versionen taucht ein `-v2` auf, und das Umschalten zwischen ihnen wird ein Rollout der
+neuen Version sein.
 
-### Третий: приложение
+### Drittes: die Anwendung
 
 ```yaml
 kind: Deployment
@@ -153,18 +156,18 @@ spec:
   replicas: 1
 ```
 
-`Deployment` — описание приложения целиком. `replicas: 1` — сколько копий держать
-запущенными. Обратите внимание на формулировку: не «запусти одну», а **«держи одну»**.
-Разница проявится в следующей лабе, когда мы копию удалим.
+`Deployment` ist die Beschreibung der Anwendung als Ganzes. `replicas: 1` gibt an, wie viele Kopien
+am Laufen gehalten werden. Achten Sie auf die Formulierung: nicht **„eine starten“**, sondern
+**„eine halten“**. Der Unterschied zeigt sich im nächsten Lab, wenn wir die Kopie löschen.
 
 ```yaml
       image: nginxinc/nginx-unprivileged:1.27-alpine
 ```
 
-Образ. Взят непривилегированный вариант nginx — он слушает порт 8080 и работает не от
-root. Обычный nginx требует прав, которых в правильно настроенном кластере не дают.
-Это не наша придирка, а требование безопасности, с которым вы столкнётесь в любом
-современном кластере.
+Das Image. Wir haben die unprivilegierte Variante von nginx genommen — sie lauscht auf Port 8080 und
+läuft nicht als root. Gewöhnliches nginx verlangt Privilegien, die ein korrekt konfigurierter Cluster
+nicht gewährt. Das ist keine Pingeligkeit unsererseits — es ist eine Sicherheitsanforderung, der Sie
+in jedem modernen Cluster begegnen.
 
 ```yaml
       resources:
@@ -172,30 +175,33 @@ root. Обычный nginx требует прав, которых в прави
         limits:   {cpu: 300m, memory: 128Mi}
 ```
 
-Две разные вещи, и их постоянно путают.
+Zwei verschiedene Dinge, und sie werden ständig verwechselt.
 
-`requests` — сколько **гарантированно зарезервировать**. По этому числу планировщик решает,
-на какой узел поместится под. Ближайший аналог — reservation в vSphere.
+`requests` ist, wie viel **als Garantie reserviert** wird. Der Scheduler nutzt diese Zahl, um zu
+entscheiden, auf welchen Node der Pod passt. Das nächste Gegenstück ist eine Reservierung in vSphere.
 
-`limits` — выше чего **не дать подняться**. Аналог — limit в vSphere.
+`limits` ist die Obergrenze, über die er **nicht hinaus darf**. Das Gegenstück ist ein Limit in
+vSphere.
 
-`20m` читается как «20 миллипроцессоров», то есть две сотых ядра. Мы просим мало
-намеренно: приложение крошечное, а в лабе про масштабирование низкий запрос позволит
-увидеть рост копий на глаз.
+`20m` liest sich als „20 Milli-CPUs“, also zwei Hundertstel eines Kerns. Wir fordern absichtlich
+wenig an: Die Anwendung ist winzig, und im Skalierungs-Lab lässt Sie eine niedrige request die Kopien
+mit eigenen Augen wachsen sehen.
 
 ```yaml
       readinessProbe:
         httpGet: {path: /healthz, port: http}
 ```
 
-Проверка готовности. Кластер стучится по этому адресу и не пускает на под трафик, пока
-не получит ответ. Именно она обеспечит обновление без простоя в лабе про выкатку версий: новая
-копия начнёт получать запросы только когда действительно готова их обрабатывать.
+Die Bereitschaftsprüfung. Der Cluster klopft an diese Adresse und schickt keinen Traffic an den Pod,
+bis er eine Antwort erhält. Genau das ermöglicht im Lab über das Ausrollen von Versionen das Update
+ohne Ausfallzeit: Eine neue Kopie beginnt erst dann Anfragen zu empfangen, wenn sie wirklich bereit
+ist, sie zu verarbeiten.
 
-### Как настройки попадают внутрь контейнера
+### Wie die Einstellungen in den Container gelangen
 
-Два ConfigMap мы описали, но сами по себе они лежат в кластере и до nginx не доходят.
-Связывают их два блока — и на них держится весь фокус этой лабы:
+Wir haben die beiden ConfigMaps beschrieben, aber für sich genommen liegen sie nur im Cluster herum
+und erreichen nginx nie. Zwei Blöcke verbinden sie miteinander — und auf ihnen ruht der ganze Kniff
+dieses Labs:
 
 ```yaml
           volumeMounts:
@@ -212,22 +218,23 @@ root. Обычный nginx требует прав, которых в прави
             name: rickroll-conf
 ```
 
-Читается снизу вверх. `volumes` объявляет: «возьми вот этот ConfigMap и сделай из него
-папку с файлами». `volumeMounts` говорит: «подставь эту папку внутрь контейнера по такому
-пути». В итоге `index.html` оказывается там, где nginx ищет страницы, а `default.conf` —
-там, где он ищет настройки.
+Lesen Sie es von unten nach oben. `volumes` erklärt: „Nimm diese ConfigMap und mach daraus einen
+Ordner mit Dateien“. `volumeMounts` sagt: „Lege diesen Ordner im Container an diesem Pfad ab“. Das
+Ergebnis: `index.html` landet dort, wo nginx nach Seiten sucht, und `default.conf` dort, wo es nach
+Einstellungen sucht.
 
-Ближайшая аналогия из вашего мира — подключить общий каталог к виртуальной машине. Разница
-в том, что содержимое живёт в кластере как отдельный объект, и поменять его можно, не
-трогая ни образ, ни саму машину.
+Die nächste Analogie aus Ihrer Welt ist das Anhängen eines freigegebenen Ordners an eine virtuelle
+Maschine. Der Unterschied: Der Inhalt liegt als eigenes Objekt im Cluster, und Sie können ihn ändern,
+ohne weder das Image noch die Maschine selbst anzufassen.
 
-⚠️ **Порядок в `volumes` важен.** Лаба про выкатку версий переключает страницу командой,
-которая обращается к тому **по номеру** — первый в списке. Если поменять блоки местами,
-команда молча подставит настройки вместо страницы, и nginx перестанет работать. В самом файле
-про это есть комментарий. Безопасный способ —
-патч-слияние по имени тома вместо номера — разобран в лабе про выкатку версий.
+⚠️ **Die Reihenfolge in `volumes` ist wichtig.** Das Lab über das Ausrollen von Versionen wechselt die
+Seite mit einem Befehl, der das Volume **über die Nummer** anspricht — das erste in der Liste.
+Vertauschen Sie die Blöcke, dann schiebt der Befehl stillschweigend die Einstellungen anstelle der
+Seite unter, und nginx hört auf zu funktionieren. Dazu gibt es einen Kommentar in der Datei selbst.
+Der sichere Weg — ein Patch-Merge über den Volume-Namen statt über die Nummer — wird im Lab über das
+Ausrollen von Versionen behandelt.
 
-### Четвёртый: постоянный адрес
+### Viertes: die dauerhafte Adresse
 
 ```yaml
 kind: Service
@@ -239,30 +246,32 @@ spec:
       targetPort: http
 ```
 
-`Service` — постоянное имя, за которым стоят все копии приложения. Обращаетесь к
-`rickroll`, попадаете на любую из них.
+`Service` ist ein dauerhafter Name, hinter dem alle Kopien der Anwendung stehen. Sie sprechen
+`rickroll` an und erreichen irgendeine von ihnen.
 
-Связь между Service и подами — не список адресов, а **условие**: `selector: app: rickroll`
-означает «все поды с меткой `app: rickroll`». Метка (label) — произвольная пара «ключ:
-значение», которую вешают на объект, чтобы потом находить его по ней; ближе всего к ней
-теги в vSphere, только здесь по меткам не ищут глазами, а строят рабочие связи. Появился
-новый под с этой меткой — он автоматически попал в балансировку. Исчез — выбыл. Никто
-не правит список руками.
+Die Verbindung zwischen dem Service und den Pods ist keine Liste von Adressen, sondern eine
+**Bedingung**: `selector: app: rickroll` bedeutet „alle Pods mit dem Label `app: rickroll`“. Ein
+Label ist ein beliebiges „Schlüssel: Wert“-Paar, das Sie an ein Objekt hängen, um es später über
+dieses Paar zu finden; am nächsten kommen dem die Tags in vSphere, nur dienen Labels hier nicht dem
+Absuchen mit dem Auge, sondern dem Aufbau funktionierender Verbindungen. Ein neuer Pod erscheint mit
+diesem Label — er tritt automatisch dem Load Balancing bei. Er verschwindet — er fällt heraus.
+Niemand bearbeitet die Liste von Hand.
 
-Вот это и есть главное отличие от пула в балансировщике, где адреса вписывают.
+Genau das ist der entscheidende Unterschied zu einem Load-Balancer-Pool, in den Sie die Adressen
+eintragen.
 
 </details>
 
-Теперь применяем:
+Jetzt wenden wir es an:
 
 ```bash
-# apply = «приведи кластер к тому, что описано в файле». Все четыре объекта создаются
-# одной командой, порядок внутри файла кластер разберёт сам.
-#   -f   взять описание из файла
+# apply = "bringe den Cluster in den in der Datei beschriebenen Zustand". Alle vier Objekte werden
+# mit einem einzigen Befehl erstellt; die Reihenfolge innerhalb der Datei ermittelt der Cluster selbst.
+#   -f   nimm die Beschreibung aus einer Datei
 kubectl apply -f rickroll.yaml
 ```
 
-**Что вы должны увидеть** — четыре строки о создании объектов:
+**Was Sie sehen sollten** — vier Zeilen über erstellte Objekte:
 
 ```
 configmap/rickroll-conf created
@@ -271,33 +280,34 @@ deployment.apps/rickroll created
 service/rickroll created
 ```
 
-Дождитесь, пока копия запустится:
+Warten Sie, bis die Kopie hochgefahren ist:
 
 ```bash
-# rollout status ждёт, пока Deployment доведёт дело до конца: нужное число копий
-# запущено и готово принимать запросы. Команда завершится сама, когда это случится.
+# rollout status wartet, bis das Deployment die Sache durchgezogen hat: die geforderte Anzahl Kopien
+# läuft und ist bereit, Anfragen anzunehmen. Der Befehl endet von selbst, sobald das eintritt.
 kubectl rollout status deployment/rickroll
 ```
 
-Ждать пришлось секунды. Запускалась не операционная система, а один процесс внутри уже
-работающей: ядро на узле поднято давно и общее для всех контейнеров. Виртуальная машина
-на том же месте грузилась бы минуту-две — ей нужно поднять своё ядро, службы и сеть.
+Das Warten war eine Sache von Sekunden. Gestartet ist kein Betriebssystem, sondern ein einzelner
+Prozess innerhalb eines bereits laufenden: Der Kernel auf dem Node wurde vor Langem hochgefahren und
+wird von allen Containern geteilt. Eine virtuelle Maschine an derselben Stelle bräuchte ein, zwei
+Minuten zum Booten — sie muss ihren eigenen Kernel, ihre Dienste und ihr Netzwerk hochbringen.
 
-## Шаг 3. Смотрим, что кластер сделал из файла
+## Schritt 3. Sehen, was der Cluster aus der Datei gemacht hat
 
-📍 **Где:** на ноутбуке.
+📍 **Wo:** auf dem Laptop.
 
-Кластер хранит не сам файл, а объекты, которые из него создал. Спросим, как выглядит
-теперь то, что мы применили:
+Der Cluster speichert nicht die Datei selbst, sondern die Objekte, die er daraus erstellt hat. Fragen
+wir, wie das, was wir angewendet haben, jetzt aussieht:
 
 ```bash
-# get deployment rickroll = показать один объект по типу и имени.
-#   -o yaml   вывести его целиком в том же виде, в каком его можно написать руками
+# get deployment rickroll = zeige ein einzelnes Objekt nach Typ und Name.
+#   -o yaml   gib es vollständig aus, in derselben Form, in der Sie es von Hand schreiben könnten
 kubectl get deployment rickroll -o yaml
 ```
 
-Вывод длинный: большую часть кластер дописал сам — значения по умолчанию, служебные поля,
-текущее состояние. Найдите глазами вот эти строки:
+Die Ausgabe ist lang: Das meiste hat der Cluster selbst ergänzt — Standardwerte, interne Felder, den
+aktuellen Zustand. Finden Sie diese Zeilen mit dem Auge:
 
 ```yaml
 spec:
@@ -308,95 +318,99 @@ spec:
       - image: nginxinc/nginx-unprivileged:1.27-alpine
 ```
 
-Это то, что вы написали в файле. **Внутри кластера всё описывается текстом** — и то, что
-вы применяете, и то, что кластер отдаёт обратно. Дашборд Cozystack, когда вы заказывали
-кластер в лабе 0, собирал такой же текст и отправлял его платформе: кнопка — надстройка
-над текстом, а не альтернатива ему.
+Das ist, was Sie in die Datei geschrieben haben. **Innerhalb des Clusters wird alles als Text
+beschrieben** — sowohl das, was Sie anwenden, als auch das, was der Cluster zurückgibt. Als Sie den
+Cluster in Lab 0 über das Cozystack-Dashboard bestellt haben, hat es genau denselben Text
+zusammengesetzt und an die Plattform geschickt: Die Schaltfläche ist eine Schicht über dem Text,
+keine Alternative dazu.
 
-Разница в том, что остаётся после. Файл можно положить в Git, отревьюить перед
-применением, посмотреть, кто и когда менял, откатить одной командой, развернуть то же
-самое во втором кластере, не вспоминая, какие галочки вы ставили в первом. Нажатие мышкой
-не оставляет следа: через месяц никто, включая вас, не вспомнит, почему там стояло именно
-это значение.
+Der Unterschied liegt darin, was danach übrig bleibt. Eine Datei können Sie in Git legen, vor dem
+Anwenden durchsehen, nachschlagen, wer sie wann geändert hat, mit einem einzigen Befehl zurückrollen,
+dasselbe in einem zweiten Cluster ausrollen, ohne sich zu erinnern zu versuchen, welche Kästchen Sie
+im ersten angehakt haben. Ein Mausklick hinterlässt keine Spur: Einen Monat später erinnert sich
+niemand, Sie eingeschlossen, warum genau dieser Wert gesetzt wurde.
 
-## Шаг 4. Открываем в браузере
+## Schritt 4. Im Browser öffnen
 
-📍 **Где:** на ноутбуке.
+📍 **Wo:** auf dem Laptop.
 
-**Что сейчас произойдёт:** приложение живёт внутри кластера и снаружи не видно. Команда
-ниже прокинет туннель с вашего ноутбука внутрь.
+**Was gleich passiert:** Die Anwendung lebt innerhalb des Clusters und ist von außen nicht sichtbar.
+Der Befehl unten legt einen Tunnel von Ihrem Laptop nach innen.
 
 ```bash
-# port-forward = туннель с ноутбука внутрь кластера, живёт, пока команда работает.
-#   svc/rickroll   вести туннель к Service с именем rickroll, а тот уже направит
-#                  запрос на живую копию приложения
-#   8080:80        левое число — порт на ноутбуке, правое — порт Service в кластере
+# port-forward = ein Tunnel vom Laptop in den Cluster, lebt so lange, wie der Befehl läuft.
+#   svc/rickroll   führe den Tunnel zum Service namens rickroll, der die Anfrage seinerseits
+#                  an eine lebende Kopie der Anwendung weiterleitet
+#   8080:80        die linke Zahl ist der Port auf dem Laptop, die rechte der Service-Port im Cluster
 kubectl port-forward svc/rickroll 8080:80
 ```
 
-Команда не завершается: она держит туннель открытым, пока вы её не остановите. Откройте
+Der Befehl endet nicht: Er hält den Tunnel offen, bis Sie ihn stoppen. Öffnen Sie
 <http://localhost:8080>.
 
-**Что вы должны увидеть:** переливающийся заголовок, строчку песни и внизу — имя пода.
-Сверьте его с тем, что показывает кластер.
+**Was Sie sehen sollten:** eine schimmernde Überschrift, eine Zeile des Songs und unten — den
+Pod-Namen. Vergleichen Sie ihn mit dem, was der Cluster anzeigt.
 
-📍 **Где:** во втором окне терминала. Первое занято туннелем — пока команда работает, ввести
-в нём ничего нельзя. Откройте новое окно и задайте в нём файл доступа заново: переменные
-окружения в новое окно не переезжают.
+📍 **Wo:** in einem zweiten Terminalfenster. Das erste ist mit dem Tunnel belegt — solange der Befehl
+läuft, können Sie darin nichts eingeben. Öffnen Sie ein neues Fenster und setzen Sie dort erneut die
+Zugangsdatei: Umgebungsvariablen werden nicht in ein neues Fenster übernommen.
 
 ```bash
 export KUBECONFIG=~/lab.kubeconfig
 ```
 
 ```bash
-# get pods = «покажи запущенные копии».
-#   -l app=rickroll   показать не все поды, а только с меткой app=rickroll —
-#                     той самой, по которой их находит Service
+# get pods = "zeige die laufenden Kopien".
+#   -l app=rickroll   zeige nicht alle Pods, sondern nur die mit dem Label app=rickroll —
+#                     eben jenem, über das der Service sie findet
 kubectl get pods -l app=rickroll
 ```
 
-Имена совпадают. Страницу отдала именно эта копия.
+Die Namen stimmen überein. Genau diese Kopie hat die Seite ausgeliefert.
 
-Закрыть туннель — `Ctrl+C`.
+Zum Schließen des Tunnels — `Ctrl+C`.
 
-## Проверка
+## Die Prüfung
 
-📍 **Где:** на ноутбуке, в том же окне терминала, где вы работали с `kubectl`.
+📍 **Wo:** auf dem Laptop, im selben Terminalfenster, in dem Sie mit `kubectl` gearbeitet haben.
 
 ```bash
-# запускать из папки лабы: файлы скрипт ищет рядом с собой.
-# ./ перед именем означает «запусти файл вот отсюда», а не ищи его в системных папках
+# Führen Sie es aus dem Lab-Ordner aus: Das Skript sucht seine Dateien neben sich selbst.
+# Das ./ vor dem Namen bedeutet "führe die Datei genau von hier aus", nicht sie in Systemordnern zu suchen
 ./check.sh
 ```
 
-⚠️ **На Windows скрипт запускается из WSL**, а не из PowerShell — как его поставить,
-написано в начале лабы 0. Без WSL лабу можно пройти, но отчёта-артефакта не будет.
+⚠️ **Unter Windows läuft das Skript aus WSL**, nicht aus PowerShell — wie man das einrichtet, steht am
+Anfang von Lab 0. Ohne WSL können Sie das Lab trotzdem abschließen, aber es gibt keinen
+Artefaktbericht.
 
-Скрипт проверит не факт применения манифеста, а работу по существу: приложение отвечает
-по HTTP, в ответе есть имя пода, и это имя совпадает с реально запущенной копией.
+Das Skript prüft nicht die Tatsache, dass das Manifest angewendet wurde, sondern die Arbeit im Kern:
+Die Anwendung antwortet über HTTP, die Antwort enthält einen Pod-Namen, und dieser Name stimmt mit
+einer tatsächlich laufenden Kopie überein.
 
-## Уборка
+## Aufräumen
 
-Приложение понадобится в лабах 2, 3 и 4 — сейчас не удаляем. Держать его дёшево: одна
-копия nginx просит две сотых ядра и 32 мегабайта, а когда дойдёт до удаления — это одна
-команда, и ресурсы вернутся в общий пул узла в ту же секунду.
+Sie brauchen die Anwendung in den Labs 2, 3 und 4 — löschen Sie sie jetzt nicht. Sie zu behalten ist
+billig: Eine Kopie von nginx fordert zwei Hundertstel eines Kerns und 32 Megabyte an, und wenn es ans
+Löschen geht — das ist ein einziger Befehl, und die Ressourcen kehren in derselben Sekunde in den
+gemeinsamen Pool des Nodes zurück.
 
-## Что мы теперь умеем
+## Was wir jetzt können
 
-- Различать, где кончается дашборд платформы и начинается ваш собственный кластер
-- Разворачивать приложение одним файлом и одной командой
-- Читать манифест и объяснять, зачем в нём каждый блок
-- Отличать `requests` от `limits`
-- Понимать, что Service находит копии по метке, а не по списку адресов
-- Попадать браузером внутрь кластера через `port-forward`
+- Sagen, wo das Plattform-Dashboard endet und Ihr eigener Cluster beginnt
+- Eine Anwendung mit einer einzigen Datei und einem einzigen Befehl ausrollen
+- Ein Manifest lesen und erklären, wofür jeder Block da ist
+- `requests` von `limits` unterscheiden
+- Verstehen, dass ein Service Kopien über ein Label findet, nicht über eine Liste von Adressen
+- Mit einem Browser über `port-forward` ins Innere des Clusters gelangen
 
-## А в vSphere это было бы
+## Und in vSphere wäre das
 
-Заявка на виртуалку, заявка в сеть на адрес, заявка в безопасность на сертификат. Дни в
-лучшем случае. Здесь — один файл и одна команда.
+Ein Antrag auf eine VM, ein Antrag an das Netzwerkteam auf eine Adresse, ein Antrag an die Sicherheit
+auf ein Zertifikat. Tage im besten Fall. Hier — eine Datei und ein Befehl.
 
-**Где vSphere удобнее, честно.** Разворачивая виртуалку, вы получаете полноценную машину:
-можно зайти внутрь, поставить что угодно, поправить на месте и оставить так работать. Под
-устроен иначе — он неизменяемый, «зайти и поправить» в нём бессмысленно, потому что при
-следующем перезапуске правка исчезнет. Это дисциплинирует, но первое время раздражает, и
-глупо делать вид, что это не так.
+**Wo vSphere ehrlicherweise bequemer ist.** Wenn Sie eine VM ausrollen, bekommen Sie eine vollwertige
+Maschine: Sie können hineingehen, alles installieren, an Ort und Stelle reparieren und sie so
+weiterlaufen lassen. Ein Pod ist anders gebaut — er ist unveränderlich, und „hineingehen und
+reparieren“ ergibt dort keinen Sinn, weil beim nächsten Neustart die Änderung verschwindet. Das
+diszipliniert, aber anfangs ist es lästig, und es wäre töricht, so zu tun, als wäre es anders.

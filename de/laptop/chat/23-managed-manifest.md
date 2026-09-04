@@ -1,4 +1,4 @@
-## 23. Разбор: что внутри 04-managed.yaml
+## 23. Genauer betrachtet: Was in 04-managed.yaml steckt
 
 ```yaml
 kind: Postgres
@@ -18,33 +18,18 @@ spec:
         admin: [ orders ]
 ```
 
-`kind: Postgres` — снова позиция каталога, как `Bucket` в первой фазе. Вы не ставите
-СУБД: вы её заказываете. Платформа сама поднимет процессы, настроит репликацию,
-заведёт расписание бэкапов и подключит мониторинг.
+`kind: Postgres` — ein weiteres Katalog-Element, genau wie `Bucket` in der ersten Phase. Sie installieren keine Datenbank-Engine: Sie bestellen eine. Die Plattform selbst startet die Prozesse, richtet die Replikation ein, legt einen Backup-Zeitplan an und bindet das Monitoring an.
 
-`users` и `databases` — платформа заведёт пользователя `orders`, базу `orders` и выдаст
-пользователю права администратора этой базы. Вручную ничего создавать не нужно: именно
-поэтому в файле схемы, который мы накатим позже, нет команд `CREATE DATABASE` и
-`CREATE USER` — они уже выполнены за вас.
+`users` und `databases` — die Plattform legt den Benutzer `orders` und die Datenbank `orders` an und erteilt diesem Benutzer Administratorrechte für diese Datenbank. Von Hand ist nichts zu erstellen: genau deshalb enthält die Schemadatei, die wir später anwenden, keine `CREATE DATABASE`- oder `CREATE USER`-Befehle — sie wurden bereits für Sie ausgeführt.
 
-`replicas: 1` — одна копия, учебный стенд. В рабочей системе ставят больше, и тогда
-платформа сама следит, кто главный, и переключает при отказе.
+`replicas: 1` — eine einzige Kopie, eine Testumgebung zum Üben. In einem Produktivsystem setzen Sie mehr, und dann verfolgt die Plattform selbst, welche die primäre ist, und schaltet bei einem Ausfall um.
 
-`resourcesPreset: t1.micro` — размер, готовый набор процессора и памяти. Самый маленький.
+`resourcesPreset: t1.micro` — die Größe, ein fertiges Paket aus CPU und Arbeitsspeicher. Das kleinste.
 
-⚠️ **Пароль лежит открытым текстом** прямо в файле, который вы кладёте в репозиторий.
-Для учебного стенда так можно, для рабочего — нет: там пароль хранят в хранилище
-секретов, а в описании оставляют только ссылку на него.
+⚠️ **Das Passwort steht im Klartext** direkt in der Datei, die Sie in das Repository einchecken. Für eine Testumgebung zum Üben ist das in Ordnung, für ein Produktivsystem nicht: Dort liegt das Passwort in einem Secrets-Store, und die Beschreibung enthält nur einen Verweis darauf.
 
-Ниже в том же файле — объект `kind: Kafka`.
+Weiter unten in derselben Datei steht ein `kind: Kafka`-Objekt.
 
-**Что такое очередь и зачем она здесь.** Kafka — это очередь сообщений. Когда
-приложение принимает заказ, оно делает две вещи: записывает заказ в базу и кладёт в
-очередь сообщение «появился заказ номер такой-то». Дальше это сообщение читают другие
-программы — та, что шлёт письмо клиенту, та, что считает отчёты. Смысл прослойки в том,
-что приложению не нужно знать, кто и когда его прочитает: оно положило и пошло дальше.
-Если читатель в этот момент лежит — сообщение дождётся его в очереди.
+**Was eine Warteschlange ist und warum sie hier steht.** Kafka ist eine Nachrichten-Warteschlange. Wenn die Anwendung eine Bestellung annimmt, tut sie zwei Dinge: Sie schreibt die Bestellung in die Datenbank und legt eine Nachricht in die Warteschlange — „Bestellung Nummer soundso ist eingegangen“. Von dort lesen andere Programme diese Nachricht — dasjenige, das dem Kunden eine E-Mail schickt, dasjenige, das Berichte zusammenrechnet. Der Sinn dieser Zwischenschicht ist, dass die Anwendung nicht wissen muss, wer sie wann liest: Sie hat die Nachricht abgelegt und ist weitergezogen. Falls ein Leser in diesem Moment gerade ausgefallen ist, wartet die Nachricht in der Warteschlange auf ihn.
 
-В нашем стенде читателей нет, очередь стоит для полноты картины: приложение при
-создании заказа пишет в неё, и если Kafka недоступна, проверка здоровья честно скажет,
-что всё плохо. Это ровно то, что происходит и в реальной системе.
+In unserer Testumgebung gibt es keine Leser; die Warteschlange ist der Vollständigkeit halber da: Die Anwendung schreibt beim Erstellen einer Bestellung in sie hinein, und falls Kafka nicht verfügbar ist, meldet die Zustandsprüfung ehrlich, dass etwas nicht stimmt. Genau das passiert auch in einem echten System.

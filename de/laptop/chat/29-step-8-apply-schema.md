@@ -1,50 +1,50 @@
-## 29. Шаг 8: ставим клиент и накатываем схему
+## 29. Schritt 8: Client installieren und Schema anwenden
 
-**Доступ к базе:**
+**Datenbankzugang:**
 ```
-хост:   postgres-db-rw.tenant-workshopXX.svc.cozy.local
-база:   orders
-логин:  orders
-пароль: Orders2019!
+host:     postgres-db-rw.tenant-workshopXX.svc.cozy.local
+database: orders
+login:    orders
+password: Orders2019!
 ```
-Пароль задан в `manifests/04-managed.yaml`, искать его нигде не надо.
+Das Passwort ist in `manifests/04-managed.yaml` festgelegt; es muss nirgends sonst gesucht werden.
 
-⚠️ **Штатный psql из CentOS 7 не подойдёт.** Ему 9.2 года выпуска, а наша база требует
-аутентификации SCRAM, которую он не умеет, и отвечает:
-`psql: SCRAM authentication requires libpq version 10 or above`. Нужен клиент версии 10 или новее.
-Берём из репозитория PGDG — для CentOS 7 там доступен максимум 15-й.
+⚠️ **Das mitgelieferte psql von CentOS 7 taugt nicht.** Es hat Version 9.2, und unsere Datenbank verlangt
+SCRAM-Authentifizierung, die es nicht beherrscht, weshalb es antwortet:
+`psql: SCRAM authentication requires libpq version 10 or above`. Sie brauchen einen Client der Version 10 oder neuer.
+Wir nehmen ihn aus dem PGDG-Repository — für CentOS 7 ist dort maximal Version 15 verfügbar.
 
-Три команды подряд, по одной причине на каждую:
+Drei Befehle nacheinander, jeder aus einem eigenen Grund:
 
 ```bash
-# 1. Подключаем репозиторий PGDG — источник пакетов PostgreSQL.
+# 1. Das PGDG-Repository einbinden — die Quelle der PostgreSQL-Pakete.
 yum install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm
 
-# 2. Библиотека libzstd, без неё клиент не поставится. В репозиториях CentOS 7 её нет,
-#    берём из архива EPEL.
+# 2. Die Bibliothek libzstd, ohne die sich der Client nicht installieren lässt. In den
+#    CentOS-7-Repositories ist sie nicht enthalten, deshalb nehmen wir sie aus dem EPEL-Archiv.
 yum install -y https://archives.fedoraproject.org/pub/archive/epel/7/x86_64/Packages/l/libzstd-1.5.5-1.el7.x86_64.rpm
 
-# 3. Сам клиент — только из живого репозитория pgdg15.
+# 3. Der Client selbst — nur aus dem aktiven Repository pgdg15.
 yum install -y --disablerepo='pgdg*' --enablerepo=pgdg15 postgresql15
 ```
 
-Вторая и третья команды выглядят избыточно, но без них установка падает, и обе ошибки
-вы иначе увидите своими глазами:
+Der zweite und der dritte Befehl wirken überflüssig, aber ohne sie schlägt die Installation fehl, und
+beide Fehler würden Sie andernfalls mit eigenen Augen sehen:
 
-- без `libzstd` — `Requires: libzstd >= 1.4.0`;
-- без `--disablerepo`/`--enablerepo` — `HTTPS Error 410 - Gone`. Пакет репозитория
-  включает разом все версии PostgreSQL, включая снятые с поддержки 12-ю и 13-ю, а `yum`
-  перед установкой обходит **каждый** включённый репозиторий и падает на первом мёртвом.
-  Мы явно оставляем только тот, который нам нужен.
+- ohne `libzstd` — `Requires: libzstd >= 1.4.0`;
+- ohne `--disablerepo`/`--enablerepo` — `HTTPS Error 410 - Gone`. Das Repository-Paket
+  zieht alle PostgreSQL-Versionen auf einmal herein, einschließlich der abgekündigten Versionen 12
+  und 13, und vor der Installation durchläuft `yum` **jedes** aktivierte Repository und scheitert am ersten toten.
+  Wir behalten ausdrücklich nur das, das wir brauchen.
 
-Проверяем, что клиент на месте:
+Prüfen Sie, dass der Client vorhanden ist:
 
 ```bash
 psql --version
 ```
 
-Если ответ — `command not found`, клиент положен мимо `PATH`; найдите его и допишите
-каталог на текущую сессию:
+Lautet die Antwort `command not found`, ist der Client außerhalb Ihres `PATH` gelandet; finden Sie ihn und ergänzen Sie
+sein Verzeichnis für die aktuelle Sitzung:
 
 ```bash
 ls /usr/pgsql-*/bin/psql
@@ -52,39 +52,39 @@ export PATH="$PATH:/usr/pgsql-15/bin"
 psql --version
 ```
 
-**Забираем файл схемы** — сеть у машины уже есть:
+**Holen Sie sich die Schemadatei** — die Maschine hat bereits Netzwerk:
 
 ```bash
 curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/laptop/scripts/orders-schema.sql
 ```
 
-**Накатываем.** Разберём команду по частям, чтобы не вводить вслепую:
+**Anwenden.** Zerlegen wir den Befehl Stück für Stück, damit Sie nicht blind tippen:
 
 ```bash
 PGPASSWORD='Orders2019!' psql -h postgres-db-rw.tenant-workshopXX.svc.cozy.local \
   -U orders -d orders -f orders-schema.sql
 ```
 
-- `PGPASSWORD='...'` — пароль передаётся переменной окружения, чтобы `psql` не
-  спрашивал его в диалоге. Так делают в скриптах.
-- `-h postgres-db-rw.tenant-workshopXX.svc.cozy.local` — адрес базы. Это **не IP**, а
-  внутреннее имя в кластере. Суффикс `-rw` важен: у managed Postgres несколько копий,
-  и это имя всегда указывает на ту, в которую **можно писать**. Есть парное имя с `-ro`
-  — только для чтения. При переключении ролей между копиями имя не меняется, поэтому в
-  настройках приложения прописывают его, а не адрес конкретного сервера.
-- `-U orders` — под каким пользователем, `-d orders` — в какую базу.
-- `-f orders-schema.sql` — выполнить команды из файла.
+- `PGPASSWORD='...'` — das Passwort wird über eine Umgebungsvariable übergeben, damit `psql` nicht
+  interaktiv danach fragt. So macht man es in Skripten.
+- `-h postgres-db-rw.tenant-workshopXX.svc.cozy.local` — die Adresse der Datenbank. Das ist **keine IP**,
+  sondern ein interner Name innerhalb des Clusters. Das Suffix `-rw` ist wichtig: managed Postgres hat mehrere
+  Kopien, und dieser Name zeigt immer auf jene, in die Sie **schreiben können**. Es gibt einen zugehörigen Namen mit `-ro`
+  — nur zum Lesen. Wenn die Rollen zwischen den Kopien wechseln, ändert sich der Name nicht, weshalb die
+  Einstellungen der Anwendung diesen Namen enthalten und nicht die Adresse eines bestimmten Servers.
+- `-U orders` — als welcher Benutzer verbunden wird, `-d orders` — mit welcher Datenbank.
+- `-f orders-schema.sql` — die Befehle aus der Datei ausführen.
 
-Именно возможность обращаться к базе по постоянному имени, а не по IP, и делает
-переключение копий незаметным для приложения. На старой машине у вас в конфиге стоял
-`localhost`, и никакого переключения не было в принципе.
+Gerade die Möglichkeit, die Datenbank über einen festen Namen statt über eine IP zu erreichen, macht
+den Wechsel der Kopien für die Anwendung unsichtbar. Auf der alten Maschine stand in Ihrer Konfiguration
+`localhost`, und einen Wechsel gab es dort von vornherein überhaupt nicht.
 
-Проверяем, что таблица на месте:
+Prüfen Sie, dass die Tabelle vorhanden ist:
 
 ```bash
 PGPASSWORD='Orders2019!' psql -h postgres-db-rw.tenant-workshopXX.svc.cozy.local \
   -U orders -d orders -c '\dt'
 ```
 
-Появилась — значит, заказ теперь создастся. Проверим это на следующем шаге, вместе
-со всей цепочкой.
+Ist sie da, wird nun eine Bestellung erzeugt. Das prüfen wir im nächsten Schritt, zusammen
+mit der gesamten Kette.

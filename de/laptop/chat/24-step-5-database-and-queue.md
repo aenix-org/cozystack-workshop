@@ -1,44 +1,44 @@
-## 24. Шаг 5: база и очередь из каталога
+## 24. Schritt 5: Datenbank und Warteschlange aus dem Katalog
 
-**Поднимаем управляемые Postgres и Kafka**
+**Wir bringen ein verwaltetes Postgres und Kafka zum Laufen**
 
-📍 **Где:** на ноутбуке.
+📍 **Wo:** auf dem Laptop.
 
-В исходной системе база и очередь жили на отдельных виртуалках с CentOS 7 — тех самых
-`192.168.10.30` и `192.168.10.40` из конфига. Их мы **не везём**: вместо них берём сервисы
-платформы. Патчить устаревшую операционную систему больше не ваша работа.
+Im ursprünglichen System lebten die Datenbank und die Warteschlange auf getrennten CentOS-7-VMs — eben jenen
+`192.168.10.30` und `192.168.10.40` aus der Konfiguration. Diese **übernehmen wir nicht**: statt ihrer nehmen wir
+die Dienste der Plattform. Ein veraltetes Betriebssystem zu patchen ist nicht mehr Ihre Aufgabe.
 
 <details>
-<summary><b>Зачем приложению очередь и что она вообще делает</b></summary>
+<summary><b>Wozu die Anwendung eine Warteschlange braucht und was diese überhaupt tut</b></summary>
 
-Вопрос честный: база понятно зачем, а очередь-то тут при чём.
+Die Frage ist berechtigt: dass eine Datenbank gebraucht wird, ist offensichtlich, aber was tut die Warteschlange hier.
 
-**Как работает приложение.** Пользователь создаёт заказ. Если бы приложение делало всю
-работу сразу — записало заказ, посчитало, отправило письмо, дёрнуло смежную систему —
-пользователь ждал бы, пока всё это закончится. А если смежная система лежит, он ждал бы
-до таймаута и получил ошибку, хотя заказ уже создан.
+**Wie die Anwendung funktioniert.** Ein Nutzer legt eine Bestellung an. Würde die Anwendung die gesamte
+Arbeit auf einmal erledigen — die Bestellung erfassen, die Berechnungen ausführen, die E-Mail versenden, das
+Nachbarsystem anstoßen —, dann würde der Nutzer warten, bis all das fertig ist. Und wäre das Nachbarsystem
+ausgefallen, würde er bis zum Timeout warten und einen Fehler bekommen, obwohl die Bestellung bereits angelegt war.
 
-Поэтому работу разрывают надвое. Приложение записывает заказ в базу со статусом `NEW`,
-кладёт сообщение «появился заказ №123» в очередь и **сразу отвечает пользователю**.
-Дальше обработчик забирает сообщение из очереди в своём темпе, делает тяжёлую часть и
-проставляет заказу статус `PROCESSED`.
+Deshalb wird die Arbeit in zwei Teile zerrissen. Die Anwendung schreibt die Bestellung mit dem Status `NEW` in die
+Datenbank, legt eine Nachricht „Bestellung Nr. 123 ist aufgetaucht“ in die Warteschlange und **antwortet dem Nutzer
+sofort**. Von dort holt sich ein Handler die Nachricht in seinem eigenen Tempo aus der Warteschlange, erledigt den
+schweren Teil und setzt den Status der Bestellung auf `PROCESSED`.
 
-Именно поэтому в таблице есть поле `processed_by`. На шаге 9 вы увидите там значение
-`kafka` — это и будет доказательством, что цепочка «приложение → очередь → обработчик»
-собралась заново на новом месте.
+Genau deshalb hat die Tabelle ein Feld `processed_by`. In Schritt 9 werden Sie dort den Wert
+`kafka` sehen — und das wird der Beweis dafür sein, dass die Kette „Anwendung → Warteschlange → Handler“
+an ihrem neuen Ort wieder zusammengefunden hat.
 
-**Как это было в vSphere.** Отдельная виртуалка, на ней вручную поставленные Kafka и
-ZooKeeper. Кто ставил — неизвестно, версия — какая была на тот момент, обновлений не было
-ни разу, мониторинга нет. Классическая машина, которую боятся перезагружать.
+**Wie es in vSphere war.** Eine eigene VM, auf der Kafka und ZooKeeper von Hand installiert wurden.
+Wer sie installiert hat, ist unbekannt, die Version ist die, die damals gerade aktuell war, Updates gab es
+kein einziges Mal, und ein Monitoring gibt es nicht. Die klassische Maschine, die alle zu rebooten fürchten.
 
-**Почему очередь не нужно перевозить, а базу нужно.** Разница в том, что они хранят.
-В базе лежат все заказы за всю историю — потеряете, и компания потеряет данные. В очереди
-лежат только сообщения, которые прямо сейчас в пути, — секунды жизни. Правильная миграция
-очереди состоит в том, чтобы дать обработчику доесть остаток и переключиться на новую.
-Ничего копировать не надо.
+**Warum die Warteschlange nicht umgezogen werden muss, die Datenbank aber schon.** Der Unterschied liegt darin, was sie speichern.
+Die Datenbank hält jede Bestellung der gesamten Geschichte — verlieren Sie sie, verliert das Unternehmen Daten. Die Warteschlange
+hält nur die Nachrichten, die gerade jetzt unterwegs sind — Sekunden an Lebensdauer. Eine ordentliche Migration der
+Warteschlange besteht darin, den Handler den Rest aufessen zu lassen und auf die neue umzuschalten.
+Es gibt nichts zu kopieren.
 
-Это общее правило, которое стоит унести с воркшопа: **при переезде мучаются с тем, что
-хранит состояние.** Всё остальное пересоздаётся заново.
+Das ist eine allgemeine Regel, die es sich vom Workshop mitzunehmen lohnt: **bei einem Umzug quält man sich mit dem,
+was Zustand hält.** Alles andere wird von Grund auf neu erzeugt.
 
 </details>
 
@@ -47,26 +47,26 @@ kubectl apply -f manifests/04-managed.yaml
 kubectl get postgreses.apps.cozystack.io,kafkas.apps.cozystack.io -n tenant-workshopXX
 ```
 
-Поднимаются они не мгновенно — пока ждёте, посмотрите в дашборде, что именно создалось.
+Sie kommen nicht sofort hoch — werfen Sie, während Sie warten, im Dashboard einen Blick darauf, was genau erstellt wurde.
 
-**Что создалось:** объект **Postgres** с именем `db` — внутри база `orders`
-и пользователь `orders` — и объект **Kafka** с именем `kafka` с топиком `orders`.
-Имена не меняйте: на них рассчитаны адреса ниже и команды следующих шагов.
+**Was erstellt wurde:** ein **Postgres**-Objekt namens `db` — mit einer Datenbank `orders`
+und einem Nutzer `orders` darin — und ein **Kafka**-Objekt namens `kafka` mit einem Topic `orders`.
+Ändern Sie die Namen nicht: die Adressen weiter unten und die Befehle der nächsten Schritte rechnen mit ihnen.
 
-🖱 **Через дашборд:** это самый наглядный шаг для мышки. Каталог платформы —
-**Postgres → Deploy new**: имя `db`, одна реплика, в секции users пользователь
-`orders`, в секции databases база `orders`. Затем **Kafka → Deploy new**: имя `kafka`,
-одна реплика, топик `orders`.
+🖱 **Über das Dashboard:** das ist der anschaulichste Schritt für die Maus. Der Plattformkatalog —
+**Postgres → Deploy new**: Name `db`, eine Replik, im Abschnitt users ein Nutzer
+`orders`, im Abschnitt databases eine Datenbank `orders`. Dann **Kafka → Deploy new**: Name `kafka`,
+eine Replik, Topic `orders`.
 
-**Записывать ничего не надо, но вот адреса — они пригодятся на шаге 7.** Изнутри
-кластера база и очередь доступны по именам:
+**Sie müssen nichts aufschreiben, aber hier sind die Adressen — sie werden in Schritt 7 nützlich sein.** Von innerhalb
+des Clusters sind die Datenbank und die Warteschlange über den Namen erreichbar:
 
 • Postgres — `postgres-db-rw.tenant-workshopXX.svc.cozy.local:5432`
 • Kafka — `kafka-kafka-kafka-bootstrap.tenant-workshopXX.svc.cozy.local:9092`
 
-Именно эти две строки через два шага заменят собой прибитые адреса `192.168.10.30`
-и `192.168.10.40` в конфиге приложения. Я пришлю их готовыми командами, свой номер
-подставите вместо `XX`.
+Genau diese beiden Zeilen werden zwei Schritte später die festverdrahteten Adressen `192.168.10.30`
+und `192.168.10.40` in der Konfiguration der Anwendung ersetzen. Ich schicke sie Ihnen als fertige Befehle; Sie
+setzen Ihre eigene Nummer anstelle von `XX` ein.
 
-Запомните саму разницу: раньше приложение ходило по прибитому адресу, теперь — по имени.
-Адрес может смениться, имя останется.
+Merken Sie sich den Unterschied selbst: früher ging die Anwendung an eine festverdrahtete Adresse, jetzt geht sie über den Namen.
+Eine Adresse kann sich ändern, ein Name bleibt.

@@ -1,61 +1,58 @@
-## 10. Забираем материалы и подставляем свой номер
+## 10. Die Materialien holen und Ihre Nummer eintragen
 
-**Репозиторий с манифестами**
+**Das Repository mit den Manifesten**
 
-📍 **Где:** на ноутбуке, в терминале. Складываем в домашнюю папку — так путь будет
-одинаковый у всех, и мне проще вам помогать.
+📍 **Wo:** auf Ihrem Laptop, im Terminal. Wir legen es in Ihr Home-Verzeichnis — so ist der Pfad bei allen gleich, und ich kann Ihnen leichter helfen.
 
-**Где открыть терминал:**
-• macOS — Spotlight (`Cmd+пробел`), наберите «Терминал»
-• Linux — `Ctrl+Alt+T` в большинстве окружений
-• Windows — меню «Пуск», наберите «PowerShell»
+**Wo Sie das Terminal öffnen:**
+• macOS — Spotlight (`Cmd+Leertaste`), „Terminal“ eingeben
+• Linux — `Ctrl+Alt+T` in den meisten Umgebungen
+• Windows — das Menü „Start“, „PowerShell“ eingeben
 
-**Забираем папку с файлами** (три команды, по одной):
+**Holen Sie den Ordner mit den Dateien** (drei Befehle, einer nach dem anderen):
 ```bash
 cd ~
 git clone https://github.com/aenix-org/cozystack-migration-workshop.git
 cd cozystack-migration-workshop/workshop
 ```
-Первая команда переводит вас в домашнюю папку, вторая скачивает туда папку
-с материалами, третья заходит внутрь неё. Дальше все команды выполняются **отсюда** —
-пути в них написаны относительно этой папки.
+Der erste Befehl bringt Sie in Ihr Home-Verzeichnis, der zweite lädt den Materialordner dorthin herunter, und der dritte wechselt hinein. Ab hier wird jeder Befehl **von hier aus** ausgeführt — die Pfade darin sind relativ zu diesem Ordner geschrieben.
 
-**Посмотрите, что скачалось:**
+**Sehen Sie sich an, was heruntergeladen wurde:**
 ```bash
 ls manifests scripts
 ```
-Должны увидеть четыре манифеста и четыре скрипта — те самые, из карты файлов.
+Sie sollten vier Manifeste und vier Skripte sehen — genau die aus der Dateiübersicht.
 
-**Если закрыли терминал или потерялись** — вернуться всегда одинаково:
+**Falls Sie das Terminal geschlossen haben oder sich verlaufen** — der Weg zurück ist immer gleich:
 ```bash
 cd ~/cozystack-migration-workshop/workshop
 ```
-На Windows путь тот же: `cd $HOME\cozystack-migration-workshop\workshop`.
-Проверить, где вы сейчас: `pwd` (в PowerShell тоже работает).
+Unter Windows ist der Pfad derselbe: `cd $HOME\cozystack-migration-workshop\workshop`.
+So prüfen Sie, wo Sie gerade sind: `pwd` (funktioniert auch in PowerShell).
 
-⚠️ Хвост `/workshop` обязателен. В репозитории рядом с материалами воркшопа лежит папка
-`labs` с самостоятельными лабами — если остановиться на уровень выше, команды не найдут
-ни `manifests`, ни `scripts`.
+⚠️ Das Anhängsel `/workshop` ist zwingend. Im Repository liegt neben den Workshop-Materialien ein Ordner `labs`
+mit eigenständigen Labs — bleiben Sie eine Ebene höher stehen, finden die Befehle weder
+`manifests` noch `scripts`.
 
-**Чем открывать файлы для правки.** Манифесты — обычные текстовые файлы, годится
-что угодно:
-• в терминале — `nano manifests/03-app-vm.yaml` (сохранить: `Ctrl+O`, `Enter`, выйти: `Ctrl+X`)
-• мышкой на macOS — `open -a TextEdit manifests/03-app-vm.yaml`
-• мышкой на Windows — `notepad manifests\03-app-vm.yaml`
-• если стоит VS Code — `code .` откроет всю папку целиком, это удобнее всего
+**Womit Sie Dateien zum Bearbeiten öffnen.** Manifeste sind ganz gewöhnliche Textdateien, es taugt also
+alles:
+• im Terminal — `nano manifests/03-app-vm.yaml` (speichern: `Ctrl+O`, `Enter`, beenden: `Ctrl+X`)
+• mit der Maus auf macOS — `open -a TextEdit manifests/03-app-vm.yaml`
+• mit der Maus auf Windows — `notepad manifests\03-app-vm.yaml`
+• falls VS Code installiert ist — `code .` öffnet den ganzen Ordner auf einmal, das ist am bequemsten
 
-⚠️ Не открывайте `.yaml` в Word или Google Docs: они подменяют кавычки и дефисы,
-после этого файл перестаёт применяться, а ошибка выглядит необъяснимо.
+⚠️ Öffnen Sie `.yaml`-Dateien nicht in Word oder Google Docs: sie ersetzen Anführungszeichen und Bindestriche,
+danach lässt sich die Datei nicht mehr anwenden, und der Fehler sieht unerklärlich aus.
 
-Во всех файлах стоит заглушка `tenant-workshopXX`. Подставьте свой номер сразу и во всё,
-иначе манифест уедет не туда. Допустим, ваш логин `workshop03`:
+In jeder Datei steht der Platzhalter `tenant-workshopXX`. Tragen Sie Ihre Nummer auf einen Schlag überall ein,
+sonst landet das Manifest am falschen Ort. Angenommen, Ihr Login ist `workshop03`:
 
 **Linux**
 ```bash
 find manifests scripts -type f -exec sed -i 's/tenant-workshopXX/tenant-workshop03/g' {} +
 ```
 
-**macOS** (здесь у `sed` другой синтаксис — обратите внимание на пустые кавычки)
+**macOS** (hier hat `sed` eine andere Syntax — achten Sie auf die leeren Anführungszeichen)
 ```bash
 find manifests scripts -type f -exec sed -i '' 's/tenant-workshopXX/tenant-workshop03/g' {} +
 ```
@@ -67,11 +64,11 @@ Get-ChildItem -Recurse manifests,scripts -File | ForEach-Object {
 }
 ```
 
-**Проверяем, что не осталось ни одной заглушки:**
+**Prüfen Sie, dass kein einziger Platzhalter übrig ist:**
 ```bash
-grep -rn tenant-workshopXX manifests scripts || echo "чисто, можно продолжать"
+grep -rn tenant-workshopXX manifests scripts || echo "clean, you can continue"
 ```
 
-Одно место команда не тронет: в `manifests/03-app-vm.yaml` строка
-`url: "ВСТАВЬТЕ_PRESIGNED_URL"`. Эту ссылку вы получите позже, когда сконвертируете образ.
-Пока — знайте, что она вас там ждёт.
+Eine Stelle rührt der Befehl nicht an: in `manifests/03-app-vm.yaml` die Zeile
+`url: "ВСТАВЬТЕ_PRESIGNED_URL"`. Diese URL erhalten Sie später, sobald Sie das Image konvertiert haben.
+Für den Moment sollten Sie nur wissen, dass sie dort auf Sie wartet.
