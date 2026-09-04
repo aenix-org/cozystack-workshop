@@ -1,36 +1,36 @@
-// Лаба 6 · Свой приватный реестр образов. Сервис «Пропуск», учебная версия.
+// Lab 6 · Tu propio registro privado de imágenes. El servicio «Pase», versión de aprendizaje.
 //
-// ЧТО ЭТА ПРОГРАММА ДЕЛАЕТ. Поднимает веб-сервер и отвечает на два адреса.
-// Адрес /healthz отдаёт короткое «ok»: по нему кластер понимает, что копия жива
-// и готова принимать трафик. Адрес / отдаёт небольшой ответ в формате JSON (текст
-// вида «поле: значение»), где перечислено, какая копия и на каком узле обслужила
-// запрос. Больше ничего: ни базы, ни диска, ни состояния. Так и задумано — в этой лабе
-// интересен не код, а путь, которым он попадает в кластер:
-// исходник -> образ -> свой реестр -> кластер.
+// QUÉ HACE ESTE PROGRAMA. Levanta un servidor web y responde en dos direcciones.
+// La dirección /healthz devuelve un breve «ok»: por ella el clúster entiende que una réplica está viva
+// y lista para recibir tráfico. La dirección / devuelve una respuesta pequeña en formato JSON (texto
+// del tipo «campo: valor»), donde se enumera qué réplica y en qué nodo atendió la
+// petición. Nada más: ni base de datos, ni disco, ni estado. Así está pensado — en esta lab
+// lo interesante no es el código, sino el camino por el que llega al clúster:
+// fuente -> imagen -> tu registro -> clúster.
 //
-// Читать этот файл на Go уметь не нужно, достаточно понимать, что здесь происходит;
-// комментарии ниже расставлены с расчётом на то, что вы видите Go впервые.
+// No hace falta saber leer este archivo en Go, basta con entender qué ocurre aquí;
+// los comentarios de abajo están puestos contando con que ves Go por primera vez.
 //
-// Внешних зависимостей нет: используется только стандартная библиотека, которая
-// приезжает вместе с компилятором. Поэтому сборка не ходит в интернет за
-// библиотеками, и собрать образ можно там, где выход наружу закрыт, — а именно
-// с этого и начинается вся лаба.
+// No hay dependencias externas: se usa solo la biblioteca estándar, que
+// llega junto con el compilador. Por eso la compilación no va a internet a por
+// bibliotecas, y se puede construir la imagen allí donde la salida al exterior está cerrada, — y precisamente
+// con esto empieza toda la lab.
 //
-// Собирается не напрямую, а через соседний Dockerfile, командой
+// No se compila directamente, sino a través del Dockerfile vecino, con el comando
 // docker build --platform linux/amd64 -t HARBOR-HOST/passes/passes-api:v1 app/
 //
-// package main — так в Go помечают программу, которую можно запустить (в отличие
-// от библиотеки). Точка входа при запуске — функция main в самом низу файла.
+// package main — así en Go se marca un programa que se puede ejecutar (a diferencia
+// de una biblioteca). El punto de entrada al ejecutarse es la función main al final del archivo.
 package main
 
-// Что берём из стандартной библиотеки:
-//   encoding/json — собрать ответ в формате JSON
-//   log           — писать сообщения; в контейнере они уходят в стандартный вывод,
-//                   откуда их забирает kubectl logs. Файлов с логами внутри нет,
-//                   и заводить их не надо — это норма для контейнеров
-//   net/http      — сам веб-сервер
-//   os            — прочитать переменные окружения
-//   time          — метка времени в ответе и таймаут сервера
+// Qué tomamos de la biblioteca estándar:
+//   encoding/json — armar la respuesta en formato JSON
+//   log           — escribir mensajes; en el contenedor van a la salida estándar,
+//                   de donde los recoge kubectl logs. No hay archivos de logs dentro,
+//                   y no hace falta crearlos — es lo normal para los contenedores
+//   net/http      — el propio servidor web
+//   os            — leer las variables de entorno
+//   time          — la marca de tiempo en la respuesta y el timeout del servidor
 import (
 	"encoding/json"
 	"log"
@@ -39,12 +39,12 @@ import (
 	"time"
 )
 
-// Форма ответа: набор полей, которые приложение сообщает о себе. Почти все они —
-// то, что приложение узнаёт от кластера: мы их не вычисляем и не угадываем, кластер
-// сам кладёт их в переменные окружения (см. passes.yaml, блок env и downward API).
+// La forma de la respuesta: el conjunto de campos que la aplicación comunica sobre sí misma. Casi todos ellos —
+// es lo que la aplicación conoce del clúster: no los calculamos ni los adivinamos, el clúster
+// mismo los pone en las variables de entorno (ver passes.yaml, el bloque env y la downward API).
 //
-// Текст в обратных кавычках справа — имя поля в готовом JSON. Без него поле уехало бы
-// в ответ как Namespace, а не как namespace; проверка в check.sh ищет строчное «pod».
+// El texto entre comillas invertidas a la derecha es el nombre del campo en el JSON final. Sin él el campo iría
+// a la respuesta como Namespace, y no como namespace; la comprobación en check.sh busca el «pod» en minúscula.
 type identity struct {
 	Service   string `json:"service"`
 	Version   string `json:"version"`
@@ -55,9 +55,9 @@ type identity struct {
 	Time      string `json:"time"`
 }
 
-// Прочитать переменную окружения, а если её нет или она пустая — вернуть запасное
-// значение. Нужна, чтобы программу можно было запустить и вне кластера, без единой
-// настройки: она не упадёт, а честно напишет в ответе «неизвестно».
+// Leer una variable de entorno, y si no existe o está vacía — devolver un valor
+// de reserva. Hace falta para que el programa se pueda ejecutar también fuera del clúster, sin una sola
+// configuración: no se caerá, sino que escribirá honestamente «desconocido» en la respuesta.
 func env(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
@@ -65,27 +65,27 @@ func env(key, fallback string) string {
 	return fallback
 }
 
-// Точка входа: с этой функции начинается работа программы.
+// Punto de entrada: con esta función empieza el trabajo del programa.
 func main() {
-	// На каком порту слушать. Порт можно переопределить переменной PORT, не пересобирая
-	// образ, но по умолчанию это 8080 — то же число, что в passes.yaml (containerPort)
-	// и в Dockerfile (EXPOSE). Разъедутся — Service будет стучаться в закрытую дверь.
+	// En qué puerto escuchar. El puerto se puede sobrescribir con la variable PORT, sin recompilar
+	// la imagen, pero por defecto es 8080 — el mismo número que en passes.yaml (containerPort)
+	// y en el Dockerfile (EXPOSE). Si divergen — el Service llamará a una puerta cerrada.
 	port := env("PORT", "8080")
 
-	// Таблица маршрутов: какой адрес какой обработчик обслуживает.
+	// La tabla de rutas: qué dirección atiende qué manejador.
 	mux := http.NewServeMux()
 
-	// Проверка готовности. Кластер стучится сюда и не пускает трафик на копию,
-	// пока не получит ответ. Отвечает всегда и быстро, ничего не проверяя:
-	// приложению нечего проверять, у него нет ни базы, ни диска.
+	// Comprobación de disponibilidad. El clúster llama aquí y no envía tráfico a la réplica
+	// hasta que recibe una respuesta. Responde siempre y rápido, sin comprobar nada:
+	// la aplicación no tiene nada que comprobar, no tiene ni base de datos ni disco.
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		_, _ = w.Write([]byte("ok\n"))
 	})
 
-	// Основной ответ. Собираем те самые поля и отдаём их одним JSON. Значения читаются
-	// при каждом запросе, поэтому вторая копия сервиса ответит своим именем пода —
-	// по этому имени в лабе и видно, что копий действительно две.
+	// La respuesta principal. Armamos esos mismos campos y los devolvemos en un único JSON. Los valores se leen
+	// en cada petición, por eso la segunda réplica del servicio responderá con su propio nombre de pod —
+	// por ese nombre en la lab se ve que las réplicas son realmente dos.
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		body := identity{
 			Service:   "passes-api",
@@ -99,30 +99,30 @@ func main() {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		enc := json.NewEncoder(w)
 		enc.SetIndent("", "  ")
-		// SetEscapeHTML(false), иначе кириллица и символы вроде < уедут в \uXXXX
-		// и ответ станет нечитаемым в терминале.
+		// SetEscapeHTML(false), de lo contrario el cirílico y caracteres como < se irían a \uXXXX
+		// y la respuesta se volvería ilegible en la terminal.
 		enc.SetEscapeHTML(false)
 		if err := enc.Encode(body); err != nil {
 			log.Printf("не удалось отдать ответ: %v", err)
 		}
 	})
 
-	// Настройки сервера. ReadHeaderTimeout — сколько ждать заголовков запроса, прежде
-	// чем оборвать соединение. Пять секунд стоят не для скорости: без этого таймаута
-	// открытые и брошенные соединения копятся, пока не съедят память контейнера,
-	// а память ограничена лимитом из манифеста.
+	// Configuración del servidor. ReadHeaderTimeout — cuánto esperar las cabeceras de la petición, antes
+	// de cortar la conexión. Los cinco segundos no son por velocidad: sin este timeout
+	// las conexiones abiertas y abandonadas se acumulan hasta comerse la memoria del contenedor,
+	// y la memoria está limitada por el límite del manifiesto.
 	srv := &http.Server{
 		Addr:              ":" + port,
 		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
-	// Первое, что вы увидите в kubectl logs. Строка нужна, чтобы отличить «приложение
-	// не запустилось» от «запустилось, но не отвечает» — это разные диагнозы.
+	// Lo primero que verás en kubectl logs. La línea hace falta para distinguir «la aplicación
+	// no arrancó» de «arrancó, pero no responde» — son diagnósticos distintos.
 	log.Printf("passes-api %s слушает порт %s, под %s",
 		env("APP_VERSION", "v1"), port, env("POD_NAME", "неизвестно"))
-	// Запускаем сервер и работаем, пока нас не остановят. Если порт занят или сервер
-	// упал — пишем причину и выходим с ошибкой. Кластер увидит завершившийся процесс
-	// и поднимет копию заново; чинить перезапуск внутри программы не нужно.
+	// Arrancamos el servidor y trabajamos hasta que nos detengan. Si el puerto está ocupado o el servidor
+	// se cayó — escribimos la causa y salimos con error. El clúster verá el proceso terminado
+	// y levantará una réplica de nuevo; no hace falta arreglar el reinicio dentro del programa.
 	log.Fatal(srv.ListenAndServe())
 }

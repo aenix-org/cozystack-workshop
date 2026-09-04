@@ -1,46 +1,46 @@
-# Лаба 9 · заказ базы ClickHouse под аналитику по журналу проходов.
-# Описание того, что вы хотите получить; собирает и настраивает сервис платформа.
-# То же самое, что вы закажете мышкой в дашборде — только текстом.
-# Применяется НЕ в лабораторный кластер, а в тенант на управляющем кластере:
+# Lab 9 · solicita una base de datos ClickHouse para analítica sobre el registro de pases de acceso.
+# Una descripción de lo que quieres obtener; la plataforma ensambla y configura el servicio.
+# Lo mismo que pedirías con el ratón en el dashboard — solo que como texto.
+# Se aplica NO al clúster de laboratorio, sino a un tenant en el clúster de gestión:
 #   kubectl --kubeconfig="$HOME/.kube/config" apply -f clickhouse.yaml
 #
-# ПЕРЕД ПРИМЕНЕНИЕМ: замените tenant-workshopXX на свой namespace,
-# а ЗдесьВашПароль — на пароль, который вы придумаете.
+# ANTES DE APLICAR: reemplaza tenant-workshopXX por tu namespace,
+# y ЗдесьВашПароль por una contraseña que se te ocurra.
 apiVersion: apps.cozystack.io/v1alpha1
 kind: ClickHouse
 metadata:
   name: analytics
   namespace: tenant-workshopXX
 spec:
-  # Одна копия и один шард. В проде держат минимум две копии, иначе потеря узла
-  # означает недоступность данных, — но нам нужен миллион строк, а не отказо-
-  # устойчивость, и лишняя копия просто съела бы ресурсы стенда.
+  # Una copia y un shard. En producción se mantienen al menos dos copias, de lo contrario perder un nodo
+  # significa que los datos quedan inaccesibles — pero necesitamos un millón de filas, no tolerancia
+  # a fallos, y una copia extra simplemente consumiría los recursos del stand.
   replicas: 1
   shards: 1
-  # Диск под данные таблиц. Миллион строк из этой лабы займёт десятки мегабайт:
-  # колоночное хранение со словарями сжимает такой журнал очень сильно.
+  # Disco para los datos de las tablas. Un millón de filas de esta lab ocupará decenas de megabytes:
+  # el almacenamiento columnar con diccionarios comprime un registro así muy fuertemente.
   size: 5Gi
-  # Отдельный диск под системные журналы сервера, включая журнал запросов.
+  # Un disco separado para los registros del sistema del servidor, incluido el registro de consultas.
   logStorageSize: 2Gi
-  # Через сколько дней выбрасывать журнал запросов. Мы будем в него смотреть.
+  # Tras cuántos días descartar el registro de consultas. Vamos a mirar en él.
   logTTL: 15
-  # replicated — тома, у которых есть копия на другом узле кластера: узел выпал,
-  # данные остались.
+  # replicated — volúmenes que tienen una copia en otro nodo del clúster: el nodo se cayó,
+  # los datos permanecieron.
   storageClass: replicated
-  # 1 процессор, 4 ГБ. ClickHouse считает в памяти, и на группировках по
-  # миллиону строк это заметно.
+  # 1 CPU, 4 GB. ClickHouse calcula en memoria, y en agrupaciones sobre
+  # un millón de filas esto se nota.
   resourcesPreset: u1.small
-  # Пользователь базы и его пароль. Пароль придумайте свой и запомните: он нужен
-  # рабочему поду (переменная CH_AUTH) и скрипту проверки (переменная CH_PASSWORD).
-  # После создания его видно в дашборде, в секрете clickhouse-analytics-credentials.
+  # El usuario de la base de datos y su contraseña. Piensa tu propia contraseña y recuérdala: la necesita
+  # el pod de trabajo (la variable CH_AUTH) y el script de verificación (la variable CH_PASSWORD).
+  # Tras la creación es visible en el dashboard, en el secreto clickhouse-analytics-credentials.
   users:
     analyst:
       password: ЗдесьВашПароль
-  # Резервные копии в объектное хранилище. Данные здесь сгенерированные,
-  # восстанавливать нечего — на учебном стенде выключено.
+  # Copias de seguridad al almacenamiento de objetos. Los datos aquí están generados,
+  # no hay nada que restaurar — desactivado en el stand de formación.
   backup:
     enabled: false
-  # Keeper нужен для согласования между копиями. Копия одна — согласовывать
-  # не с кем, а три пода Keeper заняли бы ресурсы впустую.
+  # Keeper es necesario para reconciliar entre copias. Hay una sola copia — no hay con quién
+  # reconciliar, y tres pods de Keeper ocuparían recursos para nada.
   clickhouseKeeper:
     enabled: false

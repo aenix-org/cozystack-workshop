@@ -1,60 +1,60 @@
 ---
-# Лаба 5 · Инфраструктура в Git. Сам сервис «Пропуск»: четыре объекта в одном файле.
+# Laboratorio 5 · Infraestructura en Git. El propio servicio «Pase»: cuatro objetos en un solo archivo.
 #
-# Руками в кластер не применяется. Файл кладётся в свой репозиторий на GitHub, в папку
-# apps/, рядом с namespace.yaml, а в кластер `lab` его переносит Flux — сам:
+# No se aplica al clúster a mano. El archivo se coloca en su propio repositorio en GitHub, en la
+# carpeta apps/, junto a namespace.yaml, y Flux lo lleva al clúster `lab` por sí mismo:
 #     cp app/*.yaml ~/passes-gitops/apps/
 #     cd ~/passes-gitops && git add apps && git commit -m "add passes service v1" && git push
 #
-# Строка --- разделяет объекты: один файл, четыре независимых объекта. Порядок в файле
-# на порядок создания не влияет — кластер разберётся сам.
+# La línea --- separa los objetos: un archivo, cuatro objetos independientes. El orden en el
+# archivo no afecta al orden de creación: el clúster se las arregla por sí mismo.
 #
-# В каждом объекте: apiVersion — версия схемы описания, kind — что создаём,
-# metadata.name — имя объекта, metadata.namespace — в какой перегородке кластера он
-# живёт. Дальше эти поля отдельно не поясняются.
+# En cada objeto: apiVersion — la versión del esquema de descripción, kind — qué creamos,
+# metadata.name — el nombre del objeto, metadata.namespace — en qué partición del clúster
+# vive. Más adelante estos campos no se explican por separado.
 #
-# Ни в одном из четырёх объектов нет ни пароля, ни ключа, ни токена, и это не
-# случайность: попавшее в Git остаётся там навсегда — историю можно переписать, но
-# у всех, кто успел склонировать, старая копия сохранится. Секретам здесь не место.
+# Ninguno de los cuatro objetos contiene una contraseña, una clave ni un token, y no es
+# casualidad: lo que llega a Git permanece allí para siempre — la historia se puede reescribir,
+# pero todos los que alcanzaron a clonarlo conservan la copia antigua. Los secretos no tienen lugar aquí.
 
-# --- 1 из 4. Настройки веб-сервера --------------------------------------------------
-# ConfigMap кладёт в кластер текстовый файл отдельно от приложения, а ниже (в разделе
-# volumes) этот файл подкладывается внутрь контейнера. Смысл — менять настройки, не
-# пересобирая образ: правите здесь, коммитите, и через минуту в кластере новая версия.
+# --- 1 de 4. Configuración del servidor web -----------------------------------------
+# Un ConfigMap coloca en el clúster un archivo de texto aparte de la aplicación, y más abajo
+# (en la sección volumes) ese archivo se monta dentro del contenedor. La idea es cambiar la
+# configuración sin reconstruir la imagen: editas aquí, haces commit y en un minuto el clúster tiene la nueva versión.
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: passes-conf
   namespace: passes
-# Ключ внутри data становится именем файла в контейнере: default.conf ляжет в папку,
-# которую nginx читает при старте. Вертикальная черта после имени — способ записать
-# в YAML многострочный текст как есть, с сохранением переносов.
+# Una clave dentro de data se convierte en el nombre del archivo en el contenedor: default.conf
+# cae en la carpeta que nginx lee al arrancar. La barra vertical tras el nombre es la forma de
+# escribir en YAML texto multilínea tal cual, conservando los saltos de línea.
 data:
   default.conf: |
     server {
       listen 8080;
       root /usr/share/nginx/html;
 
-      # Адрес для проверки готовности. Кластер стучится сюда и не пускает
-      # трафик на копию, пока не получит ответ.
+      # Dirección para la comprobación de disponibilidad. El clúster llama aquí y no deja
+      # pasar tráfico a una copia hasta que recibe respuesta.
       location /healthz {
         access_log off;
         return 200 "ok\n";
       }
 
       location / {
-        # В отдаваемой странице подменяем __POD__ на имя машины, где работает
-        # nginx. Внутри пода имя машины — это имя самого пода.
+        # En la página que se sirve reemplazamos __POD__ por el nombre de la máquina donde
+        # se ejecuta nginx. Dentro del pod, el nombre de la máquina es el nombre del propio pod.
         sub_filter '__POD__' '$hostname';
         sub_filter_once off;
       }
     }
 ---
-# --- 2 из 4. Страница, которую сервис отдаёт ----------------------------------------
-# В этой лабе страница — заглушка: настоящее приложение появится позже. Сейчас важно
-# не что показывает сервис, а откуда он взялся в кластере. Текст __POD__ в разметке —
-# метка для подстановки: nginx заменит её на имя пода, отдавшего страницу, и по этому
-# имени вы дальше увидите, что копий стало больше одной.
+# --- 2 de 4. La página que el servicio sirve ----------------------------------------
+# En este laboratorio la página es un marcador de posición: la aplicación real aparece más tarde.
+# Ahora lo que importa no es lo que muestra el servicio, sino de dónde salió en el clúster. El texto
+# __POD__ en el marcado es un marcador para sustitución: nginx lo reemplaza por el nombre del pod
+# que sirvió la página, y por ese nombre verás más adelante que hay más de una copia.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -85,11 +85,11 @@ data:
     </body>
     </html>
 ---
-# --- 3 из 4. Описание самого приложения ---------------------------------------------
-# Deployment — это не «запусти контейнер», а «держи запущенным столько-то копий вот
-# такого контейнера». Разница видна, когда копия умирает: кластер создаёт новую, не
-# спрашивая и не уведомляя. В vSphere ближе всего HA, но там перезапускается машина,
-# а здесь пересоздаётся копия приложения, и делается это постоянно, а не при аварии.
+# --- 3 de 4. Descripción de la propia aplicación ------------------------------------
+# Un Deployment no es «ejecuta un contenedor», sino «mantén en ejecución tantas copias de tal
+# contenedor». La diferencia se ve cuando una copia muere: el clúster crea una nueva, sin
+# preguntar y sin avisar. En vSphere lo más parecido es HA, pero allí se reinicia una máquina,
+# y aquí se recrea una copia de la aplicación, y se hace constantemente, no solo ante un fallo.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -98,31 +98,31 @@ metadata:
   labels:
     app: passes
 spec:
-  # Сколько копий держать запущенными. Формулировка важна: не «запусти одну», а
-  # «держи одну». Это число вы поменяете через Git и посмотрите, что произойдёт.
+  # Cuántas copias mantener en ejecución. La formulación importa: no «ejecuta una», sino
+  # «mantén una». Este es el número que cambiarás a través de Git para ver qué ocurre.
   replicas: 1
-  # По какому признаку Deployment узнаёт свои копии. Это не список имён подов —
-  # имена меняются при каждом пересоздании, — а условие «все поды с меткой app: passes».
-  # Метка ниже, в template.metadata.labels, должна совпадать с этим условием: разойдутся
-  # — кластер откажется принимать манифест, потому что копии окажутся ничьими.
+  # Por qué señal reconoce el Deployment sus copias. No es una lista de nombres de pods —
+  # los nombres cambian en cada recreación — sino la condición «todos los pods con la etiqueta app: passes».
+  # La etiqueta de abajo, en template.metadata.labels, debe coincidir con esta condición: si divergen,
+  # el clúster se negará a aceptar el manifiesto, porque las copias no serían de nadie.
   selector:
     matchLabels:
       app: passes
-  # template — образец, по которому штампуются копии. Всё, что внутри, описывает один
-  # под. Правка образца означает выкатку новой версии: старые копии заменяются новыми.
+  # template — el molde con el que se estampan las copias. Todo lo que hay dentro describe un
+  # pod. Editar el molde significa desplegar una nueva versión: las copias antiguas se reemplazan por nuevas.
   template:
     metadata:
       labels:
         app: passes
     spec:
-      # Ограничения безопасности на уровне всего пода. В vSphere аналога нет: там
-      # изоляция даётся гипервизором, а контейнеры делят ядро с узлом, поэтому права
-      # приходится урезать явно.
-      #   runAsNonRoot   не запускать, если образ хочет работать от root
-      #   runAsUser      под каким числовым пользователем работать; 65532 — принятый
-      #                  «непривилегированный» идентификатор в минимальных образах
-      #   seccompProfile какие системные вызовы разрешены; RuntimeDefault — набор,
-      #                  который отсекает заведомо опасное и ничего не ломает
+      # Restricciones de seguridad a nivel de todo el pod. En vSphere no hay equivalente: allí
+      # el aislamiento lo da el hipervisor, mientras que los contenedores comparten el núcleo con
+      # el nodo, así que hay que recortar los privilegios de forma explícita.
+      #   runAsNonRoot   no ejecutar si la imagen quiere trabajar como root
+      #   runAsUser      con qué usuario numérico ejecutar; 65532 es el identificador
+      #                  «no privilegiado» aceptado en las imágenes mínimas
+      #   seccompProfile qué llamadas al sistema están permitidas; RuntimeDefault es un conjunto
+      #                  que descarta lo manifiestamente peligroso y no rompe nada
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
@@ -130,34 +130,34 @@ spec:
           type: RuntimeDefault
       containers:
         - name: web
-          # Те же ограничения, но уже на конкретный контейнер.
-          #   allowPrivilegeEscalation: false  процесс не сможет добрать себе прав
-          #   capabilities.drop: ["ALL"]       отобрать все особые полномочия ядра
-          #                                    (менять сеть, монтировать, менять время);
-          #                                    веб-серверу они не нужны ни одно
+          # Las mismas restricciones, pero ahora para un contenedor concreto.
+          #   allowPrivilegeEscalation: false  el proceso no podrá obtener más privilegios
+          #   capabilities.drop: ["ALL"]       quitar todas las capacidades especiales del núcleo
+          #                                    (cambiar la red, montar, cambiar la hora);
+          #                                    un servidor web no necesita ninguna
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # Образ берётся из публичного реестра — в следующей лабе ИБ это запретит, и
-          # адрес сменится на свой Harbor. Вариант unprivileged выбран не для красоты:
-          # обычный образ nginx слушает порт 80 и хочет для этого права root, а с
-          # runAsNonRoot выше он бы не стартовал вовсе.
-          # Версия зафиксирована (1.27-alpine), а не latest: иначе один и тот же
-          # манифест завтра развернёт другое приложение, и вы об этом не узнаете.
+          # La imagen se toma de un registro público — en el próximo laboratorio Seguridad lo
+          # prohibirá y la dirección cambiará a nuestro propio Harbor. La variante unprivileged no
+          # se eligió por estética: la imagen ordinaria de nginx escucha en el puerto 80 y para eso
+          # quiere privilegios de root, y con runAsNonRoot de arriba no arrancaría en absoluto.
+          # La versión está fijada (1.27-alpine), no latest: de lo contrario el mismo manifiesto
+          # desplegaría mañana una aplicación distinta, y no te enterarías.
           image: nginxinc/nginx-unprivileged:1.27-alpine
-          # Порт, который слушает приложение. Имя `http` — не украшение: на него
-          # ссылаются проверка готовности ниже и Service в конце файла. Поменяете
-          # номер порта — менять его придётся в одном месте, а не в трёх.
+          # El puerto en el que escucha la aplicación. El nombre `http` no es adorno: a él se
+          # refieren la comprobación de disponibilidad de abajo y el Service al final del archivo.
+          # Cambia el número de puerto y lo cambiarás en un solo lugar, no en tres.
           ports:
             - containerPort: 8080
               name: http
-          # requests — сколько ресурсов гарантированно зарезервировать; по этому числу
-          # планировщик выбирает узел. limits — потолок, выше которого не пустят.
-          # Занижение requests означает, что на узел влезет больше, чем он потянет;
-          # превышение limits по памяти — контейнер убивают, по процессору — притормаживают.
-          # 20m = двадцать тысячных ядра, Mi = мегабайты. Значения здесь маленькие,
-          # потому что узел в лабе один и он невелик.
+          # requests — cuántos recursos se reservan de forma garantizada; por este número el
+          # planificador elige un nodo. limits — el techo por encima del cual no se deja pasar.
+          # Subestimar requests significa que en un nodo cabrá más de lo que puede soportar;
+          # superar limits en memoria — matan el contenedor, en CPU — lo frenan.
+          # 20m = veinte milésimas de un núcleo, Mi = megabytes. Los valores aquí son pequeños,
+          # porque en el laboratorio hay un solo nodo y no es grande.
           resources:
             requests:
               cpu: 20m
@@ -165,30 +165,30 @@ spec:
             limits:
               cpu: 300m
               memory: 64Mi
-          # Проверка готовности: кластер стучится по этому адресу и не пускает трафик
-          # на копию, пока не получит ответ. Без неё Service отправил бы запросы в
-          # ещё не поднявшийся nginx, и пользователь увидел бы ошибку при каждой выкатке.
-          # Её же ждёт Flux — в kustomization.yaml мы просили wait: true.
-          #   initialDelaySeconds  подождать перед первым стуком, дать процессу стартовать
-          #   periodSeconds        как часто стучаться дальше
+          # Comprobación de disponibilidad: el clúster llama a esta dirección y no deja pasar tráfico
+          # a una copia hasta que recibe respuesta. Sin ella el Service enviaría solicitudes a un
+          # nginx que aún no se ha levantado, y el usuario vería un error en cada despliegue.
+          # Flux también la espera — en kustomization.yaml pedimos wait: true.
+          #   initialDelaySeconds  esperar antes del primer intento, dar tiempo al proceso a arrancar
+          #   periodSeconds        con qué frecuencia llamar después
           readinessProbe:
             httpGet:
               path: /healthz
               port: http
             initialDelaySeconds: 2
             periodSeconds: 5
-          # Куда внутри контейнера подложить содержимое двух ConfigMap из начала файла.
-          # /etc/nginx/conf.d — папка, откуда nginx читает настройки при старте,
-          # /usr/share/nginx/html — папка, из которой он отдаёт файлы.
-          # Образ при этом не меняется: файлы появляются в нём в момент запуска.
+          # Dónde colocar dentro del contenedor el contenido de los dos ConfigMap del inicio del archivo.
+          # /etc/nginx/conf.d — la carpeta de la que nginx lee la configuración al arrancar,
+          # /usr/share/nginx/html — la carpeta desde la que sirve los archivos.
+          # La imagen no cambia por ello: los archivos aparecen en ella en el momento del arranque.
           volumeMounts:
             - name: conf
               mountPath: /etc/nginx/conf.d
             - name: page
               mountPath: /usr/share/nginx/html
-      # Что именно подкладывать. Имена conf и page — внутренние, они связывают этот
-      # блок с volumeMounts выше; name внутри configMap — уже имя реального объекта
-      # в кластере. Ошибётесь в нём — под будет висеть и ждать несуществующий ConfigMap.
+      # Qué montar exactamente. Los nombres conf y page son internos, enlazan este bloque
+      # con los volumeMounts de arriba; name dentro de configMap ya es el nombre del objeto real
+      # en el clúster. Si te equivocas en él, el pod quedará colgado esperando un ConfigMap inexistente.
       volumes:
         - name: conf
           configMap:
@@ -197,24 +197,24 @@ spec:
           configMap:
             name: passes-page
 ---
-# --- 4 из 4. Постоянное имя, за которым стоят все копии -----------------------------
-# Поды пересоздаются, и адреса у них каждый раз новые. Service даёт неизменное имя —
-# passes.passes.svc.cluster.local, — по которому внутри кластера всегда можно достучаться
-# до живых копий. Это внутренняя балансировка, снаружи кластера сюда пока не попасть.
+# --- 4 de 4. Un nombre permanente detrás del cual están todas las copias ------------
+# Los pods se recrean, y sus direcciones son nuevas cada vez. El Service da un nombre invariable —
+# passes.passes.svc.cluster.local — por el que dentro del clúster siempre se puede alcanzar
+# las copias vivas. Es un balanceo interno; desde fuera del clúster aún no se puede llegar aquí.
 apiVersion: v1
 kind: Service
 metadata:
   name: passes
   namespace: passes
 spec:
-  # Связь Service с подами — не список адресов, а условие «все поды с меткой app: passes».
-  # Появилась новая копия с такой меткой — она сама попала под балансировку, ничего
-  # регистрировать не нужно. Пропала — её убрали из выдачи.
+  # El vínculo del Service con los pods no es una lista de direcciones, sino la condición «todos los pods con la etiqueta app: passes».
+  # Apareció una copia nueva con esa etiqueta — entró en el balanceo por sí misma, no hay
+  # nada que registrar. Desapareció — se la quitó del reparto.
   selector:
     app: passes
-  # port — на каком порту отвечает сам Service, targetPort — куда он перенаправляет
-  # внутрь контейнера. Здесь targetPort ссылается на имя `http` из блока ports выше,
-  # а не на номер: номер можно поменять в одном месте, и связь не порвётся.
+  # port — en qué puerto responde el propio Service, targetPort — hacia dónde reenvía
+  # dentro del contenedor. Aquí targetPort se refiere al nombre `http` del bloque ports de arriba,
+  # y no a un número: el número se puede cambiar en un solo lugar y el vínculo no se romperá.
   ports:
     - port: 80
       targetPort: http

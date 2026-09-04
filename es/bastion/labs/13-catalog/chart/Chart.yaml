@@ -1,25 +1,25 @@
-# Лаба 13. Паспорт чарта «Пропуска».
+# Lab 13. Pasaporte del chart «Pases».
 #
-# Чарт — это папка: шаблоны манифестов в templates/, значения по умолчанию в values.yaml
-# и схема параметров в values.schema.json. Разворачивается командой
-# `helm install <имя-релиза> chart` из папки лабы, а в каталоге Cozystack — самой
-# платформой, когда кто-то заказывает приложение через дашборд.
+# Un chart es una carpeta: plantillas de manifiestos en templates/, valores por defecto en values.yaml
+# y el esquema de parámetros en values.schema.json. Se despliega con el comando
+# `helm install <nombre-del-release> chart` desde la carpeta de la lab, y en el catálogo de Cozystack — por la
+# propia plataforma, cuando alguien pide una aplicación a través del dashboard.
 #
-# Chart.yaml — обложка пакета: по ней Helm понимает, как пакет называется и какой он версии.
+# Chart.yaml es la portada del paquete: a partir de ella Helm entiende cómo se llama el paquete y qué versión tiene.
 apiVersion: v2
 name: guest-pass
 description: Internal guest pass service — order a pass for a visitor
 type: application
 
-# Дальше две версии, и их путают чаще всего остального в Helm. Это разные вещи.
+# A continuación vienen dos versiones, y se confunden más a menudo que ninguna otra cosa en Helm. Son cosas distintas.
 #
-# version — версия упаковки. Меняется, когда вы правите шаблоны, значения или схему,
-# даже если приложение внутри осталось прежним. Именно её Helm сравнивает при обновлении
-# релиза, по ней же различаются загруженные в репозиторий пакеты. Без её повышения
-# платформа считает, что пакет не менялся, и новую версию можно не заметить.
+# version — la versión del empaquetado. Cambia cuando editas plantillas, valores o el esquema,
+# aunque la aplicación de dentro siga siendo la misma. Es exactamente lo que Helm compara al actualizar
+# un release, y es lo que distingue los paquetes subidos al repositorio. Sin incrementarla,
+# la plataforma da por hecho que el paquete no ha cambiado, y la nueva versión puede pasar desapercibida.
 version: 0.1.0
-# appVersion — версия самого приложения внутри пакета, здесь это nginx. Живёт своей
-# жизнью: приложение может обновиться десять раз без единой правки шаблонов, и наоборот —
-# вы переписали шаблоны, а приложение то же. В имена объектов не попадает, показывается
-# в выводе `helm list` и в карточке каталога.
+# appVersion — la versión de la propia aplicación dentro del paquete, aquí es nginx. Vive su propia
+# vida: la aplicación puede actualizarse diez veces sin una sola edición de las plantillas, y al revés —
+# reescribes las plantillas, pero la aplicación es la misma. No aparece en los nombres de los objetos, se muestra
+# en la salida de `helm list` y en la tarjeta del catálogo.
 appVersion: "1.0"

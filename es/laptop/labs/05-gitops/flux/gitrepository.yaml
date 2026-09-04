@@ -1,39 +1,39 @@
 ---
-# Лаба 5 · Инфраструктура в Git. Источник: откуда Flux берёт желаемое состояние.
+# Lab 5 · Infraestructura en Git. La fuente: de dónde Flux obtiene el estado deseado.
 #
-# Применяется на вашем кластере `lab` вместе с соседним kustomization.yaml:
+# Se aplica en tu clúster `lab` junto con el kustomization.yaml vecino:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl apply -f flux/
 #
-# ВНИМАНИЕ: ЗАМЕНИТЕ url на адрес СВОЕГО репозитория, прежде чем применять: строка
-# ЗАМЕНИТЕ-МЕНЯ — заглушка, с ней Flux пойдёт в несуществующий адрес и встанет
-# с ошибкой. Ветку тоже проверьте: GitHub создаёт новые репозитории с веткой main.
+# ATENCIÓN: REEMPLAZA la url por la dirección de TU propio repositorio antes de aplicar: la cadena
+# ЗАМЕНИТЕ-МЕНЯ es un marcador de posición, con ella Flux irá a una dirección inexistente y se detendrá
+# con un error. Comprueba también la rama: GitHub crea los nuevos repositorios con la rama main.
 #
-# В каждом объекте: apiVersion — версия схемы описания, kind — что создаём,
-# metadata.name — имя, по которому на объект ссылаются дальше. Ниже не повторяется.
+# En cada objeto: apiVersion — la versión del esquema de descripción, kind — qué creamos,
+# metadata.name — el nombre por el que se referencia el objeto más adelante. No se repite abajo.
 #
-# Единственная задача этого объекта — держать в кластере свежую копию репозитория.
-# Он ничего не применяет: только скачивает. Применяет соседний Kustomization,
-# и он ссылается сюда по имени `passes`, поэтому имя менять нельзя в одиночку.
+# La única tarea de este objeto es mantener en el clúster una copia fresca del repositorio.
+# No aplica nada: solo descarga. Quien aplica es el Kustomization vecino,
+# y este referencia aquí por el nombre `passes`, por eso el nombre no se puede cambiar por sí solo.
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: GitRepository
 metadata:
   name: passes
-  # flux-system — пространство имён, которое завела команда flux install; в нём живут
-  # сами службы Flux. Объекты-настройки кладут туда же, иначе службы их не увидят.
+  # flux-system — el espacio de nombres que creó el comando flux install; en él viven
+  # los propios servicios de Flux. Los objetos de configuración se ponen ahí también, si no los servicios no los verán.
   namespace: flux-system
 spec:
-  # Как часто ходить в Git за новым состоянием. Одна минута — для лабы;
-  # в бою обычно 1–5 минут, а мгновенную реакцию делают вебхуком из GitHub.
+  # Con qué frecuencia ir a Git a por el nuevo estado. Un minuto — para la práctica;
+  # en producción normalmente 1–5 minutos, y la reacción instantánea se hace con un webhook de GitHub.
   interval: 1m
-  # Адрес репозитория. Он публичный, поэтому ни логина, ни ключа здесь нет —
-  # это упрощение учебного стенда. В бою репозиторий приватный, и рядом появляется
-  # ссылка на секрет с deploy-ключом (поле secretRef).
+  # La dirección del repositorio. Es público, por eso aquí no hay ni login ni clave —
+  # es una simplificación del banco de pruebas didáctico. En producción el repositorio es privado, y al lado aparece
+  # una referencia a un secreto con la clave de despliegue (el campo secretRef).
   url: https://github.com/ЗАМЕНИТЕ-МЕНЯ/passes-gitops
-  # Какую ветку считать источником истины. В кластер поедет то, что влито в main;
-  # то, что лежит в других ветках, не поедет. Отсюда и берётся ревью: изменение
-  # сначала живёт в своей ветке, где его можно посмотреть, и только слияние в main
-  # делает его действующим. Если репозиторий создан со старой веткой master —
-  # исправьте здесь, иначе Flux не найдёт, что читать.
+  # Qué rama considerar la fuente de la verdad. Al clúster irá lo que se fusione en main;
+  # lo que está en otras ramas no irá. De ahí viene la revisión: un cambio
+  # primero vive en su propia rama, donde se puede examinar, y solo la fusión en main
+  # lo hace efectivo. Si el repositorio se creó con la vieja rama master —
+  # corrígelo aquí, si no Flux no encontrará qué leer.
   ref:
     branch: main

@@ -1,26 +1,26 @@
 ---
-# Лаба 13. Так будет выглядеть заказ вашего приложения ПОСЛЕ того,
-# как админ применит applicationdefinition.yaml. Применяется в вашем тенанте:
+# Lab 13. Así se verá el pedido de tu aplicación DESPUÉS de que
+# el administrador aplique applicationdefinition.yaml. Se aplica en tu tenant:
 #   kubectl apply -f guestpass-example.yaml
 #
-# ВНИМАНИЕ: tenant-workshopXX — заглушка, а не имя namespace. Замените XX на номер
-# своего тенанта до применения, иначе kubectl откажет: такого namespace нет,
-# а в чужой вас не пустят.
+# ATENCIÓN: tenant-workshopXX es un marcador de posición, no un nombre de namespace. Reemplaza XX con
+# el número de tu tenant antes de aplicarlo, de lo contrario kubectl se negará: no existe tal namespace,
+# y no te dejarán entrar en el ajeno.
 #
-# Обратите внимание: группа apps.cozystack.io — та же, что у Bucket,
-# VMInstance и остальных приложений каталога. Ваше приложение встанет
-# в один ряд с ними, а не куда-то сбоку.
+# Ten en cuenta: el grupo apps.cozystack.io es el mismo que usan Bucket,
+# VMInstance y las demás aplicaciones del catálogo. Tu aplicación quedará
+# en la misma fila que ellas, no apartada a un lado.
 #
-# Применить этот файл до того, как админ зарегистрировал определение,
-# нельзя: kubectl ответит `no matches for kind "GuestPass"`.
+# No puedes aplicar este archivo antes de que el administrador haya registrado la definición:
+# kubectl responderá `no matches for kind "GuestPass"`.
 apiVersion: apps.cozystack.io/v1alpha1
 kind: GuestPass
 metadata:
   name: main
   namespace: tenant-workshopXX
-# Поля в spec — это ровно те параметры, что описаны в chart/values.yaml и показаны
-# формой заказа в дашборде. Здесь они выписаны текстом: то же самое, что нажать
-# кнопку в дашборде, но такой файл можно отревьюить, положить в Git и откатить.
+# Los campos en spec son exactamente los parámetros descritos en chart/values.yaml y mostrados
+# por el formulario de pedido en el dashboard. Aquí están escritos como texto: lo mismo que pulsar
+# el botón en el dashboard, pero un archivo así se puede revisar, poner en Git y revertir.
 spec:
   replicas: 2
   greeting: "Order a pass for your guest"

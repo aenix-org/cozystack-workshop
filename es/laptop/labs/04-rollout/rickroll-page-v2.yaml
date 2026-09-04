@@ -1,39 +1,39 @@
 ---
-# Лаба 4. Вторая версия страницы — то, что мы выкатываем под нагрузкой.
-# Отличаться должна заметно: участник смотрит на браузер, а не в diff.
+# Lab 4. La segunda versión de la página — la que desplegamos bajo carga.
+# Debe diferenciarse de forma notable: el participante mira el navegador, no un diff.
 #
-# Один объект. Применяется на вашем учебном кластере `lab`, а не в тенанте
-# на управляющем кластере:
+# Un único objeto. Se aplica en tu clúster de formación `lab`, no en el tenant
+# del clúster de gestión:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl apply -f rickroll-page-v2.yaml
-# Заглушек вроде tenant-workshopXX здесь нет — подставлять свой номер никуда не нужно.
+# Aquí no hay marcadores como tenant-workshopXX — no hace falta insertar tu número en ningún sitio.
 #
-# Главное, на чём здесь спотыкаются: этот apply сам по себе ничего не выкатывает.
-# Он кладёт в кластер ещё один файл с настройками рядом с первым. Пока том `page`
-# у Deployment ссылается на rickroll-page-v1, пользователи видят первую версию.
-# Выкаткой становится следующий шаг лабы — переключение тома на этот ConfigMap.
-# Отсюда и вся конструкция с двумя объектами: первая версия остаётся в кластере
-# нетронутой, и откат возвращает её целиком, а не восстанавливает по памяти.
+# Lo principal con lo que la gente tropieza aquí: este apply por sí mismo no despliega nada.
+# Coloca en el clúster otro archivo de configuración junto al primero. Mientras el volumen `page`
+# del Deployment apunte a rickroll-page-v1, los usuarios ven la primera versión.
+# El despliegue pasa a ser el siguiente paso de la lab — cambiar el volumen a este ConfigMap.
+# De ahí toda la construcción con dos objetos: la primera versión permanece en el clúster
+# intacta, y un rollback la devuelve por completo, en lugar de reconstruirla de memoria.
 #
-# Правь мы вместо этого ConfigMap rickroll-page-v1 на месте, откатываться было бы
-# некуда, а поды получили бы новое содержимое без замены копий и без записи
-# в истории ревизий — то есть без всего, ради чего лаба и делается.
+# Si en cambio editáramos el ConfigMap rickroll-page-v1 sobre la marcha, no habría
+# adónde hacer rollback, y los pods recibirían contenido nuevo sin reemplazar copias y sin dejar registro
+# en el historial de revisiones — es decir, sin todo aquello para lo que se hace la lab.
 #
-# Имя объекта менять нельзя: на rickroll-page-v2 ссылается патч из README
-# и проверка в check.sh.
+# El nombre del objeto no debe cambiarse: a rickroll-page-v2 lo referencia el patch del README
+# y la comprobación en check.sh.
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: rickroll-page-v2
 data:
-  # Всё, что ниже отступа после `|`, — дословное содержимое файла index.html,
-  # который окажется внутри контейнера. Это уже не YAML: комментариев здесь нет
-  # и быть не может, решётка попала бы на страницу как обычный текст.
+  # Todo lo que va por debajo de la sangría tras `|` es el contenido literal del archivo index.html,
+  # que acabará dentro del contenedor. Esto ya no es YAML: aquí no hay comentarios
+  # ni puede haberlos, una almohadilla aparecería en la página como texto normal.
   #
-  # В разметке важны две вещи, на которые смотрит check.sh: надпись «ВЕРСИЯ 2» —
-  # по ней проверка отличает вторую версию от первой, и заглушка __POD__ — её
-  # подменяет на имя пода nginx по правилу из ConfigMap rickroll-conf (лаба 1).
-  # Уберёте любую из них — проверка лабы не пройдёт, хотя выкатка будет успешной.
+  # En el marcado importan dos cosas que check.sh mira: el rótulo «ВЕРСИЯ 2» —
+  # por él la comprobación distingue la segunda versión de la primera, y el marcador __POD__ — que se
+  # sustituye por el nombre del pod nginx según la regla del ConfigMap rickroll-conf (lab 1).
+  # Si eliminas cualquiera de ellos, la comprobación de la lab no pasará, aunque el despliegue tenga éxito.
   index.html: |
     <!doctype html>
     <html lang="ru">

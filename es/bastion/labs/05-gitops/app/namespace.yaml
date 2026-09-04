@@ -1,29 +1,30 @@
 ---
-# Лаба 5 · Инфраструктура в Git. Пространство имён под сервис «Пропуск».
+# Lab 5 · Infraestructura en Git. Espacio de nombres para el servicio «Pases».
 #
-# Руками этот файл в кластер не применяется. Вы кладёте его в свой репозиторий на
-# GitHub, в папку apps/, а в кластер `lab` его переносит Flux — сам, по расписанию:
+# Este archivo no se aplica al clúster a mano. Lo colocas en tu repositorio en
+# GitHub, en la carpeta apps/, y Flux lo lleva al clúster `lab` por sí mismo, según su programación:
 #     cp app/*.yaml ~/passes-gitops/apps/
 #     cd ~/passes-gitops && git add apps && git commit -m "add passes service v1" && git push
 #
-# Как читать любой манифест: apiVersion — версия схемы описания (по ней кластер знает,
-# как его разбирать), kind — что создаём, metadata.name — имя, по которому объект потом
-# искать. Эти три поля есть в каждом объекте и ниже отдельно не поясняются.
+# Cómo leer cualquier manifiesto: apiVersion — la versión del esquema de descripción (el clúster
+# la usa para saber cómo analizar el objeto), kind — qué creamos, metadata.name — el
+# nombre por el que luego se busca el objeto. Estos tres campos están presentes en cada objeto y
+# no se explican por separado más abajo.
 #
-# Пространство имён (namespace) — логическая перегородка внутри одного кластера:
-# своя область видимости имён, свои права, свои квоты. Ближайшее в vSphere — папка
-# в дереве vCenter или resource pool.
+# Un espacio de nombres (namespace) es una partición lógica dentro de un mismo clúster:
+# su propio ámbito de nombres, sus propios permisos, sus propias cuotas. Lo más parecido en vSphere
+# es una carpeta en el árbol de vCenter o un resource pool.
 #
-# Зачем оно лежит в Git вместе с приложением, а не создано руками: когда сервис уедет
-# из репозитория, Flux уберёт и пространство имён. Не останется пустой перегородки,
-# про которую через полгода никто не вспомнит, зачем она заводилась.
+# Por qué vive en Git junto con la aplicación en lugar de crearse a mano: cuando el servicio salga
+# del repositorio, Flux eliminará también el espacio de nombres. No quedará una partición vacía
+# que dentro de seis meses nadie recuerde por qué se creó.
 apiVersion: v1
 kind: Namespace
 metadata:
   name: passes
-  # Метка на работу сервиса не влияет — она нужна, чтобы одной командой найти всё,
-  # что относится к «Пропуску»: kubectl get all -A -l app.kubernetes.io/part-of=passes.
-  # Имя part-of взято из общепринятого набора меток Kubernetes, а не придумано нами:
-  # чужие инструменты (мониторинг, выгрузки) ищут именно его.
+  # La etiqueta no afecta al funcionamiento del servicio — se necesita para que con un solo comando
+  # se pueda encontrar todo lo relacionado con «Pases»: kubectl get all -A -l app.kubernetes.io/part-of=passes.
+  # El nombre part-of está tomado del conjunto común de etiquetas de Kubernetes, no lo inventamos nosotros:
+  # herramientas externas (monitorización, exportaciones) buscan exactamente esta.
   labels:
     app.kubernetes.io/part-of: passes

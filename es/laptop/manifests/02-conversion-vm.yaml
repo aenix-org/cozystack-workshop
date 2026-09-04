@@ -1,5 +1,5 @@
-# Перед применением замените tenant-workshopXX на свой namespace.
-# Проще разом по всем файлам: см. README, раздел про подстановку номера.
+# Antes de aplicar, reemplaza tenant-workshopXX por tu propio namespace.
+# Es más fácil hacerlo en todos los archivos a la vez: consulta el README, la sección sobre la sustitución del número.
 #
 apiVersion: apps.cozystack.io/v1alpha1
 kind: VMDisk

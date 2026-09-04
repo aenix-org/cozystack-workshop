@@ -1,6 +1,6 @@
-# Перед применением замените tenant-workshopXX на свой namespace.
-# Проще разом по всем файлам: см. README, раздел про подстановку номера.
-# И ещё: в поле url ниже вставьте presigned-ссылку из convert.sh (шаг 2).
+# Antes de aplicar, reemplace tenant-workshopXX por su namespace.
+# Es más fácil hacerlo en todos los archivos a la vez: consulte el README, la sección sobre la sustitución del número.
+# Además: en el campo url de abajo, inserte el enlace presigned de convert.sh (paso 2).
 #
 apiVersion: apps.cozystack.io/v1alpha1
 kind: VMDisk
@@ -10,7 +10,7 @@ metadata:
 spec:
   source:
     http:
-      url: "ВСТАВЬТЕ_PRESIGNED_URL"  # из convert.sh (строка Share:)
+      url: "ВСТАВЬТЕ_PRESIGNED_URL"  # de convert.sh (línea Share:)
   storage: 10Gi
   storageClass: replicated
 ---
@@ -25,6 +25,6 @@ spec:
   runStrategy: Always
   disks:
     - name: app-1
-# Доступ к приложению снаружи — через `virtctl port-forward` (см. README).
-# external LoadBalancer на этом стенде (Cilium + robotlb) для VM не работает,
-# поэтому external здесь НЕ включаем.
+# El acceso a la aplicación desde el exterior es mediante `virtctl port-forward` (consulte el README).
+# el LoadBalancer external en este entorno (Cilium + robotlb) no funciona para las VM,
+# por eso NO habilitamos external aquí.

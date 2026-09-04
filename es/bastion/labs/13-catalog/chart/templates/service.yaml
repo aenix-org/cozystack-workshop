@@ -1,11 +1,11 @@
-# Лаба 13. Шаблон Service: постоянный адрес приложения.
+# Lab 13. Plantilla Service: una dirección estable para la aplicación.
 #
-# Копии приложения приходят и уходят, их адреса каждый раз новые. Service даёт имя,
-# которое не меняется, и раскидывает запросы по живым копиям. Из соседнего пода
-# к приложению обращаются по имени релиза.
+# Las copias de la aplicación aparecen y desaparecen, con direcciones nuevas cada vez. Un Service da un nombre
+# que no cambia, y reparte las solicitudes entre las copias vivas. Desde un pod vecino
+# se accede a la aplicación por el nombre del release.
 #
-# О подстановке в двойных фигурных скобках и о том, откуда берутся имена объектов,
-# написано в templates/deployment.yaml — здесь всё устроено так же.
+# La sustitución entre dobles llaves y de dónde salen los nombres de los objetos está
+# descrita en templates/deployment.yaml — aquí todo funciona igual.
 apiVersion: v1
 kind: Service
 metadata:
@@ -14,20 +14,20 @@ metadata:
     app.kubernetes.io/name: guest-pass
     app.kubernetes.io/instance: {{ .Release.Name }}
 spec:
-  # Один флаг в values решает, получит приложение адрес за пределами кластера или нет.
-  # Так же устроены штатные приложения Cozystack: поле external.
-  # Конструкция if/else выбирает одно из двух значений при рендере — в готовый манифест
-  # уходит либо LoadBalancer, либо ClusterIP, и ветвления в нём уже не остаётся.
+  # Un solo flag en values decide si la aplicación obtiene o no una dirección fuera del clúster.
+  # Las aplicaciones integradas de Cozystack funcionan igual: el campo external.
+  # La construcción if/else elige uno de dos valores durante el render — al manifiesto final
+  # va o LoadBalancer o ClusterIP, y en él ya no queda ninguna ramificación.
   type: {{ if .Values.external }}LoadBalancer{{ else }}ClusterIP{{ end }}
-  # Кому отдавать трафик. Service отбирает поды по меткам, а не по именам, поэтому
-  # ему всё равно, сколько копий и как они называются. Метки те же, что Deployment
-  # ставит своим копиям.
+  # A quién enviar el tráfico. El Service selecciona los pods por etiquetas, no por nombres, por eso
+  # le da igual cuántas copias haya y cómo se llamen. Las etiquetas son las mismas que
+  # el Deployment pone a sus copias.
   selector:
     app.kubernetes.io/name: guest-pass
     app.kubernetes.io/instance: {{ .Release.Name }}
-  # port — на каком порту слушает сам Service, targetPort — куда он стучится внутрь пода.
-  # targetPort записан именем: порт с именем http объявлен в шаблоне Deployment.
-  # Поменяется номер там — здесь править не придётся.
+  # port — en qué puerto escucha el propio Service, targetPort — a dónde llama dentro del pod.
+  # targetPort está escrito por nombre: el puerto con nombre http está declarado en la plantilla del Deployment.
+  # Si el número cambia allí, aquí no hará falta corregir nada.
   ports:
     - name: http
       port: 80

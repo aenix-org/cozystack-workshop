@@ -1,16 +1,16 @@
 ---
-# Лаба 7 · сервис «Пропуск», версия v2 — та, что умеет работать с кешем.
-# Кеш тут пока НЕ включён: сначала измеряем, как плохо без него. Включается он позже,
-# патчем cache-patch.yaml из этой же папки.
+# Lab 7 · el servicio «Pase», versión v2 — la que sabe trabajar con caché.
+# Aquí el caché todavía NO está activado: primero medimos lo malo que es sin él. Se activa más tarde,
+# con el parche cache-patch.yaml de esta misma carpeta.
 #
-# Где применяется: ваш кластер `lab` (export KUBECONFIG=~/lab.kubeconfig).
-# Команда: kubectl apply -f passes-api.yaml
+# Dónde se aplica: tu clúster `lab` (export KUBECONFIG=~/lab.kubeconfig).
+# Comando: kubectl apply -f passes-api.yaml
 #
-# HARBOR-HOST — заглушка, а не адрес. Подставьте адрес своего Harbor (см. hr-legacy.yaml,
-# там же команда sed для замены во всех файлах разом).
+# HARBOR-HOST es un marcador de posición, no una dirección. Sustituye la dirección de tu propio Harbor (ver hr-legacy.yaml,
+# que también tiene el comando sed para reemplazarla en todos los archivos de una vez).
 #
-# В файле два объекта через `---`: Deployment (копии приложения) и Service (постоянное имя
-# для них). apiVersion, kind и metadata.name дальше по файлу не комментируются.
+# El archivo tiene dos objetos separados por `---`: Deployment (copias de la aplicación) y Service (un nombre estable
+# para ellas). apiVersion, kind y metadata.name no se comentan más adelante en el archivo.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -18,64 +18,64 @@ metadata:
   labels:
     app: passes-api
 spec:
-  # Две копии, а не одна, — чтобы позже было видно главное свойство кеша: он общий.
-  # Один под положил ответ в Redis, другой его оттуда взял, хотя сам в справочник не ходил.
+  # Dos copias, no una, para que después se vea la propiedad principal del caché: es compartido.
+  # Un pod puso la respuesta en Redis, otro la tomó de ahí, aunque él mismo nunca fue al directorio.
   replicas: 2
-  # По этой метке Deployment отличает свои поды от чужих. Должна совпадать с меткой
-  # в template ниже, иначе объект не найдёт то, что сам создал.
+  # Por esta etiqueta el Deployment distingue sus propios pods de los ajenos. Debe coincidir con la etiqueta
+  # en el template de abajo, de lo contrario el objeto no encontrará lo que él mismo creó.
   selector:
     matchLabels:
       app: passes-api
-  # template — шаблон пода: из чего собирать каждую копию.
+  # template — la plantilla del pod: a partir de qué ensamblar cada copia.
   template:
     metadata:
       labels:
         app: passes-api
     spec:
-      # Требования безопасности уровня пода: не от root, ограниченный набор системных
-      # вызовов. В кластере с включёнными политиками под без этих полей не примут.
+      # Requisitos de seguridad a nivel de pod: no desde root, un conjunto restringido de llamadas
+      # al sistema. En un clúster con políticas activadas, un pod sin estos campos no será aceptado.
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
         seccompProfile:
           type: RuntimeDefault
-      # Чем кластер представится закрытому Harbor при скачивании образа. Без ссылки
-      # на этот секрет под застрянет в ImagePullBackOff.
+      # Con qué se identificará el clúster ante el Harbor cerrado al descargar la imagen. Sin una referencia
+      # a este secreto el pod se quedará atascado en ImagePullBackOff.
       imagePullSecrets:
         - name: harbor
       containers:
         - name: api
-          # Права контейнера урезаны до минимума: повышать нельзя, ядровых привилегий нет.
+          # Los privilegios del contenedor están recortados al mínimo: no se puede escalar, no hay privilegios de núcleo.
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # Тот же образ, что и у справочника. Разделяет их только MODE ниже.
+          # La misma imagen que la del directorio. Solo los separa el MODE de abajo.
           image: HARBOR-HOST/passes/passes-api:v2
-          # Имя порта нужно, чтобы проба и Service ссылались на имя, а не на число.
+          # El nombre del puerto hace falta para que la sonda y el Service referencien un nombre, no un número.
           ports:
             - containerPort: 8080
               name: http
-          # Всё поведение приложения задаётся здесь. Обратите внимание: переменных
-          # REDIS_ADDR и REDIS_PASSWORD в списке нет — и именно поэтому кеш выключен,
-          # а каждый запрос честно уходит в медленный справочник.
+          # Todo el comportamiento de la aplicación se define aquí. Fíjate: las variables
+          # REDIS_ADDR y REDIS_PASSWORD no están en la lista — y precisamente por eso el caché está apagado,
+          # y cada petición va honestamente al directorio lento.
           env:
-            # MODE=api — этот экземпляр работает самим сервисом «Пропуск».
+            # MODE=api — esta instancia funciona como el propio servicio «Pase».
             - name: MODE
               value: "api"
-            # Версия и реестр приложению для работы не нужны — они видны в ответе на «/»
-            # и дают убедиться, что запущено именно то, что вы только что собрали.
+            # La aplicación no necesita la versión ni el registro para funcionar — se ven en la respuesta a «/»
+            # y permiten confirmar que se está ejecutando exactamente lo que acabas de construir.
             - name: APP_VERSION
               value: "v2"
             - name: IMAGE_REGISTRY
               value: HARBOR-HOST
-            # Куда ходить за данными. Имя сервиса, а не адрес: копии справочника
-            # могут пересоздаваться сколько угодно, имя не меняется.
+            # Adónde ir a por los datos. Un nombre de servicio, no una dirección: las copias del directorio
+            # pueden recrearse cuantas veces sea, el nombre no cambia.
             - name: HR_URL
               value: "http://hr-legacy.default.svc.cluster.local"
-            # Кто и где выполняет запрос. Кластер подставляет эти три значения сам:
-            # заранее их не знает никто. Они попадают в ответ сервиса, и по ним видно,
-            # какая копия и на каком узле ответила, — это пригодится при замерах.
+            # Quién ejecuta la petición y dónde. El clúster sustituye estos tres valores por sí mismo:
+            # nadie los conoce de antemano. Terminan en la respuesta del servicio, y por ellos se ve
+            # qué copia y en qué nodo respondió — esto será útil durante las mediciones.
             - name: POD_NAME
               valueFrom:
                 fieldRef:
@@ -88,9 +88,9 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
-          # requests — что резервируется при выборе узла, limits — потолок. Потолок в одно
-          # ядро здесь не жадность: под нагрузкой приложение упрётся в него, а не съест
-          # весь узел, и замер покажет задержку справочника, а не борьбу за процессор.
+          # requests — lo que se reserva al elegir un nodo, limits — el techo. Un techo de un solo
+          # núcleo aquí no es avaricia: bajo carga la aplicación chocará contra él en vez de comerse
+          # todo el nodo, y la medición mostrará la latencia del directorio, no una pelea por la CPU.
           resources:
             requests:
               cpu: 50m
@@ -98,9 +98,9 @@ spec:
             limits:
               cpu: "1"
               memory: 64Mi
-          # Пока /healthz не ответит, Service не пошлёт в эту копию ни одного запроса.
-          # При обновлении это же поле бережёт вас от провала: старые копии не убирают,
-          # пока новые не сообщат о готовности.
+          # Hasta que /healthz no responda, el Service no enviará ni una sola petición a esta copia.
+          # Durante una actualización este mismo campo te salva de una caída: las copias viejas no se retiran
+          # hasta que las nuevas informen de que están listas.
           readinessProbe:
             httpGet:
               path: /healthz
@@ -108,19 +108,19 @@ spec:
             initialDelaySeconds: 2
             periodSeconds: 5
 ---
-# Service — одно постоянное имя на обе копии и распределение запросов между ними.
-# Поды пересоздаются и меняют IP, имя passes-api остаётся. По этому имени в сервис
-# ходят и Fortio, и скрипт проверки.
+# Service — un nombre estable para ambas copias y la distribución de peticiones entre ellas.
+# Los pods se recrean y cambian de IP, el nombre passes-api permanece. Por este nombre acceden al servicio
+# tanto Fortio como el script de comprobación.
 apiVersion: v1
 kind: Service
 metadata:
   name: passes-api
 spec:
-  # Метка, по которой Service набирает список живых копий. Не совпадёт с меткой подов —
-  # Service будет существовать и вести в пустоту.
+  # La etiqueta por la que el Service reúne la lista de copias vivas. Si no coincide con la etiqueta de los pods —
+  # el Service existirá y llevará a la nada.
   selector:
     app: passes-api
   ports:
-    # Снаружи обращаются на 80, внутрь пода уходит на порт с именем http (8080).
+    # Desde fuera se conectan al 80, hacia dentro del pod va al puerto llamado http (8080).
     - port: 80
       targetPort: http

@@ -1,20 +1,20 @@
 ---
-# Лаба 7 · заглушка легаси-справочника сотрудников.
-# В жизни это чужая система, которую вам не отдадут переписывать: она отвечает 800 мс,
-# и с этим надо как-то жить. Здесь — заглушка с тем же поведением, чтобы было что измерять.
+# Lab 7 · un stub para el directorio legacy de empleados.
+# En la vida real este es el sistema de otra persona que no te permitirán reescribir: responde en 800 ms,
+# y de algún modo tienes que vivir con eso. Aquí hay un stub con el mismo comportamiento, para que haya algo que medir.
 #
-# Где применяется: ваш кластер `lab` (export KUBECONFIG=~/lab.kubeconfig), не управляющий
-# кластер Cozystack. Команда: kubectl apply -f hr-legacy.yaml
+# Dónde aplica: tu clúster `lab` (export KUBECONFIG=~/lab.kubeconfig), no el clúster de gestión
+# de Cozystack. Comando: kubectl apply -f hr-legacy.yaml
 #
-# HARBOR-HOST — заглушка, а не адрес. Подставьте адрес своего Harbor, иначе кластер пойдёт
-# скачивать образ с несуществующего хоста:
+# HARBOR-HOST es un marcador de posición, no una dirección. Sustituye la dirección de tu propio Harbor, de lo contrario el clúster
+# intentará descargar la imagen desde un host inexistente:
 #   sed -i    's|HARBOR-HOST|harbor.workshop03.example.org|g' *.yaml   # Linux
 #   sed -i '' 's|HARBOR-HOST|harbor.workshop03.example.org|g' *.yaml   # macOS
 #
-# В файле два объекта, разделённых строкой `---`: Deployment (кто запускается и в скольких
-# копиях) и Service (постоянное имя, по которому в эти копии ходят). У каждого объекта
-# apiVersion и kind говорят, что это за объект, а metadata.name — как он называется;
-# дальше по файлу эти три поля не комментируются.
+# El archivo tiene dos objetos separados por una línea `---`: un Deployment (qué se ejecuta y en cuántas
+# copias) y un Service (un nombre permanente que se usa para alcanzar esas copias). Para cada objeto
+# apiVersion y kind dicen qué tipo de objeto es, y metadata.name es cómo se llama;
+# más abajo estos tres campos no se comentan.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -22,72 +22,72 @@ metadata:
   labels:
     app: hr-legacy
 spec:
-  # Сколько копий держать запущенными. Исчезнет копия — кластер создаст новую, не
-  # спрашивая. Справочнику хватает одной: он здесь не для нагрузки, а для замера.
+  # Cuántas copias mantener en ejecución. Si una copia desaparece, el clúster creará una nueva sin
+  # preguntar. Con una basta para el directorio: no está aquí para carga, sino para medición.
   replicas: 1
-  # По этой метке Deployment узнаёт свои поды среди всех остальных в кластере.
-  # Метка в selector и метка в template ниже обязаны совпадать, иначе объект
-  # не найдёт то, что сам же и создал.
+  # Por esta etiqueta el Deployment reconoce sus pods entre todos los demás en el clúster.
+  # La etiqueta en selector y la etiqueta en template de abajo deben coincidir, de lo contrario el objeto
+  # no encontrará lo que él mismo creó.
   selector:
     matchLabels:
       app: hr-legacy
-  # template — шаблон пода. Всё, что ниже, описывает одну копию: из чего её собирать,
-  # с какими правами запускать и как понять, что она готова принимать запросы.
+  # template es la plantilla del pod. Todo lo que está debajo describe una copia: de qué construirla,
+  # con qué privilegios ejecutarla, y cómo saber que está lista para aceptar solicitudes.
   template:
     metadata:
       labels:
         app: hr-legacy
     spec:
-      # Требования безопасности уровня пода. Процесс работает не от root (uid 10001),
-      # профиль seccomp отсекает системные вызовы, которые приложению не нужны.
-      # В кластере с включёнными политиками под без этих полей не запустится вовсе.
+      # Requisitos de seguridad a nivel de pod. El proceso no se ejecuta como root (uid 10001),
+      # el perfil seccomp corta las llamadas al sistema que la aplicación no necesita.
+      # En un clúster con políticas habilitadas, un pod sin estos campos no arrancará en absoluto.
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
         seccompProfile:
           type: RuntimeDefault
-      # Harbor закрыт логином и паролем, и кластеру нужно чем-то представиться. Секрет
-      # `harbor` вы завели в лабе про реестр. Без этой ссылки образ не скачается,
-      # и под останется в состоянии ImagePullBackOff.
+      # Harbor está cerrado con un login y una contraseña, y el clúster necesita algo con que identificarse. El
+      # secreto `harbor` lo configuraste en la lab del registro. Sin esta referencia la imagen no se descargará,
+      # y el pod quedará en el estado ImagePullBackOff.
       imagePullSecrets:
         - name: harbor
       containers:
         - name: hr
-          # То же, что и на уровне пода, но для конкретного контейнера: запрещаем
-          # повышение прав и отбираем все ядровые привилегии. Приложению на Go
-          # ни одна из них не нужна.
+          # Lo mismo que a nivel de pod, pero para un contenedor específico: prohibimos
+          # la escalada de privilegios y quitamos todas las capacidades del kernel. La aplicación en Go
+          # no necesita ninguna de ellas.
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # Образ один и тот же для справочника и для самого сервиса «Пропуск».
-          # Кем именно запустится процесс, решает переменная MODE ниже.
+          # La imagen es la misma para el directorio y para el propio servicio «Пропуск».
+          # Qué proceso arranca realmente lo decide la variable MODE de abajo.
           image: HARBOR-HOST/passes/passes-api:v2
-          # У порта есть имя, а не только номер: проба готовности и Service ниже
-          # ссылаются на имя. Поменяется номер — править придётся в одном месте.
+          # El puerto tiene un nombre, no solo un número: la sonda de readiness y el Service de abajo
+          # referencian el nombre. Si el número cambia, lo editarás en un solo lugar.
           ports:
             - containerPort: 8080
               name: http
-          # Переменные окружения — единственный способ настроить это приложение.
-          # Пересобирать образ ради смены поведения не нужно.
+          # Las variables de entorno son la única manera de configurar esta aplicación.
+          # No hace falta reconstruir la imagen para cambiar el comportamiento.
           env:
-            # MODE=hr — экземпляр притворяется кадровой системой: ждёт и отвечает.
+            # MODE=hr — la instancia finge ser un sistema de RRHH: espera y responde.
             - name: MODE
               value: "hr"
-            # Ровно та задержка, которую показывает настоящий справочник.
-            # Меняя её, вы меняете «насколько всё плохо» — попробуйте потом 2s.
+            # Exactamente el retardo que muestra el directorio real.
+            # Al cambiarlo, cambias «qué tan mal están las cosas» — prueba 2s después.
             - name: HR_DELAY
               value: "800ms"
-            # Своё имя под заранее не знает — его назначает кластер при создании.
-            # fieldRef подставляет это имя в переменную уже на старте, и оно
-            # попадает в ответ сервиса: видно, какая именно копия ответила.
+            # Un pod no conoce su propio nombre de antemano — el clúster se lo asigna al crearlo.
+            # fieldRef sustituye este nombre en la variable al arrancar, y este
+            # acaba en la respuesta del servicio: puedes ver qué copia respondió.
             - name: POD_NAME
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
-          # requests — сколько ресурсов резервируется под контейнер при выборе узла,
-          # limits — потолок, выше которого его не пустят. Похоже на reservation
-          # и limit в vSphere, но задаётся на контейнер, а не на виртуальную машину.
+          # requests — cuántos recursos se reservan para el contenedor al elegir un nodo,
+          # limits — el techo que no se le permitirá superar. Similar a reservation
+          # y limit en vSphere, pero se establece por contenedor, no por máquina virtual.
           resources:
             requests:
               cpu: 50m
@@ -95,9 +95,9 @@ spec:
             limits:
               cpu: "1"
               memory: 64Mi
-          # Проба готовности. Пока /healthz не ответит, Service не пошлёт в эту копию
-          # ни одного запроса. Без пробы трафик пойдёт в ещё не запустившийся процесс,
-          # и вы увидите ошибки на ровном месте — при том что «всё развернулось».
+          # Sonda de readiness. Hasta que /healthz responda, el Service no enviará ni una sola solicitud
+          # a esta copia. Sin la sonda, el tráfico iría a un proceso que aún no ha arrancado,
+          # y verías errores de la nada — aunque «todo se desplegó».
           readinessProbe:
             httpGet:
               path: /healthz
@@ -105,19 +105,19 @@ spec:
             initialDelaySeconds: 2
             periodSeconds: 5
 ---
-# Service — постоянное имя и постоянный адрес для набора подов. Поды пересоздаются
-# и каждый раз получают новый IP, а имя hr-legacy остаётся тем же. Похоже на VIP
-# балансировщика, но заводится четырьмя строками и живёт внутри кластера.
+# Service — un nombre permanente y una dirección permanente para un conjunto de pods. Los pods se recrean
+# y cada vez reciben una nueva IP, pero el nombre hr-legacy permanece igual. Similar a una VIP de
+# balanceador de carga, pero se configura en cuatro líneas y vive dentro del clúster.
 apiVersion: v1
 kind: Service
 metadata:
   name: hr-legacy
 spec:
-  # По этой метке Service набирает список живых копий. Та же метка, что у подов выше:
-  # не совпадёт — Service будет существовать и не вести никуда.
+  # Por esta etiqueta el Service reúne la lista de copias vivas. La misma etiqueta que en los pods de arriba:
+  # si no coincide, el Service existirá y no llevará a ninguna parte.
   selector:
     app: hr-legacy
   ports:
-    # Обращаются по 80-му порту, внутрь пода это уходит на порт с именем http (8080).
+    # Las solicitudes llegan por el puerto 80, dentro del pod esto va al puerto llamado http (8080).
     - port: 80
       targetPort: http

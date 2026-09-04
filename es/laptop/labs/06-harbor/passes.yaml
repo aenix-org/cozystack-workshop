@@ -1,23 +1,23 @@
 ---
-# Лаба 6 · Свой приватный реестр образов. РАБОЧИЙ вариант манифеста.
+# Lab 6 · Tu propio registro privado de imágenes. La versión FUNCIONAL del manifiesto.
 #
-# Это тот же файл, что passes-broken.yaml, плюс одно место, которого там не хватало —
-# оно отмечено ниже словами «ВОТ ЧЕГО НЕ ХВАТАЛО». Применяйте его после того, как
-# увидели отказ на сломанном варианте и разобрались, почему он произошёл.
+# Es el mismo archivo que passes-broken.yaml, más un único lugar que allí faltaba —
+# está marcado abajo con las palabras «ESTO ES LO QUE FALTABA». Aplícalo después de que
+# hayas visto el fallo en la versión rota y hayas entendido por qué ocurrió.
 #
-# Применяется на вашем кластере `lab` (не на управляющем кластере Cozystack — там
-# живёт только сам Harbor), в пространстве имён по умолчанию:
+# Se aplica en tu clúster `lab` (no en el clúster de gestión de Cozystack — allí
+# vive solo el propio Harbor), en el espacio de nombres por defecto:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl delete -f passes-broken.yaml
 #     kubectl apply -f passes.yaml
 #
-# ВНИМАНИЕ: HARBOR-HOST — заглушка, а не рабочий адрес. Перед применением подставьте адрес
-# своего Harbor; строка HARBOR-HOST встречается в файле дважды, sed заменит обе:
+# ATENCIÓN: HARBOR-HOST es un marcador de posición, no una dirección funcional. Antes de aplicar, sustituye la dirección
+# de tu propio Harbor; la cadena HARBOR-HOST aparece dos veces en el archivo, sed reemplazará ambas:
 #   sed -i    's|HARBOR-HOST|harbor.workshop03.example.org|g' passes.yaml   # Linux
 #   sed -i '' 's|HARBOR-HOST|harbor.workshop03.example.org|g' passes.yaml   # macOS
 #
-# В объектах ниже: apiVersion — версия схемы описания, kind — что создаём,
-# metadata.name — имя объекта. Отдельно дальше не поясняются.
+# En los objetos de abajo: apiVersion es la versión del esquema de descripción, kind es lo que creamos,
+# metadata.name es el nombre del objeto. No se explican por separado más adelante.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -25,67 +25,67 @@ metadata:
   labels:
     app: passes-api
 spec:
-  # Две копии, а не одна: так в ответе сервиса будет видно, что запросы обслуживают
-  # разные поды, и что образ скачался на узел один раз, а запустился дважды.
+  # Dos copias, no una: así en la respuesta del servicio se verá que las peticiones las atienden
+  # pods distintos, y que la imagen se descargó al nodo una vez pero se inició dos veces.
   replicas: 2
-  # Условие «мои копии — это поды с меткой app: passes-api». Метка в образце пода ниже
-  # должна совпадать с этой, иначе кластер отклонит манифест.
+  # La condición «mis copias son pods con la etiqueta app: passes-api». La etiqueta en la plantilla del pod de abajo
+  # debe coincidir con esta, de lo contrario el clúster rechazará el manifiesto.
   selector:
     matchLabels:
       app: passes-api
-  # Образец, по которому штампуются копии. Всё, что внутри, описывает один под.
+  # La plantilla a partir de la cual se estampan las copias. Todo lo que hay dentro describe un único pod.
   template:
     metadata:
       labels:
         app: passes-api
     spec:
-      # Ограничения безопасности на весь под: не запускать от root, работать под
-      # непривилегированным пользователем 10001, ограничить набор системных вызовов
-      # стандартным профилем. Образ собран под это же (см. app/Dockerfile, строка USER).
+      # Restricciones de seguridad para todo el pod: no ejecutar como root, trabajar como
+      # usuario no privilegiado 10001, restringir el conjunto de llamadas al sistema al
+      # perfil estándar. La imagen está construida exactamente para esto (ver app/Dockerfile, la línea USER).
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
         seccompProfile:
           type: RuntimeDefault
-      # ВОТ ЧЕГО НЕ ХВАТАЛО в passes-broken.yaml — эти две строки, и больше ничего.
+      # ESTO ES LO QUE FALTABA en passes-broken.yaml — estas dos líneas, y nada más.
       #
-      # Закрытый реестр отдаёт образ не всякому: сначала надо назваться. Секрет `harbor`
-      # (тип kubernetes.io/dockerconfigjson) хранит адрес реестра, логин и пароль; вы
-      # создали его командой kubectl create secret docker-registry. Здесь секрет только
-      # НАЗЫВАЕТСЯ по имени — берёт его оттуда не приложение, а kubelet на узле, в тот
-      # момент, когда идёт скачивать образ. Поэтому секрет должен лежать в том же
-      # пространстве имён, что и под: kubelet ищет его именно там и никуда больше.
+      # Un registro cerrado no entrega la imagen a cualquiera: primero hay que identificarse. El secreto `harbor`
+      # (de tipo kubernetes.io/dockerconfigjson) guarda la dirección del registro, el usuario y la contraseña; lo
+      # creaste con el comando kubectl create secret docker-registry. Aquí el secreto solo
+      # se REFERENCIA por su nombre — y lo toma de allí no la aplicación sino el kubelet del nodo, en el
+      # momento en que va a descargar la imagen. Por eso el secreto debe estar en el mismo
+      # espacio de nombres que el pod: el kubelet lo busca precisamente ahí y en ningún otro sitio.
       imagePullSecrets:
         - name: harbor
       containers:
         - name: api
-          # Права на уровне контейнера: не добирать себе привилегий и отдать все особые
-          # полномочия ядра. Приложению нужен один сетевой порт, остальное лишнее.
+          # Permisos a nivel del contenedor: no obtener privilegios adicionales y ceder todas las
+          # capacidades especiales del kernel. La aplicación necesita un único puerto de red, el resto sobra.
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # Первая часть имени образа — адрес реестра, и именно поэтому переезд на свой
-          # реестр меняет манифесты: имя образа становится другим. Не будь адреса в
-          # начале, кластер пошёл бы за образом в Docker Hub, а ИБ это и запретила.
+          # La primera parte del nombre de la imagen es la dirección del registro, y precisamente por eso el traslado a tu propio
+          # registro cambia los manifiestos: el nombre de la imagen se vuelve distinto. Si no hubiera dirección al
+          # principio, el clúster iría a por la imagen a Docker Hub, y eso es justo lo que la seguridad prohibió.
           image: HARBOR-HOST/passes/passes-api:v1
-          # Порт приложения. Имя `http` дальше используют проверка готовности и Service,
-          # так что номер порта задан в одном месте, а не в трёх.
+          # El puerto de la aplicación. El nombre `http` se usa más adelante en la sonda de disponibilidad y el Service,
+          # así que el número de puerto se define en un solo lugar, no en tres.
           ports:
             - containerPort: 8080
               name: http
-          # Переменные окружения, из которых приложение узнаёт, кто оно и откуда приехало.
-          # Ровно их оно и печатает в ответе (см. app/main.go, структура identity).
-          # APP_VERSION и IMAGE_REGISTRY заданы текстом — их пишем мы сами.
+          # Variables de entorno de las que la aplicación aprende quién es y de dónde vino.
+          # Es exactamente eso lo que imprime en la respuesta (ver app/main.go, la estructura identity).
+          # APP_VERSION e IMAGE_REGISTRY se definen como texto — las escribimos nosotros mismos.
           env:
             - name: APP_VERSION
               value: "v1"
             - name: IMAGE_REGISTRY
               value: HARBOR-HOST
-            # Дальше — Downward API: кластер сам кладёт в переменные то, что знает о поде.
-            # Приложению не нужно ни угадывать своё имя, ни ходить за ним в API кластера,
-            # ни носить с собой права на такой запрос. Значения подставляются в момент
-            # запуска копии, поэтому у каждой копии они свои.
+            # A continuación — la Downward API: el propio clúster pone en las variables lo que sabe sobre el pod.
+            # La aplicación no necesita adivinar su propio nombre, ni ir a por él a la API del clúster,
+            # ni llevar consigo los derechos para tal petición. Los valores se sustituyen en el momento
+            # en que se inicia una copia, por eso cada copia tiene los suyos.
             - name: POD_NAME
               valueFrom:
                 fieldRef:
@@ -98,11 +98,11 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
-          # requests — что зарезервировать под копию: по этим числам планировщик выбирает
-          # узел. limits — потолок: за память выше потолка контейнер убивают, за
-          # процессор — притормаживают. 16Mi хватает потому, что приложение на Go без
-          # зависимостей и почти ничего не держит в памяти; у JVM было бы на два порядка
-          # больше. 20m — двадцать тысячных процессорного ядра.
+          # requests — qué reservar para una copia: por estos números el planificador elige el
+          # nodo. limits — el techo: por memoria por encima del techo el contenedor se mata, por
+          # CPU se frena. 16Mi basta porque la aplicación está escrita en Go sin
+          # dependencias y casi no retiene nada en memoria; una JVM necesitaría dos órdenes de magnitud
+          # más. 20m son veinte milésimas de un núcleo de CPU.
           resources:
             requests:
               cpu: 20m
@@ -110,10 +110,10 @@ spec:
             limits:
               cpu: 300m
               memory: 64Mi
-          # Проверка готовности: пока приложение не ответит на /healthz, Service не
-          # пустит на эту копию трафик. При выкатке новой версии старая копия убирается
-          # из балансировки только после того, как новая ответила, — поэтому запросы
-          # не падают на ещё не поднявшемся процессе.
+          # Sonda de disponibilidad: hasta que la aplicación no responda en /healthz, el Service no
+          # enviará tráfico a esta copia. Durante el despliegue de una nueva versión la copia antigua se retira
+          # del balanceo de carga solo después de que la nueva haya respondido — por eso las peticiones
+          # no fallan en un proceso que aún no ha arrancado.
           readinessProbe:
             httpGet:
               path: /healthz
@@ -121,21 +121,21 @@ spec:
             initialDelaySeconds: 2
             periodSeconds: 5
 ---
-# Постоянное имя, за которым стоят обе копии. Поды пересоздаются и меняют адреса,
-# имя passes-api.default.svc.cluster.local не меняется. Без этого объекта приложение
-# работает, но достучаться до него внутри кластера не по чему — и проверка в check.sh
-# ходит именно сюда, а не в под.
+# Un nombre permanente detrás del cual están ambas copias. Los pods se recrean y cambian de direcciones,
+# el nombre passes-api.default.svc.cluster.local no cambia. Sin este objeto la aplicación
+# funciona, pero no hay por dónde alcanzarla dentro del clúster — y la comprobación en check.sh
+# va precisamente aquí, no al pod.
 apiVersion: v1
 kind: Service
 metadata:
   name: passes-api
 spec:
-  # Связь с подами — не список адресов, а условие по метке. Новая копия с меткой
-  # app: passes-api попадает под балансировку сама, регистрировать её не нужно.
+  # El enlace con los pods no es una lista de direcciones sino una condición sobre una etiqueta. Una nueva copia con la etiqueta
+  # app: passes-api entra en el balanceo de carga por sí sola, no hace falta registrarla.
   selector:
     app: passes-api
-  # port — на каком порту отвечает сам Service; targetPort ссылается на имя `http`
-  # из блока ports выше, а не на номер, поэтому связь не порвётся при смене номера.
+  # port — en qué puerto responde el propio Service; targetPort se refiere al nombre `http`
+  # del bloque ports de arriba, no al número, por eso el enlace no se romperá al cambiar el número.
   ports:
     - port: 80
       targetPort: http

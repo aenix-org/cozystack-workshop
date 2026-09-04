@@ -1,51 +1,51 @@
 ---
-# Лаба 11. Исходники мобильного приложения «Пропуск» — то, что подаётся сборке на вход.
+# Lab 11. Código fuente de la aplicación móvil «Пропуск» — lo que se entrega a la compilación como entrada.
 #
-# Применяется на вашем учебном кластере `lab`, а не в тенанте на управляющем кластере:
+# Se aplica en tu clúster de formación `lab`, no en un tenant del clúster de gestión:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl apply -f propusk-src.yaml
-# Заглушек вроде tenant-workshopXX здесь нет — подставлять свой номер никуда не нужно.
-# Namespace тоже не указан: объект ляжет в тот, что прописан в вашем kubeconfig.
+# Aquí no hay marcadores como tenant-workshopXX — no necesitas sustituir tu número en ningún sitio.
+# El namespace tampoco se especifica: el objeto cae en el que esté fijado en tu kubeconfig.
 #
-# Приложение намеренно крошечное: одна активность, один текст на экране.
-# Смысл лабы не в Android, а в том, что сборка едет в кластер.
+# La aplicación es deliberadamente diminuta: una actividad, una línea de texto en la pantalla.
+# El sentido de la lab no es Android, sino el hecho de que una compilación viaja al clúster.
 #
-# ЧТО ЭТО ЗА ФАЙЛЫ, если мобильных приложений вы никогда не собирали.
-# Проект Android — не один файл с кодом, а дерево из трёх видов файлов:
-#   *.gradle.kts  описание сборки: откуда брать библиотеки, чем компилировать, под какие
-#                 версии Android собирать. По роли это makefile, только на языке Kotlin;
-#   *.kt          собственно код приложения;
-#   *.xml         ресурсы: тексты и описание того, какой экран открывать по нажатию
-#                 на иконку.
-# Сборщик Gradle читает это дерево и выдаёт APK — один файл-установщик для телефона,
-# по роли то же, что .msi для Windows. Ставить Android SDK себе и собирать руками не
-# нужно: этим займётся Job из android-build.yaml, а здесь лежит только его вход.
+# QUÉ SON ESTOS ARCHIVOS, si nunca has compilado aplicaciones móviles.
+# Un proyecto Android no es un único archivo con código, sino un árbol de tres tipos de archivos:
+#   *.gradle.kts  la descripción de la compilación: de dónde tomar las librerías, con qué compilar, para qué
+#                 versiones de Android compilar. Por su papel es un makefile, solo que en lenguaje Kotlin;
+#   *.kt          el código de la aplicación propiamente dicho;
+#   *.xml         recursos: textos y la descripción de qué pantalla abrir al pulsar
+#                 el icono.
+# El compilador Gradle lee este árbol y produce un APK — un único archivo instalador para el teléfono,
+# por su papel lo mismo que un .msi para Windows. No necesitas instalarte el Android SDK y compilar a
+# mano: de eso se encarga un Job de android-build.yaml, y aquí solo está su entrada.
 #
-# Исходники лежат в ConfigMap, а не в образе, ровно по той же причине, по
-# которой в лабе с первым приложением в ConfigMap лежала страница nginx:
-# чтобы поменять их, не пересобирая ничего. ConfigMap — объект кластера, внутри
-# которого лежат текстовые файлы; при запуске контейнера кластер подкладывает их
-# внутрь него как обычные файлы на диске.
+# El código fuente vive en un ConfigMap, no en una imagen, exactamente por la misma razón
+# por la que en la lab con la primera aplicación la página de nginx vivía en un ConfigMap:
+# para poder cambiarlos sin recompilar nada. Un ConfigMap es un objeto del clúster, dentro
+# del cual viven archivos de texto; al arrancar el contenedor, el clúster los coloca
+# dentro de él como archivos normales en disco.
 #
-# Ключи внутри `data` — это имена файлов, а всё, что ниже отступа после `|`, —
-# дословное содержимое файла, а не YAML. Комментарий, поставленный внутрь такого
-# блока, стал бы строкой самого файла, поэтому все пояснения ниже стоят снаружи,
-# перед ключом.
+# Las claves dentro de `data` son nombres de archivo, y todo lo que hay debajo de la sangría tras `|` es
+# el contenido literal del archivo, no YAML. Un comentario colocado dentro de tal
+# bloque se convertiría en una línea del propio archivo, por eso todas las explicaciones de abajo están fuera,
+# antes de la clave.
 #
-# Плоская карта из шести ключей разворачивается в дерево каталогов не здесь, а при
-# монтировании: соответствие «ключ -> путь» задано в android-build.yaml, в блоке
-# volumes.items. Ключ ConfigMap не может содержать слэш — отсюда плоское имя
-# app-build.gradle.kts, которое в проекте станет app/build.gradle.kts.
+# El mapa plano de seis claves se despliega en un árbol de directorios no aquí, sino en el
+# momento del montaje: la correspondencia «clave -> ruta» se fija en android-build.yaml, en el
+# bloque volumes.items. Una clave de ConfigMap no puede contener una barra — de ahí el nombre plano
+# app-build.gradle.kts, que en el proyecto se convierte en app/build.gradle.kts.
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: propusk-src
 data:
-  # Верхний файл проекта: перечисляет, откуда Gradle тянет плагины и библиотеки и какие
-  # модули входят в проект (здесь один — app). Все три репозитория публичные, в интернете:
-  # контейнер сборки стартует пустым и тянет оттуда всё, отсюда и длительность сборки.
-  # Это же место вы поправите первым, когда ИБ закроет выход наружу, — сюда пропишется
-  # внутренний прокси-репозиторий, ровно как Docker Hub меняли на Harbor.
+  # El archivo de nivel superior del proyecto: enumera de dónde Gradle tira los plugins y librerías y qué
+  # módulos forman parte del proyecto (aquí hay uno — app). Los tres repositorios son públicos, en internet:
+  # el contenedor de compilación arranca vacío y tira todo desde ahí, de ahí la duración de la compilación.
+  # Este es también el primer sitio que corregirás cuando seguridad cierre el acceso saliente — aquí se
+  # escribirá un repositorio proxy interno, exactamente como se cambió Docker Hub por Harbor.
   settings.gradle.kts: |
     pluginManagement {
       repositories {
@@ -63,26 +63,26 @@ data:
     rootProject.name = "propusk"
     include(":app")
 
-  # Корневой файл сборки: фиксирует версии двух плагинов — сборщика Android и компилятора
-  # Kotlin. `apply false` означает «версию объявить, но в корневом проекте не включать»:
-  # включит их модуль app. Версии прибиты гвоздями намеренно. Сборка, которая тянет
-  # «последнее», через месяц собирается иначе, чем сегодня, и разбираться в этом будете вы.
+  # El archivo raíz de compilación: fija las versiones de dos plugins — el compilador de Android y el compilador de
+  # Kotlin. `apply false` significa «declarar la versión, pero no habilitarla en el proyecto raíz»:
+  # los habilitará el módulo app. Las versiones están clavadas a propósito. Una compilación que tira
+  # «lo último», un mes después compila de forma distinta a hoy, y serás tú quien tenga que averiguar por qué.
   build.gradle.kts: |
     plugins {
       id("com.android.application") version "8.5.2" apply false
       id("org.jetbrains.kotlin.android") version "1.9.24" apply false
     }
 
-  # Описание самого модуля приложения. Здесь три числа, от которых зависит и что скачает
-  # сборка, и где приложение вообще запустится:
-  #   compileSdk 34   версия Android SDK, которой компилируем. Её и качает шаг установки
-  #                   SDK — около полутора гигабайт, самый долгий шаг сборки;
-  #   minSdk 24       самый старый Android, на котором приложение пойдёт (это Android 7).
-  #                   Поднимете — отсечёте старые телефоны, опустите — придётся тащить
-  #                   библиотеки совместимости;
-  #   jvmTarget 17    Kotlin компилируется в байт-код Java, и это число обязано совпасть
-  #                   с версией JDK в образе сборки (gradle:8.9-jdk17 в android-build.yaml).
-  #                   Разойдутся — сборка упадёт на несовпадении версий байт-кода.
+  # Descripción del propio módulo de la aplicación. Aquí hay tres números de los que dependen tanto lo que descarga
+  # la compilación como dónde llegará a ejecutarse la aplicación:
+  #   compileSdk 34   la versión del Android SDK con la que compilamos. Es lo que descarga el paso de instalación
+  #                   del SDK — alrededor de un gigabyte y medio, el paso de compilación más largo;
+  #   minSdk 24       el Android más antiguo en el que la aplicación funcionará (esto es Android 7).
+  #                   Súbelo — cortas los teléfonos viejos, bájalo — tendrás que arrastrar
+  #                   librerías de compatibilidad;
+  #   jvmTarget 17    Kotlin se compila a bytecode de Java, y este número debe coincidir
+  #                   con la versión de JDK en la imagen de compilación (gradle:8.9-jdk17 en android-build.yaml).
+  #                   Si divergen — la compilación falla por una discrepancia de versión de bytecode.
   app-build.gradle.kts: |
     plugins {
       id("com.android.application")
@@ -117,9 +117,9 @@ data:
       }
     }
 
-  # Паспорт приложения для телефона: какие экраны в нём есть и какой из них открывается
-  # по нажатию на иконку. Ровно за это отвечает блок intent-filter с MAIN и LAUNCHER —
-  # без него приложение установится, но значка в меню не появится.
+  # El pasaporte de la aplicación para el teléfono: qué pantallas tiene y cuál se abre
+  # al pulsar el icono. Para eso sirve exactamente el bloque intent-filter con MAIN y LAUNCHER —
+  # sin él la aplicación se instalará, pero no aparecerá ningún icono en el menú.
   AndroidManifest.xml: |
     <?xml version="1.0" encoding="utf-8"?>
     <manifest xmlns:android="http://schemas.android.com/apk/res/android">
@@ -135,12 +135,12 @@ data:
       </application>
     </manifest>
 
-  # Единственный экран приложения — и весь код, который в проекте вообще есть.
-  # Взят голый android.app.Activity, а не библиотека совместимости: у проекта ноль внешних
-  # зависимостей, и это экономит по паре минут скачивания на каждой сборке.
-  # R.string.greeting — ссылка на текст из strings.xml. Класс R в исходниках не лежит, его
-  # генерирует сборка. Поэтому ошибка «unresolved reference: R» означает упавший шаг
-  # генерации ресурсов, а не опечатку в коде.
+  # La única pantalla de la aplicación — y todo el código que el proyecto tiene en absoluto.
+  # Se usa android.app.Activity a secas, no una librería de compatibilidad: el proyecto tiene cero
+  # dependencias externas, y esto ahorra un par de minutos de descarga en cada compilación.
+  # R.string.greeting — una referencia a un texto de strings.xml. La clase R no está en el código fuente, la
+  # genera la compilación. Por eso el error «unresolved reference: R» significa un paso de generación
+  # de recursos fallido, no una errata en el código.
   MainActivity.kt: |
     package io.aenix.propusk
 
@@ -159,8 +159,8 @@ data:
       }
     }
 
-  # Тексты, вынесенные из кода: так их правят и переводят, не трогая программиста.
-  # app_name видно под иконкой на телефоне, greeting — на самом экране.
+  # Textos extraídos del código: así se editan y traducen sin tocar al programador.
+  # app_name se ve bajo el icono en el teléfono, greeting — en la propia pantalla.
   strings.xml: |
     <?xml version="1.0" encoding="utf-8"?>
     <resources>

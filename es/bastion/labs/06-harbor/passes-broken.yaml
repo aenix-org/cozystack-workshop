@@ -1,31 +1,31 @@
 ---
-# Лаба 6 · Свой приватный реестр образов. ЭТОТ ФАЙЛ НАМЕРЕННО НЕПОЛНЫЙ.
+# Lab 6 · Tu propio registro de imágenes privado. ESTE ARCHIVO ESTÁ DELIBERADAMENTE INCOMPLETO.
 #
-# Он не заработает, и это задумано: вы должны увидеть отказ своими глазами и сами
-# понять, чего кластеру не хватило. Не хватает здесь одного — того, чем кластер
-# называется закрытому реестру, когда приходит за образом. Реестр не отдаёт образы
-# кому попало, а в этом описании нет ничего, что помогло бы кластеру доказать своё
-# право. Какая именно строчка это чинит — разберёте по ходу лабы; рабочий вариант
-# лежит рядом, в passes.yaml, и открывать его до разбора смысла нет.
+# No va a funcionar, y es intencionado: debes ver el fallo con tus propios ojos y
+# averiguar por ti mismo qué le faltaba al clúster. Aquí falta una sola cosa: aquello con lo
+# que el clúster se identifica ante el registro cerrado cuando viene a por una imagen. El registro
+# no reparte imágenes a cualquiera, y en esta descripción no hay nada que ayude al clúster a probar
+# su derecho. Qué línea exacta lo arregla — lo descubrirás a lo largo de la lab; la versión que
+# funciona está al lado, en passes.yaml, y no tiene sentido abrirla antes del recorrido guiado.
 #
-# Здесь только Deployment, без Service: постоянное имя сервису пока не нужно —
-# до отвечающего пода мы всё равно не доберёмся, раз образ не скачивается.
+# Aquí solo hay un Deployment, sin Service: un nombre estable para el servicio aún no hace falta —
+# de todos modos no llegaremos hasta un pod que responda, ya que la imagen no se descargará.
 #
-# Применяется на вашем кластере `lab`, в пространстве имён по умолчанию:
+# Se aplica en tu clúster `lab`, en el espacio de nombres por defecto:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl apply -f passes-broken.yaml
 #     kubectl get pods -l app=passes-api -w
 #
-# ВНИМАНИЕ: HARBOR-HOST — заглушка, а не рабочий адрес. Подставьте адрес своего Harbor,
-# иначе получите не ту ошибку, ради которой файл написан (строк с заглушкой две):
+# ATENCIÓN: HARBOR-HOST es un marcador de posición, no una dirección que funcione. Sustituye la dirección de tu Harbor,
+# de lo contrario obtendrás un error distinto del que se escribió este archivo (hay dos líneas con el marcador):
 #   sed -i    's|HARBOR-HOST|harbor.workshop03.example.org|g' passes-broken.yaml   # Linux
 #   sed -i '' 's|HARBOR-HOST|harbor.workshop03.example.org|g' passes-broken.yaml   # macOS
 #
-# В объекте ниже: apiVersion — версия схемы описания, kind — что создаём,
-# metadata.name — имя объекта. Отдельно дальше не поясняются.
+# En el objeto de abajo: apiVersion — la versión del esquema de la descripción, kind — qué creamos,
+# metadata.name — el nombre del objeto. No se explican por separado más adelante.
 #
-# Deployment — это не «запусти контейнер», а «держи запущенным столько-то копий вот
-# такого контейнера». Копия исчезнет — кластер создаст новую, не спрашивая.
+# Un Deployment no es «ejecuta un contenedor» sino «mantén ejecutándose tantas copias de este contenedor».
+# Una copia desaparece — el clúster crea una nueva sin preguntar.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -33,23 +33,23 @@ metadata:
   labels:
     app: passes-api
 spec:
-  # Одна копия: чтобы разбирать отказ, хватит и одной, а в логах и в выводе
-  # kubectl describe будет меньше шума.
+  # Una copia: para recorrer el fallo, con una basta, y habrá menos ruido en los logs
+  # y en la salida de kubectl describe.
   replicas: 1
-  # Условие «мои копии — это поды с меткой app: passes-api». Метка в образце пода ниже
-  # должна совпадать с этой, иначе кластер отклонит манифест.
+  # La condición «mis copias son pods con la etiqueta app: passes-api». La etiqueta en la plantilla del pod de abajo
+  # debe coincidir con esta, de lo contrario el clúster rechazará el manifiesto.
   selector:
     matchLabels:
       app: passes-api
-  # Образец, по которому штампуются копии. Всё, что внутри, описывает один под.
+  # La plantilla a partir de la cual se estampan las copias. Todo lo que hay dentro describe un único pod.
   template:
     metadata:
       labels:
         app: passes-api
     spec:
-      # Ограничения безопасности на весь под: не запускать от root, работать под
-      # непривилегированным пользователем 10001, ограничить набор системных вызовов
-      # стандартным профилем. Образ собран под это же (см. app/Dockerfile, строка USER).
+      # Restricciones de seguridad para todo el pod: no ejecutar como root, trabajar como el
+      # usuario no privilegiado 10001, restringir el conjunto de llamadas al sistema al
+      # perfil estándar. La imagen está construida también para esto (ver app/Dockerfile, la línea USER).
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
@@ -57,25 +57,25 @@ spec:
           type: RuntimeDefault
       containers:
         - name: api
-          # Права на уровне контейнера: не добирать себе привилегий и отдать все особые
-          # полномочия ядра. Приложению нужен один сетевой порт, остальное лишнее.
+          # Derechos a nivel de contenedor: no concederse privilegios extra y descartar todas las
+          # capacidades especiales del kernel. La aplicación necesita un único puerto de red, el resto sobra.
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # Первая часть имени образа — адрес реестра. Именно поэтому переезд на свой
-          # реестр меняет манифесты: имя образа становится другим. Не будь адреса,
-          # кластер пошёл бы за образом в Docker Hub — то есть туда, куда ИБ запретила.
+          # La primera parte del nombre de la imagen es la dirección del registro. Por eso exactamente mudarse a tu propio
+          # registro cambia los manifiestos: el nombre de la imagen pasa a ser distinto. Si no hubiera dirección,
+          # el clúster iría a por la imagen a Docker Hub — es decir, a donde el equipo de seguridad lo prohibió.
           image: HARBOR-HOST/passes/passes-api:v1
-          # Порт приложения. Имя `http` дальше используется проверкой готовности,
-          # так что номер порта задан в одном месте, а не в двух.
+          # El puerto de la aplicación. El nombre `http` se usa más abajo en la sonda de readiness,
+          # así que el número de puerto se define en un solo sitio, no en dos.
           ports:
             - containerPort: 8080
               name: http
-          # Переменные окружения, из которых приложение узнаёт, кто оно и откуда приехало.
-          # Ровно их оно и печатает в ответе (см. app/main.go, структура identity).
-          # APP_VERSION и IMAGE_REGISTRY заданы текстом — их пишем мы сами; три следующие
-          # заполняет сам кластер в момент запуска копии, приложению их знать неоткуда.
+          # Variables de entorno de las que la aplicación aprende quién es y de dónde vino.
+          # Imprime exactamente estas en la respuesta (ver app/main.go, la estructura identity).
+          # APP_VERSION e IMAGE_REGISTRY se definen como texto — las escribimos nosotros mismos; las tres siguientes
+          # las rellena el propio clúster en el momento en que una copia arranca, la aplicación no tiene forma de conocerlas.
           env:
             - name: APP_VERSION
               value: "v1"
@@ -93,10 +93,10 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
-          # requests — что зарезервировать под копию: по этим числам планировщик выбирает
-          # узел. limits — потолок: за память выше потолка контейнер убивают, за
-          # процессор — притормаживают. 16Mi хватает потому, что приложение на Go без
-          # зависимостей. 20m — двадцать тысячных процессорного ядра.
+          # requests — qué reservar para una copia: el planificador elige un nodo por estos números.
+          # limits — el techo: por memoria por encima del techo el contenedor se mata, por
+          # CPU se estrangula. 16Mi basta porque la aplicación está en Go sin
+          # dependencias. 20m son veinte milésimas de un núcleo de CPU.
           resources:
             requests:
               cpu: 20m
@@ -104,9 +104,9 @@ spec:
             limits:
               cpu: 300m
               memory: 64Mi
-          # Проверка готовности: пока приложение не ответит на /healthz, трафик на копию
-          # не пойдёт. Сегодня до неё дело не дойдёт — она проверяет уже запущенный
-          # процесс, а у нас застрянет более ранний шаг, скачивание образа.
+          # Sonda de readiness: hasta que la aplicación responda en /healthz, el tráfico a la copia
+          # no fluirá. Hoy no se llegará a esto — comprueba un proceso ya en ejecución,
+          # y en nuestro caso un paso anterior se atascará, la descarga de la imagen.
           readinessProbe:
             httpGet:
               path: /healthz

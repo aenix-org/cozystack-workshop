@@ -5,7 +5,7 @@
 #   kubectl --kubeconfig="$HOME/.kube/config" apply -f mongodb.yaml
 #
 # ANTES DE APLICAR: reemplaza tenant-workshopXX por tu namespace,
-# y TuContraseñaAquí por la contraseña que elijas.
+# y ЗдесьВашПароль por la contraseña que elijas.
 apiVersion: apps.cozystack.io/v1alpha1
 kind: MongoDB
 metadata:
@@ -39,7 +39,7 @@ spec:
   # en la cadena de conexión es obligatorio authSource=admin.
   users:
     passapp:
-      password: TuContraseñaAquí
+      password: ЗдесьВашПароль
   # La base passes y los permisos en ella: al usuario passapp se le concede el rol admin
   # de esta base, es decir, puede leer, escribir, construir índices y cambiar la
   # configuración de las colecciones. Esto no otorga permisos sobre otras bases.
