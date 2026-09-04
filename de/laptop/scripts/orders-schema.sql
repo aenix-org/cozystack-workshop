@@ -1,16 +1,16 @@
--- Схема orders для managed Postgres (таблица + история-сид).
+-- orders-Schema für managed Postgres (Tabelle + History-Seed).
 --
--- Роль `orders` и БД `orders` создаёт Postgres-chart (Postgres CR), поэтому здесь
--- НЕТ CREATE USER / CREATE DATABASE — только таблица и немного истории.
+-- Die Rolle `orders` und die DB `orders` werden vom Postgres-Chart (Postgres CR) erstellt,
+-- daher gibt es hier KEIN CREATE USER / CREATE DATABASE — nur die Tabelle und etwas History.
 --
--- ВАЖНО (PG 15+): роль orders не может создавать таблицы в схеме public без
--- гранта. Сначала один раз под superuser (secret postgres-db-superuser):
+-- WICHTIG (PG 15+): Die Rolle orders kann ohne Grant keine Tabellen im Schema public
+-- erstellen. Zuerst einmalig als Superuser (Secret postgres-db-superuser):
 --     GRANT CREATE,USAGE ON SCHEMA public TO orders;
--- и только потом накатывать этот файл от роли orders. Без таблицы приложение
--- отвечает 500 на POST /api/orders (health при этом 200 — он проверяет лишь
--- коннект к PG, а не наличие таблицы).
+-- und erst danach diese Datei als Rolle orders anwenden. Ohne die Tabelle antwortet die
+-- Anwendung mit 500 auf POST /api/orders (health bleibt dabei 200 — es prüft nur die
+-- Verbindung zu PG, nicht das Vorhandensein der Tabelle).
 --
--- Запуск (с app-VM или любой машины с доступом к managed PG):
+-- Ausführung (vom app-VM oder einer beliebigen Maschine mit Zugriff auf managed PG):
 --     PGPASSWORD='<orders-pw>' psql -h postgres-db-rw -U orders -d orders -f orders-schema.sql
 
 CREATE TABLE IF NOT EXISTS orders (
@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS orders (
     processed_at TIMESTAMPTZ
 );
 
--- немного истории, чтобы список не выглядел пустым на проекторе
+-- etwas History, damit die Liste auf dem Projektor nicht leer aussieht
 INSERT INTO orders (item, status, created_by, processed_by, created_at, processed_at)
 SELECT '12x rack rails', 'PROCESSED', 'app-1', 'kafka',
        now() - interval '3 days', now() - interval '3 days' + interval '2 seconds'

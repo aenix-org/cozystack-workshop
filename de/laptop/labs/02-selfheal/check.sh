@@ -1,36 +1,36 @@
 #!/usr/bin/env bash
-# Проверка лабы 2: самолечение.
+# Prüfung von Lab 2: Selbstheilung.
 #
-# Проверяем не «команды набраны», а состояние кластера после лабы: приложение снова
-# обслуживает запросы через Service, отдаёт имя своей копии, и это имя принадлежит
-# реально работающему поду. Плюс ищем следы того, что копии пересоздавались.
+# Wir prüfen nicht «die Befehle wurden eingetippt», sondern den Cluster-Zustand nach dem Lab: die App
+# bedient wieder Anfragen über den Service, gibt den Namen ihrer Kopie zurück, und dieser Name gehört
+# einem tatsächlich laufenden Pod. Außerdem suchen wir nach Spuren, dass Kopien neu erstellt wurden.
 #
-# Скрипт ничего не удаляет и не создаёт, кроме одноразового пода для проверки
-# доступности сервиса изнутри кластера — он убирает себя сам.
+# Das Skript löscht und erstellt nichts, außer einem einmaligen Pod zur Prüfung der
+# Service-Erreichbarkeit von innerhalb des Clusters — er entfernt sich selbst.
 
 LAB_NAME="02-selfheal"
-LAB_TITLE="Лаба 2 · Убить под и посмотреть, что будет"
+LAB_TITLE="Lab 2 · Einen Pod töten und sehen, was passiert"
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
 need_kubeconfig
 
 APP=rickroll
 
-# RFC3339 из kubectl (всегда UTC с Z) в unix-секунды. Через python3, потому что
-# BSD date на macOS и GNU date на Linux разбирают даты по-разному, а python есть везде,
-# где работает lib.sh.
+# RFC3339 aus kubectl (immer UTC mit Z) in Unix-Sekunden. Über python3, weil
+# BSD date auf macOS und GNU date auf Linux Datumsangaben unterschiedlich parsen, und python überall da ist,
+# wo lib.sh funktioniert.
 _epoch() {
   python3 -c 'import sys,datetime as d;print(int(d.datetime.strptime(sys.argv[1],
 "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=d.timezone.utc).timestamp()))' "$1" 2>/dev/null
 }
 
-# --- приложение вообще есть ------------------------------------------------
+# --- die App existiert überhaupt -------------------------------------------
 DEP_TS="$(kubectl get deployment "$APP" -o jsonpath='{.metadata.creationTimestamp}' 2>/dev/null)"
 
 if [ -z "$DEP_TS" ]; then
-  fail "приложения ${APP} нет в кластере" \
-       "в конце лабы его надо было вернуть: kubectl apply -f ../01-deploy/rickroll.yaml"
-  evidence "Что есть в namespace" "$(kubectl get deployment,rs,pods 2>/dev/null)"
+  fail "App ${APP} ist nicht im Cluster" \
+       "am Ende des Labs musste sie wiederhergestellt werden: kubectl apply -f ../01-deploy/rickroll.yaml"
+  evidence "Was im Namespace ist" "$(kubectl get deployment,rs,pods 2>/dev/null)"
   finish
   exit $?
 fi
@@ -40,21 +40,21 @@ HAVE="$(kubectl get deployment "$APP" -o jsonpath='{.status.readyReplicas}' 2>/d
 [ -z "$HAVE" ] && HAVE=0
 
 if [ "${HAVE:-0}" -ge 1 ] && [ "$HAVE" = "$WANT" ]; then
-  ok "приложение ${APP} восстановлено: готовых копий ${HAVE} из ${WANT}"
+  ok "App ${APP} wiederhergestellt: bereite Kopien ${HAVE} von ${WANT}"
 else
-  fail "копий готово ${HAVE} из заказанных ${WANT}" \
-       "смотрите kubectl describe deployment ${APP} и kubectl get pods -l app=${APP}"
+  fail "Kopien bereit ${HAVE} von den angeforderten ${WANT}" \
+       "siehe kubectl describe deployment ${APP} und kubectl get pods -l app=${APP}"
 fi
-evidence "Состояние приложения" "$(kubectl get deployment,rs,pods -l app=${APP} 2>/dev/null)"
+evidence "Zustand der App" "$(kubectl get deployment,rs,pods -l app=${APP} 2>/dev/null)"
 
-# --- цепочка Deployment -> ReplicaSet -> Pod -------------------------------
-# Смысл лабы в том, что копию возвращает ReplicaSet, а не «кластер вообще».
-# Если владельцем пода оказался не ReplicaSet, значит участник поднял под руками,
-# и самолечения он не увидит.
-# Считаем поды поимённо, а не собираем уникальные виды владельцев: у пода без
-# ownerReferences jsonpath отдаёт пустую строку, `sort -u` схлопывает её в невидимый
-# элемент, и `*ReplicaSet*` матчится, пока хоть один под управляется ReplicaSet.
-# Из-за этого посторонний под, поднятый руками, проходил проверку незамеченным.
+# --- die Kette Deployment -> ReplicaSet -> Pod -----------------------------
+# Der Sinn des Labs ist, dass die Kopie vom ReplicaSet zurückgebracht wird, nicht «vom Cluster im Allgemeinen».
+# Wenn der Besitzer des Pods sich als kein ReplicaSet herausstellt, hat der Teilnehmer den Pod von Hand erstellt,
+# und wird die Selbstheilung nicht sehen.
+# Wir zählen die Pods namentlich, statt eindeutige Besitzer-Arten zu sammeln: bei einem Pod ohne
+# ownerReferences gibt jsonpath einen leeren String zurück, `sort -u` kollabiert ihn zu einem unsichtbaren
+# Element, und `*ReplicaSet*` matcht, solange mindestens ein Pod von einem ReplicaSet verwaltet wird.
+# Dadurch bestand ein fremder, von Hand erstellter Pod die Prüfung unbemerkt.
 PODS_TOTAL="$(kubectl get pods -l app=${APP} --no-headers 2>/dev/null | grep -c . )"
 PODS_BY_RS="$(kubectl get pods -l app=${APP} \
   -o jsonpath='{range .items[?(@.metadata.ownerReferences[0].kind=="ReplicaSet")]}{.metadata.name}{"\n"}{end}' 2>/dev/null \
@@ -65,30 +65,30 @@ OWNER_KINDS="$(kubectl get pods -l app=${APP} \
 
 case "${PODS_TOTAL}:${PODS_BY_RS}" in
   0:*)
-    fail "нет ни одного пода с меткой app=${APP}" \
-         "верните приложение: kubectl apply -f ../01-deploy/rickroll.yaml"
+    fail "es gibt keinen Pod mit dem Label app=${APP}" \
+         "stellen Sie die App wieder her: kubectl apply -f ../01-deploy/rickroll.yaml"
     ;;
   *:0)
-    fail "ни один под ${APP} не управляется ReplicaSet — самолечения не будет" \
-         "похоже, под поднят руками (kubectl run). Удалите его и примените ../01-deploy/rickroll.yaml"
+    fail "kein ${APP}-Pod wird von einem ReplicaSet verwaltet — es wird keine Selbstheilung geben" \
+         "sieht so aus, als wäre der Pod von Hand erstellt worden (kubectl run). Löschen Sie ihn und wenden Sie ../01-deploy/rickroll.yaml an"
     ;;
   *)
     if [ "$PODS_TOTAL" -ne "$PODS_BY_RS" ]; then
-      fail "метку app=${APP} носят посторонние поды: ${PODS_BY_RS} из ${PODS_TOTAL} управляются ReplicaSet" \
-           "остальные попадут в балансировку и будут отдавать чужой ответ — найдите их: kubectl get pods -l app=${APP} -o wide"
-      evidence "Владельцы подов" \
+      fail "das Label app=${APP} tragen fremde Pods: ${PODS_BY_RS} von ${PODS_TOTAL} werden von einem ReplicaSet verwaltet" \
+           "die übrigen landen im Load-Balancing und liefern eine fremde Antwort — finden Sie sie: kubectl get pods -l app=${APP} -o wide"
+      evidence "Besitzer der Pods" \
         "$(kubectl get pods -l app=${APP} -o jsonpath='{range .items[*]}{.metadata.name}{" <- "}{.metadata.ownerReferences[0].kind}{"\n"}{end}' 2>/dev/null)"
     else
-    ok "копиями управляет ReplicaSet — цепочка Deployment → ReplicaSet → Pod цела"
-    evidence "Кто чей владелец" \
+    ok "die Kopien werden von einem ReplicaSet verwaltet — die Kette Deployment → ReplicaSet → Pod ist intakt"
+    evidence "Wer wessen Besitzer ist" \
       "$(kubectl get pods -l app=${APP} -o jsonpath='{range .items[*]}{.metadata.name}{" <- "}{.metadata.ownerReferences[0].kind}{"/"}{.metadata.ownerReferences[0].name}{"\n"}{end}' 2>/dev/null)"
     fi
     ;;
 esac
 
-# --- следы пересоздания копий ----------------------------------------------
-# Прямых улик «под убивали» кластер не хранит. Есть две косвенные, и обе достаточные:
-# под заметно моложе своего Deployment, и в событиях ReplicaSet больше одного создания.
+# --- Spuren der Neuerstellung von Kopien -----------------------------------
+# Direkte Beweise «der Pod wurde getötet» bewahrt der Cluster nicht auf. Es gibt zwei indirekte, und beide sind ausreichend:
+# der Pod ist merklich jünger als sein Deployment, und in den Events des ReplicaSet gibt es mehr als eine Erstellung.
 POD_TS="$(kubectl get pods -l app=${APP} \
   -o jsonpath='{.items[0].metadata.creationTimestamp}' 2>/dev/null)"
 
@@ -98,75 +98,75 @@ POD_E="$(_epoch "$POD_TS")"
 if [ -n "$DEP_E" ] && [ -n "$POD_E" ]; then
   DELTA=$(( POD_E - DEP_E ))
   if [ "$DELTA" -ge 45 ]; then
-    ok "копия моложе приложения на ${DELTA} с — значит прежнюю убирали, а эту создали взамен"
+    ok "die Kopie ist um ${DELTA} s jünger als die App — also wurde die vorherige entfernt und diese stattdessen erstellt"
   else
-    warn "копия почти ровесница приложения (разница ${DELTA} с)" \
-         "если вы восстанавливали приложение целиком в самом конце — это нормально; иначе шаг с удалением пода не выполнен"
+    warn "die Kopie ist fast gleich alt wie die App (Differenz ${DELTA} s)" \
+         "wenn Sie die App ganz am Ende komplett wiederhergestellt haben — ist das normal; sonst wurde der Schritt mit dem Löschen des Pods nicht ausgeführt"
   fi
-  evidence "Возраст объектов" "deployment создан: ${DEP_TS}
-pod создан:        ${POD_TS}
-разница:           ${DELTA} с"
+  evidence "Alter der Objekte" "deployment erstellt: ${DEP_TS}
+pod erstellt:        ${POD_TS}
+Differenz:           ${DELTA} s"
 else
-  warn "не удалось сравнить возраст пода и приложения" \
-       "нужен python3 в PATH; на прохождение лабы это не влияет"
+  warn "Alter von Pod und App konnte nicht verglichen werden" \
+       "python3 wird im PATH benötigt; auf das Bestehen des Labs hat das keinen Einfluss"
 fi
 
-# События живут около часа, поэтому их отсутствие — не провал, а замечание.
+# Events leben etwa eine Stunde, daher ist ihr Fehlen kein Durchfallen, sondern eine Anmerkung.
 CREATES="$(kubectl get events \
   --field-selector reason=SuccessfulCreate,involvedObject.kind=ReplicaSet \
   --no-headers 2>/dev/null | grep -c "$APP")"
 [ -z "$CREATES" ] && CREATES=0
 
 if [ "$CREATES" -ge 2 ]; then
-  ok "в событиях кластера ${CREATES} создания копии — самолечение действительно срабатывало"
-  evidence "События создания копий" \
+  ok "in den Cluster-Events ${CREATES} Erstellungen der Kopie — die Selbstheilung hat tatsächlich funktioniert"
+  evidence "Events der Kopie-Erstellung" \
     "$(kubectl get events --field-selector reason=SuccessfulCreate,involvedObject.kind=ReplicaSet 2>/dev/null | grep "$APP" | tail -10)"
 else
-  warn "в событиях кластера видно создание копии только ${CREATES} раз" \
-       "события хранятся около часа и могли истечь"
+  warn "in den Cluster-Events ist die Erstellung der Kopie nur ${CREATES} Mal sichtbar" \
+       "Events werden etwa eine Stunde aufbewahrt und könnten abgelaufen sein"
 fi
 
-# Ни один из двух признаков по отдельности не блокирующий: события живут около часа,
-# а возраст совпадает у того, кто законно восстановил приложение целиком в конце лабы.
-# Но если НЕ выполнен ни один — копию не удаляли вовсе, и лаба не сделана. Без этой
-# связки скрипт печатал «ЛАБА СДАНА» сразу после лабы 1, не дождавшись ни одного удаления.
+# Keines der beiden Anzeichen ist für sich allein blockierend: Events leben etwa eine Stunde,
+# und das Alter stimmt bei dem überein, der die App am Ende des Labs rechtmäßig komplett wiederhergestellt hat.
+# Aber wenn KEINES zutrifft — wurde die Kopie überhaupt nicht gelöscht, und das Lab ist nicht gemacht. Ohne diese
+# Verknüpfung druckte das Skript «LAB BESTANDEN» gleich nach Lab 1, ohne auf eine einzige Löschung zu warten.
 if [ "${DELTA:-0}" -lt 45 ] && [ "$CREATES" -lt 2 ]; then
-  fail "следов самолечения не найдено: копию не удаляли" \
-       "удалите копию: kubectl delete pod -l app=${APP} — и запустите проверку в течение часа, пока живы события"
+  fail "keine Spuren von Selbstheilung gefunden: die Kopie wurde nicht gelöscht" \
+       "löschen Sie die Kopie: kubectl delete pod -l app=${APP} — und starten Sie die Prüfung innerhalb einer Stunde, solange die Events leben"
 fi
 
-# --- сервис реально обслуживает --------------------------------------------
-# Главная проверка по существу: не «объект есть», а «через Service приходит страница
-# и в ней имя живой копии».
+# --- der Service bedient tatsächlich ---------------------------------------
+# Die wichtigste inhaltliche Prüfung: nicht «das Objekt existiert», sondern «über den Service kommt eine Seite
+# und darin steht der Name einer lebenden Kopie».
 BODY="$(in_cluster_curl "http://${APP}/")"
 
 if [ -z "$BODY" ]; then
-  fail "Service ${APP} не отдал страницу изнутри кластера" \
-       "проверьте эндпоинты: kubectl get endpointslices -l kubernetes.io/service-name=${APP}"
+  fail "Service ${APP} hat von innerhalb des Clusters keine Seite geliefert" \
+       "prüfen Sie die Endpoints: kubectl get endpointslices -l kubernetes.io/service-name=${APP}"
 elif printf '%s' "$BODY" | grep -q '__POD__'; then
-  fail "страница отдаётся, но имя копии в неё не подставилось" \
-       "потерян ConfigMap rickroll-conf: примените ../01-deploy/rickroll.yaml целиком"
+  fail "die Seite wird geliefert, aber der Name der Kopie wurde nicht eingesetzt" \
+       "die ConfigMap rickroll-conf ist verloren: wenden Sie ../01-deploy/rickroll.yaml vollständig an"
 else
   SERVED="$(printf '%s' "$BODY" | grep -o "${APP}-[a-z0-9]*-[a-z0-9]*" | head -1)"
   if [ -z "$SERVED" ]; then
-    fail "в ответе Service нет имени копии" \
-         "страница пришла не от нашего приложения — проверьте kubectl get svc ${APP} -o yaml"
+    fail "in der Antwort des Service fehlt der Name der Kopie" \
+         "die Seite kam nicht von unserer App — prüfen Sie kubectl get svc ${APP} -o yaml"
   elif kubectl get pod "$SERVED" >/dev/null 2>&1; then
-    ok "Service отдаёт страницу, её обслужила живая копия ${SERVED}"
-    evidence "Ответ Service (фрагмент)" \
+    ok "der Service liefert eine Seite, sie wurde von der lebenden Kopie ${SERVED} bedient"
+    evidence "Antwort des Service (Fragment)" \
       "$(printf '%s' "$BODY" | grep -o "вас обслужил под<b>${APP}-[a-z0-9-]*</b>" | head -1)"
   else
-    fail "страницу отдала копия ${SERVED}, но такого пода в кластере уже нет" \
-         "подождите десяток секунд и запустите проверку снова — вероятно, копия менялась прямо сейчас"
+    fail "die Seite wurde von der Kopie ${SERVED} geliefert, aber einen solchen Pod gibt es im Cluster nicht mehr" \
+         "warten Sie ein Dutzend Sekunden und starten Sie die Prüfung erneut — wahrscheinlich wechselte die Kopie gerade eben"
   fi
 fi
 
-# --- готовность к следующей лабе -------------------------------------------
+# --- Bereitschaft für das nächste Lab --------------------------------------
 if [ "$WANT" = "1" ]; then
-  ok "количество копий возвращено к одной — лаба 3 начнётся с чистого листа"
+  ok "die Anzahl der Kopien wurde auf eine zurückgesetzt — Lab 3 beginnt mit einem sauberen Blatt"
 else
-  warn "сейчас заказано копий: ${WANT}" \
-       "перед лабой 3 верните одну: kubectl scale deployment ${APP} --replicas=1"
+  warn "aktuell angefordert Kopien: ${WANT}" \
+       "stellen Sie vor Lab 3 eine wieder her: kubectl scale deployment ${APP} --replicas=1"
 fi
 
 finish

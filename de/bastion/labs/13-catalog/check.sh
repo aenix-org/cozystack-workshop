@@ -1,154 +1,154 @@
 #!/usr/bin/env bash
-# Проверка лабы 13: чарт и описание приложения готовы к передаче админу.
+# Prüfung für Lab 13: Chart und Anwendungsdefinition sind bereit zur Übergabe an den Admin.
 #
-# Эта проверка НАМЕРЕННО локальная. Применить ApplicationDefinition тенант не
-# может (объект cluster-scoped), поэтому искать его в кластере бессмысленно:
-# отсутствие объекта — не ошибка участника. Проверяем то, за что он отвечает:
-# чарт собирается, схема работает, определение разобрано и согласовано с чартом.
+# Diese Prüfung ist ABSICHTLICH lokal. Ein Tenant kann eine ApplicationDefinition nicht
+# anwenden (das Objekt ist cluster-scoped), daher ist die Suche danach im Cluster sinnlos:
+# das Fehlen des Objekts ist nicht die Schuld des Teilnehmers. Wir prüfen, wofür er verantwortlich ist:
+# das Chart baut, das Schema funktioniert, die Definition ist geparst und mit dem Chart konsistent.
 #
-# Запуск из папки лабы:
+# Ausführen aus dem Lab-Ordner:
 #   cd labs/13-catalog && ./check.sh
-# Кластер не обязателен: без KUBECONFIG две проверки будут пропущены с предупреждением,
-# а не с ошибкой.
+# Ein Cluster ist nicht erforderlich: ohne KUBECONFIG werden zwei Prüfungen mit einer Warnung übersprungen,
+# nicht mit einem Fehler.
 
 LAB_NAME="13-catalog"
-LAB_TITLE="Лаба 13 · Своё приложение в каталоге Cozystack"
+LAB_TITLE="Lab 13 · Ihre eigene Anwendung im Cozystack-Katalog"
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 CHART="$HERE/chart"
 APPDEF="$HERE/applicationdefinition.yaml"
 
-# --- инструменты -----------------------------------------------------------
-# Без helm проверять нечего, поэтому здесь скрипт останавливается сразу и не сыплет
-# десятком одинаковых отказов дальше по тексту.
+# --- Werkzeuge -------------------------------------------------------------
+# Ohne helm gibt es nichts zu prüfen, daher hält das Skript genau hier an, statt ein Dutzend
+# identischer Fehlermeldungen weiter unten im Text auszuspucken.
 if ! command -v helm >/dev/null 2>&1; then
-  fail "на машине нет helm" \
-       "поставьте: brew install helm (macOS) или https://helm.sh/docs/intro/install/ — без него лаба не проверяется"
+  fail "helm ist auf dieser Maschine nicht installiert" \
+       "installieren Sie es: brew install helm (macOS) oder https://helm.sh/docs/intro/install/ — ohne es kann das Lab nicht geprüft werden"
   finish
   exit $?
 fi
 HELM_VER="$(helm version --short 2>/dev/null)"
-ok "helm на месте (${HELM_VER})"
-evidence "Версия helm" "$HELM_VER"
+ok "helm ist vorhanden (${HELM_VER})"
+evidence "helm-Version" "$HELM_VER"
 
-# --- чарт на месте ---------------------------------------------------------
-# Отличаем «чарт сломан» от «скрипт запущен не из той папки». Вторая ошибка встречается
-# чаще первой, и сообщение про неё должно быть отдельным.
+# --- Chart vorhanden -------------------------------------------------------
+# Wir unterscheiden „das Chart ist kaputt“ von „das Skript wurde aus dem falschen Ordner ausgeführt“. Der zweite
+# Fehler ist häufiger als der erste, und seine Meldung sollte separat sein.
 if [ ! -f "$CHART/Chart.yaml" ]; then
-  fail "не найден чарт в ${CHART}" \
-       "запускайте скрипт из папки лабы: cd labs/13-catalog && ./check.sh"
+  fail "Chart nicht gefunden in ${CHART}" \
+       "führen Sie das Skript aus dem Lab-Ordner aus: cd labs/13-catalog && ./check.sh"
   finish
   exit $?
 fi
 
-# --- линтер ----------------------------------------------------------------
-# helm lint читает чарт как текст: находит опечатки в шаблонах, недостающие поля
-# Chart.yaml, ссылки на несуществующие значения. До кластера дело здесь не доходит.
+# --- Linter ----------------------------------------------------------------
+# helm lint liest das Chart als Text: es findet Tippfehler in Templates, fehlende Chart.yaml-
+# Felder, Verweise auf nicht existierende Werte. Der Cluster wird hier nie erreicht.
 LINT_OUT="$(helm lint "$CHART" 2>&1)"
 if printf '%s' "$LINT_OUT" | grep -q '0 chart(s) failed'; then
-  ok "чарт проходит helm lint"
+  ok "Chart besteht helm lint"
   evidence "helm lint" "$LINT_OUT"
 else
-  fail "чарт не проходит helm lint" \
-       "прочитайте вывод ниже и почините указанные файлы: helm lint chart"
+  fail "Chart besteht helm lint nicht" \
+       "lesen Sie die Ausgabe unten und reparieren Sie die angegebenen Dateien: helm lint chart"
   evidence "helm lint" "$LINT_OUT"
 fi
 
-# --- рендер ----------------------------------------------------------------
-# Пустой вывод и вывод из одних комментариев линтер бы пропустил, поэтому смотрим,
-# что среди отрендеренного есть Deployment, и перечисляем, что вообще получилось.
-# Главное здесь не «команда отработала», а «получились настоящие объекты».
+# --- Render ----------------------------------------------------------------
+# Leere Ausgabe und Ausgabe, die nur aus Kommentaren besteht, würden am Linter vorbeikommen, daher prüfen wir,
+# dass unter der gerenderten Ausgabe ein Deployment ist, und listen auf, was tatsächlich erzeugt wurde.
+# Der Punkt hier ist nicht „der Befehl lief“, sondern „echte Objekte kamen heraus“.
 RENDER="$(helm template main "$CHART" 2>&1)"
 if printf '%s' "$RENDER" | grep -q '^kind: Deployment'; then
   KINDS="$(printf '%s' "$RENDER" | grep '^kind:' | awk '{print $2}' | sort -u | tr '\n' ' ')"
-  ok "чарт рендерится, получаются объекты: ${KINDS}"
-  evidence "Что рендерит чарт" "$KINDS"
+  ok "Chart rendert und erzeugt Objekte: ${KINDS}"
+  evidence "Was das Chart rendert" "$KINDS"
 else
-  fail "helm template не выдал ни одного Deployment" \
-       "смотрите ошибку рендера: helm template main chart"
-  evidence "Вывод helm template" "$(printf '%s' "$RENDER" | head -30)"
+  fail "helm template hat kein einziges Deployment erzeugt" \
+       "sehen Sie sich den Render-Fehler an: helm template main chart"
+  evidence "helm-template-Ausgabe" "$(printf '%s' "$RENDER" | head -30)"
 fi
 
-# --- чарт принимается настоящим кластером ----------------------------------
-# Единственная проверка во всём наборе лаб, которая сверяет манифест с настоящей схемой
-# кластера, а не с текстом.
+# --- Chart wird von einem echten Cluster akzeptiert ------------------------
+# Die einzige Prüfung im gesamten Lab-Satz, die das Manifest gegen ein echtes Cluster-Schema verifiziert
+# statt gegen Text.
 #
-# `helm lint` и `helm template` проверяют шаблоны, но НЕ схему Kubernetes: манифест
-# с полем в неположенном месте они пропускают, а кластер отвергает. Проверено на своей
-# шкуре — securityContext, по ошибке вставленный в volumes, прошёл оба и развалился
-# только на сервере. Проверка нужна там, где чарт применяют.
+# `helm lint` und `helm template` prüfen Templates, aber NICHT das Kubernetes-Schema: ein Manifest
+# mit einem Feld an der falschen Stelle rutscht an ihnen vorbei, aber der Cluster lehnt es ab. Auf die harte
+# Tour gelernt — ein securityContext, der versehentlich in volumes eingefügt wurde, bestand beide und fiel erst
+# auf dem Server auseinander. Die Prüfung wird dort gebraucht, wo das Chart tatsächlich angewendet wird.
 #
-# Почему lint и template её не заменяют:
-#   helm lint      смотрит на устройство чарта: файлы на месте, шаблоны разбираются;
-#   helm template  подставляет значения и выдаёт текст — но что это за поля и бывают ли
-#                  они у такого объекта, он не знает и знать не может;
-#   apply --dry-run=server отправляет манифест в apiserver, тот прогоняет его через схему
-#                  типа и через admission-контроль и отвечает, принял бы или нет, ничего
-#                  при этом не создавая. Отсюда `unknown field` и отказ по политике —
-#                  ровно то, обо что чарт спотыкается у заказчика.
-# Флаг --dry-run=client такой проверки не даёт: он разбирает манифест на вашей машине.
+# Warum lint und template sie nicht ersetzen:
+#   helm lint      betrachtet die Struktur des Charts: Dateien vorhanden, Templates parsen;
+#   helm template  setzt Werte ein und erzeugt Text — aber was diese Felder sind und ob
+#                  ein solches Objekt sie überhaupt hat, weiß es nicht und kann es nicht wissen;
+#   apply --dry-run=server sendet das Manifest an den apiserver, der es durch das Typ-Schema
+#                  und durch Admission Control laufen lässt und antwortet, ob er es akzeptieren würde,
+#                  dabei nichts erzeugend. Daher kommen `unknown field` und eine Policy-Ablehnung —
+#                  genau das, worüber das Chart beim Kunden stolpert.
+# Das Flag --dry-run=client liefert diese Prüfung nicht: es parst das Manifest auf Ihrer Maschine.
 if [ -n "${KUBECONFIG:-}" ] && kubectl version -o json >/dev/null 2>&1; then
   DRY="$(printf '%s' "$RENDER" | kubectl apply --dry-run=server -f - 2>&1)"
-  # Отказ в правах и отказ по схеме — разные вещи, и путать их нельзя. Под тенантным
-  # доступом (~/.kube/config) прав на Deployment и ConfigMap нет вовсе, поэтому сюда
-  # прилетит Forbidden — и это ничего не говорит о качестве чарта. Проверка по существу
-  # возможна только доступом к кластеру `lab`, где вы полноправный хозяин.
+  # Eine Rechte-Ablehnung und eine Schema-Ablehnung sind verschiedene Dinge und dürfen nicht verwechselt werden. Unter
+  # Tenant-Zugriff (~/.kube/config) gibt es überhaupt keine Rechte auf Deployment und ConfigMap, daher kommt hier
+  # Forbidden an — und das sagt nichts über die Qualität des Charts aus. Eine inhaltliche Prüfung
+  # ist nur mit Zugriff auf den `lab`-Cluster möglich, wo Sie der volle Eigentümer sind.
   if printf '%s' "$DRY" | grep -qiE 'forbidden|cannot create|is not allowed'; then
-    warn "серверная проверка чарта пропущена: текущий доступ не позволяет её выполнить" \
-         "прогоните её доступом к своему кластеру: KUBECONFIG=~/lab.kubeconfig ./check.sh"
+    warn "serverseitige Chart-Prüfung übersprungen: der aktuelle Zugriff erlaubt ihre Ausführung nicht" \
+         "führen Sie sie mit Zugriff auf Ihren eigenen Cluster aus: KUBECONFIG=~/lab.kubeconfig ./check.sh"
   elif printf '%s' "$DRY" | grep -qiE 'error|unknown field|invalid'; then
-    fail "кластер отвергает отрендеренный чарт" \
-         "смотрите: helm template main chart | kubectl apply --dry-run=server -f -"
-    evidence "Отказ сервера" "$(printf '%s' "$DRY" | grep -iE 'error|unknown field' | head -5)"
+    fail "Cluster lehnt das gerenderte Chart ab" \
+         "sehen Sie sich an: helm template main chart | kubectl apply --dry-run=server -f -"
+    evidence "Server-Ablehnung" "$(printf '%s' "$DRY" | grep -iE 'error|unknown field' | head -5)"
   else
-    ok "кластер принимает отрендеренный чарт — поля и их места верны"
+    ok "Cluster akzeptiert das gerenderte Chart — die Felder und ihre Stellen sind korrekt"
   fi
 else
-  warn "проверка чарта на кластере пропущена: нет доступа" \
-       "задайте KUBECONFIG, чтобы прогнать helm template через kubectl apply --dry-run=server"
+  warn "Chart-Prüfung am Cluster übersprungen: kein Zugriff" \
+       "setzen Sie KUBECONFIG, um helm template durch kubectl apply --dry-run=server zu leiten"
 fi
 
-# --- параметры действительно доходят до манифестов -------------------------
-# Чарт может собираться и рендериться, а параметр при этом никуда не подставляться —
-# например, значение записали в шаблон числом. Поэтому каждый параметр проверяем делом:
-# задаём заведомо необычное значение и ищем его в готовом манифесте.
+# --- Parameter erreichen die Manifeste tatsächlich -------------------------
+# Ein Chart kann bauen und rendern, und dennoch wird ein Parameter nirgends eingesetzt —
+# zum Beispiel wurde der Wert als literale Zahl in das Template geschrieben. Also prüfen wir jeden
+# Parameter praktisch: wir setzen einen bewusst ungewöhnlichen Wert und suchen ihn im fertigen Manifest.
 R5="$(helm template main "$CHART" --set replicas=5 2>/dev/null | grep -c 'replicas: 5')"
 if [ "${R5:-0}" -ge 1 ]; then
-  ok "параметр replicas доходит до манифеста (--set replicas=5 даёт replicas: 5)"
+  ok "der replicas-Parameter erreicht das Manifest (--set replicas=5 ergibt replicas: 5)"
 else
-  fail "параметр replicas не доходит до манифеста" \
-       "в templates/deployment.yaml должно стоять replicas: {{ .Values.replicas }}"
+  fail "der replicas-Parameter erreicht das Manifest nicht" \
+       "templates/deployment.yaml sollte replicas: {{ .Values.replicas }} enthalten"
 fi
 
 EXT="$(helm template main "$CHART" --set external=true 2>/dev/null | grep -c 'type: LoadBalancer')"
 if [ "${EXT:-0}" -ge 1 ]; then
-  ok "параметр external переключает тип Service на LoadBalancer"
+  ok "der external-Parameter schaltet den Service-Typ auf LoadBalancer um"
 else
-  warn "параметр external не переключает тип Service" \
-       "не поломка чарта, но соглашение каталога Cozystack: поле external у приложений означает именно внешний доступ"
+  warn "der external-Parameter schaltet den Service-Typ nicht um" \
+       "kein Chart-Fehler, aber eine Cozystack-Katalog-Konvention: das external-Feld bei Anwendungen bedeutet genau externen Zugriff"
 fi
 
-# --- схема действительно защищает ------------------------------------------
-# Схема, которая ничего не отвергает, бесполезна. Проверяем, что она отвергает.
+# --- das Schema schützt tatsächlich ----------------------------------------
+# Ein Schema, das nichts ablehnt, ist nutzlos. Wir prüfen, dass es ablehnt.
 if helm template main "$CHART" --set replicas=abc >/dev/null 2>&1; then
-  fail "схема значений не отвергает заведомо неверное значение (replicas=abc прошло)" \
-       "проверьте, что рядом с values.yaml лежит values.schema.json и в нём replicas объявлен как integer"
+  fail "das Werte-Schema lehnt einen bewusst ungültigen Wert nicht ab (replicas=abc ging durch)" \
+       "prüfen Sie, dass values.schema.json neben values.yaml liegt und darin replicas als integer deklariert ist"
 else
-  ok "схема значений отвергает неверный тип (replicas=abc не проходит)"
+  ok "das Werte-Schema lehnt den falschen Typ ab (replicas=abc geht nicht durch)"
 fi
 
-# --- ApplicationDefinition: обязательные поля ------------------------------
-# Применить определение участник не может, значит и отказа apiserver он не увидит.
-# Поэтому обязательные поля пересчитываем здесь: без любого из них админ получит отказ
-# уже у себя, а разбираться придётся автору файла.
+# --- ApplicationDefinition: Pflichtfelder ----------------------------------
+# Der Teilnehmer kann die Definition nicht anwenden, also wird er die Ablehnung des apiservers nicht sehen.
+# Deshalb zählen wir die Pflichtfelder hier: ohne eines von ihnen bekommt der Admin auf seiner
+# Seite eine Ablehnung, und der Autor der Datei ist derjenige, der es klären muss.
 if [ ! -f "$APPDEF" ]; then
-  fail "не найден ${APPDEF}" \
-       "файл должен лежать рядом с чартом; возьмите его из репозитория лаб"
+  fail "${APPDEF} nicht gefunden" \
+       "die Datei sollte neben dem Chart liegen; nehmen Sie sie aus dem Lab-Repository"
 else
   MISSING=""
-  # Ищем ключи построчно, без разбора YAML: PyYAML есть не на каждой машине,
-  # а тащить зависимость ради проверки одного файла не стоит.
+  # Wir suchen Schlüssel Zeile für Zeile, ohne YAML zu parsen: PyYAML ist nicht auf jeder Maschine,
+  # und eine Abhängigkeit hereinzuziehen, nur um eine Datei zu prüfen, lohnt sich nicht.
   check_key() {
     grep -Eq "$1" "$APPDEF" || MISSING="$MISSING $2"
   }
@@ -164,19 +164,19 @@ else
   check_key '^[[:space:]]{4}icon:[[:space:]]+\S+' 'dashboard.icon'
 
   if [ -z "$MISSING" ]; then
-    ok "в ApplicationDefinition на месте все обязательные поля"
+    ok "alle Pflichtfelder sind in der ApplicationDefinition vorhanden"
   else
-    fail "в ApplicationDefinition не хватает полей:${MISSING}" \
-         "сверьтесь с разбором в README — без любого из них админ получит отказ при применении"
+    fail "in der ApplicationDefinition fehlen Felder:${MISSING}" \
+         "gleichen Sie mit dem Durchgang im README ab — ohne eines von ihnen bekommt der Admin beim Anwenden eine Ablehnung"
   fi
 
-  # --- схема в определении разбирается и совпадает со схемой чарта ---------
-  # Это две разные копии одного и того же, и связи между ними нет никакой.
-  # Разъехались — форма в дашборде покажет не те поля, что ждёт чарт.
+  # --- das Schema in der Definition parst und passt zum Schema des Charts ---
+  # Das sind zwei getrennte Kopien derselben Sache, ohne jegliche Verbindung dazwischen.
+  # Wenn sie auseinandergehen, zeigt das Formular im Dashboard andere Felder als das Chart erwartet.
   SCHEMA_LINE="$(awk '/openAPISchema:/{getline; sub(/^[[:space:]]+/,""); print; exit}' "$APPDEF")"
   if [ -z "$SCHEMA_LINE" ]; then
-    fail "в ApplicationDefinition пустой openAPISchema" \
-         "вставьте туда содержимое chart/values.schema.json одной строкой"
+    fail "openAPISchema ist leer in der ApplicationDefinition" \
+         "fügen Sie den Inhalt von chart/values.schema.json dort als einzelne Zeile ein"
   else
     CMP="$(SCHEMA_LINE="$SCHEMA_LINE" python3 - "$CHART/values.schema.json" <<'PY' 2>&1
 import os, sys, json
@@ -195,34 +195,34 @@ if a == b:
 else:
     only_def = sorted(set(a) - set(b))
     only_chart = sorted(set(b) - set(a))
-    print("DIFF только в определении: %s | только в чарте: %s"
+    print("DIFF nur in der Definition: %s | nur im Chart: %s"
           % (",".join(only_def) or "-", ",".join(only_chart) or "-"))
 PY
 )"
     case "$CMP" in
       SAME*)
-        ok "схема в определении разбирается и совпадает со схемой чарта (${CMP#SAME })"
-        evidence "Параметры приложения" "${CMP#SAME }"
+        ok "das Schema in der Definition parst und passt zum Schema des Charts (${CMP#SAME })"
+        evidence "Anwendungsparameter" "${CMP#SAME }"
         ;;
       DIFF*)
-        fail "схема в определении разошлась со схемой чарта: ${CMP#DIFF }" \
-             "приведите их в соответствие: содержимое openAPISchema — это chart/values.schema.json одной строкой"
+        fail "das Schema in der Definition ist vom Schema des Charts abgewichen: ${CMP#DIFF }" \
+             "bringen Sie sie in Übereinstimmung: der Inhalt von openAPISchema ist chart/values.schema.json als einzelne Zeile"
         ;;
       BADJSON*)
-        fail "openAPISchema не разбирается как JSON: ${CMP#BADJSON }" \
-             "схема должна быть одной строкой корректного JSON под 'openAPISchema: |-'"
+        fail "openAPISchema parst nicht als JSON: ${CMP#BADJSON }" \
+             "das Schema muss eine einzelne Zeile gültiges JSON unter 'openAPISchema: |-' sein"
         ;;
       *)
-        warn "не удалось сверить схемы (${CMP})" \
-             "проверьте руками, что openAPISchema совпадает с chart/values.schema.json"
+        warn "konnte die Schemata nicht vergleichen (${CMP})" \
+             "prüfen Sie von Hand, dass openAPISchema mit chart/values.schema.json übereinstimmt"
         ;;
     esac
   fi
 
-  # --- иконка ---------------------------------------------------------------
-  # Дашборд ждёт SVG, уложенный в base64, и никуда за картинкой не ходит. Ошибка здесь
-  # тихая: манифест применится, а в каталоге на месте иконки будет пусто. Поэтому строку
-  # раскодируем и смотрим, что внутри действительно SVG.
+  # --- Icon -----------------------------------------------------------------
+  # Das Dashboard erwartet ein in base64 gepacktes SVG und geht nirgendwohin für das Bild. Der Fehler
+  # hier ist still: das Manifest wird angewendet, aber im Katalog bleibt der Platz des Icons leer. Also
+  # dekodieren wir die Zeichenkette und prüfen, dass darin wirklich ein SVG ist.
   ICON="$(grep -Eo '^[[:space:]]{4}icon:[[:space:]]+\S+' "$APPDEF" | head -1 | awk '{print $2}')"
   if [ -n "$ICON" ]; then
     ICON_HEAD="$(printf '%s' "$ICON" | python3 -c 'import sys,base64
@@ -232,45 +232,45 @@ except Exception:
     print("")' 2>/dev/null)"
     case "$ICON_HEAD" in
       *"<svg"*)
-        ok "иконка раскодируется из base64 и оказывается SVG"
-        evidence "Начало иконки" "$ICON_HEAD"
+        ok "das Icon dekodiert aus base64 und stellt sich als SVG heraus"
+        evidence "Anfang des Icons" "$ICON_HEAD"
         ;;
       "")
-        fail "иконка не раскодируется из base64" \
-             "пересоберите строку: base64 -i icon.svg | tr -d '\\n' (на Linux: base64 -w0 icon.svg)"
+        fail "das Icon dekodiert nicht aus base64" \
+             "bauen Sie die Zeichenkette neu: base64 -i icon.svg | tr -d '\\n' (unter Linux: base64 -w0 icon.svg)"
         ;;
       *)
-        fail "иконка раскодируется, но это не SVG" \
-             "дашборд ждёт именно SVG; растровую картинку он покажет как мусор"
+        fail "das Icon dekodiert, aber es ist kein SVG" \
+             "das Dashboard erwartet genau ein SVG; ein Rasterbild zeigt es als Müll an"
         ;;
     esac
   fi
 fi
 
-# --- права: отказ здесь ожидаем --------------------------------------------
-# Это не проверка участника, а подтверждение устройства платформы. Поэтому
-# ответ `no` — успех, а `yes` — повод удивиться, а не радоваться.
+# --- Rechte: eine Ablehnung hier ist erwartet ------------------------------
+# Dies ist keine Prüfung des Teilnehmers, sondern eine Bestätigung, wie die Plattform gebaut ist. Also
+# ist die Antwort `no` ein Erfolg, und `yes` ein Grund, überrascht zu sein, nicht erfreut.
 if [ -n "${KUBECONFIG:-}" ] && kubectl version -o json >/dev/null 2>&1; then
   CANI="$(kubectl auth can-i create applicationdefinitions 2>/dev/null)"
   case "$CANI" in
     no)
-      ok "подтверждено: применять ApplicationDefinition вам не положено (can-i -> no)"
-      evidence "Права на ApplicationDefinition" \
+      ok "bestätigt: Sie dürfen keine ApplicationDefinition anwenden (can-i -> no)"
+      evidence "Rechte auf ApplicationDefinition" \
         "kubectl auth can-i create applicationdefinitions -> no
-Объект cluster-scoped и меняет каталог для всех тенантов, поэтому его применяет админ платформы."
+Das Objekt ist cluster-scoped und ändert den Katalog für alle Tenants, daher ist es der Plattform-Admin, der es anwendet."
       ;;
     yes)
-      warn "у вас есть права применять ApplicationDefinition (can-i -> yes)" \
-           "значит, вы работаете под админской учёткой, а не под тенантной; лаба рассчитана на тенантную"
+      warn "Sie haben Rechte, eine ApplicationDefinition anzuwenden (can-i -> yes)" \
+           "das bedeutet, Sie arbeiten unter einem Admin-Konto, nicht einem Tenant-Konto; das Lab ist für ein Tenant-Konto ausgelegt"
       ;;
     *)
-      warn "не удалось спросить кластер о правах" \
-           "не мешает сдаче лабы: проверка локальная, кластер здесь не нужен"
+      warn "konnte den Cluster nicht nach Rechten fragen" \
+           "beeinträchtigt das Bestehen des Labs nicht: die Prüfung ist lokal, der Cluster wird hier nicht gebraucht"
       ;;
   esac
 else
-  warn "кластер не опрошен (KUBECONFIG не задан или не отвечает)" \
-       "проверка локальная, кластер здесь не нужен. Чтобы увидеть отказ в правах: export KUBECONFIG=~/.kube/config"
+  warn "Cluster wurde nicht abgefragt (KUBECONFIG ist nicht gesetzt oder antwortet nicht)" \
+       "die Prüfung ist lokal, der Cluster wird hier nicht gebraucht. Um die Rechte-Ablehnung zu sehen: export KUBECONFIG=~/.kube/config"
 fi
 
 finish

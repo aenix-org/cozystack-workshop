@@ -1,58 +1,58 @@
 #!/usr/bin/env bash
-# Проверка лабы 12: мигрированная виртуалка опубликована наружу через ingress и домен
-# платформы — ровно так же, как контейнерное приложение.
+# Prüfung für Lab 12: Die migrierte virtuelle Maschine ist nach außen über den Ingress und
+# die Domain der Plattform veröffentlicht — genau wie die containerisierte Anwendung.
 #
-# Проверяем не «объекты созданы», а работу по существу:
-#   1) по доменному имени тенанта приходит HTTP 200 и это страница справочника,
-#   2) сама виртуальная машина запущена (Ready),
-#   3) Ingress, который публикует машину, на месте.
-# Первый пункт — главный: он и есть доказательство, что справочник виден снаружи.
+# Wir prüfen nicht "Objekte erstellt", sondern die tatsächliche, inhaltliche Funktion:
+#   1) der Domainname des Tenants liefert HTTP 200 und es ist die Verzeichnis-Seite,
+#   2) die virtuelle Maschine selbst läuft (Ready),
+#   3) der Ingress, der die Maschine veröffentlicht, ist vorhanden.
+# Der erste Punkt ist der wichtigste: Er ist der Beweis, dass das Verzeichnis von außen sichtbar ist.
 #
-# Запускается на виртуалке, из папки этой лабы. Нужен тенантный доступ и номер тенанта:
+# Läuft auf der VM, aus dem Ordner dieses Labs. Erfordert Tenant-Zugang und die Tenant-Nummer:
 #     export KUBECONFIG=~/.kube/config
 #     export COZY_TENANT=workshopXX
 #     cd labs/12-vm && ./check.sh
-# Проверка по домену работает и без доступа к тенанту — ей хватает curl. Без тенантного
-# доступа скрипт не падает: проверки со стороны тенанта он пропустит и скажет об этом.
+# Die Domain-Prüfung funktioniert auch ohne Tenant-Zugang — dafür genügt curl. Ohne Tenant-
+# Zugang fällt das Skript nicht aus: Es überspringt die tenantseitigen Prüfungen und sagt das.
 #
-# Скрипт ничего не меняет — только читает и отправляет HTTP-запросы. Запускать до уборки:
-# после удаления машины проверять будет нечего.
+# Das Skript ändert nichts — es liest nur und sendet HTTP-Anfragen. Vor der Aufräumphase ausführen:
+# ist die Maschine erst gelöscht, gibt es nichts mehr zu prüfen.
 
-# Эти две переменные подхватывает lib.sh — они попадают в заголовок отчёта и в имя
-# файла report-<лаба>-<дата>.md, который скрипт кладёт рядом с собой.
+# Diese beiden Variablen greift lib.sh ab — sie landen im Kopf des Berichts und im
+# Namen der Datei report-<lab>-<datum>.md, die das Skript neben sich ablegt.
 LAB_NAME="12-vm"
-LAB_TITLE="Лаба 12 · Виртуалка рядом с контейнерами"
-# Общая библиотека проверок: отсюда приходят ok / fail / warn / evidence / finish.
-# Путь считается от места, где лежит сам скрипт, поэтому запуск из любого каталога
-# работает одинаково.
+LAB_TITLE="Lab 12 · Eine virtuelle Maschine neben Containern"
+# Gemeinsame Prüfbibliothek: ok / fail / warn / evidence / finish kommen von hier.
+# Der Pfad wird relativ zum Ort aufgelöst, an dem das Skript selbst liegt, sodass der Start aus
+# jedem Verzeichnis gleich funktioniert.
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
-# Номер тенанта обязателен: из него складывается и имя namespace, и доменное имя, по
-# которому опубликован справочник. Без него проверять нечего.
+# Die Tenant-Nummer ist zwingend: Aus ihr werden sowohl der Namespace-Name als auch der Domainname
+# gebildet, unter dem das Verzeichnis veröffentlicht ist. Ohne sie gibt es nichts zu prüfen.
 need_tenant
 
-# Имена, которые проверяем. VM — имя ЗАКАЗА на машину, то есть объекта VMInstance;
-# по нему и спрашивается `kubectl get vminstance`. Сам запущенный экземпляр называется
-# иначе: платформа разворачивает заказ чартом `vm-instance`, имя чарта склеивается
-# с именем релиза, и получается vm-instance-spravochnik.
+# Die Namen, die wir prüfen. VM ist der Name der BESTELLUNG der Maschine, d. h. des VMInstance-Objekts;
+# `kubectl get vminstance` wird damit abgefragt. Die tatsächlich laufende Instanz heißt
+# anders: Die Plattform stellt die Bestellung mit dem Chart `vm-instance` bereit, der Chart-Name
+# wird mit dem Release-Namen verklebt, und man erhält vm-instance-spravochnik.
 VM=spravochnik
 NS="tenant-${COZY_TENANT}"
-# Домен, на котором ведущий заранее опубликовал справочник через Ingress. Тот же адрес
-# вы открываете в браузере.
+# Die Domain, auf der der Moderator das Verzeichnis vorab über Ingress veröffentlicht hat. Dieselbe
+# Adresse öffnen Sie im Browser.
 HOST="spravochnik.${COZY_TENANT}.workshop.aenix.io"
 URL="http://${HOST}"
 
-# Доступ к тенанту не обязателен: домен проверяется обычным curl. Если KUBECONFIG задан
-# и тенант отвечает — добавим проверки состояния машины и Ingress.
+# Tenant-Zugang ist nicht zwingend: Die Domain wird mit einem einfachen curl geprüft. Wenn KUBECONFIG
+# gesetzt ist und der Tenant antwortet — fügen wir Prüfungen für den Maschinenzustand und Ingress hinzu.
 TENANT_OK=0
 if [ -n "${KUBECONFIG:-}" ] && kubectl -n "$NS" get vminstance >/dev/null 2>&1; then
   TENANT_OK=1
 fi
 
-# --- главное: справочник виден снаружи по домену ---------------------------
-# Отдельно берём код ответа и тело: код отличает «за ingress пока никого» (503) от
-# «ведёт не туда» (404) и «домена нет вовсе» (000), а тело подтверждает, что отвечает
-# именно справочник, а не случайная заглушка.
+# --- das Wichtigste: das Verzeichnis ist von außen über die Domain sichtbar ---------
+# Wir holen den Antwortcode und den Body getrennt: Der Code unterscheidet "noch niemand hinter
+# dem Ingress" (503) von "zeigt an die falsche Stelle" (404) und "gar keine Domain" (000),
+# während der Body bestätigt, dass es das Verzeichnis ist, das antwortet, und kein zufälliger Platzhalter.
 CODE="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$URL" 2>/dev/null)"
 BODY="$(curl -s --max-time 10 "$URL" 2>/dev/null)"
 
@@ -60,65 +60,66 @@ case "$CODE" in
   200)
     case "$BODY" in
       *"Справочник сотрудников"*)
-        ok "справочник опубликован: ${URL} отвечает 200 и отдаёт страницу справочника"
-        evidence "Ответ по домену" "запрос: ${URL}
-код ответа: ${CODE}
+        ok "Verzeichnis veröffentlicht: ${URL} antwortet mit 200 und liefert die Verzeichnis-Seite"
+        evidence "Antwort über die Domain" "Anfrage: ${URL}
+Antwortcode: ${CODE}
 $(printf '%s' "$BODY" | head -3)"
         ;;
       *)
-        fail "по ${URL} приходит 200, но это не страница справочника" \
-             "за доменом отвечает что-то другое; проверьте, что на порту 8080 внутри машины слушает именно справочник"
+        fail "${URL} liefert 200, aber dies ist nicht die Verzeichnis-Seite" \
+             "hinter der Domain antwortet etwas anderes; prüfen Sie, dass auf Port 8080 innerhalb der Maschine genau das Verzeichnis lauscht"
         ;;
     esac
     ;;
   503)
-    fail "домен ${URL} отвечает 503 — за Ingress пока некому отвечать" \
-         "машина ещё грузится или служба справочника на 8080 не поднялась; дождитесь Ready у vminstance и загляните в консоль машины"
+    fail "Domain ${URL} antwortet mit 503 — hinter dem Ingress ist noch niemand, der antwortet" \
+         "die Maschine bootet noch oder der Verzeichnis-Dienst auf 8080 ist nicht hochgekommen; warten Sie auf Ready bei der vminstance und schauen Sie in die Maschinenkonsole"
     ;;
   000)
-    fail "домен ${URL} не отвечает совсем" \
-         "проверьте сеть; Ingress с этим хостом создаёт ведущий — если домена нет вовсе, спросите у него"
+    fail "Domain ${URL} antwortet überhaupt nicht" \
+         "prüfen Sie das Netzwerk; den Ingress mit diesem Host erstellt der Moderator — wenn es gar keine Domain gibt, fragen Sie ihn"
     ;;
   *)
-    fail "домен ${URL} отвечает ${CODE}, а не 200" \
-         "404 значит, что Ingress ведёт не на тот сервис; 5xx — что бэкенд не готов отвечать"
+    fail "Domain ${URL} antwortet mit ${CODE}, nicht mit 200" \
+         "404 bedeutet, dass der Ingress auf den falschen Service zeigt; 5xx bedeutet, dass das Backend nicht bereit ist zu antworten"
     ;;
 esac
 
-# --- сторона тенанта: сама машина и её публикация --------------------------
+# --- Tenant-Seite: die Maschine selbst und ihre Veröffentlichung --------------------
 if [ "$TENANT_OK" -eq 0 ]; then
-  warn "проверки со стороны тенанта пропущены: тенант недоступен по KUBECONFIG" \
-       "укажите тенантный доступ: export KUBECONFIG=~/.kube/config"
+  warn "tenantseitige Prüfungen übersprungen: Tenant über KUBECONFIG nicht erreichbar" \
+       "geben Sie Tenant-Zugang an: export KUBECONFIG=~/.kube/config"
 else
-  # Спрашиваем не «есть ли объект», а условие Ready: заказ на машину создаётся за
-  # секунду, а гость поднимается три-пять минут, и всё это время машина существует,
-  # но справочник ещё не отвечает.
+  # Wir fragen nicht "existiert das Objekt", sondern die Ready-Bedingung: Die Maschinen-Bestellung wird
+  # in einer Sekunde erstellt, aber der Gast kommt in drei bis fünf Minuten hoch, und die ganze Zeit
+  # existiert die Maschine, aber das Verzeichnis antwortet noch nicht.
   if ! kubectl -n "$NS" get vminstance "$VM" >/dev/null 2>&1; then
-    fail "в тенанте ${NS} нет виртуальной машины ${VM}" \
-         "создайте VM Disk и VM Instance в дашборде или примените staff-directory-vm.yaml"
+    fail "im Tenant ${NS} gibt es keine virtuelle Maschine ${VM}" \
+         "erstellen Sie einen VM Disk und eine VM Instance im Dashboard oder wenden Sie staff-directory-vm.yaml an"
   else
     VM_READY="$(kubectl -n "$NS" get vminstance "$VM" \
       -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)"
     if [ "$VM_READY" = "True" ]; then
-      ok "виртуальная машина ${VM} запущена"
+      ok "virtuelle Maschine ${VM} läuft"
     elif [ -n "$VM_READY" ]; then
-      fail "виртуальная машина ${VM} есть, но не готова (Ready=${VM_READY})" \
-           "смотрите карточку машины в дашборде; первое включение занимает 3-5 минут"
+      fail "virtuelle Maschine ${VM} existiert, ist aber nicht bereit (Ready=${VM_READY})" \
+           "schauen Sie sich die Maschinenkarte im Dashboard an; das erste Einschalten dauert 3-5 Minuten"
     else
-      warn "виртуальная машина ${VM} существует, но состояние прочитать не удалось" \
-           "посмотрите её глазами в дашборде: должна быть включена"
+      warn "virtuelle Maschine ${VM} existiert, aber ihr Zustand konnte nicht gelesen werden" \
+           "schauen Sie sie sich im Dashboard an: sie sollte eingeschaltet sein"
     fi
-    evidence "Виртуальные машины тенанта" "$(kubectl -n "$NS" get vminstance 2>/dev/null)"
+    evidence "Virtuelle Maschinen des Tenants" "$(kubectl -n "$NS" get vminstance 2>/dev/null)"
   fi
 
-  # Ingress создаёт ведущий, а не участник. Если домен уже отвечает 200 — он на месте;
-  # проверяем отдельно, чтобы при 503/404 сразу было видно, есть ли вообще публикация.
+  # Den Ingress erstellt der Moderator, nicht der Teilnehmer. Wenn die Domain bereits mit 200
+  # antwortet — ist er vorhanden; wir prüfen ihn separat, damit bei 503/404 sofort klar ist,
+  # ob es überhaupt eine Veröffentlichung gibt.
   if kubectl -n "$NS" get ingress spravochnik >/dev/null 2>&1; then
-    ok "Ingress spravochnik на месте — справочник опубликован в тенанте"
-    evidence "Ingress тенанта" "$(kubectl -n "$NS" get ingress spravochnik 2>/dev/null)"
+    ok "Ingress spravochnik ist vorhanden — das Verzeichnis ist im Tenant veröffentlicht"
+    evidence "Ingress des Tenants" "$(kubectl -n "$NS" get ingress spravochnik 2>/dev/null)"
   else
-    warn "Ingress spravochnik в тенанте ${NS} не найден" \
-         "его создаёт ведущий; если домен уже отвечает 200 — беспокоиться не о чем, иначе обратитесь к ведущему"
+    warn "Ingress spravochnik im Tenant ${NS} nicht gefunden" \
+         "ihn erstellt der Moderator; wenn die Domain bereits mit 200 antwortet, gibt es keinen Grund zur Sorge, andernfalls wenden Sie sich an den Moderator"
   fi
 fi
 
