@@ -1,26 +1,26 @@
 ---
-# Лаба 13. Так будет выглядеть заказ вашего приложения ПОСЛЕ того,
-# как админ применит applicationdefinition.yaml. Применяется в вашем тенанте:
+# ラボ 13。管理者が applicationdefinition.yaml を適用した後に、
+# あなたのアプリケーションの注文がどう見えるかを示します。自分のテナントで適用します:
 #   kubectl apply -f guestpass-example.yaml
 #
-# ВНИМАНИЕ: tenant-workshopXX — заглушка, а не имя namespace. Замените XX на номер
-# своего тенанта до применения, иначе kubectl откажет: такого namespace нет,
-# а в чужой вас не пустят.
+# 注意: tenant-workshopXX はプレースホルダーであり、namespace 名ではありません。適用前に XX を
+# 自分のテナント番号に置き換えてください。さもないと kubectl は拒否します: そのような namespace は存在せず、
+# 他人の namespace には入れてもらえません。
 #
-# Обратите внимание: группа apps.cozystack.io — та же, что у Bucket,
-# VMInstance и остальных приложений каталога. Ваше приложение встанет
-# в один ряд с ними, а не куда-то сбоку.
+# 注目してください: apps.cozystack.io グループは、Bucket や VMInstance、
+# その他のカタログアプリケーションが使っているものと同じです。あなたのアプリケーションは
+# それらと横並びになり、どこか脇に置かれるわけではありません。
 #
-# Применить этот файл до того, как админ зарегистрировал определение,
-# нельзя: kubectl ответит `no matches for kind "GuestPass"`.
+# 管理者が定義を登録する前にこのファイルを適用することはできません:
+# kubectl は `no matches for kind "GuestPass"` と返します。
 apiVersion: apps.cozystack.io/v1alpha1
 kind: GuestPass
 metadata:
   name: main
   namespace: tenant-workshopXX
-# Поля в spec — это ровно те параметры, что описаны в chart/values.yaml и показаны
-# формой заказа в дашборде. Здесь они выписаны текстом: то же самое, что нажать
-# кнопку в дашборде, но такой файл можно отревьюить, положить в Git и откатить.
+# spec 内のフィールドは、chart/values.yaml に記述され、ダッシュボードの注文フォームで
+# 表示されるパラメータそのものです。ここではそれらをテキストで書き出しています: ダッシュボードで
+# ボタンを押すのと同じですが、このようなファイルはレビューでき、Git に入れてロールバックできます。
 spec:
   replicas: 2
   greeting: "Order a pass for your guest"
