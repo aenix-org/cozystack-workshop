@@ -1,17 +1,17 @@
-## 4. Ставим kubectl
+## 4. kubectl のインストール
 
-**kubectl — под вашу систему**
+**kubectl — お使いのシステム向け**
 
 **macOS**
 ```bash
 brew install kubectl
 ```
-Без Homebrew:
+Homebrew を使わない場合:
 ```bash
 curl -LO "https://dl.k8s.io/release/$(curl -Ls https://dl.k8s.io/release/stable.txt)/bin/darwin/arm64/kubectl"
 chmod +x kubectl && sudo mv kubectl /usr/local/bin/
 ```
-На компьютерах с процессором Intel замените `arm64` на `amd64`.
+Intel プロセッサ搭載のコンピュータでは、`arm64` を `amd64` に置き換えてください。
 
 **Linux**
 ```bash
@@ -23,11 +23,11 @@ chmod +x kubectl && sudo mv kubectl /usr/local/bin/
 ```powershell
 winget install -e --id Kubernetes.kubectl
 ```
-После установки закройте и откройте PowerShell заново, иначе команда не найдётся.
+インストール後は PowerShell を一度閉じて開き直してください。そうしないとコマンドが見つかりません。
 
-⚠️ **Если Windows ответила «Имя "winget" не распознано»** — значит, в вашей сборке нет
-«Установщика приложений», такое бывает на Windows 10. Ничего страшного, ставим напрямую.
-Копируйте блок целиком:
+⚠️ **Windows が「用語 'winget' が認識されません」と返した場合** — お使いのビルドに
+「アプリ インストーラー」が入っていないということです。Windows 10 でよく起こります。問題ありません、直接インストールします。
+ブロック全体をコピーしてください:
 ```powershell
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $ver = (Invoke-WebRequest -UseBasicParsing https://dl.k8s.io/release/stable.txt).Content.Trim()
@@ -36,12 +36,12 @@ Invoke-WebRequest -UseBasicParsing -Uri "https://dl.k8s.io/release/$ver/bin/wind
 $old = [Environment]::GetEnvironmentVariable("Path","User")
 [Environment]::SetEnvironmentVariable("Path", "$old;$HOME\bin", "User")
 ```
-Затем обязательно закройте окно PowerShell и откройте новое.
+その後、必ず PowerShell のウィンドウを閉じて、新しいウィンドウを開いてください。
 
-Эта же папка `$HOME\bin` пригодится дальше — в неё лягут virtctl и kubelogin,
-и в PATH она уже добавлена.
+この `$HOME\bin` フォルダは後でも役に立ちます — ここに virtctl と kubelogin が置かれ、
+PATH にもすでに追加されています。
 
-**Проверка — везде одинаковая:**
+**確認 — どこでも同じです:**
 ```
 kubectl version --client
 ```

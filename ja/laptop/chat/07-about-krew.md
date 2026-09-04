@@ -1,23 +1,23 @@
-## 7. Про krew — и почему мы им не пользуемся
+## 7. krew について — そして、なぜ使わないのか
 
-**Короткий ответ: не ставьте его сегодня**
+**手短に言うと: 今日はインストールしないでください**
 
-krew — менеджер плагинов для kubectl, и им можно поставить те же virtctl и kubelogin.
-Но на прошлых воркшопах именно он съел больше всего времени, особенно на Windows.
-Если вы сделали шаги 3 и 4 — **у вас уже всё есть, этот пост пропускайте**.
+krew は kubectl のプラグインマネージャーで、同じ virtctl や kubelogin もこれで入れられます。
+ですが、過去のワークショップでいちばん時間を食ったのが、まさにこの krew でした。特に Windows で顕著でした。
+ステップ 3 と 4 を終えているなら、**もう必要なものはすべて揃っています。この投稿は飛ばしてください**。
 
-Читайте дальше, только если krew у вас уже стоит или очень хочется.
+krew をすでに入れている、あるいはどうしても使いたい場合だけ、この先を読んでください。
 
-⚠️ **Три грабли Windows, все встречались вживую:**
-• **PATH не обновился в текущем окне.** Самое частое. Лечится прямо в той же сессии:
+⚠️ **Windows で踏みがちな 3 つの落とし穴 — いずれも実際に遭遇したものです:**
+• **現在のウィンドウで PATH が更新されていない。** いちばんよくあるケースです。同じセッション内で直せます:
   `$env:Path += ";$HOME\.krew\bin"`
-• **krew.exe не доустановился** — SmartScreen или антивирус его прибили. Проверить:
+• **krew.exe のインストールが完了していない** — SmartScreen かウイルス対策ソフトに止められています。確認方法:
   `Test-Path "$HOME\.krew\bin\kubectl-krew.exe"`
-• **Админское и обычное окно PowerShell — это разные миры.** У них разные `$HOME`
-  и разный пользовательский PATH. Поставили от администратора, запускаете обычным —
-  плагин не найдётся никогда. Ставьте и запускайте в одном и том же обычном окне.
+• **管理者権限の PowerShell ウィンドウと通常のウィンドウは別世界です。** `$HOME` も
+  ユーザー PATH も異なります。管理者でインストールして通常ユーザーで実行すると、
+  プラグインは永久に見つかりません。同じ通常ウィンドウでインストールも実行も行ってください。
 
-**macOS и Linux** — копируйте блок целиком, он сам определит систему:
+**macOS と Linux** — ブロックをまるごとコピーしてください。システムは自動で判別します:
 ```bash
 set -x; cd "$(mktemp -d)" &&
 OS="$(uname | tr '[:upper:]' '[:lower:]')" &&
@@ -26,15 +26,15 @@ curl -fsSLO "https://github.com/kubernetes-sigs/krew/releases/latest/download/kr
 tar zxvf "krew-${OS}_${ARCH}.tar.gz" &&
 ./"krew-${OS}_${ARCH}" install krew
 ```
-Затем добавьте krew в PATH — строчку надо дописать в свой профиль, иначе она забудется
-при следующем запуске терминала:
+次に krew を PATH に追加します。この行はプロファイルに書き足す必要があります。そうしないと
+次回ターミナルを起動したときに忘れられてしまいます:
 ```bash
-echo 'export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"' >> ~/.zshrc   # для zsh, это по умолчанию в macOS
-echo 'export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"' >> ~/.bashrc  # для bash, обычно Linux
-source ~/.zshrc    # или source ~/.bashrc
+echo 'export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"' >> ~/.zshrc   # zsh 用、macOS のデフォルト
+echo 'export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"' >> ~/.bashrc  # bash 用、たいていは Linux
+source ~/.zshrc    # または source ~/.bashrc
 ```
 
-**Windows** (PowerShell)
+**Windows**（PowerShell）
 ```powershell
 Invoke-WebRequest -Uri "https://github.com/kubernetes-sigs/krew/releases/latest/download/krew.exe" -OutFile "$HOME\krew.exe"
 & "$HOME\krew.exe" install krew
@@ -42,18 +42,18 @@ $old = [Environment]::GetEnvironmentVariable("Path","User")
 [Environment]::SetEnvironmentVariable("Path", "$old;$HOME\.krew\bin", "User")
 Remove-Item "$HOME\krew.exe"
 ```
-Снова закройте и откройте PowerShell.
+PowerShell をもう一度閉じて開き直してください。
 
-**Ставим плагины:**
+**プラグインをインストールします:**
 ```bash
 kubectl krew install virt
 kubectl krew install oidc-login
 ```
 
-⚠️ Важное отличие: при установке через krew команда называется иначе —
-`kubectl virt console …` вместо `virtctl console …`. Дальше в инструкциях я пишу
-`virtctl` — если ставили через krew, мысленно подставляйте `kubectl virt`.
-Чтобы не путаться, можно сделать короткий псевдоним:
+⚠️ 重要な違い: krew 経由でインストールすると、コマンド名が変わります —
+`virtctl console …` ではなく `kubectl virt console …` になります。この先の手順では
+`virtctl` と書きますが、krew で入れた場合は頭の中で `kubectl virt` に読み替えてください。
+混乱しないように、短いエイリアスを設定しておくとよいでしょう:
 ```bash
 alias virtctl="kubectl virt"
 ```

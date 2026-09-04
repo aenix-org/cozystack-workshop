@@ -1,10 +1,8 @@
-## 5. Ставим virtctl
+## 5. virtctl のインストール
 
-**virtctl — управление виртуалками**
+**virtctl — 仮想マシンの操作**
 
-⚠️ **Внимание: ставим не самую свежую, а ту, что в кластере.** Клиент новее сервера
-меняет синтаксис команд, и половина вопросов на прошлых воркшопах была именно из-за этого.
-В нашем кластере **v1.8.4** — она и указана во всех блоках ниже. Не меняйте её на latest.
+⚠️ **注意: 最新版ではなく、クラスターに合ったバージョンを入れてください。** クライアントがサーバーより新しいと、コマンドの構文が変わってしまいます。これまでのワークショップでの質問の半分は、まさにこれが原因でした。私たちのクラスターは **v1.8.4** で動いています。以下のすべてのブロックで指定しているのがそのバージョンです。latest に切り替えないでください。
 
 **macOS**
 ```bash
@@ -14,7 +12,7 @@ curl -L -o virtctl "https://github.com/kubevirt/kubevirt/releases/download/${VER
 chmod +x virtctl
 sudo mv virtctl /usr/local/bin/
 ```
-Если macOS ругается «не удалось проверить разработчика»:
+macOS が「開発元を検証できません」と表示する場合:
 ```bash
 sudo xattr -d com.apple.quarantine /usr/local/bin/virtctl
 ```
@@ -28,7 +26,7 @@ chmod +x virtctl
 sudo mv virtctl /usr/local/bin/
 ```
 
-**Windows** (PowerShell, запускать от обычного пользователя)
+**Windows**（PowerShell、一般ユーザーで実行）
 ```powershell
 $ver = "v1.8.4"
 New-Item -ItemType Directory -Force "$HOME\bin" | Out-Null
@@ -36,20 +34,14 @@ Invoke-WebRequest -Uri "https://github.com/kubevirt/kubevirt/releases/download/$
 $old = [Environment]::GetEnvironmentVariable("Path","User")
 [Environment]::SetEnvironmentVariable("Path", "$old;$HOME\bin", "User")
 ```
-После этого **закройте окно PowerShell и откройте новое** — иначе новый PATH не подхватится.
+このあとは **PowerShell のウィンドウを閉じて、新しく開き直してください**。そうしないと更新された PATH が読み込まれません。
 
-**Проверяем (везде одинаково):**
+**確認（どの環境でも同じ）:**
 ```
 virtctl version
 ```
-Должна появиться строчка `Client Version:` с номером. Ругань на отсутствие связи
-с сервером на этом шаге нормальна — мы к нему ещё не подключались.
+番号付きの `Client Version:` の行が表示されるはずです。この時点でサーバーに接続できないという文句が出るのは正常です。まだ接続していないだけです。
 
-**Про имя машины в командах.** С клиентом v1.8.4 машина указывается по голому имени,
-без приставки: `vm-instance-app-1`. Если у вас всё же встал клиент поновее и он отвечает
-`target must contain type and name separated by '/'` — добавьте приставку **`vmi/`**:
-`vmi/vm-instance-app-1`.
+**コマンドでのマシン名について。** クライアント v1.8.4 では、マシンは接頭辞なしの素の名前で指定します: `vm-instance-app-1`。もし新しめのクライアントが入ってしまっていて、`target must contain type and name separated by '/'` と返す場合は、**`vmi/`** の接頭辞を付けてください: `vmi/vm-instance-app-1`。
 
-⚠️ Приставка именно `vmi/`, не `vm/`. С `vm/` придёт отказ по правам
-(`cannot get resource "virtualmachines/portforward"`): участнику выданы права
-на запущенные экземпляры машин, а не на их описания.
+⚠️ 接頭辞は `vmi/` であって `vm/` ではありません。`vm/` にすると権限エラー（`cannot get resource "virtualmachines/portforward"`）になります。参加者に付与されているのは、実行中のマシンインスタンスに対する権限であって、その定義に対する権限ではありません。

@@ -1,64 +1,65 @@
-## 8. Заходим в кластер
+## 8. クラスターへのログイン
 
-**Подключаемся к своему тенанту**
+**自分のテナントへ接続する**
 
-📍 **Где:** дашборд открываем в браузере, команды выполняем на ноутбуке.
+📍 **場所:** ダッシュボードはブラウザで開き、コマンドはノートパソコンで実行します。
 
-**Ваши доступы:**
+**あなたの認証情報:**
 ```
-дашборд: https://dashboard.workshop.aenix.io
-логин:   workshopXX      ← ваш номер, скажу лично
-пароль:  ...             ← скажу лично
+dashboard: https://dashboard.workshop.aenix.io
+login:     workshopXX      ← あなたの番号、直接お伝えします
+password:  ...             ← 直接お伝えします
 ```
 
-1. Откройте дашборд по ссылке выше.
-2. Войдите под своим логином.
-3. В дашборде: **Info → вкладка Secrets → `kubeconfig-tenant-workshopXX`**. Нажмите *Reveal*,
-   скопируйте содержимое.
-4. Сохраните в файл и укажите на него переменную:
+1. 上のリンクからダッシュボードを開きます。
+2. 自分のログインでログインします。
+3. ダッシュボードで: **Info → Secrets タブ → `kubeconfig-tenant-workshopXX`**。*Reveal* をクリックして
+   内容をコピーします。
+4. ファイルに保存し、変数をそれに向けます:
 
-**macOS и Linux**
+**macOS と Linux**
 ```bash
 mkdir -p ~/.kube
-nano ~/.kube/workshop      # вставьте скопированное, сохраните
+nano ~/.kube/workshop      # コピーした内容を貼り付けて保存します
 export KUBECONFIG=~/.kube/workshop
 ```
 
-**Windows** (PowerShell)
+**Windows**（PowerShell）
 ```powershell
-notepad $HOME\.kube\workshop   # вставьте, сохраните
+notepad $HOME\.kube\workshop   # 貼り付けて保存します
 $env:KUBECONFIG = "$HOME\.kube\workshop"
 ```
 
-**Проверяем:**
+**確認しましょう:**
 ```
 kubectl get vminstance -n tenant-workshopXX
 ```
-Откроется браузер — залогиньтесь как `workshopXX`. После этого команда должна ответить
-`No resources found`. Это правильный ответ: машин пока нет, но кластер вас узнал.
+ブラウザが開きます — `workshopXX` としてログインしてください。その後、コマンドは
+`No resources found` と返すはずです。これが正しい応答です。マシンはまだありませんが、クラスターはあなたを認識しています。
 
-⚠️ Две вещи, на которых спотыкаются чаще всего:
-• `KUBECONFIG` должен указывать ровно на тот файл, куда вы вставили конфиг.
-• `kubectl get vm` и `kubectl get vmi` работать не будут — под вашей учётной записью
-  доступен `vminstance`. Так и задумано.
+⚠️ 最もよくつまずく点が2つあります:
+• `KUBECONFIG` は、設定を貼り付けたまさにそのファイルを指している必要があります。
+• `kubectl get vm` と `kubectl get vmi` は動きません — あなたのアカウントでは `vminstance` タイプが
+  利用可能です。これは意図的な仕様です。
 
-⚠️ **`x509: certificate signed by unknown authority`** — вторая частая ошибка, почти
-всегда на Windows. Означает она не проблему с сертификатом, а то, что `kubectl` взял
-**не тот файл доступа**: доверие к внутреннему центру сертификации кластера лежит в вашем
-kubeconfig, в поле `certificate-authority-data`, и в файле по умолчанию его нет.
+⚠️ **`x509: certificate signed by unknown authority`** — 2つ目のよくあるエラーで、ほぼ
+必ず Windows で起きます。これは証明書に問題があるという意味ではなく、`kubectl` が
+**間違ったアクセスファイル**を拾ったという意味です。クラスターの内部認証局への信頼はあなたの
+kubeconfig の `certificate-authority-data` フィールドにあり、デフォルトのファイルにはそれがありません。
 
-Разбираемся по шагам, в PowerShell:
+PowerShell でステップごとに確認していきましょう:
 ```powershell
 $env:KUBECONFIG
-# пусто — значит берётся файл по умолчанию, а не тот, что вам выдали
+# 空 — デフォルトのファイルが使われており、渡されたものではないという意味です
 
 Select-String -Path "$HOME\.kube\workshop" -Pattern "certificate-authority-data" -Quiet
-# False — файл сохранён неполностью, скачайте секрет из дашборда заново
+# False — ファイルが不完全に保存されています。ダッシュボードから Secret を再度ダウンロードしてください
 
 Get-Content "$HOME\.kube\workshop" -TotalCount 1
-# должно начинаться с apiVersion; квадратики или пустота — файл в UTF-16
+# apiVersion で始まるはずです。小さな四角や空白が出る場合、ファイルは UTF-16 です
 ```
 
-Третий пункт — самая коварная ловушка Windows. Блокнот и перенаправление `>` сохраняют
-файл в **UTF-16**, а `kubectl` такой файл не читает. Сохранять только в UTF-8: в Блокноте
-тип файла «Все файлы», а из команды — через `Out-File -Encoding utf8`, не через `>`.
+3つ目の点は Windows の最も厄介な落とし穴です。メモ帳と `>` によるリダイレクトは、ファイルを
+**UTF-16** で保存してしまい、`kubectl` はそれを読み込めません。保存は必ず UTF-8 で行ってください。
+メモ帳ではファイルの種類として「すべてのファイル」を選び、コマンドラインからは `>` ではなく
+`Out-File -Encoding utf8` を使います。
