@@ -1,4 +1,4 @@
-## 13. Разбор: что внутри 01-bucket.yaml
+## 13. Genauer betrachtet: Was steckt in 01-bucket.yaml
 
 ```yaml
 apiVersion: apps.cozystack.io/v1alpha1
@@ -11,30 +11,29 @@ spec:
     app: {}
 ```
 
-`apiVersion: apps.cozystack.io/v1alpha1` — из какого набора типов взят этот объект.
-`apps.cozystack.io` — это и есть каталог Cozystack: всё, что там перечислено, вы можете
-заказать. Не «Kubernetes сам по себе умеет бакеты» — их добавила платформа.
+`apiVersion: apps.cozystack.io/v1alpha1` — aus welchem Satz von Typen dieses Objekt stammt.
+`apps.cozystack.io` ist der Cozystack-Katalog selbst: Alles, was dort aufgeführt ist, können Sie
+bestellen. Es ist nicht so, dass „Kubernetes von sich aus Buckets beherrscht“ — die Plattform hat sie hinzugefügt.
 
-`kind: Bucket` — что именно заказываем. Файл не описывает, *как* поднять хранилище: он
-говорит «хочу бакет», а всё остальное платформа делает сама. Так работает весь каталог —
-вы пишете, что вам нужно, а не последовательность действий.
+`kind: Bucket` — was Sie genau bestellen. Die Datei beschreibt nicht, *wie* der Speicher aufgebaut
+wird: Sie sagt „Ich möchte einen Bucket“, und alles Übrige erledigt die Plattform selbst. So funktioniert
+der gesamte Katalog — Sie schreiben auf, was Sie brauchen, und nicht eine Abfolge von Schritten.
 
-`metadata.name: my-images` — имя заказа. По нему вы будете находить его в дашборде и в
-командах. Имя внутреннее; настоящее имя ведра в S3 платформа сгенерирует своё, длинное
-и уникальное, — его вы увидите позже в параметре `bucketName`.
+`metadata.name: my-images` — der Name der Bestellung. Damit finden Sie die Bestellung im Dashboard
+und in Befehlen wieder. Dieser Name ist intern; die Plattform erzeugt ihren eigenen echten Bucket-Namen
+in S3, lang und eindeutig — diesen sehen Sie später im Parameter `bucketName`.
 
-`namespace: tenant-workshopXX` — ваш участок платформы. В файле на виртуалке здесь **уже
-стоит ваш номер** — его подставили при подготовке стенда, менять ничего не нужно (`XX`
-показан только для примера). Namespace («пространство имён») — это перегородка внутри
-кластера: объекты с одинаковыми именами в разных namespace друг другу не мешают и друг
-друга не видят. Ближайший аналог — отдельный Resource Pool со своими правами доступа,
-только строже.
+`namespace: tenant-workshopXX` — Ihr Abschnitt der Plattform. In der Datei auf dem Bastion **steht Ihre
+Nummer hier bereits** — sie wurde beim Vorbereiten der Testumgebung eingetragen, es ist also nichts zu
+ändern (`XX` ist nur als Beispiel gezeigt). Ein namespace ist eine Trennwand innerhalb des Clusters:
+Objekte mit gleichem Namen in verschiedenen namespaces stören sich nicht gegenseitig und sehen einander
+nicht. Die nächste Analogie ist ein eigener Resource Pool mit eigenen Zugriffsrechten, nur strenger.
 
-`users: app: {}` — заводит пользователя S3 с именем `app`. Пустые фигурные скобки
-означают «настройки по умолчанию»: платформа сама придумает ему ключ доступа и
-секретный ключ и положит их в отдельный объект-секрет, который вы откроете в дашборде.
-Никаких паролей вы не придумываете и никуда не вписываете.
+`users: app: {}` — legt einen S3-Benutzer mit dem Namen `app` an. Die leeren geschweiften Klammern
+bedeuten „Standardeinstellungen“: Die Plattform denkt sich selbst einen Zugriffsschlüssel und einen
+geheimen Schlüssel für ihn aus und legt sie in ein separates Secret-Objekt, das Sie im Dashboard öffnen.
+Sie denken sich keinerlei Passwörter aus und tragen sie nirgends ein.
 
-Обратите внимание, чего в файле **нет**: размера, адреса, портов, сертификата, узлов,
-на которых всё это разместится. Всё это платформа определяет сама. В этом и разница
-между «заказать в каталоге» и «поставить руками».
+Beachten Sie, was in der Datei **nicht** steht: Größe, Adresse, Ports, Zertifikat, die Nodes, auf denen
+das alles untergebracht wird. All das bestimmt die Plattform selbst. Genau das ist der Unterschied
+zwischen „aus dem Katalog bestellen“ und „von Hand einrichten“.

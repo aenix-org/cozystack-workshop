@@ -1,80 +1,51 @@
-## 16. Шаг 2: машина-конвертер
+## 16. Schritt 2: die Konverter-Maschine
 
-**Поднимаем виртуалку, в которой будем конвертировать**
+**Wir starten die VM, in der wir die Konvertierung durchführen**
 
-📍 **Где:** на виртуалке.
+📍 **Wo:** auf dem Bastion.
 
-**Что такое «конвертация» и почему без неё никак.** Диск виртуальной машины — это файл.
-VMware хранит его в своём формате, `VMDK`. KVM, на котором работают виртуалки в Cozystack,
-этот формат не понимает — ему нужен `QCOW2`. Содержимое одно и то же, ваша CentOS со всем
-добром, но упаковка разная. Конвертация — это переупаковка файла из одного формата в
-другой, данные при этом не меняются.
+**Was „Konvertierung“ ist und warum es keinen Weg daran vorbei gibt.** Der Datenträger einer virtuellen Maschine ist eine Datei. VMware speichert sie in seinem eigenen Format, `VMDK`. KVM, auf dem die VMs in Cozystack laufen, versteht dieses Format nicht — es braucht `QCOW2`. Der Inhalt ist derselbe, Ihr CentOS mit allem Drum und Dran, aber die Verpackung ist eine andere. Konvertierung ist das Umpacken der Datei von einem Format in das andere; die Daten selbst ändern sich dabei nicht.
 
-Дополнительно нужно поправить то, что внутри. Система, выросшая в vSphere, ожидает
-увидеть виртуальное железо VMware: свои сетевые карты, свои контроллеры дисков, драйверы
-`vmxnet3` и `pvscsi`. На новом месте железо другое — `virtio`. Если не подложить нужные
-драйверы в загрузочный образ заранее, машина стартует и не найдёт ни диска, ни сети.
-Этим тоже занимается конвертация.
+Darüber hinaus muss man anpassen, was darin steckt. Ein System, das in vSphere aufgewachsen ist, erwartet die virtuelle Hardware von VMware vorzufinden: seine eigenen Netzwerkkarten, seine eigenen Festplatten-Controller, die Treiber `vmxnet3` und `pvscsi`. Am neuen Ort ist die Hardware anders — `virtio`. Wenn Sie nicht vorab die passenden Treiber in das Boot-Image einschleusen, startet die Maschine und findet weder Datenträger noch Netzwerk. Auch darum kümmert sich die Konvertierung.
 
-**Почему отдельная машина, а не сама виртуалка.** Инструмент называется `virt-v2v`, он
-тянет за собой полкило зависимостей и жуёт десятки гигабайт. Ставить его на общую
-виртуалку, с которой работают все участники, — плохая идея: она маленькая и одна на всех.
-Проще поднять в кластере временную машину рядом с хранилищем, сделать дело внутри
-и погасить.
+**Warum eine eigene Maschine und nicht die VM selbst.** Das Werkzeug heißt `virt-v2v`, es schleppt einen Berg an Abhängigkeiten mit sich und frisst Dutzende Gigabyte. Es auf dem gemeinsamen Bastion zu installieren, von dem aus alle arbeiten, ist eine schlechte Idee: er ist klein und es gibt nur einen für Sie alle. Einfacher ist es, im Cluster eine Wegwerf-Maschine direkt neben dem Storage hochzufahren, die Arbeit darin zu erledigen und sie wieder herunterzufahren.
 
-Заодно это ровно тот приём, которым конвертацию делают в реальных проектах миграции:
-конвертер живёт рядом с данными, а не на чьей-то рабочей машине через VPN.
+Als Bonus ist das genau der Ansatz, mit dem die Konvertierung in echten Migrationsprojekten durchgeführt wird: der Konverter lebt neben den Daten und nicht auf jemandes Arbeitsplatzrechner über ein VPN.
 
 ```bash
 kubectl apply -f manifests/02-conversion-vm.yaml
 kubectl get vminstance -n tenant-workshopXX -w
 ```
 
-Ждём состояния `Running` (нажмите Ctrl+C, чтобы выйти из слежения). Заходим внутрь
-**через консоль**:
+Wir warten auf den Zustand `Running` (drücken Sie Ctrl+C, um die Beobachtung zu beenden). Wir gehen **über die Konsole** hinein:
 
 ```bash
 virtctl console --namespace=tenant-workshopXX vm-instance-convert
 ```
 
-**Доступ в машину-конвертер:**
+**Zugang zur Konverter-Maschine:**
 ```
-логин:  ubuntu
-пароль: ubuntu
+login:    ubuntu
+password: ubuntu
 ```
 
-Выйти из консоли — `Ctrl+]`. Если экран пустой, нажмите Enter.
+Um die Konsole zu verlassen — `Ctrl+]`. Wenn der Bildschirm leer ist, drücken Sie Enter.
 
-⚠️ **Через `virtctl ssh` не заходите.** На прошлых воркшопах он не заработал ни у кого:
-отвечает `exit status 255` и рвёт соединение. Консоль идёт через API кластера и работает
-всегда. То же самое доступно мышкой — кнопка **VNC** на странице машины в дашборде.
+⚠️ **Gehen Sie nicht über `virtctl ssh` hinein.** Bei früheren Workshops hat es bei niemandem funktioniert: es antwortet mit `exit status 255` und bricht die Verbindung ab. Die Konsole läuft über die Cluster-API und funktioniert immer. Dasselbe ist mit der Maus verfügbar — die Schaltfläche **VNC** auf der Seite der Maschine im Dashboard.
 
-**Что именно создала эта команда.** В файле описаны два объекта, поэтому в дашборде
-появятся две записи, а не одна:
+**Was genau dieser Befehl erzeugt hat.** Die Datei beschreibt zwei Objekte, deshalb tauchen im Dashboard zwei Einträge auf und nicht einer:
 
-• **VM Disk** с именем `convert-tools` — диск на 25Gi, клонированный из каталожного
-  образа `ubuntu-20.04`
-• **VM Instance** с именем `convert` — сама машина, которая этот диск подключает
+• **VM Disk** mit dem Namen `convert-tools` — ein 25Gi-Datenträger, geklont aus dem Katalog-Image `ubuntu-20.04`
+• **VM Instance** mit dem Namen `convert` — die Maschine selbst, die diesen Datenträger einbindet
 
-Виртуалка без диска не бывает — поэтому диск всегда создаётся первым и отдельным
-объектом. Запомните это, на шаге 4 будет ровно та же пара.
+Eine VM existiert nie ohne Datenträger — deshalb wird der Datenträger immer zuerst und als eigenes Objekt erzeugt. Merken Sie sich das; in Schritt 4 sehen Sie genau dasselbe Paar.
 
-⚠️ И сразу про имена, иначе будете путаться. Объект в дашборде называется `convert`,
-а машина, которую он поднимает, внутри кластера зовётся **`vm-instance-convert`** —
-с приставкой. Поэтому в дашборде вы ищете `convert`, а в командах `virtctl` пишете
-`vm-instance-convert`.
+⚠️ Und gleich ein Wort zu den Namen, sonst kommen Sie durcheinander. Das Objekt im Dashboard heißt `convert`, aber die Maschine, die es hochfährt, ist innerhalb des Clusters als **`vm-instance-convert`** bekannt — mit dem Präfix. Im Dashboard suchen Sie also nach `convert`, während Sie in `virtctl`-Befehlen `vm-instance-convert` schreiben.
 
-🖱 **Через дашборд:** создаёте те же два объекта руками, по очереди.
-**1)** **VM Disk → Deploy new**: имя `convert-tools`, source = **image**, образ
-`ubuntu-20.04`, размер `25Gi`, storage class `replicated`.
-**2)** **VM Instance → Deploy new**: имя `convert`, instance type `u1.large`,
-profile `ubuntu`, в списке дисков выбираете `convert-tools` — тот, что создали
-шагом раньше. Зайти внутрь можно там же кнопкой **VNC**, тогда ни ssh, ни virtctl
-не нужны, всё в браузере.
+🖱 **Über das Dashboard:** Sie erzeugen dieselben zwei Objekte von Hand, eines nach dem anderen.
+**1)** **VM Disk → Deploy new**: Name `convert-tools`, source = **image**, Image `ubuntu-20.04`, Größe `25Gi`, storage class `replicated`.
+**2)** **VM Instance → Deploy new**: Name `convert`, instance type `u1.large`, profile `ubuntu`, und in der Liste der Datenträger wählen Sie `convert-tools` — den, den Sie einen Schritt zuvor erstellt haben. Sie können dort gleich mit der Schaltfläche **VNC** hineingehen, dann braucht es weder ssh noch virtctl, alles läuft im Browser.
 
-⚠️ Диск делайте не меньше 25Gi: если он меньше образа, клон не пройдёт, а потом диск
-зависает в состоянии Terminating и мешается.
+⚠️ Machen Sie den Datenträger nicht kleiner als 25Gi: ist er kleiner als das Image, geht der Klon nicht durch, und dann hängt der Datenträger im Zustand Terminating fest und steht im Weg.
 
-⚠️ В манифесте намеренно указан образ **ubuntu-20.04**, не меняйте его.
-На 24.04 машина не загружается, а на 22.04 конвертация спотыкается о старую базу
-пакетов внутри CentOS 7. Мы это проверили, чтобы вы не проверяли.
+⚠️ Das Manifest gibt bewusst das Image **ubuntu-20.04** an; ändern Sie es nicht. Auf 24.04 bootet die Maschine nicht, und auf 22.04 stolpert die Konvertierung über die alte Paketdatenbank in CentOS 7. Wir haben das geprüft, damit Sie es nicht prüfen müssen.

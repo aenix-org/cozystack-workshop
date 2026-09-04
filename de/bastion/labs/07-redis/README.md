@@ -1,114 +1,115 @@
-# Лаба 7 · Кеш перед медленным бэкендом
+# Lab 7 · Ein Cache vor einem langsamen Backend
 
 | | |
 |---|---|
-| **Время** | 50 минут, из них 10 — ожидание |
-| **Что доказывает** | Выигрыш от кеша измеряется, а не декларируется: было 800 мс, стало единицы |
-| **Что понадобится** | Кластер из лабы 0, Harbor и образ из лабы 6, `kubectl`, `docker`, доступ в дашборд |
+| **Zeit** | 50 Minuten, davon 10 mit Warten |
+| **Was es beweist** | Der Gewinn durch einen Cache wird gemessen, nicht behauptet: vorher 800 ms, jetzt einstellig |
+| **Was Sie brauchen** | Der Cluster aus Lab 0, Harbor und das Image aus Lab 6, `kubectl`, `docker`, Zugang zum Dashboard |
 
-> ⚠️ **`workshopXX` — это заглушка, а не имя.** Подставьте свой номер тенанта, иначе
-> команда уйдёт в чужой тенант и вы получите отказ в доступе либо, что хуже, чужие
-> данные. Свой номер вы получили вместе с паролем.
+> ⚠️ **`workshopXX` ist ein Platzhalter, kein Name.** Setzen Sie Ihre eigene Tenant-Nummer ein, sonst
+> geht der Befehl in einen fremden Tenant und Sie erhalten eine Zugriffsverweigerung — oder, schlimmer,
+> fremde Daten. Ihre Nummer haben Sie zusammen mit Ihrem Passwort erhalten.
 
-## Зачем это
+## Warum das wichtig ist
 
-Сервис «Пропуск» работает, ИБ довольна, реестр свой. И тут приходит охрана.
+Der Dienst „Passierschein“ funktioniert, die Informationssicherheit ist zufrieden, die Registry gehört Ihnen. Und dann kommt der Werkschutz.
 
-> На проходной список гостей открывается по десять секунд. Люди стоят в очереди, мы
-> смотрим в экран и ждём. Раньше было нормально.
+> Am Kontrollpunkt öffnet sich die Gästeliste zehn Sekunden lang. Die Leute stehen Schlange, wir
+> starren auf den Bildschirm und warten. Früher war das in Ordnung.
 
-Смотрите, что происходит. Каждая строка списка — это гость, у каждого гостя есть
-приглашающий сотрудник, а сведения о сотрудниках лежат не у вас. Они лежат в кадровой
-системе, которую поставили в 2011 году, и она отвечает **800 миллисекунд** на запрос.
-Двенадцать строк на экране — почти десять секунд.
+Sehen Sie, was passiert. Jede Zeile der Liste ist ein Gast, jeder Gast hat einen Mitarbeiter, der
+ihn eingeladen hat, und die Mitarbeiterdaten liegen nicht bei Ihnen. Sie liegen in einem HR-System,
+das 2011 installiert wurde, und es braucht **800 Millisekunden**, um auf eine Anfrage zu antworten.
+Zwölf Zeilen auf dem Bildschirm — fast zehn Sekunden.
 
-Переписать кадровую систему нельзя: она не ваша, она чужая, и очередь на доработки там
-расписана до следующего года. Ускорить её тоже нельзя по той же причине.
+Das HR-System können Sie nicht umschreiben: Es gehört nicht Ihnen, es gehört jemand anderem, und
+seine Änderungswarteschlange ist bis nächstes Jahr ausgebucht. Beschleunigen können Sie es aus
+demselben Grund ebenfalls nicht.
 
-Зато можно перестать спрашивать её так часто. Фамилия и отдел сотрудника меняются
-примерно раз в несколько лет. Спрашивать их у медленной системы **при каждом** открытии
-списка — расточительство: достаточно спросить один раз и запомнить ответ.
+Was Sie tun können: es nicht so oft fragen. Nachname und Abteilung eines Mitarbeiters ändern sich
+etwa alle paar Jahre. Sie beim langsamen System **jedes Mal** abzufragen, wenn die Liste geöffnet
+wird, ist Verschwendung: Es genügt, einmal zu fragen und die Antwort zu merken.
 
-Место, где запоминают ответы, называется кешем. Сегодня мы его поставим — и, что важнее,
-**измерим разницу до и после**. Не «стало быстрее», а конкретное число.
+Der Ort, an dem Antworten gemerkt werden, heißt Cache. Heute setzen wir einen ein — und, was
+wichtiger ist, **messen den Unterschied vorher und nachher**. Nicht „es wurde schneller“, sondern eine konkrete Zahl.
 
-## Словарик
+## Mini-Glossar
 
-| Термин | Что это | Похоже на… но |
+| Begriff | Was es ist | Ähnlich wie … aber |
 |---|---|---|
-| **Кеш** | Быстрое хранилище готовых ответов на повторяющиеся вопросы | **Кеш чтения на массиве**, но здесь решает, что кешировать, приложение, а не устройство |
-| **Redis** | Хранилище «ключ-значение» целиком в оперативной памяти | прямого аналога нет; ближе всего memcached, если сталкивались |
-| **Ключ** | Строка, по которой в кеше ищут значение | **Имя файла**, но придумываете вы, и от того, как придумаете, зависит всё |
-| **TTL (time to live)** | Срок жизни записи, после которого она исчезает сама | **Срок хранения снапшота**, но удаление происходит без чьего-либо участия и без задания по расписанию |
-| **Промах (cache miss)** | Ответа в кеше нет, надо идти к медленному источнику | **Промах кеша чтения на массиве**, но промах здесь стоит не миллисекунды, а поход в чужую систему |
-| **Попадание (cache hit)** | Ответ нашёлся в кеше | **Попадание кеша чтения**, но попадание считает приложение, и оно же видно в ответе полем `cached` |
-| **Sentinel** | Служба, которая следит за Redis и переключает роль ведущего при отказе | **HA-агент**, но работает внутри самого Redis, отдельного кластера под неё не нужно |
-| **Managed-сервис** | Сервис, который платформа устанавливает, обновляет и бэкапит за вас | вы не получаете root на машину с ним — и в этом смысл |
-| **Fortio** | Генератор нагрузки с веб-интерфейсом и гистограммой задержек | своего аналога в vSphere нет: это не средство измерять инфраструктуру, а средство измерять сервис |
-| **p50 / p99** | Медиана и «худшие проценты»: у 99% запросов задержка не больше этого | средняя задержка врёт, эти два числа — нет |
+| **Cache** | Schneller Speicher fertiger Antworten auf wiederkehrende Fragen | **Ein Lese-Cache auf einem Storage-Array**, aber hier entscheidet die Anwendung, was gecacht wird, nicht das Gerät |
+| **Redis** | Ein Key-Value-Store, der vollständig im Arbeitsspeicher (RAM) gehalten wird | es gibt kein direktes Gegenstück; am nächsten kommt memcached, falls Sie ihm begegnet sind |
+| **Schlüssel** | Die Zeichenkette, mit der ein Wert im Cache nachgeschlagen wird | **Ein Dateiname**, aber Sie erfinden ihn, und alles hängt davon ab, wie Sie das tun |
+| **TTL (time to live)** | Wie lange ein Eintrag lebt, bevor er von selbst verschwindet | **Eine Aufbewahrungsfrist für Snapshots**, aber das Löschen geschieht ohne jemandes Zutun und ohne geplanten Job |
+| **Miss (cache miss)** | Die Antwort ist nicht im Cache, Sie müssen zur langsamen Quelle gehen | **Ein Lese-Cache-Miss auf einem Storage-Array**, aber ein Miss kostet hier nicht Millisekunden, sondern einen Gang in ein fremdes System |
+| **Hit (cache hit)** | Die Antwort wurde im Cache gefunden | **Ein Lese-Cache-Hit**, aber den Hit zählt die Anwendung, und auch er ist in der Antwort im Feld `cached` sichtbar |
+| **Sentinel** | Ein Dienst, der Redis überwacht und bei einem Ausfall die Leader-Rolle neu vergibt | **Ein HA-Agent**, aber er läuft in Redis selbst, ein separater Cluster ist dafür nicht nötig |
+| **Managed Service** | Ein Dienst, den die Plattform für Sie installiert, aktualisiert und sichert | Sie bekommen kein root auf der Maschine, auf der er läuft — und das ist der Sinn der Sache |
+| **Fortio** | Ein Lastgenerator mit Weboberfläche und einem Latenz-Histogramm | in vSphere gibt es kein Gegenstück: Es ist kein Werkzeug, um Infrastruktur zu messen, sondern um einen Dienst zu messen |
+| **p50 / p99** | Der Median und die „schlimmsten Prozente“: 99 % der Anfragen haben eine Latenz nicht höher als diese | die durchschnittliche Latenz führt in die Irre, diese beiden Zahlen nicht |
 
-## Два кубконфига: не перепутайте
+## Zwei Kubeconfigs: nicht verwechseln
 
-В этой лабе снова два кластера.
+In diesem Lab gibt es wieder zwei Cluster.
 
-| Кубконфиг | Что это | Что в нём делаем |
+| Kubeconfig | Was es ist | Was wir darin tun |
 |---|---|---|
-| `~/.kube/config` | Управляющий кластер Cozystack, ваш тенант | смотрим на Redis: адрес, состояние |
-| `~/lab.kubeconfig` | **Ваш** кластер `lab` из лабы 0 | разворачиваем приложение и меряем |
+| `~/.kube/config` | Der Cozystack-Management-Cluster, Ihr Tenant | Redis ansehen: Adresse, Zustand |
+| `~/lab.kubeconfig` | **Ihr** `lab`-Cluster aus Lab 0 | die Anwendung ausrollen und messen |
 
-Оба берутся в дашборде: тенантный — в секрете `kubeconfig-tenant-workshopXX` на вкладке
-Secrets, кластерный — в разделе доступов вашего кластера `lab`.
+Beide bekommen Sie im Dashboard: den des Tenants aus dem Secret `kubeconfig-tenant-workshopXX` auf dem
+Reiter Secrets, den des Clusters im Zugangsbereich Ihres `lab`-Clusters.
 
-⚠️ **Перед каждым блоком команд написано, куда он адресован.** Если что-то ведёт себя
-странно, первым делом `echo $KUBECONFIG`.
+⚠️ **Vor jedem Befehlsblock steht, wohin er gerichtet ist.** Wenn sich etwas seltsam
+verhält, ist das Erste `echo $KUBECONFIG`.
 
-## Что лежит в папке лабы
+## Was im Lab-Ordner liegt
 
-Все файлы уже у вас — вы забрали их вместе с репозиторием. Создавать и печатать заново
-ничего не нужно: там, где ниже написано `kubectl apply -f имя.yaml`, файл берётся отсюда.
+Alle Dateien haben Sie bereits — Sie haben sie zusammen mit dem Repository geholt. Es gibt nichts
+neu zu erstellen oder abzutippen: Wo unten `kubectl apply -f name.yaml` steht, stammt die Datei von hier.
 
 ```bash
-# все команды этой лабы выполняются из папки лабы — перейдите в неё
+# alle Befehle dieses Labs laufen aus dem Lab-Ordner — wechseln Sie hinein
 cd labs/07-redis
 ```
 
-| Файл | Что это | Когда пригодится |
+| Datei | Was es ist | Wann es nützlich ist |
 |---|---|---|
-| `app/` | Исходники сервиса «Пропуск», версия с кешем | собираете локально, `docker build` |
-| `hr-legacy.yaml` | Заглушка легаси-справочника: отвечает медленно, как настоящий | применяете на своём кластере `lab` |
-| `passes-api.yaml` | Сервис «Пропуск» без кеша — сначала измеряем, как плохо | применяете туда же |
-| `cache-patch-broken.yaml` | **Намеренно неполный** патч включения кеша | применяете, чтобы увидеть ошибку |
-| `cache-patch.yaml` | Рабочий патч. Патч, а не полный манифест: видно ровно то, что меняется | применяете после разбора |
-| `fortio.yaml` | Генератор нагрузки для замеров до и после | применяете туда же |
-| `check.sh` | Проверка, что второй запрос на порядок быстрее первого | запускаете в конце лабы |
+| `app/` | Die Quellen des Dienstes „Passierschein“, die Version mit Cache | Sie bauen sie lokal, `docker build` |
+| `hr-legacy.yaml` | Ein Stub des Legacy-Verzeichnisses: antwortet langsam, wie das echte | Sie wenden es auf Ihrem `lab`-Cluster an |
+| `passes-api.yaml` | Der Dienst „Passierschein“ ohne Cache — zuerst messen wir, wie schlimm es ist | Sie wenden es an dieselbe Stelle an |
+| `cache-patch-broken.yaml` | Ein **absichtlich unvollständiger** Patch, der den Cache einschaltet | Sie wenden es an, um den Fehler zu sehen |
+| `cache-patch.yaml` | Der funktionierende Patch. Ein Patch, kein vollständiges Manifest: Sie sehen genau, was sich ändert | Sie wenden es nach der Erläuterung an |
+| `fortio.yaml` | Der Lastgenerator für die Vorher-Nachher-Messungen | Sie wenden es an dieselbe Stelle an |
+| `check.sh` | Eine Prüfung, dass die zweite Anfrage um eine Größenordnung schneller ist als die erste | Sie führen es am Ende des Labs aus |
 
-## Шаг 1. Собираем версию v2 и кладём в свой реестр
+## Schritt 1. Version v2 bauen und in die eigene Registry pushen
 
-📍 **Где:** на виртуалке (в терминале bastion).
+📍 **Wo:** auf dem Bastion (im Bastion-Terminal).
 
-В папке `app/` лежит исходник. От версии из прошлой лабы он отличается двумя вещами:
-появился режим «медленный справочник» и появилась работа с кешем.
+Im Ordner `app/` liegt der Quelltext. Von der Version des vorigen Labs unterscheidet er sich in zwei
+Dingen: einem Modus „langsames Verzeichnis“ und der Arbeit mit dem Cache.
 
 <details>
-<summary><b>Разбираем приложение</b></summary>
+<summary><b>Genauer betrachtet: was in app/ steckt</b></summary>
 
-**Один образ, две роли.** Переменная `MODE` определяет, кем запустится процесс:
+**Ein Image, zwei Rollen.** Die Variable `MODE` bestimmt, als was der Prozess startet:
 
-| `MODE` | Кто это | Что делает |
+| `MODE` | Was es ist | Was es tut |
 |---|---|---|
-| `hr` | заглушка легаси-справочника | спит `HR_DELAY` (по умолчанию 800 мс) и отдаёт данные сотрудника |
-| `api` | сам сервис «Пропуск» | ходит в справочник, а если задан `REDIS_ADDR` — сначала в кеш |
+| `hr` | ein Stub des Legacy-Verzeichnisses | schläft `HR_DELAY` (standardmäßig 800 ms) und gibt die Mitarbeiterdaten zurück |
+| `api` | der Dienst „Passierschein“ selbst | geht ins Verzeichnis, und wenn `REDIS_ADDR` gesetzt ist — zuerst in den Cache |
 
-Два образа вместо одного означали бы два места, где можно забыть обновить версию.
+Zwei Images statt einem würden zwei Stellen bedeuten, an denen man vergessen kann, die Version zu aktualisieren.
 
-**Как устроен поход за данными.** Вся логика кеширования — примерно двадцать строк:
+**Wie der Gang nach den Daten abläuft.** Die gesamte Caching-Logik umfasst etwa zwanzig Zeilen:
 
 ```go
 if cache != nil {
     raw, found, err := cache.Get(key)
     switch {
     case err != nil:
-        log.Printf("кеш недоступен (%v), иду в справочник", err)
+        log.Printf("cache unavailable (%v), going to the directory", err)
     case found:
         if json.Unmarshal([]byte(raw), &emp) == nil {
             fromCache = true
@@ -123,181 +124,180 @@ if !fromCache {
 }
 ```
 
-Обратите внимание на первую ветку: **если кеш недоступен, приложение не падает.** Оно
-пишет в журнал и идёт в справочник — медленно, но правильно. Это не украшение, а
-обязательное свойство любого кеша: кеш ускоряет, но не может быть условием
-работоспособности. Если сервис ложится вместе с кешем, вы построили не кеш, а ещё одну
-точку отказа.
+Beachten Sie den ersten Zweig: **Ist der Cache nicht erreichbar, stürzt die Anwendung nicht ab.** Sie
+schreibt ins Log und geht ins Verzeichnis — langsam, aber korrekt. Das ist keine Zierde, sondern eine
+zwingende Eigenschaft jedes Caches: Ein Cache beschleunigt, darf aber keine Voraussetzung für die
+Funktionsfähigkeit sein. Wenn der Dienst zusammen mit dem Cache ausfällt, haben Sie keinen Cache gebaut, sondern einen weiteren Ausfallpunkt.
 
-Из этого свойства, кстати, вырастет предсказуемая неудача чуть дальше по лабе.
-Приложение, которое молча продолжает работать, — приятно в бою и коварно при отладке.
+Aus dieser Eigenschaft erwächst übrigens etwas weiter im Lab ein vorhersehbarer Fehlschlag.
+Eine Anwendung, die stillschweigend weiterarbeitet, ist im Betrieb angenehm und beim Debuggen tückisch.
 
-**Ключ.** `employee:42` — имя сущности, двоеточие, идентификатор. Двоеточие здесь не
-синтаксис Redis, а общепринятая привычка: она позволяет потом искать по образцу
-`employee:*` и не путать свои ключи с чужими, когда в одном Redis живут два приложения.
+**Der Schlüssel.** `employee:42` — ein Entitätsname, ein Doppelpunkt, ein Bezeichner. Der Doppelpunkt
+ist hier keine Redis-Syntax, sondern eine weit verbreitete Gewohnheit: Er erlaubt Ihnen, später nach
+dem Muster `employee:*` zu suchen und die eigenen Schlüssel nicht mit fremden zu verwechseln, wenn zwei Anwendungen in einem Redis leben.
 
-**Срок жизни назначается той же командой, что и запись:**
+**Die Lebensdauer wird mit demselben Befehl gesetzt wie das Schreiben:**
 
 ```go
 r.do("SET", key, val, "EX", strconv.Itoa(ttlSeconds))
 ```
 
-Не `SET`, а потом `EXPIRE` двумя командами. Между двумя командами соединение может
-оборваться — и ключ останется в кеше навсегда. Такие ключи потом ищут месяцами.
+Nicht `SET` und dann `EXPIRE` als zwei Befehle. Zwischen zwei Befehlen kann die Verbindung abreißen — und
+der Schlüssel bleibt für immer im Cache. Nach solchen Schlüsseln fahndet man danach monatelang.
 
-**Клиент Redis здесь свой, на пятьдесят строк.** Протокол Redis текстовый, и для `GET`
-и `SET` он помещается в одну функцию. В рабочем проекте берут готовую библиотеку —
-она умеет пул соединений, повторы и sentinel. Здесь свой нужен ровно затем, чтобы у
-сборки не было внешних зависимостей: вспомните, с чего началась прошлая лаба.
+**Der Redis-Client hier ist ein eigener, fünfzig Zeilen.** Das Redis-Protokoll ist textbasiert, und für `GET`
+und `SET` passt es in eine einzige Funktion. In einem echten Projekt würden Sie eine fertige Bibliothek
+nehmen — sie beherrscht Connection-Pooling, Wiederholungen und Sentinel. Hier braucht es einen eigenen
+genau deshalb, damit der Build keine externen Abhängigkeiten hat: Erinnern Sie sich, womit das vorige Lab begann.
 
-**Отдельный клиент HTTP с увеличенным пулом соединений:**
+**Ein separater HTTP-Client mit vergrößertem Verbindungspool:**
 
 ```go
 tr := http.DefaultTransport.(*http.Transport).Clone()
 tr.MaxIdleConnsPerHost = 64
 ```
 
-Без этой строки под нагрузкой половина времени уходила бы на установку TCP-соединений
-к справочнику, и замер показал бы не задержку справочника, а нашу собственную
-неаккуратность. Первое правило измерений: убедитесь, что вы измеряете то, что думаете.
+Ohne diese Zeile würde unter Last die halbe Zeit für den Aufbau von TCP-Verbindungen zum
+Verzeichnis draufgehen, und die Messung zeigte nicht die Latenz des Verzeichnisses, sondern unsere
+eigene Nachlässigkeit. Die erste Regel des Messens: Vergewissern Sie sich, dass Sie das messen, was Sie zu messen glauben.
 
 </details>
 
-Собираем и отправляем в свой Harbor. `build` соберёт образ по `Dockerfile` и оставит его
-на виртуалке, `push` отправит его в реестр. Имя образа то же, что и в прошлой лабе, а тег
-другой — `v2`: в реестре теперь будут лежать обе версии, и старая никуда не денется.
+Bauen Sie es und pushen Sie es in Ihr eigenes Harbor. `build` baut das Image aus dem `Dockerfile` und
+lässt es auf dem Bastion, `push` schickt es in die Registry. Der Image-Name ist derselbe wie im vorigen
+Lab, aber der Tag ist anders — `v2`: Die Registry hält nun beide Versionen, und die alte verschwindet nicht.
 
-Подставьте свой адрес:
+Setzen Sie Ihre eigene Adresse ein:
 
 ```bash
 cd labs/07-redis
 
-# build = «собери образ по Dockerfile».
-#   --platform linux/amd64  под какой процессор собирать; узлы кластера на x86
-#   -t <адрес>/<проект>/<имя>:<тег>  как назвать результат; адрес реестра в начале
-#                           имени — это то, куда потом уедет push
-#   app/                    папка с Dockerfile и исходниками, откуда собирать
+# build = „baue das Image aus dem Dockerfile".
+#   --platform linux/amd64  für welchen Prozessor bauen; die Cluster-Nodes sind x86
+#   -t <host>/<projekt>/<name>:<tag>  wie das Ergebnis heißen soll; der Registry-Host am
+#                           Anfang des Namens ist das Ziel, wohin push es später schickt
+#   app/                    der Ordner mit Dockerfile und Quellen, aus denen gebaut wird
 docker build --platform linux/amd64 -t harbor.workshop03.example.org/passes/passes-api:v2 app/
 
-# push = «отправь образ в реестр». Адрес берётся из первой части имени образа,
-# реквизиты — из того docker login, который вы делали в прошлой лабе.
+# push = „schicke das Image in die Registry". Die Adresse stammt aus dem ersten Teil des
+# Image-Namens, die Zugangsdaten — aus dem docker login, das Sie im vorigen Lab gemacht haben.
 docker push harbor.workshop03.example.org/passes/passes-api:v2
 ```
 
-⚠️ **`--platform linux/amd64` обязателен, если у вас Mac на Apple Silicon или виртуалку на
-ARM.** Без него образ соберётся под ARM, запушится без ошибок, а в кластере даст
-`CrashLoopBackOff` с `exec format error` в логах.
+⚠️ **`--platform linux/amd64` ist erforderlich, wenn Sie einen Mac mit Apple Silicon oder eine VM auf
+ARM haben.** Ohne es baut das Image für ARM, pusht ohne Fehler und liefert im Cluster
+`CrashLoopBackOff` mit `exec format error` in den Logs.
 
-## Шаг 2. Разворачиваем справочник и сервис
+## Schritt 2. Verzeichnis und Dienst ausrollen
 
-📍 **Где:** на виртуалке, кластер `lab`.
+📍 **Wo:** auf dem Bastion, der `lab`-Cluster.
 
-В обоих манифестах вместо адреса реестра стоит заглушка `HARBOR-HOST`: её заменяет `sed`,
-правя файлы на месте. Дальше `apply` передаёт кластеру описанное в файлах, а
-`rollout status` ждёт, пока копии поднимутся.
+In beiden Manifesten steht statt der Registry-Adresse ein Platzhalter `HARBOR-HOST`: `sed` ersetzt ihn
+und bearbeitet die Dateien an Ort und Stelle. Dann übergibt `apply` dem Cluster, was in den Dateien
+beschrieben ist, und `rollout status` wartet, bis die Kopien hochkommen.
 
 ```bash
-# KUBECONFIG говорит kubectl, каким файлом доступа пользоваться. Переключаемся на
-# ваш кластер `lab`; действует до закрытия окна терминала.
+# KUBECONFIG sagt kubectl, welche Zugangsdatei zu verwenden ist. Wir wechseln zu
+# Ihrem `lab`-Cluster; das gilt, bis Sie das Terminalfenster schließen.
 export KUBECONFIG=~/lab.kubeconfig
 
-# sed -i = «правь файл на месте».
-#   's|что|на что|g'  заменить все вхождения; разделитель | взят вместо / потому,
-#                     что в адресе есть слеши
-#   Версия sed в macOS требует после -i обязательный аргумент; пустые кавычки
-#   означают «резервную копию не делать». В Linux такого аргумента быть не должно.
-#   Файлов в конце строки два: sed принимает их сразу несколько и правит за один проход.
+# sed -i = „bearbeite die Datei an Ort und Stelle".
+#   's|alt|neu|g'  jedes Vorkommen ersetzen; als Trenner wird | statt / verwendet, weil
+#                  die Adresse Schrägstriche enthält
+#   Die macOS-Version von sed verlangt nach -i ein zwingendes Argument; leere Anführungszeichen
+#   bedeuten „keine Sicherungskopie anlegen". Unter Linux darf dieses Argument nicht dastehen.
+#   Am Zeilenende stehen zwei Dateien: sed nimmt mehrere auf einmal und bearbeitet sie in einem Durchgang.
 
 # Linux
 sed -i    's|HARBOR-HOST|harbor.workshop03.example.org|g' hr-legacy.yaml passes-api.yaml
 # macOS
 sed -i '' 's|HARBOR-HOST|harbor.workshop03.example.org|g' hr-legacy.yaml passes-api.yaml
 
-# apply = «приведи кластер к тому, что описано в файлах». Флаг -f повторяется на каждый файл.
+# apply = „bringe den Cluster in den in den Dateien beschriebenen Zustand". Das Flag -f wird für jede Datei wiederholt.
 kubectl apply -f hr-legacy.yaml -f passes-api.yaml
 
-# rollout status ждёт готовности копий и завершается сам; не дождавшись — вернёт ошибку
+# rollout status wartet auf die Bereitschaft der Kopien und beendet sich von selbst; andernfalls gibt es einen Fehler zurück
 kubectl rollout status deployment/hr-legacy
 kubectl rollout status deployment/passes-api
 ```
 
-⚠️ Оба манифеста ссылаются на секрет `harbor` — тот самый `imagePullSecret` из прошлой
-лабы. Если вы её не делали, поды встанут в `ImagePullBackOff`. Создать секрет:
+⚠️ Beide Manifeste verweisen auf das Secret `harbor` — genau das `imagePullSecret` aus dem vorigen
+Lab. Wenn Sie es nicht gemacht haben, landen die Pods in `ImagePullBackOff`. Das Secret erstellen:
 
 ```bash
-# create secret docker-registry = «заведи секрет с реквизитами к реестру»;
-# такой секрет умеет читать сам kubelet, когда скачивает образ на узел.
-#   harbor             имя секрета в кластере — на него ссылаются оба манифеста
-#   --docker-server    к какому реестру эти реквизиты
-#   --docker-username  кто заходит; --docker-password — пароль администратора Harbor
+# create secret docker-registry = „erstelle ein Secret mit Registry-Zugangsdaten";
+# ein solches Secret kann der kubelet selbst lesen, wenn er das Image auf einen Node zieht.
+#   harbor             der Name des Secrets im Cluster — beide Manifeste verweisen darauf
+#   --docker-server    für welche Registry diese Zugangsdaten gelten
+#   --docker-username  wer sich anmeldet; --docker-password — das Passwort des Harbor-Administrators
 kubectl create secret docker-registry harbor \
   --docker-server=harbor.workshop03.example.org \
-  --docker-username=admin --docker-password='ВАШ-ПАРОЛЬ'
+  --docker-username=admin --docker-password='IHR-PASSWORT'
 ```
 
-Проверим, что цепочка работает. Сервис виден только изнутри кластера, поэтому запрос к
-нему делаем оттуда же: поднимаем одноразовый под с `curl`, он спрашивает сервис
-`passes-api`, печатает ответ и исчезает.
+Prüfen wir, dass die Kette funktioniert. Der Dienst ist nur von innerhalb des Clusters sichtbar, deshalb
+stellen wir die Anfrage auch von dort: Wir starten einen Einweg-Pod mit `curl`, er fragt den Dienst
+`passes-api`, gibt die Antwort aus und verschwindet.
 
 ```bash
-# run probe = «запусти под с именем probe».
-#   --rm              удалить под, как только он отработает
-#   -i                показать нам его вывод
-#   --restart=Never   не перезапускать: это разовая команда, а не постоянная служба
-#   --image=...       из какого образа; версия зафиксирована, чтобы не приехало новое
-#   --quiet           не печатать служебные строки, только ответ
-#   --                всё, что после этих двух чёрточек, — команда внутри пода
-# Адрес вида <сервис>.<пространство имён>.svc.cluster.local — внутреннее имя сервиса;
-# по нему поды находят друг друга, не зная адресов.
+# run probe = „starte einen Pod namens probe".
+#   --rm              den Pod löschen, sobald er fertig ist
+#   -i                uns seine Ausgabe zeigen
+#   --restart=Never   nicht neu starten: dies ist ein einmaliger Befehl, kein dauerhafter Dienst
+#   --image=...       welches Image verwenden; die Version ist fixiert, damit nichts Neues ankommt
+#   --quiet           keine Dienstzeilen ausgeben, nur die Antwort
+#   --                alles nach diesen zwei Strichen ist der Befehl im Pod
+# Eine Adresse der Form <service>.<namespace>.svc.cluster.local ist der interne Name des Dienstes;
+# darüber finden sich die Pods, ohne Adressen zu kennen.
 kubectl run probe --rm -i --restart=Never --image=curlimages/curl:8.11.1 --quiet -- \
   curl -s "http://passes-api.default.svc.cluster.local/employee?id=42"
 ```
 
-**Что вы должны увидеть:**
+**Was Sie sehen sollten:**
 
 ```json
-{"cache":"off","cached":false,"dept":"Логистика","id":"42","name":"Попова Е. К.",
+{"cache":"off","cached":false,"dept":"Logistics","id":"42","name":"Popova E. K.",
  "pod":"passes-api-6f8b9c7d5-x2ktm","took_ms":803,"ttl_s":60}
 ```
 
-Ключевые поля: `cache: off` — кеша нет, `took_ms: 803` — вот они, ваши восемьсот
-миллисекунд. Именно эту цифру мы и будем уменьшать.
+Die entscheidenden Felder: `cache: off` — kein Cache, `took_ms: 803` — da sind sie, Ihre achthundert
+Millisekunden. Genau diese Zahl werden wir verkleinern.
 
-## Шаг 3. Меряем, как плохо сейчас
+## Schritt 3. Messen, wie schlimm es jetzt ist
 
-📍 **Где:** на виртуалке, кластер `lab`.
+📍 **Wo:** auf dem Bastion, der `lab`-Cluster.
 
-Один запрос — не измерение. Нужна нагрузка, похожая на рабочую, и распределение задержек.
+Eine Anfrage ist keine Messung. Sie brauchen eine Last, die der echten ähnelt, und eine Verteilung der Latenzen.
 
-Разворачиваем генератор. Он поднимается как обычное приложение и живёт в кластере рядом
-с сервисом — так замер не зависит от вашего интернета и от туннеля:
+Rollen Sie den Generator aus. Er kommt hoch wie eine gewöhnliche Anwendung und lebt im Cluster neben
+dem Dienst — so hängt die Messung nicht von Ihrem Internet oder dem Tunnel ab:
 
 ```bash
-# в файле два объекта: сам генератор и сервис к нему
+# die Datei enthält zwei Objekte: den Generator selbst und einen Service dafür
 kubectl apply -f fortio.yaml
 kubectl rollout status deployment/fortio
 ```
 
-Теперь запускаем нагрузку. Команда `kubectl exec` выполняет что-либо внутри уже
-работающего пода — здесь внутри генератора запускается он сам, в режиме обстрела:
+Jetzt starten wir die Last. Der Befehl `kubectl exec` führt etwas innerhalb eines bereits laufenden
+Pods aus — hier, innerhalb des Generators, wird der Generator selbst gestartet, im Beschuss-Modus:
 
 ```bash
-# exec deploy/fortio = выполнить команду внутри пода этого приложения
-#   --            граница: слева kubectl, справа команда, которая пойдёт внутрь пода
-#   fortio load   режим обстрела: слать запросы и мерить время ответа
-#   -qps 20       двадцать запросов в секунду — задаём темп, а не «жмём изо всех сил»
-#   -t 20s        сколько длится замер
-#   -c 16         шестнадцать параллельных соединений. Число не произвольное:
-#                 справочник отвечает 800 мс, значит одно соединение успевает
-#                 чуть больше запроса в секунду. Чтобы держать заданные 20 в
-#                 секунду, соединений нужно не меньше шестнадцати — иначе Fortio
-#                 упрётся в задержку и не выдаст заказанный темп.
-#   последний аргумент — адрес, который обстреливаем
+# exec deploy/fortio = einen Befehl im Pod dieser Anwendung ausführen
+#   --            die Grenze: links kubectl, rechts der Befehl, der in den Pod geht
+#   fortio load   Beschuss-Modus: Anfragen senden und die Antwortzeit messen
+#   -qps 20       zwanzig Anfragen pro Sekunde — wir geben ein Tempo vor, nicht „so fest wie möglich"
+#   -t 20s        wie lange die Messung dauert
+#   -c 16         sechzehn parallele Verbindungen. Die Zahl ist nicht willkürlich:
+#                 das Verzeichnis antwortet in 800 ms, also schafft eine Verbindung
+#                 etwas mehr als eine Anfrage pro Sekunde. Um die gesetzten 20 pro
+#                 Sekunde zu halten, brauchen Sie mindestens sechzehn Verbindungen — sonst
+#                 stößt Fortio an die Latenzwand und liefert das gewünschte Tempo nicht.
+#   das letzte Argument ist die Adresse, die wir beschießen
 kubectl exec deploy/fortio -- fortio load -qps 20 -t 20s -c 16 \
   "http://passes-api.default.svc.cluster.local/employee?id=42"
 ```
 
-**Что вы должны увидеть** — в конце вывода гистограмму и строки с процентилями:
+**Was Sie sehen sollten** — am Ende der Ausgabe ein Histogramm und Zeilen mit Perzentilen:
 
 ```
 # target 50% 0.801
@@ -306,252 +306,249 @@ kubectl exec deploy/fortio -- fortio load -qps 20 -t 20s -c 16 \
 Code 200 : 400 (100.0 %)
 ```
 
-**Запишите эти числа.** Через десять минут они понадобятся для сравнения, а память
-устроена так, что «ну было где-то восемьсот» превращается в «ну было где-то полсекунды».
+**Schreiben Sie diese Zahlen auf.** In zehn Minuten brauchen Sie sie zum Vergleich, und das Gedächtnis
+ist so gebaut, dass aus „na, es waren so um die achthundert“ ein „na, es war so um die halbe Sekunde“ wird.
 
-### То же самое мышкой
+### Dasselbe mit der Maus
 
-Мышкой — это не дашборд Cozystack: он работает с управляющим кластером и показывает
-позиции каталога тенанта, а внутрь вашего кластера `lab` не заглядывает. Свой веб-интерфейс
-есть у самого генератора, и до него надо дотянуться туннелем.
+Mit der Maus — das ist nicht das Cozystack-Dashboard: Es arbeitet mit dem Management-Cluster und zeigt
+die Katalogeinträge des Tenants, aber in Ihren `lab`-Cluster schaut es nicht hinein. Der Generator selbst
+hat eine eigene Weboberfläche, und die müssen Sie über einen Tunnel erreichen.
 
 ```bash
-# port-forward svc/fortio = туннель с виртуалки до сервиса генератора в кластере
-#   8081:8080 — левое число порт у вас на виртуалке, правое порт сервиса в кластере
-# Порт 8081 взят потому, что 8080 может быть занят чем-то ещё на вашей машине.
-# Окно не закрывайте: туннель живёт, пока команда работает. Прервать — Ctrl+C.
+# port-forward svc/fortio = ein Tunnel vom Bastion zum Service des Generators im Cluster
+#   8081:8080 — die linke Zahl ist der Port auf Ihrem Bastion, die rechte der Service-Port im Cluster
+# Port 8081 wird verwendet, weil 8080 auf Ihrer Maschine von etwas anderem belegt sein könnte.
+# Fenster nicht schließen: Der Tunnel lebt, solange der Befehl läuft. Zum Abbrechen — Ctrl+C.
 kubectl port-forward svc/fortio 8081:8080
 ```
 
-Откройте <http://localhost:8081/fortio>. Заполните:
+Öffnen Sie <http://localhost:8081/fortio>. Füllen Sie aus:
 
-| Поле | Значение |
+| Feld | Wert |
 |---|---|
 | URL | `http://passes-api.default.svc.cluster.local/employee?id=42` |
 | QPS | `20` |
 | Duration | `20s` |
 | Connections | `16` |
 
-Нажмите **Start**. Внизу нарисуется гистограмма задержек. Она нагляднее чисел: видно, что
-все запросы собрались в одну узкую полосу около 800 мс — то есть тормозит не «иногда», а
-всегда и одинаково.
+Klicken Sie auf **Start**. Unten wird ein Latenz-Histogramm gezeichnet. Es ist anschaulicher als die
+Zahlen: Sie sehen, wie sich alle Anfragen in einem schmalen Band um 800 ms sammeln — das heißt, es ist
+langsam nicht „manchmal“, sondern immer und um denselben Betrag.
 
 
 <details>
-<summary><b>Почему p50 и p99, а не средняя задержка</b></summary>
+<summary><b>Warum p50 und p99, nicht die durchschnittliche Latenz</b></summary>
 
-Средняя задержка — самая обманчивая метрика в эксплуатации.
+Die durchschnittliche Latenz ist die trügerischste Metrik im Betrieb.
 
-Представьте: девяносто запросов по 10 мс и десять запросов по 2000 мс. Средняя — 209 мс,
-и по отчёту всё прилично. А на деле каждый десятый пользователь ждал две секунды и ушёл.
+Stellen Sie sich vor: neunzig Anfragen zu 10 ms und zehn Anfragen zu 2000 ms. Der Durchschnitt beträgt
+209 ms, und laut Bericht sieht alles ordentlich aus. In Wirklichkeit aber wartete jeder zehnte Nutzer zwei Sekunden und ging.
 
-**p50 (медиана)** — половина запросов быстрее этого числа, половина медленнее. Отвечает
-на вопрос «сколько ждёт обычный пользователь».
+**p50 (der Median)** — die Hälfte der Anfragen ist schneller als diese Zahl, die Hälfte langsamer. Er
+beantwortet die Frage „wie lange wartet ein gewöhnlicher Nutzer“.
 
-**p99** — 99% запросов быстрее этого числа. Отвечает на вопрос «как бывает плохо».
-Именно p99 определяет, будет ли охрана на проходной жаловаться: жалуются не на среднее,
-а на тот раз, когда пришлось ждать.
+**p99** — 99 % der Anfragen sind schneller als diese Zahl. Er beantwortet die Frage „wie schlimm wird es“.
+Es ist p99, der bestimmt, ob der Werkschutz am Kontrollpunkt sich beschwert: Menschen beschweren sich nicht
+über den Durchschnitt, sondern über das eine Mal, als sie warten mussten.
 
-В нашем замере p50 и p99 почти совпали — 801 и 812 мс. Это признак, что тормоза не
-случайные, а системные: медленно ровно всегда. Такое лечится кешем. Если бы p50 был 10 мс,
-а p99 — 2000 мс, причина была бы другой, и кеш бы не помог.
+In unserer Messung fielen p50 und p99 fast zusammen — 801 und 812 ms. Das ist ein Zeichen, dass die
+Langsamkeit nicht zufällig, sondern systemisch ist: langsam genau immer. Das heilt ein Cache. Wären p50
+10 ms und p99 2000 ms, wäre die Ursache eine andere, und ein Cache würde nicht helfen.
 
 </details>
 
-## Шаг 4. Создаём Redis
+## Schritt 4. Redis erstellen
 
-📍 **Где:** в браузере, в дашборде Cozystack. Redis — общий ресурс тенанта, как и Harbor.
+📍 **Wo:** im Browser, im Cozystack-Dashboard. Redis ist eine gemeinsame Tenant-Ressource, wie Harbor.
 
-Тенант → **Создать приложение** → `Redis`.
+Tenant → **Create application** → `Redis`.
 
-| Поле | Значение | Почему так |
+| Feld | Wert | Warum so |
 |---|---|---|
-| Имя | `cache` | попадёт в имена сервисов, короткое удобнее |
-| Replicas | `2` | одна ведущая копия и одна ведомая: посмотрим, что это даёт |
-| Size | `1Gi` | справочник сотрудников в память поместится с большим запасом |
+| Name | `cache` | kommt in Service-Namen vor, kürzer ist praktischer |
+| Replicas | `2` | eine Leader-Kopie und eine Follower-Kopie: wir sehen, was das bringt |
+| Size | `1Gi` | das Mitarbeiterverzeichnis passt mit großem Spielraum in den Speicher |
 | Storage class | `replicated` | |
-| Resources preset | оставить предложенный | |
+| Resources preset | den vorgeschlagenen belassen | |
 | Version | `v8` | |
-| Auth enabled | **включено** (по умолчанию) | платформа сгенерирует пароль сама |
-| External | **выключено** | наружу этот кеш выставлять незачем |
+| Auth enabled | **ein** (Standard) | die Plattform generiert das Passwort selbst |
+| External | **aus** | es gibt keinen Grund, diesen Cache nach außen freizugeben |
 
-Готовности ждать три-пять минут.
+Rechnen Sie mit drei bis fünf Minuten Wartezeit bis zur Bereitschaft.
 
-⚠️ **Этот Redis не имеет отношения к тому Redis, который вы могли видеть в форме создания
-Harbor.** Там он внутренний кеш самого реестра. Этот — ваш собственный, для вашего
-приложения.
+⚠️ **Dieses Redis hat nichts mit dem Redis zu tun, das Sie im Formular zum Erstellen von Harbor gesehen
+haben könnten.** Dort ist es der interne Cache der Registry selbst. Dieses hier ist Ihr eigenes, für Ihre Anwendung.
 
 <details>
-<summary><b>Чем managed Redis отличается от Redis, поставленного на виртуалку</b></summary>
+<summary><b>Wie sich managed Redis von Redis auf einer VM unterscheidet</b></summary>
 
-Поставить Redis на виртуальную машину — работа на полчаса: `apt install redis`, поправить
-`bind` и `requirepass`, включить в автозагрузку. Именно поэтому managed-сервис кажется
-избыточным. Разница не в установке, а в том, что происходит дальше.
+Redis auf einer virtuellen Maschine zu installieren ist eine halbe Stunde Arbeit: `apt install redis`,
+`bind` und `requirepass` anpassen, beim Systemstart aktivieren. Genau deshalb wirkt ein Managed Service
+übertrieben. Der Unterschied liegt nicht in der Installation, sondern in dem, was danach passiert.
 
-**Репликация.** Вы поставили `replicas: 2` — и получили две копии данных на разных узлах
-плюс три sentinel, которые за ними следят. Если узел с ведущей копией умрёт, sentinel
-проведут выборы и назначат ведущей вторую копию. Приложение переживёт это с паузой в
-несколько секунд. Собрать то же самое руками — день работы и потом ещё день на проверку,
-что оно действительно переключается, а не только выглядит настроенным.
+**Replikation.** Sie setzen `replicas: 2` — und bekamen zwei Kopien der Daten auf verschiedenen Nodes
+plus drei Sentinels, die über sie wachen. Stirbt der Node mit der Leader-Kopie, halten die Sentinels eine
+Wahl ab und machen die zweite Kopie zum Leader. Die Anwendung übersteht das mit einer Pause von wenigen
+Sekunden. Dasselbe von Hand zusammenzubauen ist ein Tag Arbeit und dann noch ein Tag, um zu prüfen, dass
+es wirklich umschaltet und nicht nur konfiguriert aussieht.
 
-**Обновления.** Уязвимость в Redis — не редкость. На виртуалке обновление означает
-`apt upgrade`, перезапуск и надежду, что конфиг переживёт смену мажорной версии.
-Здесь обновление образа приезжает вместе с обновлением платформы, и порядок перезапуска
-копий выдержан так, чтобы сервис не пропал.
+**Updates.** Eine Schwachstelle in Redis ist keine Seltenheit. Auf einer VM bedeutet ein Update
+`apt upgrade`, einen Neustart und die Hoffnung, dass die Konfiguration einen Wechsel der Major-Version
+übersteht. Hier kommt das Image-Update zusammen mit einem Plattform-Update, und die Reihenfolge, in der
+die Kopien neu starten, ist so eingerichtet, dass der Dienst nicht verschwindet.
 
-**Наблюдаемость.** Метрики уже собираются: экспортер поднят рядом с каждой
-копией, графики есть без вашего участия. На виртуалке это ещё один пакет, ещё один конфиг
-и ещё одна вещь, которую забыли настроить.
+**Observability.** Metriken werden bereits gesammelt: Neben jeder Kopie läuft ein Exporter, die Graphen
+sind ohne Ihr Zutun da. Auf einer VM ist das ein weiteres Paket, eine weitere Konfiguration und eine
+weitere Sache, die vergessen wurde.
 
-**Чего вы лишаетесь.** Честно: root на машине с Redis. Нельзя зайти по SSH, нельзя
-поправить конфиг руками, нельзя поставить рядом свой скрипт. Всё, что не выведено в
-параметры приложения, вам недоступно — а выведено далеко не всё. Если вам нужен
-нестандартный `maxmemory-policy` или модуль Redis, managed-сервис вам его не даст, и
-придётся ставить своё на виртуалке. Это реальное ограничение, а не мелочь.
+**Worauf Sie verzichten.** Ehrlich: root auf der Maschine mit Redis. Sie können sich nicht per SSH
+anmelden, die Konfiguration nicht von Hand bearbeiten, kein eigenes Skript daneben ablegen. Alles, was
+nicht als Anwendungsparameter herausgeführt ist, ist für Sie unerreichbar — und herausgeführt ist längst
+nicht alles. Wenn Sie eine nicht standardmäßige `maxmemory-policy` oder ein Redis-Modul brauchen, gibt ein
+Managed Service es Ihnen nicht, und Sie müssen Ihr eigenes auf einer VM installieren. Das ist eine echte Einschränkung, keine Kleinigkeit.
 
 </details>
 
-## Шаг 5. Находим адрес Redis и проверяем связность
+## Schritt 5. Die Redis-Adresse finden und die Verbindung prüfen
 
-📍 **Где:** на виртуалке, **управляющий** кластер.
+📍 **Wo:** auf dem Bastion, der **Management**-Cluster.
 
-Redis живёт в вашем тенанте на управляющем кластере, а приложение — в вашем кластере
-`lab`. Это два разных кластера, и первым делом надо убедиться, что второй дотягивается
-до первого.
+Redis lebt in Ihrem Tenant auf dem Management-Cluster, und die Anwendung in Ihrem `lab`-Cluster. Das sind
+zwei verschiedene Cluster, und als Erstes muss man sich vergewissern, dass der zweite den ersten erreicht.
 
-Смотрим, какие сервисы появились:
+Sehen wir uns an, welche Services aufgetaucht sind:
 
 ```bash
-# --kubeconfig задаёт файл доступа прямо в команде — на один раз, не трогая KUBECONFIG.
-# Так две команды подряд можно адресовать в разные кластеры и не запутаться.
-#   -n tenant-workshopXX  пространство имён вашего тенанта
-#   get svc               «покажи сервисы» — постоянные адреса, за которыми стоят поды
-#   | grep redis          оставить в выводе только строки со словом redis
+# --kubeconfig setzt die Zugangsdatei direkt im Befehl — nur dieses eine Mal, ohne KUBECONFIG anzurühren.
+# So kann man zwei Befehle hintereinander an verschiedene Cluster richten, ohne durcheinanderzukommen.
+#   -n tenant-workshopXX  der Namespace Ihres Tenants
+#   get svc               „zeige die Services" — dauerhafte Adressen, hinter denen Pods stehen
+#   | grep redis          nur die Zeilen mit dem Wort redis in der Ausgabe behalten
 kubectl --kubeconfig ~/.kube/config -n tenant-workshopXX get svc | grep redis
 ```
 
-**Что вы должны увидеть** — несколько сервисов с говорящими префиксами:
+**Was Sie sehen sollten** — mehrere Services mit sprechenden Präfixen:
 
-| Имя | Что за ним стоит |
+| Name | Was dahintersteht |
 |---|---|
-| `rfrm-redis-cache` | ведущая копия (master) — сюда пишут и читают |
-| `rfrs-redis-cache` | ведомые копии (replicas) — только чтение |
-| `rfs-redis-cache` | sentinel — служба, которая следит и переключает роли |
+| `rfrm-redis-cache` | die Leader-Kopie (master) — hierhin wird geschrieben und von hier gelesen |
+| `rfrs-redis-cache` | die Follower-Kopien (replicas) — nur Lesen |
+| `rfs-redis-cache` | sentinel — der Dienst, der überwacht und Rollen umschaltet |
 
-⚠️ **Откуда в именах взялось лишнее `redis-`.** Платформа добавляет к имени приложения
-префикс с типом сервиса: приложение `cache` типа Redis внутри называется `redis-cache`.
-Отсюда `rfrm-redis-cache`, а не `rfrm-cache`. Не угадывайте имена — смотрите на вывод
-команды выше, он и есть источник истины.
+⚠️ **Woher das zusätzliche `redis-` in den Namen kommt.** Die Plattform hängt dem Anwendungsnamen ein
+Präfix mit dem Service-Typ an: Die Anwendung `cache` vom Typ Redis heißt intern `redis-cache`.
+Daher `rfrm-redis-cache`, nicht `rfrm-cache`. Raten Sie Namen nicht — schauen Sie auf die Ausgabe
+des obigen Befehls, das ist die Quelle der Wahrheit.
 
-Нам нужен `rfrm-redis-cache`: кеш и пишет, и читает, а писать можно только в ведущую
-копию.
+Wir brauchen `rfrm-redis-cache`: Der Cache schreibt und liest, und schreiben kann man nur in die Leader-Kopie.
 
-Полное имя, по которому его видно из вашего кластера, собирается так:
+Der vollständige Name, unter dem er von Ihrem Cluster aus sichtbar ist, wird so zusammengesetzt:
 
 ```
 rfrm-redis-cache.tenant-workshopXX.svc.cozy.local
 ```
 
-Забираем пароль. 📍 **Где:** в дашборде, приложение `cache`, вкладка с секретами. Нужен
-секрет `redis-cache-auth`, ключ `password`.
+Holen Sie das Passwort. 📍 **Wo:** im Dashboard, die Anwendung `cache`, der Reiter mit den Secrets. Sie
+brauchen das Secret `redis-cache-auth`, den Schlüssel `password`.
 
-Теперь — проверка связности. 📍 **Где:** на виртуалке, кластер **`lab`**.
+Jetzt — eine Verbindungsprüfung. 📍 **Wo:** auf dem Bastion, der **`lab`**-Cluster.
 
-Поднимаем в своём кластере одноразовый под с клиентом Redis и просим его сказать Redis
-слово `ping`. Если ответ придёт, значит из кластера `lab` видно кеш в тенанте — а это
-и есть то единственное, что мы сейчас проверяем.
+In Ihrem Cluster starten wir einen Einweg-Pod mit einem Redis-Client und bitten ihn, Redis das Wort
+`ping` zu sagen. Kommt eine Antwort zurück, dann ist der Cache im Tenant vom `lab`-Cluster aus sichtbar —
+und das ist das eine und einzige, was wir gerade prüfen.
 
-⚠️ **Пароль передаём переменной `REDISCLI_AUTH`, а не флагом `-a`.** Всё, что попадает в
-аргументы команды, видно в списке процессов на узле и остаётся в описании пода — а его
-читает любой, у кого есть доступ к вашему пространству имён. Сам `redis-cli` про это
-предупреждает, и глушить предупреждение вместо того, чтобы убрать причину, — плохая
-привычка.
+⚠️ **Das Passwort übergeben wir über die Variable `REDISCLI_AUTH`, nicht über das Flag `-a`.** Alles, was
+in die Argumente eines Befehls gerät, ist in der Prozessliste auf dem Node sichtbar und bleibt in der
+Beschreibung des Pods — die jeder lesen kann, der Zugang zu Ihrem Namespace hat. `redis-cli` selbst warnt
+davor, und die Warnung stummzuschalten, statt die Ursache zu beseitigen, ist eine schlechte Angewohnheit.
 
 ```bash
 export KUBECONFIG=~/lab.kubeconfig
 
-# run redis-probe = разовый под с клиентом redis-cli:
-#   --rm --restart=Never  отработал и удалился, перезапускать не надо
-#   -i --quiet            показать нам вывод и не печатать служебные строки
-#   --env=REDISCLI_AUTH   пароль уезжает в под переменной окружения, а не аргументом
-#   --                    справа от этих чёрточек команда, которая пойдёт внутрь пода
-#   redis-cli -h <имя>    к какому серверу подключаться; имя — то самое, полное
-#   ping                  короткий вопрос «ты живой»; ответ на него — PONG
+# run redis-probe = ein Einweg-Pod mit dem redis-cli-Client:
+#   --rm --restart=Never  hat seine Arbeit getan und sich gelöscht, kein Neustart nötig
+#   -i --quiet            uns die Ausgabe zeigen und keine Dienstzeilen ausgeben
+#   --env=REDISCLI_AUTH   das Passwort geht als Umgebungsvariable in den Pod, nicht als Argument
+#   --                    rechts von diesen Strichen steht der Befehl, der in den Pod geht
+#   redis-cli -h <name>   mit welchem Server verbinden; der Name ist genau jener vollständige
+#   ping                  ein kurzes „lebst du"; die Antwort darauf ist PONG
 kubectl run redis-probe --rm -i --restart=Never --image=redis:7-alpine --quiet \
-  --env=REDISCLI_AUTH='ВАШ-ПАРОЛЬ' -- \
+  --env=REDISCLI_AUTH='IHR-PASSWORT' -- \
   redis-cli -h rfrm-redis-cache.tenant-workshopXX.svc.cozy.local ping
 ```
 
-**Что вы должны увидеть:**
+**Was Sie sehen sollten:**
 
 ```
 PONG
 ```
 
-⚠️ **Если вместо `PONG` вы увидели ошибку разрешения имени** — значит, из вашего кластера
-не видно внутренних имён управляющего. Это лечится обращением по адресу:
+⚠️ **Wenn Sie statt `PONG` einen Fehler bei der Namensauflösung erhalten haben** — dann sind die internen
+Namen des Management-Clusters von Ihrem Cluster aus nicht sichtbar. Das behebt man, indem man ihn über die IP anspricht:
 
 ```bash
-# -o jsonpath='{.spec.clusterIP}' — напечатать одно поле объекта: внутренний адрес,
-# который платформа выдала этому сервису. {"\n"} добавляет перевод строки.
+# -o jsonpath='{.spec.clusterIP}' — ein Feld des Objekts ausgeben: die interne Adresse,
+# die die Plattform diesem Service zugewiesen hat. {"\n"} fügt einen Zeilenumbruch hinzu.
 kubectl --kubeconfig ~/.kube/config -n tenant-workshopXX get svc rfrm-redis-cache \
   -o jsonpath='{.spec.clusterIP}{"\n"}'
 ```
 
-Дальше везде подставляйте полученный адрес вместо имени. Работать будет так же; хуже
-только тем, что при пересоздании Redis адрес сменится, а имя — нет. Если и по адресу не
-отвечает — напишите в чат воркшопа, это настройка стенда, а не ваша ошибка.
+Von hier an setzen Sie überall die erhaltene Adresse anstelle des Namens ein. Es funktioniert genauso;
+der einzige Nachteil ist, dass sich beim Neuerstellen von Redis die Adresse ändert, der Name aber nicht.
+Antwortet es auch über die Adresse nicht — schreiben Sie in den Workshop-Chat, das ist ein
+Konfigurationsproblem der Testumgebung, nicht Ihr Fehler.
 
-## Шаг 6. Включаем кеш
+## Schritt 6. Den Cache einschalten
 
-📍 **Где:** на виртуалке, кластер `lab`.
+📍 **Wo:** auf dem Bastion, der `lab`-Cluster.
 
-Меняем приложение не целым манифестом, а патчем — так видно ровно то, что меняется.
-Сначала подставляем в патч адрес своего Redis, потом отдаём патч кластеру: `kubectl patch`
-дописывает изменения в уже существующий объект, а не заменяет его целиком.
+Wir ändern die Anwendung nicht mit einem ganzen Manifest, sondern mit einem Patch — so sehen Sie genau,
+was sich ändert. Zuerst setzen wir die Adresse Ihres Redis in den Patch ein, dann übergeben wir den Patch
+dem Cluster: `kubectl patch` fügt Änderungen an ein bereits vorhandenes Objekt an, statt es komplett zu ersetzen.
 
 ```bash
-# та же подстановка адреса, что и раньше, только заглушка другая — REDIS-ADDR
+# dieselbe Adress-Ersetzung wie zuvor, nur der Platzhalter ist ein anderer — REDIS-ADDR
 
 # Linux
 sed -i    's|REDIS-ADDR|rfrm-redis-cache.tenant-workshopXX.svc.cozy.local|g' cache-patch-broken.yaml
 # macOS
 sed -i '' 's|REDIS-ADDR|rfrm-redis-cache.tenant-workshopXX.svc.cozy.local|g' cache-patch-broken.yaml
 
-# patch deployment passes-api = «поправь вот этот объект тем, что лежит в файле»
-#   --patch-file  откуда взять изменения
-# Изменение переменных окружения означает новые поды: старые будут заменены.
+# patch deployment passes-api = „bessere dieses Objekt mit dem aus, was in der Datei steht"
+#   --patch-file  woher die Änderungen genommen werden
+# Änderung von Umgebungsvariablen bedeutet neue Pods: die alten werden ersetzt.
 kubectl patch deployment passes-api --patch-file cache-patch-broken.yaml
 
-# ждём, пока новые копии станут готовы, — иначе замерим ещё старые
+# warten, bis die neuen Kopien bereit sind — sonst messen wir noch die alten
 kubectl rollout status deployment/passes-api
 ```
 
-Меряем ещё раз — той же командой, которой мерили до включения кеша. Условия обстрела
-должны совпадать до последнего флага, иначе сравнивать будет нечего:
+Messen Sie erneut — mit demselben Befehl, mit dem wir vor dem Einschalten des Caches gemessen haben. Die
+Beschuss-Bedingungen müssen bis zum letzten Flag übereinstimmen, sonst gibt es nichts zu vergleichen:
 
 ```bash
-# те же двадцать запросов в секунду, те же двадцать секунд, те же шестнадцать соединений
+# dieselben zwanzig Anfragen pro Sekunde, dieselben zwanzig Sekunden, dieselben sechzehn Verbindungen
 kubectl exec deploy/fortio -- fortio load -qps 20 -t 20s -c 16 \
   "http://passes-api.default.svc.cluster.local/employee?id=42"
 ```
 
-> **Остановитесь и подумайте, прежде чем читать дальше.**
+> **Halten Sie inne und denken Sie nach, bevor Sie weiterlesen.**
 >
-> Числа не изменились: те же восемьсот миллисекунд. При этом ни один под не упал, ошибок
-> в ответах нет, все запросы вернули `200`. Redis создан, адрес правильный — вы только что
-> получили от него `PONG`.
+> Die Zahlen haben sich nicht verändert: dieselben achthundert Millisekunden. Und doch ist kein einziger
+> Pod abgestürzt, in den Antworten gibt es keine Fehler, jede Anfrage lieferte `200`. Redis ist erstellt,
+> die Adresse stimmt — Sie haben gerade ein `PONG` von ihm bekommen.
 >
-> Где смотреть?
+> Wo soll man schauen?
 
 <details>
-<summary><b>Ответ и урок шире, чем эта ошибка</b></summary>
+<summary><b>Die Antwort und eine Lehre, die über diesen Fehler hinausgeht</b></summary>
 
-Сначала посмотрите, что отвечает само приложение: в ответе есть поля, по которым видно,
-включён ли кеш и пришёл ли ответ из него.
+Schauen Sie zuerst, was die Anwendung selbst antwortet: Die Antwort hat Felder, die zeigen, ob der Cache
+eingeschaltet ist und ob die Antwort aus ihm kam.
 
 ```bash
-# тот же одноразовый под с curl, что и раньше: спрашиваем сервис изнутри кластера
+# derselbe Einweg-Pod mit curl wie zuvor: wir fragen den Dienst von innerhalb des Clusters
 kubectl run probe --rm -i --restart=Never --image=curlimages/curl:8.11.1 --quiet -- \
   curl -s "http://passes-api.default.svc.cluster.local/employee?id=42"
 ```
@@ -560,85 +557,84 @@ kubectl run probe --rm -i --restart=Never --image=curlimages/curl:8.11.1 --quiet
 {"cache":"redis","cached":false,"took_ms":802, ...}
 ```
 
-`cache: redis` — кеш включён. `cached: false` — и при этом ответ пришёл не из него.
-Причём **всегда** false, сколько ни повторяй.
+`cache: redis` — der Cache ist eingeschaltet. `cached: false` — und trotzdem kam die Antwort nicht aus ihm.
+Und zwar **immer** false, so oft Sie es auch wiederholen.
 
-Теперь журнал. Приложение пишет туда, что у него не получилось, — и это единственное
-место, где сейчас видно правду:
+Jetzt das Log. Die Anwendung schreibt dorthin, was ihr nicht gelungen ist — und das ist der einzige Ort,
+an dem die Wahrheit derzeit sichtbar ist:
 
 ```bash
-# logs = «покажи, что приложение писало в свой вывод».
-#   -l app=passes-api  сразу по всем копиям с этой меткой, а не по одной названной
-#   --tail=20          последние двадцать строк каждой копии, а не весь журнал
+# logs = „zeige, was die Anwendung in ihre Ausgabe geschrieben hat".
+#   -l app=passes-api  über alle Kopien mit diesem Label auf einmal, nicht über eine benannte
+#   --tail=20          die letzten zwanzig Zeilen jeder Kopie, nicht das ganze Log
 kubectl logs -l app=passes-api --tail=20
 ```
 
 ```
-кеш недоступен (redis: NOAUTH Authentication required.), иду в справочник
-кеш недоступен (redis: NOAUTH Authentication required.), иду в справочник
+cache unavailable (redis: NOAUTH Authentication required.), going to the directory
+cache unavailable (redis: NOAUTH Authentication required.), going to the directory
 ```
 
-Вот и ответ. Мы указали адрес Redis, но не указали пароль. Redis требует аутентификации —
-вы сами включили `Auth enabled` при создании, и это правильная настройка. Приложение
-честно попыталось, получило отказ, записало это в журнал и пошло в справочник.
+Da ist die Antwort. Wir haben die Redis-Adresse angegeben, aber nicht das Passwort. Redis verlangt
+Authentifizierung — Sie haben `Auth enabled` beim Erstellen selbst eingeschaltet, und das ist die richtige
+Einstellung. Die Anwendung hat ehrlich versucht, wurde abgewiesen, hat es ins Log geschrieben und ist ins Verzeichnis gegangen.
 
-**Почему это не выглядело как поломка.** Потому что поломки и не было. Приложение
-спроектировано так, чтобы переживать недоступность кеша: кеш ускоряет, но не может быть
-условием работоспособности. В бою это спасает — падение Redis не роняет сервис. При
-отладке это же свойство прячет проблему: всё зелёное, ошибок нет, но не быстрее.
+**Warum das nicht wie ein Defekt aussah.** Weil es keinen Defekt gab. Die Anwendung ist so entworfen, dass
+sie die Nichterreichbarkeit des Caches übersteht: Ein Cache beschleunigt, darf aber keine Voraussetzung für
+die Funktionsfähigkeit sein. Im Betrieb rettet Sie das — ein Ausfall von Redis reißt den Dienst nicht mit.
+Beim Debuggen verbirgt genau diese Eigenschaft das Problem: Alles ist grün, keine Fehler, aber nicht schneller.
 
-**Урок шире, чем эта ошибка.** Отказ, который не мешает работать, — самый дорогой вид отказа.
-Он не поднимает тревогу и живёт в проде месяцами. Отсюда практическое правило:
-**у каждого ускорителя должен быть наблюдаемый признак того, что он работает.** У нас
-это поле `cached` в ответе. Если бы его не было, вы бы сейчас гадали.
+**Die Lehre reicht über diesen Fehler hinaus.** Ein Ausfall, der die Arbeit nicht behindert, ist die
+teuerste Art von Ausfall. Er schlägt keinen Alarm und lebt monatelang im Produktivbetrieb. Daher eine
+praktische Regel: **Jeder Beschleuniger muss ein beobachtbares Zeichen dafür haben, dass er funktioniert.**
+Bei uns ist das das Feld `cached` in der Antwort. Gäbe es das nicht, würden Sie jetzt raten.
 
-В настоящей системе на этом месте стоит метрика «доля попаданий в кеш» и оповещение на
-случай, если она упала до нуля.
+In einem echten System steht an dieser Stelle eine Metrik „Cache-Hit-Ratio“ und ein Alert für den Fall, dass sie auf null fällt.
 
 </details>
 
-## Шаг 7. Кладём пароль и меряем снова
+## Schritt 7. Das Passwort eintragen und erneut messen
 
-📍 **Где:** на виртуалке, кластер `lab`.
+📍 **Wo:** auf dem Bastion, der `lab`-Cluster.
 
-Пароль от Redis живёт в управляющем кластере, а нужен он приложению в вашем. Переносим —
-через переменную оболочки, чтобы пароль не попал в историю команд:
+Das Redis-Passwort lebt im Management-Cluster, und die Anwendung braucht es in Ihrem. Wir tragen es
+hinüber — über eine Shell-Variable, damit das Passwort nicht in der Befehlshistorie landet:
 
 ```bash
-# read кладёт введённое с клавиатуры в переменную REDIS_PASS:
-#   -s  не показывать вводимое на экране
-#   -r  не считать обратный слеш служебным символом
-# На экране после этой строки ничего не появится: вставьте пароль из дашборда и Enter.
+# read legt das über die Tastatur Eingegebene in die Variable REDIS_PASS:
+#   -s  das Eingegebene nicht auf dem Bildschirm anzeigen
+#   -r  einen Backslash nicht als Sonderzeichen behandeln
+# Nach dieser Zeile erscheint nichts auf dem Bildschirm: fügen Sie das Passwort aus dem Dashboard ein und Enter.
 read -rs REDIS_PASS
 
-# create secret generic = обычный секрет, набор пар «ключ-значение».
-#   redis-password              имя секрета в кластере
-#   --from-literal=password=... завести в нём ключ password с этим значением;
-#                               именно на пару «имя секрета + ключ» сошлётся патч
+# create secret generic = ein gewöhnliches Secret, eine Menge von Schlüssel-Wert-Paaren.
+#   redis-password              der Name des Secrets im Cluster
+#   --from-literal=password=... darin einen Schlüssel password mit diesem Wert anlegen;
+#                               genau auf das Paar „Secret-Name + Schlüssel" verweist der Patch
 kubectl create secret generic redis-password --from-literal=password="$REDIS_PASS"
 
-# unset стирает переменную, чтобы пароль не достался следующим командам в этом окне
+# unset löscht die Variable, damit das Passwort nicht an die nächsten Befehle in diesem Fenster gelangt
 unset REDIS_PASS
 ```
 
-Применяем полный патч. В нём тот же адрес Redis плюс ссылка на только что созданный
-секрет и срок жизни записей в кеше; разбор — в спойлере сразу после команды.
+Wenden Sie den vollständigen Patch an. Er enthält dieselbe Redis-Adresse plus einen Verweis auf das gerade
+erstellte Secret und die Lebensdauer der Cache-Einträge; die Erläuterung steht im Spoiler direkt nach dem Befehl.
 
 ```bash
-# та же подстановка адреса, теперь в рабочем файле патча
+# dieselbe Adress-Ersetzung, jetzt in der funktionierenden Patch-Datei
 
 # Linux
 sed -i    's|REDIS-ADDR|rfrm-redis-cache.tenant-workshopXX.svc.cozy.local|g' cache-patch.yaml
 # macOS
 sed -i '' 's|REDIS-ADDR|rfrm-redis-cache.tenant-workshopXX.svc.cozy.local|g' cache-patch.yaml
 
-# поправить существующий Deployment содержимым файла и дождаться новых копий
+# das vorhandene Deployment mit dem Inhalt der Datei ausbessern und auf die neuen Kopien warten
 kubectl patch deployment passes-api --patch-file cache-patch.yaml
 kubectl rollout status deployment/passes-api
 ```
 
 <details>
-<summary><b>Разбираем патч</b></summary>
+<summary><b>Genauer betrachtet: was in cache-patch.yaml steckt</b></summary>
 
 ```yaml
 spec:
@@ -658,60 +654,58 @@ spec:
               value: "60"
 ```
 
-**Почему патч, а не полный манифест.** Патч — это «изменить вот это», а не «состояние
-должно быть таким». В файле видно ровно то, что меняется, а не двести строк, среди
-которых надо искать глазами три новые.
+**Warum ein Patch, kein vollständiges Manifest.** Ein Patch heißt „ändere dies“, nicht „der Zustand soll
+so sein". In der Datei sehen Sie genau, was sich ändert, nicht zweihundert Zeilen, unter denen Sie die drei neuen mit den Augen suchen müssen.
 
-**Почему это не затирает остальные переменные.** Списки в Kubernetes умеют сливаться по
-ключу. Для `env` ключ — поле `name`: три записи из патча добавятся к тем, что уже есть,
-а запись `REDIS_ADDR` заменит одноимённую, оставшуюся от сломанного патча. Списки
-контейнеров сливаются так же, по имени, — поэтому `- name: api` обязателен, без него
-Kubernetes не поймёт, какой контейнер вы правите.
+**Warum das die übrigen Variablen nicht auslöscht.** Listen in Kubernetes können sich nach einem Schlüssel
+zusammenführen. Für `env` ist der Schlüssel das Feld `name`: Die drei Einträge aus dem Patch werden zu den
+bereits vorhandenen hinzugefügt, und der Eintrag `REDIS_ADDR` ersetzt den gleichnamigen, der vom kaputten
+Patch übrig geblieben ist. Container-Listen führen sich genauso zusammen, nach Namen — deshalb ist
+`- name: api` zwingend; ohne es versteht Kubernetes nicht, welchen Container Sie bearbeiten.
 
-**Почему пароль через `secretKeyRef`, а не текстом.** Значение приезжает из секрета
-`redis-password` в момент запуска пода. В самом манифесте пароля нет — и это важно, потому
-что манифест поедет в Git, где он останется навсегда. Секрет в Git не попадёт.
+**Warum das Passwort über `secretKeyRef`, nicht als Text.** Der Wert kommt aus dem Secret
+`redis-password` im Moment des Pod-Starts. Im Manifest selbst gibt es kein Passwort — und das ist wichtig,
+denn das Manifest geht in Git, wo es für immer bliebe. Das Secret gelangt nicht in Git.
 
-Честно: секрет в кластере по-прежнему лежит в открытом виде, лишь в другом месте. Тот,
-кто может читать секреты в этом пространстве имён, увидит пароль. Настоящее решение —
-внешнее хранилище секретов, и это отдельная лаба.
+Ehrlich: Das Secret im Cluster liegt weiterhin im Klartext, nur an einer anderen Stelle. Jeder, der Secrets
+in diesem Namespace lesen kann, sieht das Passwort. Die echte Lösung ist ein externer Secret-Store, und das ist ein eigenes Lab.
 
-**`CACHE_TTL: 60`.** Шестьдесят секунд — компромисс. Ниже — читайте следующий спойлер.
+**`CACHE_TTL: 60`.** Sechzig Sekunden sind ein Kompromiss. Unten — lesen Sie den nächsten Spoiler.
 
 </details>
 
-Проверяем поштучно, прежде чем нагружать. Два одинаковых запроса подряд по идентификатору,
-которого ещё не спрашивали: первый обязан быть медленным, второй — быстрым.
+Prüfen wir Stück für Stück, bevor wir Last aufbringen. Zwei identische Anfragen hintereinander für einen
+Bezeichner, der noch nicht abgefragt wurde: Die erste muss langsam sein, die zweite — schnell.
 
 ```bash
-# тот же одноразовый под с curl, но внутри него запускается оболочка sh:
-#   sh -c '...'  выполнить несколько команд, переданных одной строкой
-#   ; echo       между ответами вставить перевод строки, чтобы они не слиплись
-# id=777 взят потому, что этого сотрудника ещё не спрашивали: в кеше его точно нет.
+# derselbe Einweg-Pod mit curl, aber darin wird eine sh-Shell gestartet:
+#   sh -c '...'  mehrere als eine Zeichenkette übergebene Befehle ausführen
+#   ; echo       zwischen die Antworten einen Zeilenumbruch einfügen, damit sie nicht zusammenkleben
+# id=777 wird verwendet, weil dieser Mitarbeiter noch nicht abgefragt wurde: im Cache ist er definitiv nicht.
 kubectl run probe --rm -i --restart=Never --image=curlimages/curl:8.11.1 --quiet -- \
   sh -c 'curl -s "http://passes-api.default.svc.cluster.local/employee?id=777"; echo;
          curl -s "http://passes-api.default.svc.cluster.local/employee?id=777"'
 ```
 
-**Что вы должны увидеть** — два ответа, и они разные:
+**Was Sie sehen sollten** — zwei Antworten, und sie sind verschieden:
 
 ```json
 {"cached":false,"took_ms":804, ...}
 {"cached":true,"took_ms":1, ...}
 ```
 
-Первый запрос — промах: в кеше пусто, пришлось идти в справочник, 804 мс. Второй —
-попадание: ответ уже лежал, 1 мс.
+Die erste Anfrage ist ein Miss: Der Cache war leer, es musste ins Verzeichnis gegangen werden, 804 ms. Die
+zweite ist ein Hit: Die Antwort lag bereits vor, 1 ms.
 
-Теперь замер под нагрузкой, та же команда с теми же флагами, третий раз:
+Jetzt eine Messung unter Last, derselbe Befehl mit denselben Flags, ein drittes Mal:
 
 ```bash
-# ничего не меняем в условиях обстрела: меняется только то, что внутри сервиса
+# wir ändern nichts an den Beschuss-Bedingungen: es ändert sich nur, was im Dienst steckt
 kubectl exec deploy/fortio -- fortio load -qps 20 -t 20s -c 16 \
   "http://passes-api.default.svc.cluster.local/employee?id=42"
 ```
 
-**Что вы должны увидеть:**
+**Was Sie sehen sollten:**
 
 ```
 # target 50% 0.0012
@@ -720,174 +714,168 @@ kubectl exec deploy/fortio -- fortio load -qps 20 -t 20s -c 16 \
 Code 200 : 400 (100.0 %)
 ```
 
-## Шаг 8. Считаем выгоду
+## Schritt 8. Den Gewinn zusammenrechnen
 
-📍 **Где:** на бумажке.
+📍 **Wo:** auf einem Zettel.
 
-Соберите три числа в таблицу. Ваши будут отличаться — стенд, сеть, соседи по узлу:
+Sammeln Sie drei Zahlen in einer Tabelle. Ihre werden abweichen — die Testumgebung, das Netzwerk, die Nachbarn auf dem Node:
 
-| | p50 | p99 | Что это значит для охраны |
+| | p50 | p99 | Was es für den Werkschutz bedeutet |
 |---|---|---|---|
-| Без кеша | 801 мс | 812 мс | список из 12 строк открывается ~9,6 с |
-| Кеш включён, пароля нет | 802 мс | 815 мс | ничего не изменилось |
-| Кеш работает | 1,2 мс | 4,3 мс | тот же список — ~0,05 с |
+| Ohne Cache | 801 ms | 812 ms | eine Liste mit 12 Zeilen öffnet sich in ~9,6 s |
+| Cache ein, kein Passwort | 802 ms | 815 ms | nichts hat sich geändert |
+| Cache funktioniert | 1,2 ms | 4,3 ms | dieselbe Liste — ~0,05 s |
 
-Разница в **несколько сотен раз**, и это не оборот речи, а частное двух измеренных чисел.
+Der Unterschied ist **mehrere hundertfach**, und das ist keine Redewendung, sondern der Quotient zweier gemessener Zahlen.
 
-Заметьте, чего мы **не** делали. Не переписывали кадровую систему. Не добавляли узлов.
-Не меняли ни строчки в логике сервиса «Пропуск» — только научили его не спрашивать
-одно и то же дважды. Изменение уместилось в три переменные окружения.
+Beachten Sie, was wir **nicht** getan haben. Wir haben das HR-System nicht umgeschrieben. Wir haben keine
+Nodes hinzugefügt. Wir haben keine einzige Zeile in der Logik des Dienstes „Passierschein“ geändert — wir
+haben ihm nur beigebracht, nicht zweimal dasselbe zu fragen. Die Änderung passte in drei Umgebungsvariablen.
 
 <details>
-<summary><b>Когда кеш не помогает, и как это увидеть заранее</b></summary>
+<summary><b>Wann ein Cache nicht hilft, und wie man es im Voraus erkennt</b></summary>
 
-Кеш — не универсальное ускорение. Он помогает при одном условии: **один и тот же вопрос
-задают многократно.** Проверьте себя на трёх случаях.
+Ein Cache ist keine universelle Beschleunigung. Er hilft unter einer Bedingung: **dieselbe Frage wird viele
+Male gestellt.** Prüfen Sie sich an drei Fällen.
 
-**Каждый запрос уникален.** Если бы список гостей запрашивал сведения о новом сотруднике
-каждый раз, попаданий не было бы вовсе, а к каждому запросу добавился бы поход в Redis.
-Стало бы медленнее. Убедиться можно так — прогоните две короткие серии по разным
-идентификаторам и посмотрите на первые запросы каждой:
+**Jede Anfrage ist einzigartig.** Würde die Gästeliste jedes Mal Informationen über einen neuen Mitarbeiter
+anfragen, gäbe es überhaupt keine Hits, und zu jeder Anfrage käme ein Gang zu Redis hinzu. Es würde
+langsamer. Bestätigen können Sie das so — führen Sie zwei kurze Serien über verschiedene Bezeichner aus und
+schauen Sie auf die jeweils ersten Anfragen:
 
 ```bash
-# два обстрела подряд по разным сотрудникам, по десять секунд каждый.
-# В начале каждой серии кеш по этому ключу пуст — и первый запрос идёт в справочник.
+# zwei Beschüsse hintereinander über verschiedene Mitarbeiter, je zehn Sekunden.
+# Zu Beginn jeder Serie ist der Cache für diesen Schlüssel leer — und die erste Anfrage geht ins Verzeichnis.
 kubectl exec deploy/fortio -- fortio load -qps 20 -t 10s -c 16 \
   "http://passes-api.default.svc.cluster.local/employee?id=1"
 kubectl exec deploy/fortio -- fortio load -qps 20 -t 10s -c 16 \
   "http://passes-api.default.svc.cluster.local/employee?id=2"
 ```
 
-Первые запросы каждой серии — промахи. На большом наборе редко повторяющихся ключей
-кеш вырождается в накладные расходы.
+Die ersten Anfragen jeder Serie sind Misses. Bei einer großen Menge selten wiederholter Schlüssel entartet der Cache zu Overhead.
 
-**Данные меняются чаще, чем TTL.** Если бы сведения о сотруднике менялись каждые
-десять секунд, а TTL стоял 60, охрана видела бы устаревшие данные до минуты. Кеш всегда
-торгует свежестью за скорость, и решать, сколько свежести не жалко, — не техническое
-решение, а вопрос к заказчику.
+**Die Daten ändern sich häufiger als der TTL.** Änderten sich die Informationen über einen Mitarbeiter alle
+zehn Sekunden, während der TTL auf 60 stand, sähe der Werkschutz bis zu eine Minute lang veraltete Daten.
+Ein Cache tauscht immer Aktualität gegen Geschwindigkeit, und zu entscheiden, wie viel Aktualität entbehrlich
+ist, ist keine technische Entscheidung, sondern eine Frage an den Kunden.
 
-**Медленно не всегда, а иногда.** Помните разницу p50 и p99 из первого замера? Если p50 маленький,
-а p99 огромный, тормозит не источник данных, а что-то плавающее: сборка мусора, соседи по
-узлу, блокировки в базе. Кеш это замаскирует, но не вылечит, и однажды вы будете
-разбираться с тем же самым, только на год позже и с кешем поверх.
+**Langsam nicht immer, sondern manchmal.** Erinnern Sie sich an den Unterschied zwischen p50 und p99 aus der
+ersten Messung? Ist p50 klein und p99 riesig, dann ist nicht die Datenquelle langsam, sondern etwas
+Sporadisches: Garbage Collection, Nachbarn auf dem Node, Sperren in der Datenbank. Ein Cache maskiert das,
+heilt es aber nicht, und eines Tages werden Sie genau dasselbe entwirren, nur ein Jahr später und mit einem Cache obendrauf.
 
 </details>
 
 <details>
-<summary><b>Как выбирают TTL</b></summary>
+<summary><b>Wie der TTL gewählt wird</b></summary>
 
-TTL — единственный настоящий параметр кеша, и выбирается он не из технических
-соображений.
+Der TTL ist der einzige echte Parameter eines Caches, und er wird nicht aus technischen Gründen gewählt.
 
-Вопрос звучит так: **сколько времени вы готовы показывать устаревшие данные?**
+Die Frage lautet: **Wie lange sind Sie bereit, veraltete Daten zu zeigen?**
 
-Для справочника сотрудников: фамилию меняют раз в несколько лет, отдел — раз в год.
-Вчерашний отдел на проходной никому не помешает. TTL мог бы быть и час, и сутки.
+Für ein Mitarbeiterverzeichnis: Ein Nachname wird alle paar Jahre geändert, eine Abteilung einmal im Jahr.
+Die gestrige Abteilung am Kontrollpunkt stört niemanden. Der TTL könnte ebenso gut eine Stunde oder ein Tag sein.
 
-Мы поставили шестьдесят секунд, чтобы лаба была наблюдаемой: подождите минуту, повторите
-запрос — увидите `cached: false` снова, потому что запись истекла и сходила в справочник.
-С TTL в сутки это пришлось бы принимать на веру.
+Wir haben sechzig Sekunden gesetzt, damit das Lab beobachtbar ist: Warten Sie eine Minute, wiederholen Sie
+die Anfrage — Sie sehen wieder `cached: false`, weil der Eintrag abgelaufen und ins Verzeichnis gegangen ist.
+Bei einem TTL von einem Tag müssten Sie das glauben.
 
-Крайние случаи:
+Grenzfälle:
 
-| TTL | Что получается |
+| TTL | Was Sie bekommen |
 |---|---|
-| Слишком мал | попаданий мало, кеш почти не работает, нагрузка на источник осталась |
-| Слишком велик | быстро, но пользователи видят вчерашние данные и жалуются на другое |
-| Не задан вовсе | ключи копятся, память кончается, Redis начинает выбрасывать что попало |
+| Zu klein | wenige Hits, der Cache funktioniert kaum, die Last auf die Quelle bleibt |
+| Zu groß | schnell, aber die Nutzer sehen die gestrigen Daten und beschweren sich über etwas anderes |
+| Gar nicht gesetzt | Schlüssel häufen sich an, der Speicher geht aus, Redis fängt an, willkürlich zu verdrängen |
 
-Последняя строка — самая коварная. Кеш без TTL со временем превращается в базу данных,
-которую никто не бэкапит.
+Die letzte Zeile ist die tückischste. Ein Cache ohne TTL verwandelt sich mit der Zeit in eine Datenbank, die niemand sichert.
 
 </details>
 
-## Проверка
+## Prüfung
 
-📍 **Где:** на виртуалке, в том же окне терминала, где вы работали с `kubectl`.
+📍 **Wo:** auf dem Bastion, im selben Terminalfenster, in dem Sie mit `kubectl` gearbeitet haben.
 
-Скрипт ходит в оба кластера сразу и берёт их из переменных окружения. Первые две
-обязательны, третья — путь к тенантному кубконфигу.
+Das Skript geht in beide Cluster auf einmal und nimmt sie aus Umgebungsvariablen. Die ersten beiden sind
+zwingend, die dritte ist der Pfad zum Tenant-Kubeconfig.
 
 ```bash
 cd labs/07-redis
 
-# в каком кластере проверять приложение — в вашем `lab`
+# in welchem Cluster die Anwendung geprüft wird — in Ihrem `lab`
 export KUBECONFIG=~/lab.kubeconfig
-# ваш номер тенанта: из него скрипт соберёт имя пространства имён tenant-workshop03
+# Ihre Tenant-Nummer: daraus setzt das Skript den Namespace-Namen tenant-workshop03 zusammen
 export COZY_TENANT=workshop03
-# где лежит доступ к управляющему кластеру — там скрипт посмотрит на сам Redis.
-# Не задать можно: тогда скрипт поищет ~/.kube/config, а не найдя — пропустит
-# проверки на управляющем кластере и скажет об этом.
+# wo der Zugang zum Management-Cluster liegt — dort schaut das Skript auf Redis selbst.
+# Sie können sie nicht setzen: dann sucht das Skript ~/.kube/config, und findet es das nicht — überspringt
+# es die Prüfungen auf dem Management-Cluster und sagt das.
 export COZY_KUBECONFIG=~/.kube/config
 
 ./check.sh
 ```
 
-⚠️ **На Windows скрипт запускается из WSL**, а не из PowerShell — как его поставить,
-написано в начале лабы 0. Без WSL лабу можно пройти, но отчёта-артефакта не будет.
+⚠️ **Unter Windows läuft das Skript aus WSL**, nicht aus PowerShell — wie man es installiert, steht am
+Anfang von Lab 0. Ohne WSL können Sie das Lab dennoch abschließen, aber es gibt keinen Artefakt-Bericht.
 
-Скрипт не верит на слово ни одному манифесту. Он сам делает два запроса подряд по
-случайному идентификатору и смотрит: первый должен быть промахом и занять сотни
-миллисекунд, второй — попаданием и занять единицы. Разницу он записывает в отчёт числами.
-Заодно проверяет, что медленный справочник действительно медленный: без этого сравнение
-ничего не значило бы.
+Das Skript glaubt keinem Manifest aufs Wort. Es stellt selbst zwei Anfragen hintereinander für einen
+zufälligen Bezeichner und beobachtet: Die erste sollte ein Miss sein und Hunderte von Millisekunden dauern,
+die zweite ein Hit und einstellig ausfallen. Den Unterschied hält es im Bericht als Zahlen fest. Nebenbei
+prüft es, dass das langsame Verzeichnis wirklich langsam ist: Ohne das würde der Vergleich nichts bedeuten.
 
-## Уборка
+## Aufräumen
 
-Всё понадобится в следующих лабах — сейчас не удаляем.
+Alles wird in den folgenden Labs gebraucht — jetzt löschen wir nichts.
 
-Когда закончите со всеми лабами:
+Wenn Sie mit allen Labs fertig sind:
 
 ```bash
-# delete -f = удалить из кластера ровно те объекты, что описаны в файлах
+# delete -f = genau die in den Dateien beschriebenen Objekte aus dem Cluster entfernen
 kubectl delete -f passes-api.yaml -f hr-legacy.yaml -f fortio.yaml
-# секрет создавался командой, а не файлом, — удаляем его по имени
+# das Secret wurde durch einen Befehl erstellt, nicht durch eine Datei — wir löschen es nach Namen
 kubectl delete secret redis-password
 ```
 
-Сам Redis удаляется через дашборд, как обычное приложение.
+Redis selbst wird über das Dashboard gelöscht, wie eine gewöhnliche Anwendung.
 
-Удалить кеш — операция дешёвая и почти безопасная, и это отдельное свойство кешей: **в
-кеше нет данных, которых нет больше нигде.** Всё, что в нём лежит, восстановимо походом
-к источнику. Потерять Redis означает потерять скорость на несколько минут, пока он
-наполнится заново, — но не потерять информацию. С базой данных так не выйдет, и в лабе
-про базу вы к этому вернётесь.
+Den Cache zu löschen ist eine billige und fast gefahrlose Operation, und das ist eine besondere Eigenschaft
+von Caches: **In einem Cache liegen keine Daten, die es nirgends sonst gibt.** Alles darin lässt sich mit
+einem Gang zur Quelle wiederherstellen. Redis zu verlieren bedeutet, für ein paar Minuten Geschwindigkeit
+zu verlieren, während er sich neu füllt — aber keine Information zu verlieren. Bei einer Datenbank
+funktioniert das nicht so, und im Lab über die Datenbank kommen Sie darauf zurück.
 
-## Что мы теперь умеем
+## Was wir jetzt können
 
-- Заводить managed Redis и объяснять, что даёт репликация, которой вы не настраивали
-- Измерять задержку до и после изменения, а не рассуждать о ней
-- Читать p50 и p99 и понимать, почему средняя задержка обманывает
-- Выбирать TTL исходя из того, сколько устаревания терпит заказчик
-- Находить отказ, который не мешает работать, — самый дорогой вид отказа
+- Ein managed Redis bereitstellen und erklären, was die Replikation bringt, die Sie nicht konfiguriert haben
+- Die Latenz vor und nach einer Änderung messen, statt darüber zu reden
+- p50 und p99 lesen und verstehen, warum die durchschnittliche Latenz täuscht
+- Einen TTL danach wählen, wie viel Veralterung der Kunde toleriert
+- Den Ausfall finden, der die Arbeit nicht behindert — die teuerste Art von Ausfall
 
-## А в vSphere это было бы
+## Und in vSphere wäre das
 
-Аналога у этой задачи в vSphere нет, и это стоит сказать прямо. Кеш — не инфраструктурный
-объект, а часть архитектуры приложения. Гипервизор не умеет кешировать ответы кадровой
-системы и не должен уметь.
+Für diese Aufgabe gibt es in vSphere kein Gegenstück, und das sollte man klar sagen. Ein Cache ist kein
+Infrastrukturobjekt, sondern Teil der Architektur der Anwendung. Der Hypervisor kann die Antworten des
+HR-Systems nicht cachen und soll es auch nicht können.
 
-Что делали бы в мире виртуальных машин: заявка на виртуалку под Redis, установка,
-настройка `requirepass`, настройка автозапуска, потом — если дойдут руки — вторая
-виртуалка под реплику, sentinel, проверка переключения. Дни работы, из которых собственно
-кеш занимает полчаса, а остальное — обвязка. Отсюда и берётся привычка, знакомая любому
-администратору: «давайте пока без реплики, потом добавим». Потом не добавляют.
+Was man in der Welt der virtuellen Maschinen täte: ein Antrag auf eine VM für Redis, Installation,
+Konfiguration von `requirepass`, Konfiguration des Autostarts, dann — wenn man dazu kommt — eine zweite VM
+für die Replika, Sentinel, Prüfung des Failovers. Tage an Arbeit, von denen der eigentliche Cache eine halbe
+Stunde ausmacht und der Rest Beiwerk ist. Daher stammt eine Gewohnheit, die jedem Administrator vertraut
+ist: „lass uns vorerst ohne Replika, wir fügen sie später hinzu“. Später fügen sie sie nicht hinzu.
 
-Разница не в том, что здесь Redis ставится быстрее. Разница в том, что реплика,
-переключение при отказе, метрики и обновления приезжают по умолчанию, и «пока без
-реплики» не возникает как вариант.
+Der Unterschied ist nicht, dass Redis sich hier schneller installiert. Der Unterschied ist, dass Replika,
+Failover, Metriken und Updates standardmäßig mitkommen und „vorerst ohne Replika“ nie als Option aufkommt.
 
-**Где vSphere удобнее, честно.** Три вещи.
+**Wo vSphere praktischer ist, ehrlich.** Drei Dinge.
 
-**Полный контроль.** На своей виртуалке вы поставите любую версию Redis, любой модуль, любой
-`maxmemory-policy` и свой скрипт мониторинга рядом. Здесь вам доступно только то, что
-выведено в параметры приложения, — а выведено далеко не всё.
+**Volle Kontrolle.** Auf Ihrer eigenen VM installieren Sie jede Version von Redis, jedes Modul, jede
+`maxmemory-policy` und Ihr eigenes Monitoring-Skript daneben. Hier haben Sie nur Zugriff auf das, was als
+Anwendungsparameter herausgeführt ist — und herausgeführt ist längst nicht alles.
 
-**Диагностика.** Когда Redis на виртуалке ведёт себя странно, вы заходите по SSH и смотрите
-`redis-cli INFO`, `SLOWLOG`, системные счётчики. Здесь SSH нет, и добираться до тех же
-сведений приходится через `kubectl exec` и метрики — дольше и с меньшим разрешением.
+**Diagnose.** Wenn Redis auf einer VM sich seltsam verhält, melden Sie sich per SSH an und schauen auf
+`redis-cli INFO`, `SLOWLOG`, die System-Zähler. Hier gibt es kein SSH, und an dieselben Informationen zu
+gelangen muss über `kubectl exec` und Metriken laufen — langsamer und mit geringerer Auflösung.
 
-**Предсказуемость соседей.** Виртуалка с Redis — это гарантированные ядра и память, которые
-вы видите в vCenter. Managed-сервис живёт на общих узлах рядом с чужой нагрузкой; лимиты
-его защищают, но «почему сегодня на два миллисекунды медленнее» вы будете выяснять
-дольше, чем выяснили бы на выделенной машине.
+**Vorhersehbarkeit der Nachbarn.** Eine VM mit Redis bedeutet garantierte Kerne und Speicher, die Sie in
+vCenter sehen. Ein Managed Service lebt auf gemeinsam genutzten Nodes neben fremder Last; Limits schützen
+ihn, aber „warum ist er heute zwei Millisekunden langsamer“ werden Sie länger herausfinden als auf einer dedizierten Maschine.

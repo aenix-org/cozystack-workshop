@@ -1,131 +1,114 @@
-# Лаба 5 · Инфраструктура в Git
+# Lab 5 · Infrastruktur in Git
 
 | | |
 |---|---|
-| **Время** | 40 минут |
-| **Что доказывает** | Кластер сам приводит себя к тому, что написано в Git, и держит это состояние |
-| **Что понадобится** | Кластер из лабы 0, `kubectl`, `git`, аккаунт на GitHub, `flux` CLI |
+| **Zeit** | 40 Minuten |
+| **Was es zeigt** | Der Cluster bringt sich selbst in den Zustand, der in Git steht, und hält ihn |
+| **Was Sie brauchen** | Der Cluster aus Lab 0, `kubectl`, `git`, ein GitHub-Konto, die `flux`-CLI |
 
-## Зачем это
+## Warum das wichtig ist
 
-Тренировка кончилась. Дальше — рабочая задача.
+Das Üben ist vorbei. Ab hier ist es eine echte Aufgabe.
 
-Бизнес просит внутренний сервис **«Пропуск»**: сотрудник через мобильное приложение
-заказывает пропуск для гостя, охрана видит список на проходной, руководство раз в месяц
-смотрит отчёт. Вы в платформенной команде, и выкатывать это вам.
+Das Unternehmen möchte einen internen Dienst namens **„Passes“**: Ein Mitarbeiter bestellt über eine mobile App einen Besucherausweis, der Sicherheitsdienst sieht die Liste am Empfang, und das Management schaut sich einmal im Monat einen Bericht an. Sie sind im Plattform-Team, und diesen Dienst auszuliefern ist Ihre Aufgabe.
 
-Команд у сервиса будет несколько, а вас в платформенной команде трое. И вот здесь
-начинается то, из-за чего эта лаба идёт первой в рабочей части.
+Hinter dem Dienst werden mehrere Teams stehen, und im Plattform-Team sind Sie zu dritt. Und genau hier beginnt der Grund, warum dieses Lab im praktischen Teil an erster Stelle steht.
 
-**Что происходит, когда админов трое.** Кто-то поднял приложение через дашборд. Кто-то
-подправил лимиты через `kubectl edit`, потому что было ночью и горело. Кто-то в пятницу
-поменял количество копий и в понедельник забыл. Через месяц никто не может ответить на
-два вопроса: **почему настройка такая** и **какой она должна быть**. А когда всё падает,
-выясняется, что восстанавливать не из чего — состояние жило только в голове кластера,
-и вместе с кластером оно исчезло.
+**Was passiert, wenn es drei Administratoren gibt.** Jemand hat die App über das Dashboard hochgezogen. Jemand hat die Limits über `kubectl edit` angepasst, weil es mitten in der Nacht war und alles brannte. Jemand hat am Freitag die Anzahl der Kopien geändert und es bis Montag vergessen. Einen Monat später kann niemand zwei Fragen beantworten: **warum diese Einstellung so ist, wie sie ist** und **wie sie sein sollte**. Und wenn alles zusammenbricht, stellt sich heraus, dass es nichts gibt, woraus man wiederherstellen könnte — der Zustand lebte nur im Kopf des Clusters und verschwand zusammen mit dem Cluster.
 
-Лечится это не регламентом и не «давайте договоримся не лезть руками». Лечится тем, что
-руками лезть **становится бессмысленно**: кластер сам вернёт как было. Именно это мы
-сегодня и включим.
+Das Heilmittel dagegen ist keine Richtlinie, und es ist auch kein „einigen wir uns alle darauf, nichts von Hand anzufassen“. Das Heilmittel besteht darin, das Anfassen von Hand **sinnlos** zu machen: Der Cluster stellt den alten Zustand wieder her. Genau das schalten wir heute ein.
 
-## Словарик
+## Kleines Glossar
 
-| Термин | Что это | Похоже на… но |
+| Begriff | Was es ist | Wie… aber |
 |---|---|---|
-| **Репозиторий** | Набор файлов вместе с полной историей их правок: что изменилось, кто и зачем | **Папка с шаблонами на общем диске**, но у каждого своя полная копия, а не одна на всех |
-| **GitOps** | Подход: желаемое состояние лежит в Git, а в кластере работает агент, который его туда переносит | **vRealize Automation с blueprint**, но не разовое применение, а непрерывная сверка |
-| **Flux** | Тот самый агент. Работает внутри кластера | **Агент/скрипт по расписанию**, но не «применил и забыл»: сверяет каждую минуту и исправляет расхождения |
-| **Kustomization** | Объект в кластере: что именно из репозитория применять | **Задание на развёртывание**, но не путать с утилитой `kustomize` — имя совпадает, смысл разный |
+| **Repository** | Eine Menge von Dateien zusammen mit der vollständigen Historie ihrer Änderungen: was sich geändert hat, wer es geändert hat und warum | **Ein Ordner mit Vorlagen auf einem gemeinsamen Laufwerk**, aber jeder hat seine eigene vollständige Kopie statt einer einzigen für alle |
+| **GitOps** | Ein Ansatz: Der gewünschte Zustand lebt in Git, und ein im Cluster laufender Agent überträgt ihn dorthin | **vRealize Automation mit einem Blueprint**, aber keine einmalige Anwendung — ein kontinuierlicher Abgleich |
+| **Flux** | Genau dieser Agent. Er läuft innerhalb des Clusters | **Ein geplanter Agent/Skript**, aber nicht „anwenden und vergessen“: Er prüft jede Minute und behebt jede Abweichung |
+| **Kustomization** | Ein Objekt im Cluster: was genau aus dem Repository anzuwenden ist | **Ein Deployment-Job**, aber verwechseln Sie es nicht mit dem `kustomize`-Werkzeug — gleicher Name, andere Bedeutung |
 
-Остальные слова этой лабы — Git, Коммит, Ветка, Pull request, Reconciliation (сверка), Дрейф
-(drift), GitRepository, Prune — вводятся по ходу, в том шаге, где впервые понадобятся. Заучивать
-их сейчас не нужно: в отрыве от действия они не запомнятся.
+Die übrigen Begriffe dieses Labs — Git, Commit, Branch, Pull Request, Reconciliation, Drift, GitRepository, Prune — werden nach und nach eingeführt, an dem Schritt, an dem sie zuerst gebraucht werden. Sie müssen sie sich jetzt nicht merken: ohne die Handlung bleiben sie ohnehin nicht hängen.
 
 <details>
-<summary><b>Если хотите увидеть весь список сразу</b></summary>
+<summary><b>Falls Sie die ganze Liste auf einmal sehen möchten</b></summary>
 
-| Термин | Что это | Похоже на… но |
+| Begriff | Was es ist | Wie… aber |
 |---|---|---|
-| **Git** | Хранилище текстовых файлов с полной историей правок | **Архив конфигов + журнал изменений**, но хранит не копии файлов, а каждое изменение отдельно, с автором и причиной |
-| **Коммит** | Одно сохранённое изменение: что, кто, зачем | **Запись в журнале изменений**, но хранит и сам изменённый текст, а не только упоминание о правке |
-| **Ветка** | Параллельная линия изменений | прямого аналога нет; нужна, чтобы готовить правку, не трогая рабочую версию |
-| **Pull request** | Предложение влить ветку, которое кто-то смотрит до применения | **Согласование заявки**, но обсуждают конкретные строки конфига, а не общий смысл заявки |
-| **Reconciliation (сверка)** | Цикл: прочитал желаемое → сравнил с фактическим → исправил | **Логика DRS, которая тянет кластер к целевому состоянию**, но сверяется не размещение машин, а вообще всё описанное |
-| **Дрейф (drift)** | Расхождение факта с описанием | **Изменение мимо шаблона**, но здесь дрейф не «отмечается в отчёте о соответствии», а молча устраняется |
-| **GitRepository** | Объект в кластере: откуда брать состояние | **Настройка источника шаблонов**, но источник опрашивается сам по расписанию, а не в момент, когда кто-то нажал «развернуть» |
-| **Prune** | Режим «удалять из кластера то, что исчезло из Git» | прямого аналога нет; без него удаление файла из репозитория ничего не удаляет в кластере |
+| **Git** | Ein Speicher für Textdateien mit der vollständigen Änderungshistorie | **Ein Archiv von Konfigurationen + ein Änderungsprotokoll**, aber es speichert nicht Kopien von Dateien, sondern jede Änderung einzeln, mit ihrem Autor und Grund |
+| **Commit** | Eine gespeicherte Änderung: was, wer, warum | **Ein Eintrag in einem Änderungsprotokoll**, aber es speichert den geänderten Text selbst, nicht nur den Hinweis, dass eine Änderung stattfand |
+| **Branch** | Eine parallele Änderungslinie | keine direkte Analogie; Sie brauchen ihn, um eine Änderung vorzubereiten, ohne die funktionierende Version anzufassen |
+| **Pull Request** | Ein Vorschlag, einen Branch zu mergen, den jemand prüft, bevor er angewendet wird | **Das Genehmigen eines Antrags**, aber die Diskussion dreht sich um konkrete Konfigurationszeilen, nicht um den allgemeinen Sinn des Antrags |
+| **Reconciliation** | Die Schleife: den gewünschten Zustand lesen → mit dem tatsächlichen Zustand vergleichen → ihn korrigieren | **Die DRS-Logik, die den Cluster in Richtung eines Zielzustands zieht**, aber abgeglichen wird nicht die Platzierung von Maschinen — sondern alles, was beschrieben wurde |
+| **Drift** | Eine Abweichung zwischen Ist und Beschreibung | **Eine Änderung außerhalb der Vorlage**, aber hier wird der Drift nicht „in einem Compliance-Bericht vermerkt“ — er wird stillschweigend entfernt |
+| **GitRepository** | Ein Objekt im Cluster: woher der Zustand genommen wird | **Die Einstellung für eine Vorlagenquelle**, aber die Quelle wird von selbst nach Zeitplan abgefragt, nicht in dem Moment, in dem jemand auf „Deploy“ klickt |
+| **Prune** | Der Modus „lösche aus dem Cluster, was aus Git verschwunden ist“ | keine direkte Analogie; ohne ihn löscht das Löschen einer Datei aus dem Repository nichts im Cluster |
 
 </details>
 
-## Что лежит в папке лабы
+## Was im Lab-Ordner liegt
 
-Все файлы уже у вас — вы забрали их вместе с репозиторием. Создавать и печатать заново
-ничего не нужно: там, где ниже написано `kubectl apply -f имя.yaml`, файл берётся отсюда.
+Alle Dateien gehören bereits Ihnen — Sie haben sie zusammen mit dem Repository übernommen. Es gibt nichts zu erstellen oder erneut abzutippen: Wo immer unten `kubectl apply -f name.yaml` steht, stammt die Datei von hier.
 
 ```bash
-# Дальше все команды выполняются отсюда: пути в `kubectl apply -f` отсчитываются от этой папки.
+# Ab hier laufen alle Befehle aus diesem Ordner: Die Pfade in `kubectl apply -f` sind relativ dazu.
 cd labs/05-gitops
 ```
 
-| Файл | Что это | Когда пригодится |
+| Datei | Was es ist | Wann es nützlich ist |
 |---|---|---|
-| `app/` | То, что должно оказаться в кластере: namespace и сам сервис «Пропуск» | кладёте в свой репозиторий Git |
-| `flux/` | Два описания для Flux: откуда брать репозиторий и что из него применять | применяете на своём кластере `lab` |
-| `check.sh` | Проверка, что кластер сам подтянул изменение из Git | запускаете в конце лабы |
+| `app/` | Was im Cluster landen soll: der Namespace und der Dienst „Passes“ selbst | Sie legen es in Ihr eigenes Git-Repository |
+| `flux/` | Zwei Beschreibungen für Flux: woher das Repository zu nehmen ist und was daraus anzuwenden ist | Sie wenden es auf Ihren eigenen `lab`-Cluster an |
+| `check.sh` | Eine Prüfung, dass der Cluster die Änderung von selbst aus Git geholt hat | Sie führen es am Ende des Labs aus |
 
-## Шаг 1. Заводим репозиторий
+## Schritt 1. Das Repository einrichten
 
-📍 **Где:** в браузере, на GitHub.
+📍 **Wo:** im Browser, auf GitHub.
 
-Создайте новый репозиторий:
+Erstellen Sie ein neues Repository:
 
-| Поле | Значение | Почему так |
+| Feld | Wert | Warum |
 |---|---|---|
-| Имя | `passes-gitops` | по нему будет видно, что это состояние сервиса, а не его исходники |
-| Видимость | **Public** | чтобы Flux ходил в него без ключей и вы не тратили время на доступы |
-| Add a README file | поставить галочку | иначе репозиторий будет пустой, без ветки, и Flux не найдёт, что читать |
+| Name | `passes-gitops` | es macht klar, dass dies der Zustand des Dienstes ist, nicht sein Quellcode |
+| Visibility | **Public** | damit Flux es ohne Schlüssel erreichen kann und Sie keine Zeit mit Zugriffsrechten verbringen |
+| Add a README file | Kästchen ankreuzen | sonst ist das Repository leer, ohne Branch, und Flux findet nichts zum Lesen |
 
-⚠️ **Публичный репозиторий здесь — сознательное упрощение учебного стенда.** В бою
-репозиторий приватный, а Flux ходит в него по deploy-ключу. Это ещё двадцать минут
-возни с SSH-ключами, а сегодня мы про другое. Что там будет лежать — манифесты без
-единого пароля, — вы увидите сами: пароли в Git не кладут, для них отдельная лаба.
+⚠️ **Ein öffentliches Repository ist hier eine bewusste Vereinfachung der Schulungs-Testumgebung.** In der Produktion ist das Repository privat, und Flux erreicht es über einen Deploy-Key. Das sind weitere zwanzig Minuten Herumbasteln mit SSH-Schlüsseln, und heute geht es um etwas anderes. Was dort leben wird — Manifeste ohne ein einziges Passwort — sehen Sie selbst: Passwörter gehören nicht in Git, und dafür gibt es ein eigenes Lab.
 
-📍 **Где:** на виртуалке (в терминале bastion).
+📍 **Wo:** auf dem Bastion (im Bastion-Terminal).
 
-Заберите репозиторий к себе:
+Holen Sie das Repository auf Ihre Maschine:
 
 ```bash
-# clone = скачать репозиторий целиком, вместе со всей историей правок. Вы получаете
-# не доступ к общей папке, а свою полную копию на диске: работать с ней можно и без сети.
-# `ВАШ-ЛОГИН` замените на свой логин на GitHub, иначе команда пойдёт в чужой репозиторий.
-git clone https://github.com/ВАШ-ЛОГИН/passes-gitops.git
-# clone создаёт папку с именем репозитория. Дальше работаем изнутри неё.
+# clone = das Repository vollständig herunterladen, zusammen mit seiner gesamten Änderungshistorie. Sie erhalten
+# nicht Zugriff auf einen gemeinsamen Ordner, sondern Ihre eigene vollständige Kopie auf der Festplatte: Sie können offline damit arbeiten.
+# IHR-LOGIN durch Ihren eigenen GitHub-Login ersetzen, sonst geht der Befehl zu einem fremden Repository.
+git clone https://github.com/IHR-LOGIN/passes-gitops.git
+# clone erstellt einen Ordner, der nach dem Repository benannt ist. Ab hier arbeiten wir darin.
 cd passes-gitops
 ```
 
-## Шаг 2. Кладём в репозиторий сервис «Пропуск»
+## Schritt 2. Den Dienst „Passes“ ins Repository legen
 
-📍 **Где:** на виртуалке (в терминале bastion).
+📍 **Wo:** auf dem Bastion (im Bastion-Terminal).
 
-В папке этой лабы лежат два файла: `app/namespace.yaml` и `app/passes.yaml`. Скопируйте
-их в свой репозиторий, в папку `apps`:
+Im Ordner dieses Labs liegen zwei Dateien: `app/namespace.yaml` und `app/passes.yaml`. Kopieren Sie sie in Ihr Repository, in den Ordner `apps`:
 
 ```bash
-# apps — папка, из которой Flux будет забирать описания. Имя выбрано нами, и ровно оно же
-# указано в настройке Flux, поэтому менять его без нужды не стоит.
-#   -p  не считать ошибкой, если папка уже существует
+# apps — der Ordner, aus dem Flux die Beschreibungen holt. Wir haben den Namen gewählt, und es ist genau
+# derselbe, der in der Flux-Konfiguration genannt ist, es gibt also keinen Grund, ihn ohne Anlass zu ändern.
+#   -p  es nicht als Fehler behandeln, wenn der Ordner bereits existiert
 mkdir -p apps
-# Копируем оба файла из материалов воркшопа (они лежат в ~/workshop) к себе
-# в репозиторий; `*.yaml` возьмёт оба файла разом.
+# Beide Dateien aus den Workshop-Materialien (sie liegen in ~/workshop) in Ihr eigenes
+# Repository kopieren; `*.yaml` nimmt beide Dateien auf einmal.
 cp ~/workshop/labs/05-gitops/app/*.yaml apps/
 ```
 
-Прежде чем отправлять — разберём, что вы кладёте.
+Bevor Sie sie abschicken, gehen wir durch, was Sie hineinlegen.
 
 <details>
-<summary><b>Разбираем манифесты построчно</b></summary>
+<summary><b>Genauer betrachtet: was in namespace.yaml und passes.yaml steckt</b></summary>
 
-### `namespace.yaml` — своё пространство имён
+### `namespace.yaml` — ein eigener Namespace
 
 ```yaml
 kind: Namespace
@@ -133,46 +116,34 @@ metadata:
   name: passes
 ```
 
-Пространство имён (namespace) — это логическая перегородка внутри одного кластера.
-Ближайший аналог в vSphere — папка в дереве vCenter или resource pool: те же ресурсы,
-но отдельная область видимости, отдельные права и отдельные квоты.
+Ein Namespace ist eine logische Unterteilung innerhalb eines einzelnen Clusters. Die nächste Analogie in vSphere ist ein Ordner im vCenter-Baum oder ein Resource Pool: dieselben Ressourcen, aber ein eigener Geltungsbereich, eigene Rechte und eigene Quotas.
 
-Зачем оно в Git вместе с приложением, а не создано руками: когда сервис однажды уедет
-из репозитория, Flux уберёт и пространство имён. Не останется пустой перегородки, про
-которую через полгода никто не вспомнит, зачем она заводилась.
+Warum in Git zusammen mit der Anwendung ablegen, statt ihn von Hand zu erstellen: Wenn der Dienst irgendwann das Repository verlässt, entfernt Flux auch den Namespace. Es bleibt keine leere Unterteilung zurück, bei der sich sechs Monate später niemand erinnert, warum sie angelegt wurde.
 
-### `passes.yaml` — сам сервис
+### `passes.yaml` — der Dienst selbst
 
-Четыре объекта, разделённых строкой `---`.
+Vier Objekte, getrennt durch eine `---`-Zeile.
 
-**Первый — `ConfigMap` с настройками nginx.** `ConfigMap` кладёт текстовый файл в кластер
-отдельно от приложения, а потом этот файл подкладывается внутрь контейнера. Смысл в том,
-чтобы менять настройки, не пересобирая образ.
+**Das erste — eine `ConfigMap` mit der nginx-Konfiguration.** Eine `ConfigMap` legt eine Textdatei getrennt von der Anwendung in den Cluster, und diese Datei wird dann im Container eingehängt. Der Sinn ist, die Konfiguration zu ändern, ohne das Image neu zu bauen.
 
-Внутри — обычный конфиг nginx. Одна строка заслуживает внимания:
+Darin steckt eine gewöhnliche nginx-Konfiguration. Eine Zeile verdient Aufmerksamkeit:
 
 ```
 sub_filter '__POD__' '$hostname';
 ```
 
-Это указание nginx: в отдаваемой странице заменяй текст `__POD__` на имя машины, где
-ты работаешь. Внутри пода имя машины — это имя самого пода. Так страница и сообщает,
-какая именно копия её отдала. Дальше по этому имени вы увидите, что копий стало две.
+Das sagt nginx: In der Seite, die es ausliefert, ersetze den Text `__POD__` durch den Namen der Maschine, auf der es läuft. Innerhalb eines Pods ist der Maschinenname der Name des Pods selbst. So meldet die Seite, welche Kopie sie ausgeliefert hat. Später sehen Sie an diesem Namen, dass es nun zwei Kopien gibt.
 
-**Второй — `ConfigMap` со страницей.** Пока это заглушка: настоящее приложение появится
-в следующей лабе, а сегодня важно не что показывает сервис, а **откуда он взялся**
-в кластере.
+**Das zweite — eine `ConfigMap` mit der Seite.** Vorerst ist es ein Platzhalter: Die echte Anwendung taucht im nächsten Lab auf, und heute zählt nicht, was der Dienst anzeigt, sondern **woher er** im Cluster **kam**.
 
-**Третий — `Deployment`.** Описание приложения: какой образ, сколько копий, как проверять
-готовность.
+**Das dritte — ein `Deployment`.** Die Beschreibung der Anwendung: welches Image, wie viele Kopien, wie die Bereitschaft zu prüfen ist.
 
 ```yaml
 spec:
   replicas: 1
 ```
 
-Сколько копий держать запущенными. Обратите внимание на формулировку: не «запусти одну»,
-а «держи одну». Это число мы поменяем через Git и посмотрим, что произойдёт.
+Wie viele Kopien am Laufen gehalten werden sollen. Achten Sie auf die Formulierung: nicht „eine starten“, sondern „eine halten“. Das ist die Zahl, die wir über Git ändern und dabei beobachten, was passiert.
 
 ```yaml
           readinessProbe:
@@ -181,172 +152,143 @@ spec:
               port: http
 ```
 
-Проверка готовности: кластер стучится по этому адресу и не пускает трафик на копию, пока
-не получит ответ. Она же нужна Flux — мы попросим его дожидаться готовности, а не
-отчитываться сразу после применения.
+Die Bereitschaftsprüfung: Der Cluster klopft an diese Adresse und schickt einer Kopie keinen Traffic, bis er eine Antwort erhält. Flux braucht sie ebenfalls — wir werden es bitten, auf die Bereitschaft zu warten, statt gleich nach dem Anwenden Erfolg zu melden.
 
-**Четвёртый — `Service`.** Постоянное имя, за которым стоят все копии. Связь между
-`Service` и подами — не список адресов, а условие `selector: app: passes`, то есть
-«все поды с такой меткой». Появилась новая копия с меткой — она сама попала под
-балансировку.
+**Das vierte — ein `Service`.** Ein dauerhafter Name, der vor allen Kopien steht. Die Verbindung zwischen dem `Service` und den Pods ist keine Adressliste, sondern die Bedingung `selector: app: passes`, also „alle Pods mit diesem Label“. Eine neue Kopie mit dem Label ist aufgetaucht — sie wird automatisch in den Lastausgleich aufgenommen.
 
-Ни в одном из четырёх объектов нет ни пароля, ни ключа, ни токена. Это не случайность:
-всё, что попало в Git, попало туда навсегда — историю можно переписать, но у всех, кто
-успел склонировать, старая копия останется. Секретам здесь не место, для них отдельный
-механизм и отдельная лаба.
+Keines der vier Objekte enthält ein Passwort, einen Schlüssel oder einen Token. Das ist kein Zufall: Alles, was in Git gelangt, gelangt für immer dorthin — die Historie lässt sich umschreiben, aber jeder, der es geschafft hat, es zu klonen, behält die alte Kopie. Secrets haben hier nichts zu suchen; dafür gibt es einen eigenen Mechanismus und ein eigenes Lab.
 
 </details>
 
-Отправляем в GitHub. Git запоминает не всё подряд, а то, что ему явно показали, — поэтому
-команд три, и каждая делает своё:
+Schicken Sie es zu GitHub. Git merkt sich nicht wahllos alles, sondern das, was ihm ausdrücklich gezeigt wurde — deshalb gibt es drei Befehle, von denen jeder seine eigene Aufgabe hat:
 
 ```bash
-# add = отметить файлы, которые войдут в следующую запись истории.
+# add = die Dateien markieren, die in den nächsten Historieneintrag kommen.
 git add apps
-# commit = сохранить отмеченное одной записью: содержимое, автор, время и причина.
-#   -m "..."  та самая причина. Она останется в истории навсегда, и её будут читать.
-# Коммит пока лежит только у вас на виртуалке — в GitHub его ещё нет.
+# commit = das Markierte als einen Eintrag speichern: Inhalt, Autor, Zeit und Grund.
+#   -m "..."  genau dieser Grund. Er bleibt für immer in der Historie, und Menschen werden ihn lesen.
+# Der Commit lebt vorerst nur auf Ihrem Bastion — er ist noch nicht in GitHub.
 git commit -m "add passes service v1"
-# push = отправить накопленные коммиты в GitHub. До этой команды там ничего не изменится.
+# push = die angesammelten Commits zu GitHub schicken. Bis zu diesem Befehl ändert sich dort nichts.
 git push
 ```
 
-**Что вы должны увидеть** — в браузере, на странице репозитория, папку `apps` с двумя
-файлами. В кластере при этом пока ничего не изменилось: Git о кластере не знает.
+**Was Sie sehen sollten** — im Browser, auf der Repository-Seite, den Ordner `apps` mit zwei Dateien. Im Cluster hat sich unterdessen noch nichts geändert: Git weiß nichts vom Cluster.
 
-## Шаг 3. Ставим Flux в свой кластер
+## Schritt 3. Flux in Ihren Cluster installieren
 
-📍 **Где:** на виртуалке (в терминале bastion).
+📍 **Wo:** auf dem Bastion (im Bastion-Terminal).
 
-Flux — это несколько служб внутри вашего кластера. Одна ходит в Git и скачивает
-содержимое, другая применяет скачанное в кластер и следит за расхождениями.
+Flux besteht aus mehreren Diensten innerhalb Ihres Clusters. Einer greift nach Git und lädt den Inhalt herunter, ein anderer wendet das Heruntergeladene auf den Cluster an und wacht über Abweichungen.
 
-Кластер ваш, вы в нём полноправный администратор. Ставите сами, платформенную команду
-просить не нужно.
+Der Cluster gehört Ihnen, und Sie sind sein vollständiger Administrator. Sie installieren es selbst; das Plattform-Team müssen Sie nicht fragen.
 
-Сначала — инструмент командной строки `flux`. Он живёт на вашем виртуалке, а не в кластере:
-им вы поставите службы и потом будете спрашивать у них состояние.
+Zuerst das `flux`-Kommandozeilenwerkzeug. Es lebt auf Ihrem Bastion, nicht im Cluster: Sie verwenden es, um die Dienste zu installieren und sie danach nach ihrem Zustand zu fragen.
 
 macOS:
 
 ```bash
-# Homebrew возьмёт формулу из репозитория проекта Flux и положит один исполняемый файл.
+# Homebrew nimmt die Formel aus dem Repository des Flux-Projekts und legt eine ausführbare Datei ab.
 brew install fluxcd/tap/flux
 ```
 
 Linux:
 
 ```bash
-# Скрипт с сайта Flux определяет вашу архитектуру и кладёт файл в /usr/local/bin.
-#   -s          curl работает молча, без индикатора загрузки
-#   | sudo bash скачанный текст сразу выполняется с правами администратора — из-за
-#               записи в системную папку они и нужны
+# Das Skript von der Flux-Seite erkennt Ihre Architektur und legt die Datei in /usr/local/bin ab.
+#   -s          curl arbeitet still, ohne Fortschrittsanzeige
+#   | sudo bash der heruntergeladene Text wird sofort mit Administratorrechten ausgeführt — sie sind
+#               nötig wegen des Schreibens in einen Systemordner
 curl -s https://fluxcd.io/install.sh | sudo bash
 ```
 
-Windows (PowerShell, если установлен Chocolatey):
+Windows (PowerShell, falls Chocolatey installiert ist):
 
 ```powershell
-# choco — сторонний менеджер пакетов для Windows; ставит тот же один файл flux.exe.
+# choco — ein Drittanbieter-Paketmanager für Windows; er installiert dieselbe einzelne flux.exe-Datei.
 choco install flux
 ```
 
-Теперь ставим сами службы в кластер:
+Jetzt installieren wir die Dienste selbst in den Cluster:
 
 ```bash
-# Задаём файл доступа: команда ниже создаёт объекты в кластере, и важно, в каком именно.
+# Die Zugriffsdatei setzen: Der Befehl unten erstellt Objekte im Cluster, und es kommt darauf an, in welchem.
 export KUBECONFIG=~/lab.kubeconfig
-# flux install заводит в кластере namespace `flux-system` и разворачивает в нём службы.
-#   --components=...  какие именно ставить:
-#     source-controller     ходит в Git и держит у себя свежую копию репозитория
-#     kustomize-controller  применяет скачанное в кластер и следит за расхождениями
+# flux install richtet im Cluster einen `flux-system`-Namespace ein und rollt die Dienste dorthin aus.
+#   --components=...  welche genau zu installieren sind:
+#     source-controller     greift nach Git und hält eine frische Kopie des Repositorys
+#     kustomize-controller  wendet das Heruntergeladene auf den Cluster an und wacht über Abweichungen
 flux install --components=source-controller,kustomize-controller
 ```
 
-⚠️ **Проверьте, куда смотрит `KUBECONFIG`, прежде чем нажимать Enter.** Мы ставим Flux
-в ваш собственный кластер `lab`, а не в тот, откуда его выдали. Если сомневаетесь —
-`kubectl get nodes` должен показать один узел с именем вида `kubernetes-lab-md0-...`.
+⚠️ **Prüfen Sie, wohin `KUBECONFIG` zeigt, bevor Sie Enter drücken.** Wir installieren Flux in Ihren eigenen `lab`-Cluster, nicht in den, aus dem er Ihnen übergeben wurde. Im Zweifel — `kubectl get nodes` sollte einen Node mit einem Namen wie `kubernetes-lab-md0-...` zeigen.
 
-**Что вы должны увидеть** — перечисление создаваемого и в конце строку об успешной
-установке:
+**Was Sie sehen sollten** — eine Auflistung dessen, was erstellt wird, und am Ende eine Zeile über eine erfolgreiche Installation:
 
 ```
 ✔ install finished
 ```
 
-Мы ставим только две службы из четырёх. Полный набор Flux умеет ещё разворачивать
-Helm-чарты и слать уведомления в мессенджеры — сегодня это не нужно, а узел у нас
-один и памяти на нём немного.
+Wir installieren nur zwei der vier Dienste. Der vollständige Flux-Satz kann auch Helm-Charts ausrollen und Benachrichtigungen an Messenger senden — heute wird das nicht gebraucht, und wir haben nur einen Node mit nicht viel Speicher darauf.
 
-Убедитесь, что службы поднялись:
+Vergewissern Sie sich, dass die Dienste hochgekommen sind:
 
 ```bash
-# -n flux-system — namespace, в котором поселился Flux. Без этого ключа kubectl смотрит
-# в namespace по умолчанию и покажет пустоту.
+# -n flux-system — der Namespace, in dem sich Flux eingerichtet hat. Ohne dieses Flag schaut kubectl im
+# default-Namespace und zeigt nichts.
 kubectl get pods -n flux-system
 ```
 
-**Что вы должны увидеть** — две строки в состоянии `Running`.
+**Was Sie sehen sollten** — zwei Zeilen im Zustand `Running`.
 
 <details>
-<summary><b>Если <code>flux</code> CLI поставить не получилось</b></summary>
+<summary><b>Falls die Installation der <code>flux</code>-CLI nicht geklappt hat</b></summary>
 
-Всё то же самое ставится обычным манифестом, без инструмента:
+Genau dasselbe lässt sich mit einem gewöhnlichen Manifest installieren, ohne das Werkzeug:
 
 ```bash
-# Тот же набор служб, но готовым описанием: -f принимает не только путь на диске,
-# но и ссылку. kubectl скачает файл и применит его содержимое.
+# Derselbe Satz von Diensten, aber als fertige Beschreibung: -f akzeptiert nicht nur einen Pfad auf der Festplatte,
+# sondern auch einen Link. kubectl lädt die Datei herunter und wendet ihren Inhalt an.
 kubectl apply -f https://github.com/fluxcd/flux2/releases/latest/download/install.yaml
 ```
 
-Разница: так встанут все четыре службы вместо двух. На памяти это скажется, но лаба
-пройдёт. Дальше по тексту команды `flux ...` понадобятся только для того, чтобы
-посмотреть состояние, — их можно заменить на `kubectl get gitrepository` и
-`kubectl get kustomization`, они показывают то же самое, только менее аккуратно.
+Der Unterschied: So kommen alle vier Dienste hoch statt zwei. Das macht sich beim Speicher bemerkbar, aber das Lab geht trotzdem durch. Weiter im Text werden die `flux ...`-Befehle nur gebraucht, um den Zustand anzusehen — sie lassen sich durch `kubectl get gitrepository` und `kubectl get kustomization` ersetzen, die dasselbe zeigen, nur weniger übersichtlich.
 
 </details>
 
-## Шаг 4. Направляем Flux на репозиторий
+## Schritt 4. Flux auf das Repository richten
 
-📍 **Где:** на виртуалке (в терминале bastion).
+📍 **Wo:** auf dem Bastion (im Bastion-Terminal).
 
-Flux установлен, но он пока не знает, куда ходить. Скажем ему это двумя объектами.
+Flux ist installiert, weiß aber noch nicht, wohin es gehen soll. Wir sagen es ihm, mit zwei Objekten.
 
-Откройте `flux/gitrepository.yaml` из папки этой лабы и подставьте адрес **своего**
-репозитория вместо заглушки `ЗАМЕНИТЕ-МЕНЯ`:
+Öffnen Sie `flux/gitrepository.yaml` aus dem Ordner dieses Labs und tragen Sie die Adresse **Ihres** Repositorys anstelle des Platzhalters `ERSETZEN-MICH` ein:
 
 ```yaml
-  url: https://github.com/ЗАМЕНИТЕ-МЕНЯ/passes-gitops
+  url: https://github.com/ERSETZEN-MICH/passes-gitops
 ```
 
 <details>
-<summary><b>Разбираем оба объекта построчно</b></summary>
+<summary><b>Genauer betrachtet: was in gitrepository.yaml und kustomization.yaml steckt</b></summary>
 
-### `GitRepository` — откуда брать
+### `GitRepository` — woher es zu nehmen ist
 
 ```yaml
 kind: GitRepository
 spec:
   interval: 1m
-  url: https://github.com/ЗАМЕНИТЕ-МЕНЯ/passes-gitops
+  url: https://github.com/ERSETZEN-MICH/passes-gitops
   ref:
     branch: main
 ```
 
-Единственная задача этого объекта — держать у себя свежую копию репозитория. Он ничего
-не применяет в кластер, он только скачивает.
+Die einzige Aufgabe dieses Objekts ist, eine frische Kopie des Repositorys zu halten. Es wendet nichts auf den Cluster an, es lädt nur herunter.
 
-`interval: 1m` — как часто ходить за обновлениями. Минута выбрана для лабы, чтобы не
-ждать. В бою обычно ставят от одной до пяти минут, а мгновенную реакцию на push делают
-не уменьшением интервала, а вебхуком: GitHub сам стучится в кластер, когда что-то
-изменилось.
+`interval: 1m` — wie oft nach Updates gegangen wird. Eine Minute ist für das Lab gewählt, damit Sie nicht warten müssen. In der Produktion wird es üblicherweise auf ein bis fünf Minuten gesetzt, und eine sofortige Reaktion auf einen Push wird nicht durch Verkleinern des Intervalls erreicht, sondern mit einem Webhook: GitHub selbst klopft am Cluster an, wenn sich etwas geändert hat.
 
-`ref: branch: main` — какую ветку считать источником истины. Всё, что влито в `main`,
-поедет в кластер. Всё, что лежит в других ветках, — не поедет. Отсюда возьмётся ревью:
-изменение сначала живёт в своей ветке, где на него можно посмотреть, и только слияние
-в `main` делает его действующим.
+`ref: branch: main` — welcher Branch als Quelle der Wahrheit gilt. Alles, was in `main` gemergt wird, reist zum Cluster. Alles in anderen Branches nicht. Daher kommt die Review: Eine Änderung lebt zuerst in ihrem eigenen Branch, wo man sie ansehen kann, und erst das Mergen in `main` lässt sie wirksam werden.
 
-### `Kustomization` — что применять
+### `Kustomization` — was anzuwenden ist
 
 ```yaml
 kind: Kustomization
@@ -360,130 +302,115 @@ spec:
   wait: true
 ```
 
-`path: ./apps` — папка внутри репозитория. Всё, что в ней лежит, поедет в кластер. Файлы
-рядом с ней — например `README.md` в корне — не тронутся.
+`path: ./apps` — der Ordner innerhalb des Repositorys. Alles darin reist zum Cluster. Dateien daneben — zum Beispiel eine `README.md` im Wurzelverzeichnis — werden nicht angerührt.
 
-`interval: 1m` здесь означает не то же самое, что в `GitRepository`. Там это «как часто
-скачивать». Здесь — **как часто сверять фактическое состояние кластера с описанным**.
-Даже если в Git ничего не менялось, раз в минуту Flux смотрит, соответствует ли кластер
-описанию, и приводит его в соответствие. Именно на этом мы поймаемся чуть дальше по лабе.
+`interval: 1m` bedeutet hier nicht dasselbe wie in `GitRepository`. Dort heißt es „wie oft herunterladen“. Hier heißt es **wie oft der tatsächliche Zustand des Clusters gegen den beschriebenen abgeglichen wird**. Selbst wenn sich in Git nichts geändert hat, prüft Flux einmal pro Minute, ob der Cluster der Beschreibung entspricht, und bringt ihn in Übereinstimmung. Genau daran werden wir uns etwas weiter im Lab verfangen.
 
-`prune: true` — удалять из кластера объекты, которые исчезли из Git. Без этого Git
-перестаёт быть полным описанием: удалили файл из репозитория, а объект остался работать
-в кластере, и через полгода никто не понимает, откуда он взялся. С `prune` описание и
-реальность совпадают в обе стороны.
+`prune: true` — aus dem Cluster die Objekte löschen, die aus Git verschwunden sind. Ohne dies hört Git auf, eine vollständige Beschreibung zu sein: Sie löschen eine Datei aus dem Repository, aber das Objekt läuft weiter im Cluster, und sechs Monate später versteht niemand, woher es kam. Mit `prune` stimmen Beschreibung und Realität in beide Richtungen überein.
 
-`wait: true` — не отчитываться об успехе сразу после применения, а дождаться, пока
-применённое станет готовым. Разница ровно та же, что между «отправил заявку» и «заявка
-выполнена».
+`wait: true` — nicht gleich nach dem Anwenden Erfolg melden, sondern warten, bis das Angewendete bereit ist. Der Unterschied ist genau derselbe wie zwischen „den Antrag eingereicht“ und „der Antrag ist erledigt“.
 
 </details>
 
-Применяем оба:
+Wenden Sie beide an:
 
 ```bash
-# -f указывает на папку, а не на файл: применятся все манифесты, которые в ней лежат, —
-# и GitRepository, и Kustomization. Оба создаются в namespace flux-system.
+# -f zeigt auf einen Ordner, nicht auf eine Datei: alle Manifeste darin werden angewendet —
+# sowohl GitRepository als auch Kustomization. Beide werden im flux-system-Namespace erstellt.
 kubectl apply -f flux/
 ```
 
-Смотрим, что получилось:
+Sehen wir uns an, was dabei herauskam:
 
 ```bash
-# Спрашиваем у Flux состояние сверки.
-#   --watch  держать окно занятым и обновлять строку по мере изменений
-# READY: True означает, что содержимое репозитория доехало до кластера и применилось.
-# REVISION — ветка и короткий идентификатор коммита, который сейчас применён.
+# Wir fragen Flux nach dem Abgleichszustand.
+#   --watch  das Fenster belegt halten und die Zeile aktualisieren, während sich Dinge ändern
+# READY: True bedeutet, dass der Inhalt des Repositorys den Cluster erreicht hat und angewendet wurde.
+# REVISION — der Branch und die kurze Kennung des aktuell angewendeten Commits.
 flux get kustomizations --watch
 ```
 
-**Что вы должны увидеть** — через несколько десятков секунд состояние `Ready: True`
-и хеш коммита, который применён:
+**Was Sie sehen sollten** — nach einigen Dutzend Sekunden der Zustand `Ready: True` und der Hash des angewendeten Commits:
 
 ```
 NAME     REVISION            SUSPENDED  READY  MESSAGE
 passes   main@sha1:a1b2c3d   False      True   Applied revision: main@sha1:a1b2c3d
 ```
 
-Прервите наблюдение по `Ctrl+C` и посмотрите, что появилось в кластере:
+Beenden Sie die Beobachtung mit `Ctrl+C` und sehen Sie sich an, was im Cluster aufgetaucht ist:
 
 ```bash
-# all — сокращение для основных типов объектов сразу: поды, Deployment, Service и прочее.
-# Namespace `passes` вы не создавали руками: он приехал из репозитория вместе с приложением.
+# all — eine Kurzform für die wichtigsten Objekttypen auf einmal: Pods, Deployment, Service und den Rest.
+# Sie haben den `passes`-Namespace nicht von Hand erstellt: Er kam aus dem Repository zusammen mit der Anwendung.
 kubectl get all -n passes
 ```
 
-**Вы ничего не применяли руками.** Вы положили текст в GitHub, а кластер сам его забрал.
-Разница между этим и `kubectl apply -f` не в удобстве — она в том, что теперь есть
-единственное место, где написано, как должно быть.
+**Sie haben nichts von Hand angewendet.** Sie haben Text in GitHub gelegt, und der Cluster hat ihn von selbst geholt. Der Unterschied zwischen diesem Vorgehen und `kubectl apply -f` ist nicht die Bequemlichkeit — sondern dass es nun einen einzigen Ort gibt, an dem geschrieben steht, wie die Dinge sein sollen.
 
-## Шаг 5. Первое изменение через `git push`
+## Schritt 5. Die erste Änderung über `git push`
 
-📍 **Где:** на виртуалке, в папке репозитория.
+📍 **Wo:** auf dem Bastion, im Repository-Ordner.
 
-Сервису «Пропуск» одной копии мало: охрана смотрит список круглосуточно, и обновление
-приложения не должно ронять проходную. Поставим две.
+Eine Kopie reicht für den Dienst „Passes“ nicht: Der Sicherheitsdienst beobachtet die Liste rund um die Uhr, und ein Update der Anwendung sollte den Empfang nicht lahmlegen. Setzen wir zwei.
 
-Раньше вы сделали бы `kubectl scale`. Теперь — правку в файле.
+Früher hätten Sie `kubectl scale` ausgeführt. Jetzt — eine Änderung in der Datei.
 
-Откройте `apps/passes.yaml` и поменяйте:
+Öffnen Sie `apps/passes.yaml` und ändern Sie:
 
 ```yaml
 spec:
   replicas: 2
 ```
 
-Отправляйте:
+Schicken Sie es ab:
 
 ```bash
-# Те же три шага, что и при первой отправке: отметить файл, сохранить с причиной, отправить.
+# Dieselben drei Schritte wie beim ersten Abschicken: die Datei markieren, mit einem Grund speichern, senden.
 git add apps/passes.yaml
 git commit -m "passes: two replicas so the gate does not go dark during rollout"
 git push
 ```
 
-Теперь смотрите на кластер и ждите:
+Beobachten Sie nun den Cluster und warten Sie:
 
 ```bash
-# -w = «следи и дописывай»: окно остаётся занятым, новая строка появляется каждый раз,
-# когда меняется состояние копий. Выход — Ctrl+C.
+# -w = „beobachten und weiter anhängen": Das Fenster bleibt belegt, eine neue Zeile erscheint jedes Mal,
+# wenn sich der Zustand der Kopien ändert. Beenden mit Ctrl+C.
 kubectl get pods -n passes -w
 ```
 
-**Что вы должны увидеть** — в течение минуты появляется вторая копия. Вы её не создавали.
+**Was Sie sehen sollten** — innerhalb einer Minute erscheint eine zweite Kopie. Sie haben sie nicht erstellt.
 
-Не хочется ждать минуту — можно попросить Flux сверить прямо сейчас:
+Wollen Sie keine Minute warten — Sie können Flux bitten, jetzt sofort abzugleichen:
 
 ```bash
-# reconcile = «сверься прямо сейчас, не дожидаясь очередной минуты».
-#   kustomization passes  какой объект сверять
-#   --with-source         сначала сходить в Git за свежим коммитом и только потом применять;
-#                         без этого флага сверка пойдёт по копии, скачанной раньше
+# reconcile = „jetzt sofort abgleichen, ohne auf die nächste Minute zu warten".
+#   kustomization passes  welches Objekt abzugleichen ist
+#   --with-source         zuerst für den frischen Commit zu Git gehen und erst dann anwenden;
+#                         ohne dieses Flag arbeitet der Abgleich mit der zuvor heruntergeladenen Kopie
 flux reconcile kustomization passes --with-source
 ```
 
-Обратите внимание на текст коммита. `two replicas so the gate does not go dark during
-rollout` — это причина. Через полгода, когда кто-то спросит «а почему тут две, а не
-одна», ответ найдётся за пять секунд:
+Beachten Sie die Commit-Nachricht. `two replicas so the gate does not go dark during rollout` — das ist der Grund. In sechs Monaten, wenn jemand fragt „warum sind hier zwei und nicht eine“, ist die Antwort in fünf Sekunden gefunden:
 
 ```bash
-# log = история коммитов, свежие сверху.
-#   --oneline         по одной строке на коммит: короткий идентификатор и текст причины
-#   apps/passes.yaml  показать только коммиты, которые трогали именно этот файл
+# log = die Historie der Commits, das Frischeste oben.
+#   --oneline         eine Zeile pro Commit: eine kurze Kennung und der Grundtext
+#   apps/passes.yaml  nur die Commits zeigen, die genau diese Datei berührt haben
 git log --oneline apps/passes.yaml
 ```
 
-Ни дашборд, ни `kubectl` такого следа не оставляют.
+Weder das Dashboard noch `kubectl` hinterlässt eine solche Spur.
 
-## Шаг 6. Проверим, что всё под контролем
+## Schritt 6. Prüfen wir, dass alles unter Kontrolle ist
 
-📍 **Где:** на виртуалке (в терминале bastion).
+📍 **Wo:** auf dem Bastion (im Bastion-Terminal).
 
-Ночь, инцидент, сервису не хватает копий. Вы делаете то, что делали всегда:
+Nacht, ein Vorfall, dem Dienst fehlen Kopien. Sie tun, was Sie immer getan haben:
 
 ```bash
-# Меняем количество копий прямо в кластере, минуя Git, — как делали до сегодняшнего дня.
-#   -n passes  приложение живёт в этом namespace, без ключа команда его не найдёт
+# Die Anzahl der Kopien direkt im Cluster ändern, an Git vorbei — wie Sie es bis heute getan haben.
+#   -n passes  die Anwendung lebt in diesem Namespace; ohne das Flag findet der Befehl sie nicht
 kubectl scale deployment passes -n passes --replicas=5
 ```
 
@@ -491,96 +418,79 @@ kubectl scale deployment passes -n passes --replicas=5
 deployment.apps/passes scaled
 ```
 
-Сработало. Проверяем:
+Es hat funktioniert. Prüfen wir:
 
 ```bash
-# Колонка READY читается как «готово/заказано»: сколько копий отвечает и сколько их должно быть.
+# Die Spalte READY liest sich als „bereit/bestellt": wie viele Kopien antworten und wie viele es sein sollten.
 kubectl get deployment passes -n passes
 ```
 
-Пять копий. Подождите минуту и посмотрите ещё раз:
+Fünf Kopien. Warten Sie eine Minute und schauen Sie erneut:
 
 ```bash
-# Та же команда. Разница только в том, что между двумя запусками прошла минута.
+# Derselbe Befehl. Der einzige Unterschied ist, dass zwischen den beiden Ausführungen eine Minute verging.
 kubectl get deployment passes -n passes
 ```
 
-**Что вы увидите:**
+**Was Sie sehen werden:**
 
 ```
 NAME     READY   UP-TO-DATE   AVAILABLE   AGE
 passes   2/2     2            2           8m
 ```
 
-Копий снова две. Ваша команда исполнилась и была отменена.
+Wieder zwei Kopien. Ihr Befehl wurde ausgeführt und dann rückgängig gemacht.
 
-> **Остановитесь и подумайте, прежде чем читать дальше.**
+> **Halten Sie inne und denken Sie nach, bevor Sie weiterlesen.**
 >
-> Кто её отменил? Почему это произошло молча, без единой ошибки в ответ на вашу команду?
-> И главное: это поломка, которую надо чинить, или так и задумано?
+> Wer hat es rückgängig gemacht? Warum geschah es stillschweigend, ohne einen einzigen Fehler als Antwort auf Ihren Befehl?
+> Und am wichtigsten: Ist das ein Defekt, der behoben werden muss, oder arbeitet es wie beabsichtigt?
 
 <details>
-<summary><b>Ответ и урок шире, чем эта ошибка</b></summary>
+<summary><b>Die Antwort und eine Lehre, die über diesen Fehler hinausgeht</b></summary>
 
-Отменил Flux, и это ровно то, ради чего он поставлен.
+Flux hat es rückgängig gemacht, und genau dafür wurde es installiert.
 
-Раз в минуту `Kustomization` берёт то, что лежит в Git, и сравнивает с тем, что в
-кластере. В Git написано `replicas: 2`. В кластере оказалось `5`. Расхождение — значит
-кластер неправ, потому что источник истины не он.
+Einmal pro Minute nimmt die `Kustomization`, was in Git steht, und vergleicht es mit dem, was im Cluster ist. Git sagt `replicas: 2`. Im Cluster fanden sich `5`. Eine Abweichung — was bedeutet, dass der Cluster falsch liegt, denn er ist nicht die Quelle der Wahrheit.
 
-**Почему `kubectl scale` не вернул ошибку.** Он и не мог: он честно сделал ровно то,
-о чём его попросили. Kubernetes принял изменение, копии действительно поднялись. Через
-минуту пришла сверка и вернула описанное состояние. Никто ни с кем не спорил —
-разные механизмы работали каждый по своим правилам.
+**Warum `kubectl scale` keinen Fehler zurückgab.** Es konnte gar nicht: Es tat ehrlich genau das, worum es gebeten wurde. Kubernetes nahm die Änderung an, die Kopien kamen tatsächlich hoch. Eine Minute später kam der Abgleich und stellte den beschriebenen Zustand wieder her. Niemand stritt mit niemandem — verschiedene Mechanismen arbeiteten jeder nach seinen eigenen Regeln.
 
-**Почему это фича, а не баг.** Вернитесь к боли, с которой лаба начиналась: вас трое,
-кто-то поменял руками, и никто не знает, что где стоит. Теперь так не бывает. Изменение
-мимо Git живёт до ближайшей сверки — то есть не живёт. Из этого следует три вещи:
+**Warum das ein Feature ist und kein Bug.** Gehen Sie zurück zu dem Schmerz, mit dem das Lab begann: Sie sind zu dritt, jemand hat etwas von Hand geändert, und niemand weiß, was wo eingestellt ist. Jetzt passiert das nicht mehr. Eine Änderung außerhalb von Git lebt bis zum nächsten Abgleich — das heißt, sie lebt nicht. Daraus folgen drei Dinge:
 
-1. **Кластер невозможно тихо разнастроить.** Не «не принято», а физически не выходит.
-2. **Git всегда описывает реальность.** Не «должен описывать» — описывает, потому что
-   расхождение устраняется само.
-3. **Восстановление кластера превращается в скучную процедуру.** Поставить Flux, дать
-   ему репозиторий, подождать. Всё, что было, вернётся, потому что оно всё записано.
+1. **Der Cluster kann nicht stillschweigend fehlkonfiguriert werden.** Nicht „es ist verpönt“, sondern physisch unmöglich.
+2. **Git beschreibt immer die Realität.** Nicht „sollte beschreiben“ — es beschreibt sie, weil die Abweichung sich selbst entfernt.
+3. **Die Wiederherstellung des Clusters wird zu einer langweiligen Prozedur.** Flux installieren, ihm das Repository geben, warten. Alles, was da war, kommt zurück, weil alles aufgeschrieben ist.
 
-**Урок шире, чем эта ошибка.** Вы только что увидели разницу между «применил и забыл»
-и «сверяет постоянно». Обычный `kubectl apply` — это выстрел: состояние поменялось
-и дальше живёт само по себе, кто угодно может его сдвинуть. Reconciliation — это не
-выстрел, а тяга: описание постоянно притягивает реальность к себе.
+**Die Lehre reicht über diesen Fehler hinaus.** Sie haben gerade den Unterschied zwischen „anwenden und vergessen“ und „ständig abgleichen“ gesehen. Ein gewöhnliches `kubectl apply` ist ein Schuss: Der Zustand änderte sich und lebt dann für sich, und jeder kann ihn anstoßen. Der Abgleich ist kein Schuss, sondern ein Zug: Die Beschreibung zieht die Realität ständig zu sich heran.
 
-Тот же самый механизм, кстати, чинит и не ваши ошибки. Если под удалит сбой узла или
-кто-то случайно снесёт `Service` — вернётся и это.
+Derselbe Mechanismus behebt übrigens auch Fehler, die nicht Ihre sind. Wenn ein Node-Ausfall einen Pod löscht oder jemand versehentlich den `Service` wegwischt — das kommt ebenfalls zurück.
 
-**Когда это мешает.** Мешает во время инцидента, если вам действительно надо изменить
-что-то немедленно и обсуждать некогда. Для таких случаев Flux умеет приостанавливаться:
+**Wann es im Weg steht.** Es steht während eines Vorfalls im Weg, wenn Sie wirklich sofort etwas ändern müssen und keine Zeit zum Diskutieren ist. Für solche Fälle kann Flux pausieren:
 
 ```bash
-# suspend = приостановить сверку для этого объекта. Flux перестаёт приводить кластер
-# к описанию, и ручные изменения начинают жить. Содержимое Git при этом не меняется.
+# suspend = den Abgleich für dieses Objekt pausieren. Flux hört auf, den Cluster in die
+# Beschreibung zu bringen, und manuelle Änderungen beginnen zu leben. Der Inhalt von Git ändert sich unterdessen nicht.
 flux suspend kustomization passes
 ```
 
-После этого сверка не идёт, и руками можно всё. Обратно:
+Danach läuft der Abgleich nicht, und von Hand können Sie alles tun. Um es umzukehren:
 
 ```bash
-# resume = снова включить сверку. Ближайшая же сверка уберёт всё, что сделано руками.
+# resume = den Abgleich wieder einschalten. Der nächste Abgleich entfernt alles, was von Hand getan wurde.
 flux resume kustomization passes
 ```
 
-⚠️ Приостановка — это отложенный долг: пока `Kustomization` на паузе, Git снова перестаёт
-описывать реальность, и вы вернулись ровно туда, откуда уходили. Правило одно: приостановили —
-заведите себе напоминание вернуть.
+⚠️ Pausieren ist eine aufgeschobene Schuld: Solange die `Kustomization` pausiert ist, hört Git wieder auf, die Realität zu beschreiben, und Sie sind genau dort, wo Sie angefangen haben. Es gibt eine Regel: pausiert — stellen Sie sich eine Erinnerung, es wieder einzuschalten.
 
 </details>
 
-## Шаг 7. Откат через `git revert`
+## Schritt 7. Zurückrollen über `git revert`
 
-📍 **Где:** на виртуалке (в терминале bastion).
+📍 **Wo:** auf dem Bastion (im Bastion-Terminal).
 
-Теперь настоящая ситуация. Вы выкатываете изменение, и оно оказывается плохим.
+Nun eine echte Situation. Sie rollen eine Änderung aus, und sie erweist sich als schlecht.
 
-Внесите правку: пусть кто-то, не подумав, ужмёт память до неработоспособного значения.
-В `apps/passes.yaml` поменяйте лимит памяти:
+Nehmen Sie eine Änderung vor: Sagen wir, jemand drückt ohne nachzudenken den Speicher auf einen unbrauchbaren Wert herunter. Ändern Sie in `apps/passes.yaml` das Speicherlimit:
 
 ```yaml
           resources:
@@ -592,31 +502,27 @@ flux resume kustomization passes
               memory: 4Mi
 ```
 
-Отправляем. Заведомо плохое изменение едет тем же путём, что и хорошее: никакой проверки
-между вашим `push` и кластером сейчас нет — в этом и суть шага.
+Schicken Sie es. Eine wissentlich schlechte Änderung reist denselben Weg wie eine gute: Im Moment gibt es keine Prüfung zwischen Ihrem `push` und dem Cluster — und das ist der Sinn dieses Schritts.
 
 ```bash
-# Те же add, commit, push. Причина в коммите написана честно — она пригодится через
-# пять минут, когда изменение придётся отменять.
+# Dieselben add, commit, push. Der Grund im Commit ist ehrlich geschrieben — er wird sich als nützlich erweisen,
+# in fünf Minuten, wenn die Änderung rückgängig gemacht werden muss.
 git add apps/passes.yaml
 git commit -m "passes: trim memory limit"
 git push
 ```
 
-Ждём и смотрим:
+Wir warten und beobachten:
 
 ```bash
-# Следим за копиями, пока сверка не принесёт новое описание.
+# Die Kopien beobachten, bis der Abgleich die neue Beschreibung bringt.
 kubectl get pods -n passes -w
 ```
 
-**Что вы должны увидеть** — новые копии не поднимаются. Состояние `OOMKilled` означает, что
-процесс убит за превышение лимита памяти, `CrashLoopBackOff` — что кластер уже несколько раз
-перезапускал копию подряд и теперь выжидает перед следующей попыткой всё дольше. Nginx не
-влезает в четыре мегабайта и умирает сразу после старта.
+**Was Sie sehen sollten** — neue Kopien kommen nicht hoch. Der Zustand `OOMKilled` bedeutet, dass der Prozess wegen Überschreitung des Speicherlimits getötet wurde; `CrashLoopBackOff` bedeutet, dass der Cluster die Kopie bereits mehrmals hintereinander neu gestartet hat und nun immer länger bis zum nächsten Versuch wartet. Nginx passt nicht in vier Megabyte und stirbt gleich nach dem Start.
 
 ```bash
-# Тот же список, но одним снимком, без слежения.
+# Dieselbe Liste, aber als einzelne Momentaufnahme, ohne Beobachtung.
 kubectl get pods -n passes
 ```
 
@@ -626,49 +532,44 @@ passes-6c9d4f7b8-2xk4n    1/1     Running            0          12m
 passes-7f8a1b2c3-qq7lp    0/1     CrashLoopBackOff   3          90s
 ```
 
-Старая копия ещё работает — сервис жив, но обновление встало. Надо откатываться.
+Die alte Kopie läuft noch — der Dienst lebt, aber das Update ist stecken geblieben. Zeit zum Zurückrollen.
 
-**Как вы откатывались бы раньше:**
+**Wie Sie früher zurückgerollt hätten:**
 
 ```bash
-# undo вернул бы Deployment к предыдущей ревизии — к настройкам, что были до правки.
+# undo würde das Deployment auf die vorherige Revision zurücksetzen — auf die Einstellungen von vor der Änderung.
 kubectl rollout undo deployment/passes -n passes
 ```
 
-Эта команда сработает. Копии вернутся к прошлому образу и прошлым настройкам, и через
-двадцать секунд всё будет хорошо — ровно до момента, когда Flux сверится с Git. А в Git
-по-прежнему лежит `memory: 4Mi`. Через минуту сломанное вернётся.
+Dieser Befehl wird funktionieren. Die Kopien kehren zum vorherigen Image und zu den vorherigen Einstellungen zurück, und in zwanzig Sekunden ist alles gut — bis zu dem Moment, in dem Flux mit Git abgleicht. Und in Git steht immer noch `memory: 4Mi`. Innerhalb einer Minute kommt der kaputte Zustand zurück.
 
-**Не делайте `rollout undo`. Откатывайте там, где живёт истина** — в Git:
+**Machen Sie kein `rollout undo`. Rollen Sie dort zurück, wo die Wahrheit lebt** — in Git:
 
 ```bash
-# revert = добавить новый коммит, который отменяет изменения указанного.
-#   HEAD       «последний коммит текущей ветки» — тот самый, с плохим лимитом
-#   --no-edit  не открывать редактор для текста коммита, Git напишет заголовок сам
+# revert = einen neuen Commit hinzufügen, der die Änderungen des angegebenen rückgängig macht.
+#   HEAD       „der letzte Commit des aktuellen Branch" — genau der mit dem schlechten Limit
+#   --no-edit  keinen Editor für die Commit-Nachricht öffnen; Git schreibt die Kopfzeile selbst
 git revert --no-edit HEAD
-# Пока отменяющий коммит не отправлен в GitHub, Flux о нём не знает.
+# Bis der rückgängig machende Commit zu GitHub geschickt wird, weiß Flux nichts davon.
 git push
 ```
 
-**Что вы должны увидеть** — новый коммит с заголовком `Revert "passes: trim memory
-limit"`, а через минуту в кластере снова две работающие копии.
+**Was Sie sehen sollten** — einen neuen Commit mit der Kopfzeile `Revert "passes: trim memory limit"`, und innerhalb einer Minute wieder zwei funktionierende Kopien im Cluster.
 
 ```bash
-# Копии снова поднимаются: рабочий лимит памяти вернулся.
+# Die Kopien kommen wieder hoch: das funktionierende Speicherlimit ist zurück.
 kubectl get pods -n passes
-# А здесь видно, какой коммит сейчас применён, — он должен совпасть с отменяющим.
+# Und hier sehen Sie, welcher Commit jetzt angewendet ist — er sollte mit dem rückgängig machenden übereinstimmen.
 flux get kustomizations
 ```
 
 <details>
-<summary><b>Чем <code>git revert</code> отличается от «вернуть как было»</b></summary>
+<summary><b>Wie sich <code>git revert</code> von „stell es wieder so her, wie es war“ unterscheidet</b></summary>
 
-`git revert` не стирает плохой коммит. Он добавляет **новый** коммит, который отменяет
-изменения плохого. В истории остаётся всё: и что сломали, и когда заметили, и что
-откатили.
+`git revert` löscht den schlechten Commit nicht. Es fügt einen **neuen** Commit hinzu, der die Änderungen des schlechten rückgängig macht. Alles bleibt in der Historie: was kaputt war, wann es bemerkt wurde und was zurückgerollt wurde.
 
 ```bash
-# -4 — показать четыре последних коммита; верхний самый свежий.
+# -4 — die vier neuesten Commits zeigen; der oberste ist der frischeste.
 git log --oneline -4
 ```
 
@@ -679,183 +580,138 @@ c71a4f9 passes: two replicas so the gate does not go dark during rollout
 0e5f2d3 add passes service v1
 ```
 
-Сравните с тем, как это выглядит без Git. Через месяц вопрос «а мы точно уже наступали
-на эти грабли?» не имеет ответа: `kubectl rollout undo` следа не оставляет, а история
-ревизий `Deployment` хранит последние десять и умирает вместе с объектом.
+Vergleichen Sie das damit, wie es ohne Git aussieht. Einen Monat später hat die Frage „Moment, sind wir schon einmal in diese Falle getappt?“ keine Antwort: `kubectl rollout undo` hinterlässt keine Spur, und die Revisionshistorie des `Deployment` behält die letzten zehn und stirbt zusammen mit dem Objekt.
 
-Здесь у вас четыре строки, по которым видно: наступали, вот когда, вот кто, вот что
-именно сделали, вот сколько прожило до отката.
+Hier haben Sie vier Zeilen, aus denen Sie sehen können: ja, das haben wir, hier ist wann, hier ist wer, hier ist, was genau getan wurde, hier ist, wie lange es vor dem Zurückrollen lebte.
 
-**Есть и вторая команда — `git reset`, которая действительно стирает историю.** В общем
-репозитории её не используют: коммит, который вы стёрли у себя, остался у двоих коллег,
-и следующий их `push` вернёт его обратно. Отмена в общей ветке — это всегда `revert`.
+**Es gibt auch einen zweiten Befehl — `git reset`, der die Historie tatsächlich löscht.** In einem gemeinsamen Repository wird er nicht verwendet: Ein Commit, den Sie auf Ihrer Maschine gelöscht haben, ist noch auf den Maschinen zweier Kollegen, und deren nächster `push` bringt ihn zurück. Rückgängigmachen in einem gemeinsamen Branch ist immer `revert`.
 
 </details>
 
-## Шаг 8. Ревью через pull request
+## Schritt 8. Review über einen Pull Request
 
-📍 **Где:** в браузере, на GitHub.
+📍 **Wo:** im Browser, auf GitHub.
 
-Последняя часть боли, которую мы лечим: изменение уезжало в кластер сразу, и никто на
-него не смотрел. Плохой лимит памяти из прошлого шага прошёл бы ревью за десять секунд —
-но ревью не было.
+Der letzte Teil des Schmerzes, den wir heilen: Eine Änderung reiste sofort zum Cluster, und niemand hat sie angesehen. Das schlechte Speicherlimit aus dem vorigen Schritt wäre in zehn Sekunden durch das Review gefallen — aber es gab kein Review.
 
-Заведите ветку под изменение:
+Legen Sie einen Branch für die Änderung an:
 
 ```bash
-# checkout -b = завести новую ветку и сразу перейти в неё. Ветка — отдельная линия
-# изменений: коммиты, сделанные в ней, в `main` не попадают, а значит и в кластер тоже.
-#   passes/version-line  имя ветки; косая черта в имени разрешена и служит для группировки
+# checkout -b = einen neuen Branch anlegen und sofort dorthin wechseln. Ein Branch ist eine eigene Linie
+# von Änderungen: Commits, die darin gemacht werden, erreichen `main` nicht und damit auch nicht den Cluster.
+#   passes/version-line  der Branch-Name; ein Schrägstrich im Namen ist erlaubt und dient der Gruppierung
 git checkout -b passes/version-line
 ```
 
-Поменяйте в `apps/passes.yaml` строку страницы — например, версию в тексте с `v1` на
-`v1.1`. Отправьте ветку:
+Ändern Sie in `apps/passes.yaml` die Zeile der Seite — zum Beispiel die Version im Text von `v1` auf `v1.1`. Schicken Sie den Branch:
 
 ```bash
 git add apps/passes.yaml
 git commit -m "passes: bump the version shown on the page"
-# origin — имя, под которым Git помнит адрес, откуда вы клонировали репозиторий.
-#   -u origin passes/version-line  создать ветку с таким же именем в GitHub и запомнить
-#                                  связь с ней, чтобы дальше хватало голого `git push`
+# origin — der Name, unter dem Git die Adresse merkt, von der Sie das Repository geklont haben.
+#   -u origin passes/version-line  einen gleichnamigen Branch in GitHub anlegen und die
+#                                  Verbindung damit merken, sodass später ein bloßes `git push` genügt
 git push -u origin passes/version-line
 ```
 
-В ответ GitHub напечатает ссылку на создание pull request. Откройте её.
+Als Antwort gibt GitHub einen Link zum Erstellen eines Pull Requests aus. Öffnen Sie ihn.
 
-**Посмотрите на вкладку «Files changed».** Вот это и есть ревью инфраструктуры: не
-«Петя говорит, что поправил лимиты», а конкретные строки — было и стало, с подсветкой.
-Коллега видит ровно то, что поедет в кластер, и может написать замечание к конкретной
-строке.
+**Schauen Sie sich den Tab „Files changed“ an.** Das ist Infrastruktur-Review: nicht „Pete sagt, er habe die Limits gefixt“, sondern konkrete Zeilen — vorher und nachher, hervorgehoben. Ihr Kollege sieht genau, was zum Cluster reisen wird, und kann einen Kommentar zu einer bestimmten Zeile hinterlassen.
 
-Кластер при этом не изменился, и не изменится: `GitRepository` смотрит на ветку `main`,
-а изменение живёт в другой ветке.
+Der Cluster hat sich unterdessen nicht geändert und wird es nicht: `GitRepository` schaut auf den `main`-Branch, und die Änderung lebt in einem anderen Branch.
 
-Нажмите **Merge pull request** — изменение попадает в `main`, и ближайшая сверка привезёт его
-в кластер. Через минуту открываем туннель и смотрим, что отдаёт сервис:
+Klicken Sie auf **Merge pull request** — die Änderung landet in `main`, und der nächste Abgleich bringt sie zum Cluster. Nach einer Minute öffnen wir einen Tunnel und sehen uns an, was der Dienst ausliefert:
 
 ```bash
-# port-forward = временный туннель с виртуалки внутрь кластера.
-#   -n passes     namespace, в котором живёт сервис
-#   svc/passes    куда ведём: в Service, а не в конкретную копию
-#   8080:80       слева порт на виртуалке, справа порт сервиса внутри кластера
+# port-forward = ein temporärer Tunnel vom Bastion in den Cluster.
+#   -n passes     der Namespace, in dem der Dienst lebt
+#   svc/passes    wohin wir führen: zum Service, nicht zu einer bestimmten Kopie
+#   8080:80       links der Port auf dem Bastion, rechts der Port des Dienstes im Cluster
 kubectl port-forward -n passes svc/passes 8080:80
 ```
 
-📍 **В браузере** <http://localhost:8080> — на странице `v1.1`. Закрыть туннель — `Ctrl+C`.
+📍 **Im Browser** <http://localhost:8080> — die Seite zeigt `v1.1`. Schließen Sie den Tunnel mit `Ctrl+C`.
 
-Полный маршрут изменения теперь такой: **ветка → pull request → ревью → merge →
-кластер**. Ни на одном шаге никто не заходил в кластер руками.
+Der vollständige Weg einer Änderung ist nun dieser: **Branch → Pull Request → Review → Merge → Cluster**. An keinem Schritt hat jemand den Cluster von Hand betreten.
 
 <details>
-<summary><b>Что из этого делают в бою, чего мы не сделали</b></summary>
+<summary><b>Was davon in der Produktion gemacht wird, was wir nicht gemacht haben</b></summary>
 
-Три вещи, которые в рабочем репозитории добавляют сверху:
+Drei Dinge, die ein produktives Repository obendrauf ergänzt:
 
-**Защита ветки.** В настройках GitHub ветку `main` закрывают от прямого push, и
-единственный способ туда попасть — pull request с одобрением. Иначе дисциплина держится
-на честном слове, а честное слово ломается в три часа ночи.
+**Branch Protection.** In den GitHub-Einstellungen ist der `main`-Branch für direkte Pushes gesperrt, und der einzige Weg hinein ist ein Pull Request mit einer Freigabe. Sonst beruht die Disziplin auf gutem Willen, und guter Wille bricht um drei Uhr morgens.
 
-**Проверки до слияния.** Автоматика проверяет манифесты на синтаксис и на соответствие
-политикам до того, как они поедут в кластер, и не даёт влить сломанное.
+**Prüfungen vor dem Merge.** Automatisierung prüft die Manifeste auf Syntax und auf Richtlinienkonformität, bevor sie zum Cluster reisen, und lässt kaputte nicht mergen.
 
-**Несколько сред.** Обычно в репозитории лежит не одна папка, а `apps/staging` и
-`apps/production`, на каждую — свой `Kustomization` в своём кластере. Изменение сначала
-едет в staging, отлёживается, потом в production.
+**Mehrere Umgebungen.** Üblicherweise enthält das Repository nicht einen Ordner, sondern `apps/staging` und `apps/production`, jeder mit seiner eigenen `Kustomization` in seinem eigenen Cluster. Eine Änderung reist zuerst nach Staging, setzt sich, dann nach Production.
 
-Мы этого не делали, потому что каждая вещь — отдельный час, а механика от них не
-меняется: источник истины по-прежнему Git, а Flux по-прежнему тянет кластер к нему.
+Wir haben das nicht gemacht, weil jede Sache eine eigene Stunde ist, und die Mechanik ändert sich dadurch nicht: Die Quelle der Wahrheit ist weiterhin Git, und Flux zieht den Cluster weiterhin zu ihr hin.
 
 </details>
 
-## Проверка
+## Überprüfung
 
-📍 **Где:** на виртуалке, в том же окне терминала, где вы работали с `kubectl`.
+📍 **Wo:** auf dem Bastion, im selben Terminalfenster, in dem Sie mit `kubectl` gearbeitet haben.
 
 ```bash
-# Возвращаемся в папку лабы: скрипт лежит там, а вы работали в папке своего репозитория.
+# Zurück zum Lab-Ordner: Das Skript lebt dort, und Sie haben im Ordner Ihres eigenen Repositorys gearbeitet.
 cd labs/05-gitops
 export KUBECONFIG=~/lab.kubeconfig
-# Скрипт ничего не меняет в кластере: только читает состояние и печатает отчёт.
+# Das Skript ändert nichts im Cluster: Es liest nur den Zustand und gibt einen Bericht aus.
 ./check.sh
 ```
 
-⚠️ **На Windows скрипт запускается из WSL**, а не из PowerShell — как его поставить,
-написано в начале лабы 0. Без WSL лабу можно пройти, но отчёта-артефакта не будет.
+⚠️ **Unter Windows läuft das Skript aus WSL**, nicht aus PowerShell — wie man es installiert, steht am Anfang von Lab 0. Ohne WSL können Sie das Lab dennoch abschließen, aber es wird kein Bericht-Artefakt geben.
 
-Скрипт проверяет не факт установки Flux, а то, что механизм работает: службы Flux живы,
-источник указывает на ваш репозиторий и успешно из него читает, объекты в кластере
-действительно принадлежат Flux (а не были применены руками), сервис отвечает по HTTP,
-и сверка не приостановлена.
+Das Skript prüft nicht die Tatsache, dass Flux installiert ist, sondern dass der Mechanismus funktioniert: Die Flux-Dienste leben, die Quelle zeigt auf Ihr Repository und liest erfolgreich daraus, die Objekte im Cluster gehören wirklich zu Flux (statt von Hand angewendet worden zu sein), der Dienst antwortet über HTTP, und der Abgleich ist nicht pausiert.
 
-Если вы хотите, чтобы скрипт заодно посмотрел на историю вашего репозитория — покажите
-ему, где лежит клон:
+Falls Sie möchten, dass das Skript auch in die Historie Ihres Repositorys schaut — zeigen Sie ihm, wo der Klon lebt:
 
 ```bash
-# LAB_REPO — переменная, из которой скрипт узнаёт, где лежит клон вашего репозитория.
-# Путь подставьте свой, если клонировали не в домашнюю папку.
+# LAB_REPO — die Variable, aus der das Skript erfährt, wo der Klon Ihres Repositorys lebt.
+# Tragen Sie Ihren eigenen Pfad ein, falls Sie es an einen anderen Ort als das Home-Verzeichnis geklont haben.
 export LAB_REPO=~/passes-gitops
 ./check.sh
 ```
 
-Тогда он дополнительно сверит, что применённый в кластере коммит совпадает с последним
-в вашей ветке, и что откат делался через `revert`.
+Dann prüft es zusätzlich, dass der im Cluster angewendete Commit mit dem neuesten in Ihrem Branch übereinstimmt und dass das Zurückrollen über `revert` gemacht wurde.
 
-## Уборка
+## Aufräumen
 
-Ничего не удаляем: репозиторий и Flux понадобятся дальше — следующие сервисы будут
-приезжать в кластер тем же путём.
+Wir löschen nichts: Das Repository und Flux werden später gebraucht — die nächsten Dienste gelangen auf dieselbe Weise in den Cluster.
 
-Когда закончите со всеми лабами, убрать всё разом можно так:
+Wenn Sie mit allen Labs fertig sind, können Sie alles auf einmal so entfernen:
 
 ```bash
-# delete kustomization = убрать объект сверки из кластера.
-#   --silent  не переспрашивать подтверждение
+# delete kustomization = das Abgleichsobjekt aus dem Cluster entfernen.
+#   --silent  nicht erneut nach Bestätigung fragen
 flux delete kustomization passes --silent
 ```
 
-Из-за `prune: true` вместе с `Kustomization` уедет всё, что она приносила: приложение,
-настройки и само пространство имён `passes`. Ничего не надо перечислять руками и никто
-не забудет хвост — потому что список того, что было создано, Flux хранит у себя.
+Wegen `prune: true` verschwindet alles, was die `Kustomization` gebracht hat, mit ihr: die Anwendung, die Einstellungen und der `passes`-Namespace selbst. Nichts muss von Hand aufgelistet werden, und niemand vergisst einen Rest — denn Flux führt die Liste dessen, was erstellt wurde, für sich selbst.
 
-Это, кстати, отдельная выгода GitOps, которую замечают не сразу. Полное удаление
-сервиса — это `git rm` папки и `push`.
+Das ist übrigens ein eigener Vorteil von GitOps, der nicht sofort auffällt. Einen Dienst vollständig zu löschen ist ein `git rm` des Ordners und ein `push`.
 
-## Что мы теперь умеем
+## Was wir jetzt können
 
-- Держать состояние кластера в Git и понимать, чем это отличается от `kubectl apply`
-- Ставить Flux себе в кластер и направлять его на репозиторий
-- Объяснять, что такое reconciliation и почему изменение мимо Git не выживает
-- Откатываться через `git revert`, а не через `kubectl rollout undo`
-- Проводить изменение инфраструктуры через pull request и ревью
+- Den Zustand des Clusters in Git halten und verstehen, wie sich das von `kubectl apply` unterscheidet
+- Flux in unseren Cluster installieren und es auf ein Repository richten
+- Erklären, was ein Abgleich ist und warum eine Änderung außerhalb von Git nicht überlebt
+- Über `git revert` zurückrollen statt über `kubectl rollout undo`
+- Eine Infrastrukturänderung durch einen Pull Request und ein Review führen
 
-## А в vSphere это было бы
+## Und in vSphere wäre das
 
-Ближайший аналог — blueprint в vRealize Automation: желаемая конфигурация описана
-отдельно и разворачивается по описанию. Но дальше пути расходятся. Blueprint
-разворачивает и отпускает; если кто-то потом зайдёт в vCenter и поменяет машине память,
-blueprint об этом не узнает. Инструменты соответствия покажут расхождение в отчёте —
-и всё, устранять его пойдёт человек.
+Die nächste Analogie ist ein Blueprint in vRealize Automation: Die gewünschte Konfiguration wird separat beschrieben und aus der Beschreibung ausgerollt. Aber von dort trennen sich die Wege. Ein Blueprint rollt aus und lässt los; wenn danach jemand in vCenter geht und den Speicher einer Maschine ändert, erfährt der Blueprint nichts davon. Compliance-Werkzeuge zeigen die Abweichung in einem Bericht — und das war's, ein Mensch geht hin, um sie aufzulösen.
 
-Здесь расхождение устраняется само, каждую минуту, без отчёта и без человека.
+Hier löst sich die Abweichung von selbst auf, jede Minute, ohne Bericht und ohne Menschen.
 
-Второе отличие — про историю. В vCenter есть журнал задач: кто и когда что сделал. Он
-отвечает на вопрос «что произошло», но не отвечает на «почему» и «как должно быть».
-В Git есть и то и другое: текст изменения, автор, причина в сообщении коммита и
-обсуждение в pull request.
+Der zweite Unterschied betrifft die Historie. In vCenter gibt es ein Task-Protokoll: wer was und wann getan hat. Es beantwortet die Frage „was passiert ist“, aber nicht „warum“ und „wie es sein sollte“. Git hat beides: den Text der Änderung, den Autor, den Grund in der Commit-Nachricht und die Diskussion im Pull Request.
 
-**Где vSphere удобнее, честно.** Три вещи.
+**Wo vSphere ehrlich gesagt bequemer ist.** Drei Dinge.
 
-**Порог входа.** Чтобы поменять память виртуальной машине в vCenter, нужно уметь пользоваться
-vCenter. Чтобы поменять её здесь, нужно уметь пользоваться Git: ветки, коммиты, слияния,
-конфликты. Для человека, который Git не знает, это не «удобнее» — это новая профессия,
-и первые две недели он будет работать медленнее, чем работал.
+**Die Einstiegshürde.** Um den Speicher einer virtuellen Maschine in vCenter zu ändern, müssen Sie vCenter bedienen können. Um ihn hier zu ändern, müssen Sie Git bedienen können: Branches, Commits, Merges, Konflikte. Für jemanden, der Git nicht kennt, ist das nicht „bequemer“ — es ist ein neuer Beruf, und in den ersten zwei Wochen arbeitet er langsamer als zuvor.
 
-**Скорость реакции.** В аварии вы хотите изменить состояние сейчас, а не через ветку,
-ревью и минуту сверки. Механизм паузы есть, но им надо не забыть воспользоваться и
-не забыть выключить.
+**Reaktionsgeschwindigkeit.** In einem Notfall wollen Sie den Zustand jetzt ändern, nicht über einen Branch, eine Review und eine Minute Abgleich. Der Pause-Mechanismus existiert, aber Sie müssen daran denken, ihn zu benutzen, und daran denken, ihn wieder auszuschalten.
 
-**Понятность отказа.** Когда что-то не разворачивается в vCenter, вам показывают задачу с
-ошибкой. Когда не разворачивается здесь, надо посмотреть состояние `GitRepository`,
-потом `Kustomization`, потом события, потом логи двух служб. Диагностика распределена
-по слоям, и это честно неудобно, пока не привыкнешь.
+**Klarheit im Fehlerfall.** Wenn in vCenter etwas nicht ausgerollt wird, wird Ihnen ein Task mit einem Fehler angezeigt. Wenn es hier nicht ausgerollt wird, müssen Sie den Zustand des `GitRepository` ansehen, dann die `Kustomization`, dann die Events, dann die Logs zweier Dienste. Die Diagnose ist über Schichten verteilt, und das ist ehrlich gesagt unbequem, bis man sich daran gewöhnt hat.

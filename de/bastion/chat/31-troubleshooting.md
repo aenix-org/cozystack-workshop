@@ -1,32 +1,32 @@
-## 31. Если что-то не работает
+## 31. Wenn etwas nicht funktioniert
 
-**Короткий список того, обо что спотыкаются**
+**Eine kurze Liste der Dinge, über die man stolpert**
 
-• **Приложение недоступно снаружи.** В мигрированном CentOS обычно виноват встроенный
-  межсетевой экран — он закрывает порт 8080:
+• **Die Anwendung ist von außen nicht erreichbar.** Auf einem migrierten CentOS ist meist die
+  eingebaute Firewall schuld — sie blockiert Port 8080:
   ```bash
   systemctl stop firewalld
   ```
 
-• **`kubectl` отвечает «forbidden».** Проверьте, что обращаетесь к своему пространству:
-  `-n tenant-workshopXX`. И помните, что доступен `vminstance`, а не `vm` или `vmi`.
+• **`kubectl` antwortet mit „forbidden“.** Prüfen Sie, dass Sie Ihren eigenen namespace ansprechen:
+  `-n tenant-workshopXX`. Und denken Sie daran, dass `vminstance` verfügbar ist, nicht `vm` oder `vmi`.
 
-• **Заказ не создаётся, а здоровье при этом `200`.** Не создана таблица — вернитесь
-  к сообщению про схему базы.
+• **Die Bestellung wird nicht angelegt, obwohl health dabei `200` zurückgibt.** Die Tabelle wurde nicht
+  angelegt — gehen Sie zurück zur Nachricht über das Datenbankschema.
 
-• **Новая машина (app-VM) висит в `Pending`.** Не погашена машина-конвертер — она
-  держит 8Gi квоты, и на новую не хватает. Удалите её и её диск:
+• **Die neue Maschine (app-VM) hängt in `Pending`.** Die Konvertierungsmaschine wurde nicht
+  heruntergefahren — sie belegt 8Gi der Quota, und für die neue bleibt nicht genug übrig. Löschen Sie sie und ihre Disk:
   ```bash
   kubectl delete vminstance convert --namespace tenant-workshopXX
   kubectl delete vmdisk convert-tools --namespace tenant-workshopXX
   ```
 
-• **`mc` пишет `Insufficient permissions` при заливке образа.** В `convert.sh` в поле
-  `BUCKET` вписан `my-images` вместо настоящего `bucketName` (длинный `bucket-...-...`).
-  Возьмите `bucketName` из секрета бакета в дашборде и подставьте его.
+• **`mc` meldet `Insufficient permissions` beim Hochladen des Images.** In `convert.sh` steht im Feld
+  `BUCKET` `my-images` statt des echten `bucketName` (das lange `bucket-...-...`).
+  Nehmen Sie den `bucketName` aus dem Secret des Buckets im Dashboard und tragen Sie ihn ein.
 
-• **Диск завис в состоянии Terminating.** Скорее всего размер диска меньше образа.
-  Для ubuntu-20.04 нужно не меньше 25Gi.
+• **Die Disk hängt im Zustand Terminating.** Höchstwahrscheinlich ist die Disk kleiner als das Image.
+  Für ubuntu-20.04 brauchen Sie mindestens 25Gi.
 
-• **Ничего не помогает.** Пишите сюда, разберём вместе. Это нормальная часть работы,
-  а не повод для неловкости — на реальной миграции будет то же самое, только в три часа ночи.
+• **Nichts hilft.** Schreiben Sie hier, wir klären das gemeinsam. Das ist ein normaler Teil der Arbeit
+  und kein Grund, sich unwohl zu fühlen — bei einer echten Migration ist es genauso, nur um drei Uhr nachts.

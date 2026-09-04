@@ -1,39 +1,39 @@
 ---
-# Лаба 5 · Инфраструктура в Git. Источник: откуда Flux берёт желаемое состояние.
+# Lab 5 · Infrastruktur in Git. Quelle: woher Flux den gewünschten Zustand nimmt.
 #
-# Применяется на вашем кластере `lab` вместе с соседним kustomization.yaml:
+# Wird auf Ihrem Cluster `lab` zusammen mit dem benachbarten kustomization.yaml angewendet:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl apply -f flux/
 #
-# ВНИМАНИЕ: ЗАМЕНИТЕ url на адрес СВОЕГО репозитория, прежде чем применять: строка
-# ЗАМЕНИТЕ-МЕНЯ — заглушка, с ней Flux пойдёт в несуществующий адрес и встанет
-# с ошибкой. Ветку тоже проверьте: GitHub создаёт новые репозитории с веткой main.
+# ACHTUNG: ERSETZEN Sie die url durch die Adresse IHRES eigenen Repositorys, bevor Sie anwenden: die Zeile
+# ERSETZEN-MICH ist ein Platzhalter, mit ihr geht Flux zu einer nicht existierenden Adresse und bleibt
+# mit einem Fehler stehen. Prüfen Sie auch den Branch: GitHub erstellt neue Repositorys mit dem Branch main.
 #
-# В каждом объекте: apiVersion — версия схемы описания, kind — что создаём,
-# metadata.name — имя, по которому на объект ссылаются дальше. Ниже не повторяется.
+# In jedem Objekt: apiVersion — die Version des Beschreibungsschemas, kind — was wir erstellen,
+# metadata.name — der Name, über den weiter unten auf das Objekt verwiesen wird. Unten nicht wiederholt.
 #
-# Единственная задача этого объекта — держать в кластере свежую копию репозитория.
-# Он ничего не применяет: только скачивает. Применяет соседний Kustomization,
-# и он ссылается сюда по имени `passes`, поэтому имя менять нельзя в одиночку.
+# Die einzige Aufgabe dieses Objekts ist, im Cluster eine frische Kopie des Repositorys zu halten.
+# Es wendet nichts an: es lädt nur herunter. Angewendet wird von der benachbarten Kustomization,
+# und sie verweist hierher über den Namen `passes`, deshalb kann der Name nicht allein geändert werden.
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: GitRepository
 metadata:
   name: passes
-  # flux-system — пространство имён, которое завела команда flux install; в нём живут
-  # сами службы Flux. Объекты-настройки кладут туда же, иначе службы их не увидят.
+  # flux-system — der Namespace, den der Befehl flux install angelegt hat; in ihm leben
+  # die Flux-Dienste selbst. Konfigurationsobjekte legt man dorthin, sonst sehen die Dienste sie nicht.
   namespace: flux-system
 spec:
-  # Как часто ходить в Git за новым состоянием. Одна минута — для лабы;
-  # в бою обычно 1–5 минут, а мгновенную реакцию делают вебхуком из GitHub.
+  # Wie oft nach dem neuen Zustand in Git gegangen wird. Eine Minute — für das Lab;
+  # in der Produktion üblicherweise 1–5 Minuten, eine sofortige Reaktion macht man mit einem Webhook aus GitHub.
   interval: 1m
-  # Адрес репозитория. Он публичный, поэтому ни логина, ни ключа здесь нет —
-  # это упрощение учебного стенда. В бою репозиторий приватный, и рядом появляется
-  # ссылка на секрет с deploy-ключом (поле secretRef).
-  url: https://github.com/ЗАМЕНИТЕ-МЕНЯ/passes-gitops
-  # Какую ветку считать источником истины. В кластер поедет то, что влито в main;
-  # то, что лежит в других ветках, не поедет. Отсюда и берётся ревью: изменение
-  # сначала живёт в своей ветке, где его можно посмотреть, и только слияние в main
-  # делает его действующим. Если репозиторий создан со старой веткой master —
-  # исправьте здесь, иначе Flux не найдёт, что читать.
+  # Die Adresse des Repositorys. Es ist öffentlich, deshalb gibt es hier weder Login noch Schlüssel —
+  # das ist eine Vereinfachung des Schulungsstands. In der Produktion ist das Repository privat, und daneben erscheint
+  # ein Verweis auf ein Secret mit dem Deploy-Schlüssel (Feld secretRef).
+  url: https://github.com/ERSETZEN-MICH/passes-gitops
+  # Welcher Branch als Quelle der Wahrheit gilt. In den Cluster reist, was in main gemergt ist;
+  # was in anderen Branches liegt, reist nicht. Daher kommt die Review: eine Änderung
+  # lebt zuerst in ihrem eigenen Branch, wo man sie ansehen kann, und erst das Mergen in main
+  # macht sie wirksam. Falls das Repository mit dem alten Branch master erstellt wurde —
+  # korrigieren Sie es hier, sonst findet Flux nichts zum Lesen.
   ref:
     branch: main

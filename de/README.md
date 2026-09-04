@@ -1,56 +1,56 @@
-# Миграция с VMware на Cozystack: воркшоп и лабораторные
+# Von VMware zu Cozystack migrieren: Workshop und Labs
 
-Материалы для тех, кто администрирует VMware и хочет понять, что такое Cozystack —
-не по презентации, а руками. Kubernetes знать не нужно: всё объясняется по ходу, через
-то, что вы уже знаете по vSphere.
+Material für alle, die VMware administrieren und verstehen möchten, was Cozystack ist —
+nicht anhand von Folien, sondern praktisch. Kubernetes-Kenntnisse sind nicht erforderlich:
+Alles wird unterwegs erklärt, ausgehend von dem, was Sie bereits aus vSphere kennen.
 
-## Два пути прохождения — выберите свой
+## Zwei Wege, ihn zu absolvieren — wählen Sie Ihren
 
-Один и тот же воркшоп собран в двух вариантах. Отличаются они только тем, **откуда вы
-работаете с кластером**. Ведущий скажет, какой ваш.
+Denselben Workshop gibt es in zwei Varianten. Sie unterscheiden sich nur darin, **von wo aus
+Sie mit dem Cluster arbeiten**. Die Lehrkraft teilt Ihnen mit, welche für Sie vorgesehen ist.
 
-| | [`laptop/`](laptop/) — со своего ноутбука | [`bastion/`](bastion/) — через общую виртуалку |
+| | [`laptop/`](laptop/) — vom eigenen Laptop | [`bastion/`](bastion/) — über den Bastion |
 |---|---|---|
-| **Инструменты** | ставите сами: `kubectl`, `virtctl`, `kubelogin` | уже стоят на виртуалке |
-| **Доступ к кластеру** | kubeconfig из дашборда, вход через браузер | заходите по SSH, доступ уже настроен |
-| **Номер тенанта в файлах** | подставляете сами | подставлен заранее |
-| **Проверка приложения** | `virtctl port-forward` + `localhost:8080` | по доменному имени `app.<номер>.workshop.aenix.io` |
-| **Кому** | у кого нет общей виртуалки | подготовленный стенд с bastion |
+| **Werkzeuge** | Sie installieren sie selbst: `kubectl`, `virtctl`, `kubelogin` | bereits auf dem Bastion installiert |
+| **Cluster-Zugang** | kubeconfig aus dem Dashboard, Anmeldung über den Browser | Sie melden sich per SSH an, Zugang ist bereits eingerichtet |
+| **Tenant-Nummer in den Dateien** | tragen Sie selbst ein | im Voraus eingetragen |
+| **App prüfen** | `virtctl port-forward` + `localhost:8080` | über den Domainnamen `app.<Nummer>.workshop.aenix.io` |
+| **Für wen** | alle ohne gemeinsamen Bastion | eine vorbereitete Testumgebung mit Bastion |
 
-Внутри каждой папки — самодостаточный набор: свой `README.md` (маршрут), `chat/`
-(сообщения для чата по шагам), `manifests/`, `scripts/`. Открывайте README своего пути
-и идите по нему.
+In jedem Ordner liegt ein in sich geschlossener Satz: ein eigenes `README.md` (die Route), `chat/`
+(die Chat-Nachrichten für jeden Schritt), `manifests/`, `scripts/`. Öffnen Sie das README für Ihren Weg
+und folgen Sie ihm.
 
-## Лабораторные
+## Labs
 
-В обеих папках лежит `labs/` — шестнадцать самостоятельных лабораторных, которые
-проходятся в своём темпе, дома или в перерывах. Каждая со своим скриптом проверки
-(`check/`). Весь набор — около девяти часов, не на один присест: берите по одной за вечер.
+Beide Ordner enthalten `labs/` — sechzehn eigenständige Labs, die Sie in Ihrem eigenen Tempo durcharbeiten,
+zu Hause oder in den Pausen. Zu jedem gehört ein eigenes Prüfskript (`check/`). Der gesamte Satz umfasst
+etwa neun Stunden und ist nicht für eine einzige Sitzung gedacht: Nehmen Sie sich eines pro Abend vor.
 
-| Лаба | О чём | Время |
+| Lab | Worum es geht | Zeit |
 |---|---|---|
-| 0 · Свой кластер | завести себе Kubernetes за десять минут | 15 мин |
-| 1 · Первое приложение | развернуть приложение одним файлом и одной командой | 25 мин |
-| 2 · Самолечение | удалить копию и посмотреть, что будет | 25 мин |
-| 3 · Масштабирование | дать нагрузку и увидеть, как растут копии | 30 мин |
-| 4 · Выкатка и откат | сменить версию под нагрузкой, без простоя | 30 мин |
-| 5 · Инфраструктура в Git | описать всё в репозитории и катить через push | 40 мин |
-| 6 · Свой реестр | Harbor, сборка сервиса на Go, деплой из своего реестра | 45 мин |
-| 7 · Кеш | Redis перед медленным бэкендом, выигрыш в цифрах | 50 мин |
-| 8 · Секреты | убрать пароль из манифеста в OpenBao | 50 мин |
-| 9 · Аналитика | миллион строк и отчёт за миллисекунды | 45 мин |
-| 10 · Документы | MongoDB там, где у записей разная форма | 45 мин |
-| 11 · Сборка мобильного | собрать APK в кластере, положить в бакет | 40 мин |
-| 12 · Виртуалка рядом | легаси не надо контейнеризовать, чтобы переехать | 30 мин |
-| 13 · Своё в каталоге | упаковать приложение как аппку Cozystack | 40 мин |
-| 14 · Наблюдаемость | найти в графиках следы своей же нагрузки | 30 мин |
-| 15 · Что делать в понедельник | с какой системы начать и что обещать руководству | 20 мин |
+| 0 · Ihr eigener Cluster | in zehn Minuten zu einem eigenen Kubernetes | 15 Min. |
+| 1 · Erste Anwendung | eine Anwendung mit einer Datei und einem Befehl bereitstellen | 25 Min. |
+| 2 · Selbstheilung | eine Replica löschen und sehen, was passiert | 25 Min. |
+| 3 · Skalierung | Last erzeugen und zusehen, wie die Replicas wachsen | 30 Min. |
+| 4 · Rollout und Rollback | die Version unter Last ändern, ohne Ausfallzeit | 30 Min. |
+| 5 · Infrastruktur in Git | alles in einem Repository beschreiben und mit einem Push ausliefern | 40 Min. |
+| 6 · Eigene Registry | Harbor, einen Go-Service bauen, aus der eigenen Registry bereitstellen | 45 Min. |
+| 7 · Cache | Redis vor einem langsamen Backend, der Gewinn in Zahlen | 50 Min. |
+| 8 · Secrets | ein Passwort aus dem Manifest nach OpenBao auslagern | 50 Min. |
+| 9 · Analytics | eine Million Zeilen und ein Bericht in Millisekunden | 45 Min. |
+| 10 · Dokumente | MongoDB, wo Datensätze unterschiedliche Formen haben | 45 Min. |
+| 11 · Mobile-Build | ein APK im Cluster bauen und in einen Bucket ablegen | 40 Min. |
+| 12 · Eine VM daneben | Legacy muss nicht containerisiert werden, um umzuziehen | 30 Min. |
+| 13 · Eigenes im Katalog | eine Anwendung als Cozystack-App verpacken | 40 Min. |
+| 14 · Observability | die Spuren der eigenen Last in den Graphen finden | 30 Min. |
+| 15 · Was am Montag zu tun ist | mit welchem System beginnen und was dem Management versprechen | 20 Min. |
 
-Ссылки на лабы — в README вашего пути: [`laptop/labs/`](laptop/labs/) или
+Links zu den Labs finden Sie im README für Ihren Weg: [`laptop/labs/`](laptop/labs/) oder
 [`bastion/labs/`](bastion/labs/).
 
-## Служебное
+## Organisatorisches
 
-* [`CONVENTIONS.md`](CONVENTIONS.md) — как написаны материалы (для авторов).
-* [`REQUIREMENTS.md`](REQUIREMENTS.md) — что нужно, чтобы развернуть стенд (для тех,
-  кто готовит воркшоп: квоты, порядок создания тенантов, версия платформы).
+* [`CONVENTIONS.md`](CONVENTIONS.md) — wie die Materialien geschrieben sind (für Autoren).
+* [`REQUIREMENTS.md`](REQUIREMENTS.md) — was Sie brauchen, um die Testumgebung aufzubauen (für alle,
+  die den Workshop vorbereiten: Quotas, die Reihenfolge, in der Tenants angelegt werden, die Plattformversion).

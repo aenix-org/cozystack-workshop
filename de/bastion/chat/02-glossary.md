@@ -1,33 +1,34 @@
-## 2. Словарик: как это называется у вас и как здесь
+## 2. Kleines Glossar: wie es bei Ihnen heißt und wie es hier heißt
 
-**Одно сообщение, к которому можно возвращаться**
+**Eine Nachricht, zu der Sie zurückkehren können**
 
-Половина непонимания на воркшопах — не про технологию, а про слова. Ниже перевод. Там, где
-аналогия врёт, я честно пишу, где именно: неверная аналогия хуже её отсутствия.
+Die Hälfte der Verwirrung in Workshops betrifft nicht die Technik, sondern die Wörter. Unten steht die
+Übersetzung. Wo die Analogie in die Irre führt, sage ich ehrlich, wo genau: eine falsche Analogie ist schlimmer
+als gar keine.
 
-| В vSphere | В Cozystack / Kubernetes | Где аналогия врёт |
+| In vSphere | In Cozystack / Kubernetes | Wo die Analogie in die Irre führt |
 |---|---|---|
-| Виртуальная машина | **VM Instance** | Ничего не врёт, это она и есть |
-| Диск VM | **VM Disk** | Отдельный объект. Машины без диска не бывает, поэтому диск всегда создаётся первым |
-| Шаблон VM | Образ в каталоге | — |
-| Контейнер приложения | **Под** | Под одноразовый. Его не чинят — удаляют, и создаётся новый |
+| Virtuelle Maschine | **VM Instance** | Hier führt nichts in die Irre — genau das ist es |
+| Disk der VM | **VM Disk** | Ein eigenes Objekt. Ohne Disk gibt es keine VM, deshalb wird die Disk immer zuerst erstellt |
+| VM-Vorlage | Ein Image im Katalog | — |
+| Anwendungscontainer | **Pod** | Ein Pod ist Wegwerfware. Man repariert ihn nicht — man löscht ihn, und ein neuer wird erstellt |
 | vApp | **Deployment** | — |
-| Пул ресурсов | **Тенант** с квотой | Тенант ещё и граница доступа: чужой в него не заглянет |
-| vCenter | API-сервер | Дашборд — это морда к нему, а не сам он |
-| HA | **Deployment** держит N копий | Не «поднимет упавшую», а «всегда держит столько, сколько сказано» |
-| Пул балансировщика | **Service** | — |
-| Datastore | **Storage Class** | `replicated` — с репликацией на три узла, `local` — без неё |
-| Отдельная VM с Postgres | **Postgres из каталога** | Приезжает с репликацией и бэкапами, обновляется сам |
-| Заявка в отдел ИТ | *нет аналога* | Вы делаете это сами, за минуту |
+| Ressourcen-Pool | **Tenant** mit einer Quota | Ein Tenant ist zugleich eine Zugriffsgrenze: ein Außenstehender kann nicht hineinsehen |
+| vCenter | API-Server | Das Dashboard ist nur ein Gesicht dafür, nicht die Sache selbst |
+| HA | Ein **Deployment** hält N Kopien | Nicht „bringt eine abgestürzte wieder hoch“, sondern „hält immer so viele, wie Sie angegeben haben“ |
+| Load-Balancer-Pool | **Service** | — |
+| Datastore | **Storage Class** | `replicated` — repliziert über drei Nodes, `local` — ohne Replikation |
+| Eine separate VM mit Postgres | **Postgres aus dem Katalog** | Kommt mit Replikation und Backups, aktualisiert sich selbst |
+| Ein Ticket an die IT-Abteilung | *keine Analogie* | Sie machen es selbst, in einer Minute |
 
-⚠️ **Не путайте две «виртуалки».** На этом пути слово «виртуалка» значит **bastion** —
-общую машину, на которую вы зашли по SSH и с которой командуете кластером. А та машина,
-которую вы поднимете в кластере (конвертер, потом app-VM), — это **VM Instance**, и её
-мы зовём «ваша машина» или «app-VM». Bastion — откуда вы командуете; app-VM — что вы
-создаёте внутри кластера. Команды `kubectl`/`virtctl` вы набираете на bastion, а `netfix`,
-схему базы и `psql` — уже внутри app-VM (через `virtctl console`).
+⚠️ **Verwechseln Sie die beiden „VMs“ nicht.** Auf diesem Pfad meint das Wort „VM“ den **Bastion** —
+die gemeinsame Maschine, auf die Sie sich über SSH eingeloggt haben und von der aus Sie den Cluster steuern.
+Und die Maschine, die Sie im Cluster hochfahren (der Konverter, dann die app-VM), ist eine **VM Instance**, und
+die nennen wir „Ihre Maschine“ oder „app-VM“. Der Bastion ist der Ort, von dem aus Sie Befehle absetzen; die
+app-VM ist das, was Sie im Cluster erstellen. Die Befehle `kubectl`/`virtctl` tippen Sie auf dem Bastion, während
+`netfix`, das Datenbankschema und `psql` innerhalb der app-VM passieren (über `virtctl console`).
 
-**Одна вещь, к которой придётся привыкнуть.** В vSphere вы **создаёте** объект: нажали —
-он появился, дальше живёт сам. Здесь вы **описываете желаемое состояние**, а кластер
-постоянно сравнивает его с фактическим и устраняет разницу. Поэтому если что-то удалить,
-оно может вернуться — не потому что глюк, а потому что вы не отменяли желание.
+**Eine Sache, an die Sie sich gewöhnen müssen.** In vSphere **erstellen** Sie ein Objekt: Sie klicken —
+es erscheint und lebt von da an von allein. Hier **beschreiben Sie den gewünschten Zustand**, und der Cluster
+vergleicht ihn ständig mit dem tatsächlichen Zustand und beseitigt die Differenz. Wenn Sie also etwas löschen,
+kann es zurückkommen — nicht wegen einer Panne, sondern weil Sie den Wunsch nie widerrufen haben.

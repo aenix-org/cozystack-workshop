@@ -1,31 +1,27 @@
-## 27. Шаг 7: переключаем приложение на управляемые сервисы
+## 27. Schritt 7: die Anwendung auf die verwalteten Dienste umstellen
 
-**Меняем прибитые адреса на имена**
+**Fest verdrahtete Adressen durch Namen ersetzen**
 
-📍 **Где:** внутри вашей машины (app-VM), после перезагрузки. Не на bastion.
+📍 **Wo:** innerhalb Ihrer Maschine (app-VM), nach dem Neustart. Nicht auf dem Bastion.
 
-📄 Это содержимое `scripts/connect-managed.sh`. Тоже набираем руками — по той же
-причине, и потому что команд всего три.
+📄 Dies ist der Inhalt von `scripts/connect-managed.sh`. Tippen Sie ihn ebenfalls von Hand ab — aus demselben Grund und weil es nur drei Befehle sind.
 
-Внутри машины откройте конфиг приложения:
+Öffnen Sie innerhalb der Maschine die Konfiguration der Anwendung:
 ```bash
 cat /etc/orders/application.properties
 ```
-Вы увидите те самые `192.168.10.30` и `192.168.10.40`. Это боль любой легаси-системы:
-никто уже не помнит, почему именно эти адреса.
+Sie sehen dieselben `192.168.10.30` und `192.168.10.40`. Das ist der Schmerz jedes Legacy-Systems: Niemand erinnert sich mehr, warum es genau diese Adressen sind.
 
-Замените их на имена сервисов (подставьте свой номер вместо `XX`):
+Ersetzen Sie sie durch die Dienstnamen (setzen Sie Ihre eigene Nummer statt `XX` ein):
 ```bash
 sed -i 's|192.168.10.30|postgres-db-rw.tenant-workshopXX.svc.cozy.local|g' /etc/orders/application.properties
 sed -i 's|192.168.10.40|kafka-kafka-kafka-bootstrap.tenant-workshopXX.svc.cozy.local|g' /etc/orders/application.properties
 systemctl restart orders-api
 ```
-(двумя командами, а не одной с переносом: перенос строки при копировании из чата
-часто теряется, и команда выполняется наполовину)
+(zwei Befehle statt eines mit Zeilenumbruch: Ein Zeilenumbruch geht beim Kopieren aus dem Chat oft verloren, und der Befehl wird nur zur Hälfte ausgeführt)
 
-Проверяем:
+Prüfen Sie es:
 ```bash
 curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/actuator/health
 ```
-`200` — приложение видит и базу, и очередь. Если `503` — вернитесь на шаг с сетью,
-скорее всего адрес не сменился.
+`200` — die Anwendung sieht sowohl die Datenbank als auch die Warteschlange. Bei `503` gehen Sie zurück zum Schritt mit dem Netzwerk; höchstwahrscheinlich hat sich die Adresse nicht geändert.

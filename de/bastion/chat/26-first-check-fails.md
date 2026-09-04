@@ -1,48 +1,39 @@
-## 26. Первая проверка: пробуем запустить и ловим ошибку
+## 26. Erste Prüfung: versuchen zu starten und den Fehler einfangen
 
-**Не пропускайте этот шаг. Он самый полезный из всех.**
+**Überspringen Sie diesen Schritt nicht. Er ist der nützlichste von allen.**
 
-📍 **Где:** внутри вашей машины — той, что подняли на третьей фазе (app-VM). Не на bastion.
+📍 **Wo:** in Ihrer VM — derjenigen, die Sie in der dritten Phase hochgefahren haben (app-VM). Nicht auf dem Bastion.
 
-Машина переехала, загрузилась, сеть работает. По логике всё должно поехать — приложение
-как стояло на этой машине, так и стоит, мы его не трогали. Проверим:
+Die VM ist umgezogen, gebootet, und das Netzwerk funktioniert. Nach aller Logik sollte sie einfach laufen — die Anwendung sitzt auf dieser VM genau dort, wo sie immer saß, wir haben sie nie angefasst. Prüfen wir das:
 
 ```bash
 systemctl status orders-api
 curl -s -o /dev/null -w 'HTTP %{http_code}\n' localhost:8080/actuator/health
 ```
 
-**Не работает.** Служба либо не поднялась, либо отвечает `503`. Смотрим, на что жалуется:
+**Es funktioniert nicht.** Der Dienst ist entweder gar nicht hochgekommen oder antwortet mit `503`. Sehen wir uns an, worüber er sich beschwert:
 
 ```bash
 journalctl -u orders-api --no-pager | tail -20
 ```
 
-В логе будет что-то в духе `Connection to 192.168.10.30:5432 refused` или таймаут на
-том же адресе.
+Im Log wird etwas in der Art von `Connection to 192.168.10.30:5432 refused` stehen oder ein Timeout gegen dieselbe Adresse.
 
-> **Остановитесь и подумайте, прежде чем читать дальше.**
+> **Halten Sie inne und denken Sie nach, bevor Sie weiterlesen.**
 >
-> Приложение мы не трогали, машина загрузилась, сеть работает. Почему не поднимается?
+> Die Anwendung haben wir nicht angefasst, die VM ist gebootet, das Netzwerk funktioniert. Warum kommt sie nicht hoch?
 
 <details>
-<summary><b>Ответ и урок шире, чем эта ошибка</b></summary>
+<summary><b>Die Antwort und eine Lehre, die über diesen Fehler hinausgeht</b></summary>
 
-Потому что в конфиге прибиты адреса `192.168.10.30` и `192.168.10.40` — база и очередь,
-которые жили на **двух других виртуалках в vSphere**. Мы их не везли и везти не собирались.
-Здесь по этим адресам нет ничего.
+Weil in der Konfiguration die Adressen `192.168.10.30` und `192.168.10.40` fest verdrahtet sind — die Datenbank und die Queue, die auf **zwei anderen VMs in vSphere** lebten. Wir haben sie nicht mitgenommen und hatten das nie vor. Unter diesen Adressen ist hier nichts.
 
-Приложение исправно, машина исправна, сеть исправна. Сломана единственная вещь —
-предположение, что мир вокруг остался прежним.
+Die Anwendung ist in Ordnung, die VM ist in Ordnung, das Netzwerk ist in Ordnung. Das Einzige, was kaputt ist, ist die Annahme, die Welt um sie herum sei dieselbe geblieben.
 
-**Это и есть настоящая миграция.** Перевезти диск — самая простая её часть, и на ней
-обычно всё внимание. А ломается всегда то, что снаружи: адреса, DNS-имена, доступы,
-сертификаты, соседние системы. Поэтому в реальном проекте на перевоз машины закладывают
-день, а на «доведение до работоспособности» — недели.
+**Das ist genau das, was eine echte Migration ausmacht.** Eine Platte zu verschieben ist der einfachste Teil davon, und es ist der Teil, der üblicherweise alle Aufmerksamkeit bekommt. Was kaputtgeht, ist immer das, was außen liegt: Adressen, DNS-Namen, Zugangsdaten, Zertifikate, benachbarte Systeme. Deshalb kalkuliert man in einem echten Projekt einen Tag für den Umzug der VM und Wochen für das „Zum-Laufen-Bringen“.
 
-Сейчас вы это увидели за две минуты и на своей шкуре, а не в чужой презентации.
+Sie haben das gerade selbst in zwei Minuten gesehen, und zwar am eigenen Leib, nicht in der Präsentation eines anderen.
 
 </details>
 
-**Что делаем дальше.** Чинить будем не приложение, а его представление о мире: подставим
-вместо прибитых IP имена managed-сервисов, которые подняли на шаге 5.
+**Was wir als Nächstes tun.** Wir werden nicht die Anwendung reparieren, sondern ihr Bild von der Welt: an die Stelle der fest verdrahteten IPs setzen wir die Namen der Managed Services, die wir in Schritt 5 hochgefahren haben.

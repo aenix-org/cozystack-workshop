@@ -1,44 +1,45 @@
-# Требования к стенду
+# Anforderungen an die Umgebung
 
-Для тех, кто разворачивает окружение под воркшоп или под самостоятельное прохождение
-лаб. Участникам этот файл не нужен.
+Für alle, die die Umgebung für den Workshop einrichten oder die Labs selbstständig
+durcharbeiten. Teilnehmende benötigen diese Datei nicht.
 
-## Квота тенанта
+## Tenant-Quota
 
-**Не меньше 40 процессоров и 48 ГБ памяти на тенанта.**
+**Mindestens 40 CPUs und 48 GB Arbeitsspeicher pro Tenant.**
 
-Причина в том, как считается квота на запросы: она равна десятой части от лимита.
-Тенанту с `cpu: 16` достаётся 1600m запросов — а один учебный кластер из лабы 0 занимает
-около 1435m. На управляемые сервисы из лаб 6–12 не остаётся ничего, при этом лаба 0
-прямо просит кластер не удалять.
+Der Grund liegt darin, wie die Request-Quota berechnet wird: Sie beträgt ein Zehntel des Limits.
+Ein Tenant mit `cpu: 16` erhält 1600m an Requests — während ein einzelner Lab-Cluster aus Lab 0
+etwa 1435m beansprucht. Das lässt nichts für die Managed Services in den Labs 6–12 übrig, und
+Lab 0 fordert Sie ausdrücklich auf, den Cluster nicht zu löschen.
 
-Симптом при нехватке: `exceeded quota: tenant-quota` в событиях и кластер, навсегда
-застрявший в статусе `Unknown`. Сам он из этого состояния не выйдет.
+Das Symptom, wenn es knapp wird: `exceeded quota: tenant-quota` in den Events und ein Cluster,
+der für immer im Status `Unknown` feststeckt. Aus diesem Zustand kommt er nicht von selbst heraus.
 
-## Создание тенантов
+## Tenants erstellen
 
-**По одному, а не пачкой.**
+**Einen nach dem anderen, nicht im Stapel.**
 
-Несколько одновременных созданий с включённым хранилищем и мониторингом забивают очередь
-helm-controller: релизы уходят в цикл «установка — отказ — удаление» с десятиминутными
-таймаутами. Диагностируется по `observedGeneration: -1` у зависшего HelmRelease.
+Mehrere gleichzeitige Erstellungen mit aktiviertem Storage und Monitoring verstopfen die
+Warteschlange des helm-controller: Releases geraten in einen Install–Fail–Delete-Zyklus mit
+zehnminütigen Timeouts. Sie diagnostizieren das an `observedGeneration: -1` auf der hängenden
+HelmRelease.
 
-То же касается удаления: тенант с кластером внутри снимается минутами, потому что
-cleanup-джоба ждёт, пока освободятся виртуальные машины воркеров.
+Dasselbe gilt für das Löschen: Ein Tenant mit einem Cluster darin braucht Minuten zum Abbau,
+weil der Cleanup-Job darauf wartet, dass die virtuellen Maschinen der Worker freigegeben werden.
 
-## Что должно быть включено в тенанте
+## Was im Tenant aktiviert sein muss
 
-| Что | Зачем | Лабы |
+| Was | Warum | Labs |
 |---|---|---|
-| etcd | Без него не поднимется кластер из лабы 0 | все |
-| Хранилище (SeaweedFS) | Бакеты и Harbor | 6, 11 |
-| Мониторинг | Метрики и дашборды | 3, 14 |
+| etcd | Ohne es kommt der Cluster aus Lab 0 nicht hoch | alle |
+| Storage (SeaweedFS) | Buckets und Harbor | 6, 11 |
+| Monitoring | Metriken und Dashboards | 3, 14 |
 
-`metrics-server` ставится автоматически, если у тенанта есть etcd, — отдельно включать
-его не нужно. Живёт он в namespace `cozy-monitoring`, но частью аддона мониторинга
-не является.
+`metrics-server` wird automatisch installiert, wenn der Tenant etcd hat — Sie müssen ihn nicht
+separat aktivieren. Er liegt im `cozy-monitoring` namespace, ist aber nicht Teil des
+Monitoring-Add-ons.
 
-## Версия платформы
+## Plattformversion
 
-Лабы писались и проверялись на **Cozystack v1.6.1**. На более ранних версиях часть
-позиций каталога называется иначе или имеет другой набор полей.
+Die Labs wurden mit **Cozystack v1.6.1** geschrieben und verifiziert. In früheren Versionen haben
+einige Catalog-Einträge einen anderen Namen oder einen anderen Satz von Feldern.

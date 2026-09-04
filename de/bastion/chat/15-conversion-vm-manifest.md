@@ -1,8 +1,8 @@
-## 15. Разбор: что внутри 02-conversion-vm.yaml
+## 15. Genauer betrachtet: was in 02-conversion-vm.yaml steckt
 
-В файле **два** объекта, разделённых строкой `---`. Так в YAML записывают несколько
-документов в одном файле. Виртуальной машины без диска не бывает, поэтому диск
-описывается отдельно и всегда создаётся первым.
+Die Datei enthält **zwei** Objekte, getrennt durch eine `---`-Zeile. So packt YAML mehrere
+Dokumente in eine Datei. Eine virtuelle Maschine kann nicht ohne Disk existieren, deshalb wird
+die Disk separat beschrieben und immer zuerst erstellt.
 
 ```yaml
 kind: VMDisk
@@ -16,27 +16,30 @@ spec:
   storageClass: replicated
 ```
 
-`kind: VMDisk` — диск сам по себе, отдельный объект. Это непривычно: в vSphere диск —
-свойство машины, здесь — самостоятельная сущность, которую можно создать заранее,
-подключить к машине, отключить и подключить к другой.
+`kind: VMDisk` — die Disk für sich, ein eigenes Objekt. Daran muss man sich gewöhnen: In
+vSphere ist eine Disk eine Eigenschaft der Maschine, hier ist sie eine eigenständige Entität,
+die Sie im Voraus erstellen, an eine Maschine anhängen, wieder abhängen und an eine andere
+anhängen können.
 
-`source.image.name: ubuntu-20.04` — откуда взять содержимое. Это тот самый каталог
-образов из карты выше: Cozystack заранее скачал с `cloud-images.ubuntu.com`
-официальный облачный образ Ubuntu 20.04 и держит его у себя. Здесь мы просим сделать с
-него копию. В интернет за ним никто не пойдёт, копия делается внутри кластера.
+`source.image.name: ubuntu-20.04` — woher der Inhalt bezogen wird. Das ist derselbe
+Image-Katalog aus der Übersicht oben: Cozystack hat das offizielle Ubuntu-20.04-Cloud-Image
+bereits von `cloud-images.ubuntu.com` heruntergeladen und hält es lokal vor. Hier bitten wir
+darum, eine Kopie anzulegen. Niemand greift dafür auf das Internet zu; die Kopie entsteht
+innerhalb des Clusters.
 
-⚠️ **Версия Ubuntu указана намеренно, менять её не надо.** На 24.04 машина не
-загружается, на 22.04 переупаковка спотыкается о старую базу пакетов RPM внутри
-CentOS 7 — `virt-v2v` не может её разобрать. Проверено, чтобы вам не пришлось.
+⚠️ **Die Ubuntu-Version ist bewusst festgelegt — ändern Sie sie nicht.** Auf 24.04 bootet die
+Maschine nicht; auf 22.04 stolpert das Umpacken über die alte RPM-Paketdatenbank in CentOS 7 —
+`virt-v2v` kann sie nicht parsen. Getestet, damit Sie es nicht müssen.
 
-`storage: 25Gi` — размер диска. Каталожный образ Ubuntu занимает 20Gi, и **диск должен
-быть больше образа**, иначе копирование оборвётся на середине, а диск потом зависнет в
-состоянии `Terminating` и будет мешаться. Запас нужен ещё и потому, что внутри будут
-лежать одновременно скачанный `app-1.ova` и результат переупаковки.
+`storage: 25Gi` — die Größe der Disk. Das Ubuntu-Image aus dem Katalog belegt 20Gi, und **die
+Disk muss größer sein als das Image**, sonst bricht die Kopie auf halbem Weg ab und die Disk
+bleibt danach in einem `Terminating`-Zustand hängen und steht im Weg. Der Puffer wird außerdem
+gebraucht, weil die heruntergeladene `app-1.ova` und das Ergebnis des Umpackens gleichzeitig
+darin liegen.
 
-`storageClass: replicated` — как хранить. `replicated` означает несколько копий на
-разных узлах: узел выключился — данные на месте. Аналог — политика хранения в vSphere.
-Бывает ещё `local` — быстрее, но живёт на одном узле.
+`storageClass: replicated` — wie sie gespeichert wird. `replicated` bedeutet mehrere Kopien auf
+verschiedenen Nodes: Fällt ein Node aus — die Daten sind weiterhin da. Das Gegenstück ist eine
+Storage Policy in vSphere. Es gibt auch `local` — schneller, liegt aber auf einem einzelnen Node.
 
 ```yaml
 kind: VMInstance
@@ -50,20 +53,21 @@ spec:
     - name: convert-tools
 ```
 
-`instanceType: u1.large` — размер машины, готовый набор «столько-то процессоров,
-столько-то памяти»: здесь два процессора и восемь гигабайт. Переупаковка держит образ
-в памяти кусками и требует её всерьёз.
+`instanceType: u1.large` — die Größe der Maschine, ein fertiges Bündel aus „so viele CPUs, so
+viel Speicher": hier zwei CPUs und acht Gigabyte. Das Umpacken hält das Image stückweise im
+Speicher und fordert ihn ernsthaft ein.
 
-`instanceProfile: ubuntu` — набор настроек виртуального железа под эту гостевую систему:
-какие дисковые контроллеры, какая сетевая карта, как проброшены часы. Ближайший
-аналог — «Guest OS Type» в мастере создания VM, который так же молча меняет десяток
-настроек под выбранную систему.
+`instanceProfile: ubuntu` — ein Satz von Einstellungen der virtuellen Hardware, zugeschnitten auf
+dieses Gastsystem: welche Disk-Controller, welche Netzwerkkarte, wie die Uhr durchgereicht wird.
+Das nächste Gegenstück ist „Guest OS Type“ im Assistenten zur VM-Erstellung, der ebenso
+stillschweigend ein Dutzend Einstellungen an das gewählte System anpasst.
 
-`runStrategy: Always` — держать машину включённой, а если упадёт — поднять. Это не
-«автозапуск при старте хоста», а постоянно действующее правило: платформа следит, чтобы
-машина была запущена.
+`runStrategy: Always` — die Maschine laufen lassen und, falls sie abstürzt, wieder hochfahren.
+Das ist kein „Autostart, wenn der Host bootet“, sondern eine dauerhafte Regel: Die Plattform
+sorgt dafür, dass die Maschine läuft.
 
-`disks` — какие диски подключить. Ссылка по имени на объект `VMDisk`, описанный выше.
+`disks` — welche Disks angehängt werden. Ein Verweis per Name auf das oben beschriebene
+`VMDisk`-Objekt.
 
 ```yaml
   cloudInit: |
@@ -74,14 +78,15 @@ spec:
       - [ bash, -c, "wget ... mc && chmod +x /usr/local/bin/mc" ]
 ```
 
-`cloudInit` — инструкции, которые машина выполнит сама при первом запуске. Это
-стандартный механизм всех облачных образов: система при старте ищет такой текст и
-исполняет. В vSphere ближайший аналог — Customization Specification, только описанная
-текстом и лежащая в том же файле, что и сама машина.
+`cloudInit` — Anweisungen, die die Maschine beim ersten Start selbst ausführt. Das ist der
+Standardmechanismus jedes Cloud-Images: Beim Start sucht das System nach solchem Text und führt
+ihn aus. In vSphere ist das nächste Gegenstück eine Customization Specification, nur ist sie hier
+als Text ausgedrückt und liegt in derselben Datei wie die Maschine selbst.
 
-Здесь мы просим задать пароль, поставить `virt-v2v` с его зависимостями и скачать
-`mc` — консольный клиент для работы с S3-хранилищем, тот самый, которым будем заливать
-результат в бакет.
+Hier bitten wir darum, ein Passwort zu setzen, `virt-v2v` mit seinen Abhängigkeiten zu
+installieren und `mc` herunterzuladen — einen Konsolen-Client für die Arbeit mit S3-Storage,
+genau den, mit dem wir das Ergebnis in den Bucket hochladen werden.
 
-⚠️ **Пароль в открытом виде** — только для учебного стенда, машина живёт полчаса и
-доступна лишь изнутри кластера. На рабочей машине вместо `password` кладут ssh-ключи.
+⚠️ **Das Passwort im Klartext** — nur für die Testumgebung der Schulung: Die Maschine lebt eine
+halbe Stunde und ist nur von innerhalb des Clusters erreichbar. Auf einer echten Maschine setzen
+Sie ssh-Schlüssel an die Stelle von `password`.

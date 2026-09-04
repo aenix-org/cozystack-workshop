@@ -1,202 +1,222 @@
-# Как писать лабораторные
+# Wie man Labs schreibt
 
-Прочитайте до первой правки в любой лабе. Цель документа одна: чтобы пятнадцать лаб
-читались как одна работа, а не как пятнадцать разных.
+Lesen Sie dies, bevor Sie zum ersten Mal ein Lab bearbeiten. Dieses Dokument hat ein einziges
+Ziel: dafür zu sorgen, dass sich die fünfzehn Labs wie eine zusammenhängende Arbeit lesen und
+nicht wie fünfzehn verschiedene.
 
-## Кто читатель
+## Wer der Leser ist
 
-Системный администратор VMware. Kubernetes видит впервые или почти впервые, и **это
-нормально** — материал рассчитан ровно на него. Он умён, у него двадцать лет опыта, он
-прекрасно разбирается в виртуализации, сетях и хранилищах. Чего он не знает — так это
-нашей терминологии.
+Eine VMware-Systemadministratorin oder ein VMware-Systemadministrator. Diese Person sieht
+Kubernetes zum ersten Mal, oder fast zum ersten Mal, und **das ist in Ordnung** — das Material
+richtet sich genau an diese Person. Sie ist klug, hat zwanzig Jahre Erfahrung und kennt
+Virtualisierung, Netzwerke und Storage in- und auswendig. Was sie nicht kennt, ist unsere
+Terminologie.
 
-Из этого следует всё остальное.
+Alles Weitere folgt daraus.
 
-## Правила языка
+## Sprachregeln
 
-**Ни одного термина без расшифровки при первом появлении в этой лабе.** Не «в соседней
-лабе объясняли» — лабы проходят вразнобой. Расшифровка через то, что читатель уже знает
-по vSphere.
+**Kein Begriff ohne Erklärung, wenn er zum ersten Mal in diesem Lab auftaucht.** Nicht „das
+wurde in einem anderen Lab erklärt“ — die Labs werden in beliebiger Reihenfolge bearbeitet.
+Erklären Sie ihn über etwas, das der Leser bereits aus vSphere kennt.
 
-**Запрещённые слова:** «просто», «очевидно», «как обычно», «всего лишь», «тривиально».
-Если что-то действительно очевидно — это не нужно писать. Если не очевидно — «просто»
-читателя унижает.
+**Verbotene Wörter:** „einfach“, „offensichtlich“, „wie gewohnt“, „bloß“, „trivialerweise“.
+Wenn etwas wirklich offensichtlich ist, braucht man es nicht zu schreiben. Wenn es nicht
+offensichtlich ist, setzt „einfach“ den Leser herab.
 
-**Обращение на «вы», строчное.** Без заигрывания, без панибратства, без восклицательных
-знаков.
+**Sprechen Sie den Leser direkt mit „Sie“ an.** Keine verschämten Andeutungen, keine falsche
+Kumpelhaftigkeit, keine Ausrufezeichen.
 
-**Не продавать.** Никаких «мощный», «гибкий», «из коробки решает все задачи». Выгода
-показывается фактом и сравнением, а не прилагательным. Вместо «Cozystack обеспечивает
-высокую доступность» — «удалите под и посмотрите на часы».
+**Verkaufen Sie nicht.** Kein „leistungsstark“, „flexibel“, „löst jedes Problem out of the
+box“. Der Nutzen zeigt sich über eine Tatsache und einen Vergleich, nicht über ein Adjektiv.
+Statt „Cozystack bietet Hochverfügbarkeit“ — „löschen Sie einen Pod und schauen Sie auf die
+Uhr“.
 
-**Честно про недостатки.** Если что-то работает хуже, чем в vSphere, — так и пишем.
-Читатель это всё равно заметит, и если мы промолчали, он перестанет верить остальному.
+**Seien Sie ehrlich, was die Schwächen angeht.** Wenn etwas schlechter funktioniert als in
+vSphere, sagen Sie es. Der Leser merkt es ohnehin, und wenn wir schwiegen, würde er dem Rest
+nicht mehr vertrauen.
 
-## Обязательная структура лабы
+## Der vorgeschriebene Aufbau eines Labs
 
-Файл `README.md` в папке лабы. Порядок разделов жёсткий.
+Eine Datei `README.md` im Ordner des Labs. Die Reihenfolge der Abschnitte ist verbindlich.
 
-1. **Заголовок** — `# Лаба NN · Название`
-2. **Шапка** — время, что доказывает, что понадобится
-3. **Зачем это** — задача из жизни, а не «сейчас изучим X». Продолжение сквозного
-   сценария (см. ниже)
-4. **Словарик** — только новые для этой лабы термины, таблицей в три колонки: термин,
-   что это, «похоже на… но». Третья колонка называет вещь из vSphere и тут же говорит,
-   чем термин от неё отличается, — одной фразой, а не двумя обрывками в разных ячейках.
-   Отдельной колонки «где аналогия врёт» быть не должно: без контекста её заголовок
-   ничего не значит
-5. **Что лежит в папке лабы** — таблица всех файлов лабы: файл, что это, когда
-   пригодится. Читатель не должен гадать, откуда взялся `имя.yaml` в команде `apply`
-   и не надо ли создавать его самому. Каждый файл, который лаба применяет, обязан
-   лежать в её папке (или в соседней, и тогда путь пишется явно: `../03-scale/hpa.yaml`)
-6. **Шаги** — по одному действию на шаг
-7. **Проверка** — что должно получиться и как это увидеть
-8. **Уборка** — обязательно, и с объяснением, почему это дёшево
-9. **Что мы теперь умеем** — три-четыре пункта
-10. **А в vSphere это было бы** — честное сравнение, включая то, где vSphere удобнее
+1. **Titel** — `# Lab NN · Name`
+2. **Kopf** — die Zeit, was es beweist, was Sie brauchen
+3. **Warum das** — eine Aufgabe aus dem echten Leben, nicht „jetzt lernen wir X“. Eine
+   Fortsetzung des durchlaufenden Szenarios (siehe unten)
+4. **Mini-Glossar** — nur die Begriffe, die in diesem Lab neu sind, als dreispaltige Tabelle:
+   Begriff, was es ist, „wie … aber“. Die dritte Spalte nennt das Ding aus vSphere und sagt im
+   selben Atemzug, wie sich der Begriff davon unterscheidet — in einer einzigen Wendung, nicht
+   als zwei Fragmente in getrennten Zellen. Es darf keine eigene Spalte „wo die Analogie
+   bricht“ geben: aus dem Zusammenhang gerissen bedeutet ihre Überschrift nichts
+5. **Was im Ordner des Labs liegt** — eine Tabelle jeder Datei im Lab: Datei, was es ist, wann
+   sie nützlich wird. Der Leser sollte nicht raten müssen, woher die `name.yaml` in einem
+   `apply`-Befehl kommt oder ob er sie selbst anlegen muss. Jede Datei, die das Lab anwendet,
+   muss in seinem Ordner liegen (oder in einem benachbarten, und dann wird der Pfad
+   ausdrücklich ausgeschrieben: `../03-scale/hpa.yaml`)
+6. **Schritte** — eine Aktion pro Schritt
+7. **Überprüfung** — wie das Ergebnis aussehen soll und wie man es sieht
+8. **Aufräumen** — verpflichtend, und mit einer Erklärung, warum es billig ist
+9. **Was wir jetzt können** — drei oder vier Punkte
+10. **Und in vSphere wäre das** — ein ehrlicher Vergleich, auch dort, wo vSphere bequemer ist
 
-## Сквозной сценарий
+## Das durchlaufende Szenario
 
-Все лабы — части одной рабочей задачи, а не набор упражнений.
+Alle Labs sind Teile einer einzigen Arbeitsaufgabe, nicht eine Sammlung von Übungen.
 
-**Вводная:** вы в платформенной команде. Бизнес просит выкатить внутренний сервис
-«Пропуск» — сотрудник через мобильное приложение заказывает пропуск для гостя, охрана
-видит список на проходной, руководство раз в месяц смотрит отчёт.
+**Der Ausgangspunkt:** Sie sind im Plattform-Team. Das Business bittet Sie, einen internen
+Dienst namens „Passes“ auszurollen — eine Mitarbeiterin bestellt über eine mobile App einen
+Passierschein für einen Gast, der Sicherheitsdienst sieht die Liste am Kontrollpunkt, und das
+Management schaut einmal im Monat in einen Bericht.
 
-Каждый сервис появляется **из-за конкретной боли**, а не потому что настала его очередь:
+Jeder Dienst taucht **wegen eines konkreten Schmerzes** auf, nicht weil er an der Reihe ist:
 
-| Что появляется | Из-за чего |
+| Was auftaucht | Weswegen |
 |---|---|
-| Harbor | ИБ запретила тянуть образы из интернета |
-| Redis | справочник сотрудников из легаси отвечает 800 мс |
-| MongoDB | у пропусков разные поля: разовый, на неделю, на автомобиль |
-| OpenBao | аудит нашёл пароль от базы в манифесте |
-| ClickHouse | руководство хочет «сколько гостей и когда пики» |
-| Бакет | мобильной команде некуда класть APK |
-| GitOps | нас трое, кто-то поменял руками и всё легло |
-| Каталог | дочерние компании хотят такой же сервис себе |
+| Harbor | der Sicherheitsdienst hat verboten, Images aus dem Internet zu ziehen |
+| Redis | das Mitarbeiterverzeichnis im Altsystem braucht 800 ms für eine Antwort |
+| MongoDB | Passierscheine haben unterschiedliche Felder: einmalig, wöchentlich, für ein Auto |
+| OpenBao | ein Audit hat das Datenbank-Passwort in einem Manifest gefunden |
+| ClickHouse | das Management will „wie viele Gäste, und wann die Spitzen liegen“ |
+| Bucket | das Mobile-Team hat keinen Ort für die APK |
+| GitOps | wir sind zu dritt, jemand hat etwas von Hand geändert und alles fiel aus |
+| Catalog | Tochtergesellschaften wollen denselben Dienst für sich |
 
-Лабы 0–4 — тренировка на безобидном приложении, до начала рабочей задачи. Это оговаривается
-прямо: «сначала на кошках».
+Die Labs 0–4 sind Übung an einer harmlosen Anwendung, bevor die eigentliche Aufgabe beginnt.
+Das wird offen gesagt: „erst die Stützräder“.
 
-## Разбор кода и манифестов
+## Code und Manifeste durchgehen
 
-**YAML без разбора не появляется нигде.** Ни одного файла, который читатель применяет,
-не поняв.
+**Nirgends taucht YAML ohne eine Durchsprache auf.** Keine einzige Datei, die der Leser
+anwendet, ohne sie verstanden zu haben.
 
-Разбор — в спойлере, чтобы поток не разбухал:
+Die Durchsprache kommt in einen Spoiler, damit der Hauptfluss nicht aufbläht:
 
 ```markdown
 <details>
-<summary><b>Разбираем манифест построчно</b></summary>
+<summary><b>Das Manifest Zeile für Zeile durchgehen</b></summary>
 
-...построчно, прозой...
+... Zeile für Zeile, in Prosa ...
 
 </details>
 ```
 
-В разборе объясняем **зачем блок нужен**, а не что в нём написано. Плохо: «`replicas: 1` —
-это количество реплик». Хорошо: «`replicas: 1` — сколько копий держать запущенными. Если
-копия исчезнет, кластер создаст новую, не спрашивая. Отсюда самолечение в следующей лабе».
+In der Durchsprache erklären wir, **warum der Block gebraucht wird**, nicht was in ihm steht.
+Schlecht: „`replicas: 1` ist die Anzahl der Replicas.“ Gut: „`replicas: 1` — wie viele Kopien
+am Laufen gehalten werden. Verschwindet eine Kopie, erstellt der Cluster ungefragt eine neue.
+Daher kommt die Selbstheilung im nächsten Lab.“
 
-## Предсказуемые неудачи
+## Vorhersehbare Fehlschläge
 
-**В каждой лабе, где это уместно, должна быть проверка, которая не пройдёт.** Читатель
-упирается, диагностирует и понимает необходимость следующего шага сам.
+**Jedes Lab muss dort, wo es passt, eine Überprüfung enthalten, die nicht durchläuft.** Der
+Leser fährt gegen die Wand, diagnostiziert sie und begreift von selbst, warum der nächste
+Schritt nötig ist.
 
-Форма всегда одна, и порядок в ней не переставляется:
+Die Form ist immer dieselbe, und ihre Reihenfolge wird nie umgestellt:
 
-1. Предлагаем проверить, будто всё уже готово
-2. **Показываем ошибку** — сначала вывод, потом вопросы. Не наоборот
-3. Останавливаем
-4. Спойлер с ответом — и с уроком шире, чем эта конкретная ошибка
+1. Wir schlagen eine Überprüfung vor, als wäre schon alles vorhanden
+2. **Wir zeigen den Fehler** — zuerst die Ausgabe, dann die Fragen. Nicht umgekehrt
+3. Wir halten den Leser an
+4. Ein Spoiler mit der Antwort — und mit einer Lehre, die über diesen konkreten Fehler
+   hinausgeht
 
-Три места, где формулировки закреплены дословно, чтобы лабы не разъезжались.
+Drei Stellen, an denen der Wortlaut wörtlich festgelegt ist, damit die Labs nicht
+auseinanderdriften.
 
-Остановка — всегда врезка-цитата, без ⚠️ (он занят под грабли):
+Der Stopp ist immer ein Blockzitat-Callout, ohne ⚠️ (dieser Marker ist Fallstricken
+vorbehalten):
 
 ```markdown
-> **Остановитесь и подумайте, прежде чем читать дальше.**
+> **Halten Sie inne und denken Sie nach, bevor Sie weiterlesen.**
 >
-> Вопрос. Второй вопрос, если он есть.
+> Eine Frage. Eine zweite Frage, falls es eine gibt.
 ```
 
-Заголовок спойлера — всегда `Ответ и урок шире, чем эта ошибка`.
+Die Überschrift des Spoilers lautet immer `Die Antwort und eine Lehre, die über diesen Fehler
+hinausgeht`.
 
-Абзац с самим уроком внутри спойлера открывается так: `**Урок шире, чем эта ошибка.**`
+Der Absatz mit der Lehre selbst, im Spoiler, beginnt so: `**Die Lehre reicht über diesen
+Fehler hinaus.**`
 
-Неудача должна быть настоящей, а не постановочной. Если шаг работает — не надо ломать
-его искусственно.
+Der Fehlschlag muss echt sein, nicht inszeniert. Wenn ein Schritt funktioniert, muss man ihn
+nicht künstlich kaputtmachen.
 
-## Два пути: мышкой и текстом
+## Zwei Wege: mit der Maus und über Text
 
-Где действие доступно и в дашборде, и через `kubectl`, показываем **оба** и говорим, когда
-какой уместен.
+Wo eine Aktion sowohl im Dashboard als auch über `kubectl` verfügbar ist, zeigen wir **beide**
+und sagen, wann welcher angebracht ist.
 
-**Ни один из путей не прячется в спойлер.** Работа текстом — не запасной вариант на
-случай, если дашборд лёг: это то, к чему мы читателя и ведём, потому что описание в файле
-можно отревьюить, положить в Git и откатить. Спойлер — для разбора полей, а не для
-самого способа работы.
+**Keiner der beiden Wege wird in einem Spoiler versteckt.** Die Arbeit über Text ist kein
+Notbehelf für den Fall, dass das Dashboard ausfällt: Sie ist genau das, wohin wir den Leser
+führen, denn eine Beschreibung in einer Datei lässt sich prüfen, in Git ablegen und
+zurückrollen. Der Spoiler ist für das Durchgehen der Felder da, nicht für die Arbeitsweise
+selbst.
 
-Managed-сервисы (Harbor, Redis, MongoDB, ClickHouse, OpenBao, бакеты, виртуалки) — ведём
-через дашборд: там ловится ощущение самообслуживания.
+Managed Services (Harbor, Redis, MongoDB, ClickHouse, OpenBao, Buckets, virtuelle Maschinen) —
+steuern wir über das Dashboard: dort kommt das Gefühl von Self-Service durch.
 
-Своё приложение — через `kubectl` и Git: там ловится, что инфраструктура это текст,
-который можно отревьюить и откатить.
+Die eigene Anwendung — über `kubectl` und Git: dort kommt durch, dass Infrastruktur Text ist,
+der sich prüfen und zurückrollen lässt.
 
-## Сквозные названия
+## Konsistente Benennung
 
-Одна вещь называется одинаково во всех лабах и во всех сообщениях для чата. Читатель
-проходит материал вразнобой и не должен догадываться, что `lab` и «учебный кластер» —
-это одно и то же.
+Eine Sache heißt in jedem Lab und in jeder Chat-Nachricht gleich. Der Leser geht das Material
+in beliebiger Reihenfolge durch und sollte nicht raten müssen, dass `lab` und „der lab-Cluster“
+ein und dasselbe sind.
 
-| Что | Как называем |
+| Ding | Wie wir es nennen |
 |---|---|
-| Единица материала | «лаба». Не «лабораторная», не «модуль», не «урок» |
-| Учебный кластер из лабы 0 | приложение `lab` |
-| Тренировочное приложение лаб 0–4 | `rickroll` |
-| Рабочий сервис лаб 5–14 | «Пропуск» в тексте, `passes` в манифестах |
-| Номер тенанта | `workshopXX` в заглушках, `workshop03` в разобранных примерах |
+| Die Einheit des Materials | „lab“. Nicht „Lab-Übung“, nicht „Modul“, nicht „Lektion“ |
+| Der lab-Cluster aus Lab 0 | die Anwendung `lab` |
+| Die Übungsanwendung der Labs 0–4 | `rickroll` |
+| Der Produktionsdienst der Labs 5–14 | „Passes“ im Text, `passes` in den Manifesten |
+| Die Tenant-Nummer | `workshopXX` in Platzhaltern, `workshop03` in ausgearbeiteten Beispielen |
 
-Отдельно: **пути к файлам доступа и имена переменных окружения одинаковы везде.** Если
-в одной лабе тенантный кубконфиг лежит по одному пути, а в соседней по другому, читатель
-решит, что это два разных файла, и заведёт себе два.
+Gesondert: **die Pfade zu den Zugangsdateien und die Namen der Umgebungsvariablen sind überall
+gleich.** Wenn in einem Lab die Tenant-kubeconfig unter einem Pfad liegt und in einem
+benachbarten unter einem anderen, wird der Leser schließen, dass es zwei verschiedene Dateien
+sind, und am Ende zwei davon behalten.
 
-Название лабы в её заголовке и короткое имя в таблице корневого `README.md` должны
-узнаваться друг в друге. «Кеш» в таблице и «Кеш перед медленным бэкендом» в файле — это
-явно одна лаба. Если в таблице одно слово, а в заголовке другое, читатель будет открывать
-файлы наугад.
+Der Name eines Labs in seinem Titel und sein Kurzname in der Tabelle der Wurzel-`README.md`
+müssen einander erkennbar sein. „Cache“ in der Tabelle und „Ein Cache vor einem langsamen
+Backend“ in der Datei sind offensichtlich dasselbe Lab. Wenn die Tabelle ein Wort nennt und der
+Titel ein anderes, öffnet der Leser Dateien aufs Geratewohl.
 
-Время в шапке лабы и время в таблице корневого `README.md` — одно и то же число.
-В шапке указываем полное время, включая ожидание, и отдельно оговариваем, сколько
-из него уходит на ожидание.
+Die Zeit im Kopf des Labs und die Zeit in der Tabelle der Wurzel-`README.md` sind dieselbe
+Zahl. Im Kopf geben wir die volle Zeit an, einschließlich Warten, und vermerken gesondert, wie
+viel davon auf Warten entfällt.
 
-## Оформление
+## Formatierung
 
-- Разделы и шаги — оба уровня `##`. Заголовок шага: `## Шаг N. Что делаем`. Слова
-  «часть», «этап», «упражнение» не используем — везде «шаг». Подзаголовки внутри шага —
-  `###`, но чаще уместнее спойлер
-- Команды — в блоках с указанием языка: ` ```bash `, ` ```yaml `, ` ```sql `
-- Перед каждой командой — что сейчас произойдёт. После — что вы должны увидеть
-- Строки не длиннее 100 символов
-- Эмодзи — только функциональные маркеры: 📍 где выполняется, ⚠️ грабли. Больше в лабах
-  никаких. В сообщениях для чата к ним добавляются 🖱 путь мышкой, 📄 файл из репозитория,
-  ⏳ долгое ожидание — и на этом список закрыт
-- Таблицы вместо списков там, где есть колонки
+- Abschnitte und Schritte sind beide auf `##`-Ebene. Die Überschrift eines Schritts:
+  `## Schritt N. Was wir tun`. Wir verwenden nicht die Wörter „Teil“, „Etappe“, „Übung“ —
+  überall heißt es „Schritt“. Unterüberschriften innerhalb eines Schritts sind `###`, aber
+  häufiger passt ein Spoiler besser
+- Befehle stehen in Blöcken mit markierter Sprache: ` ```bash `, ` ```yaml `, ` ```sql `
+- Vor jedem Befehl, was gleich passiert. Danach, was Sie sehen sollten
+- Zeilen nicht länger als 100 Zeichen
+- Emojis sind ausschließlich funktionale Marker: 📍 wo es läuft, ⚠️ ein Fallstrick. Mehr nicht
+  in den Labs. In Chat-Nachrichten kommen hinzu 🖱 der Maus-Weg, 📄 eine Datei aus dem
+  Repository, ⏳ ein langes Warten — und damit ist die Liste abgeschlossen
+- Tabellen statt Listen, wo immer es Spalten gibt
 
-## Проверка
+## Überprüfung
 
-В каждой папке — `check.sh`. Участник запускает его сам и получает отчёт: что проверено,
-что прошло, что нет, и приложенные свидетельства. Требования к скриптам — в `check/README.md`.
+In jedem Ordner liegt eine `check.sh`. Der Teilnehmer führt sie selbst aus und erhält einen
+Bericht: was geprüft wurde, was bestanden hat, was nicht, samt beigefügtem Beleg. Die
+Anforderungen an die Skripte stehen in `check/README.md`.
 
-В тексте лабы на него ссылаемся в разделе «Проверка».
+Im Text des Labs verweisen wir im Abschnitt „Überprüfung“ darauf.
 
-## Чего не делать
+## Was man nicht tun soll
 
-- Не ссылаться на номера шагов из других лаб — они проходятся вразнобой
-- Не ссылаться на номер шага и внутри своей лабы («предсказуемая неудача на шаге 7»):
-  шаги смещаются при правке, и ссылка тихо начинает врать. Пишем «чуть дальше по лабе»
-- Не предполагать, что предыдущая лаба выполнена, если это не написано в «что понадобится»
-- Не оставлять `TODO`, `TBD` и заглушек в опубликованном тексте
-- Не придумывать поля манифестов и имена секретов. Проверять по
-  `packages/apps/<app>/values.schema.json` в репозитории cozystack
+- Verweisen Sie nicht auf Schrittnummern aus anderen Labs — sie werden in beliebiger
+  Reihenfolge bearbeitet
+- Verweisen Sie auch innerhalb Ihres eigenen Labs nicht auf eine Schrittnummer („der
+  vorhersehbare Fehlschlag in Schritt 7“): Schritte verschieben sich beim Bearbeiten, und der
+  Verweis wird unbemerkt irreführend. Schreiben Sie „etwas weiter im Lab“
+- Setzen Sie nicht voraus, dass das vorherige Lab gemacht wurde, sofern es nicht unter „was Sie
+  brauchen“ steht
+- Lassen Sie keine `TODO`, `TBD` oder Platzhalter im veröffentlichten Text
+- Erfinden Sie keine Manifest-Felder oder Secret-Namen. Prüfen Sie sie gegen
+  `packages/apps/<app>/values.schema.json` im cozystack-Repository

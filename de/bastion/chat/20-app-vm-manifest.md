@@ -1,6 +1,6 @@
-## 20. Разбор: что внутри 03-app-vm.yaml
+## 20. Genauer betrachtet: Was steckt in 03-app-vm.yaml
 
-Снова два объекта — диск и машина.
+Wieder zwei Objekte — eine Disk und eine Maschine.
 
 ```yaml
 kind: VMDisk
@@ -11,10 +11,7 @@ spec:
   storage: 10Gi
 ```
 
-`source.http` вместо `source.image` — вот и вся разница с предыдущей фазой. Сюда вы
-вставляете ссылку из вывода `convert.sh`, ту, что после слова `Share:`. Вставлять её
-надо целиком, вместе с длинным «хвостом» после знака вопроса: этот хвост и есть подпись,
-без него платформа получит отказ в доступе.
+`source.http` statt `source.image` — das ist der ganze Unterschied zur vorherigen Phase. Hier fügen Sie den Link aus der Ausgabe von `convert.sh` ein, den nach dem Wort `Share:`. Fügen Sie ihn vollständig ein, samt dem langen „Anhang“ nach dem Fragezeichen: dieser Anhang ist die Signatur, und ohne ihn wird der Plattform der Zugriff verweigert.
 
 ```yaml
 kind: VMInstance
@@ -25,9 +22,6 @@ spec:
     - name: app-1
 ```
 
-`instanceProfile: centos.7` — профиль виртуального железа под старую систему. Он важнее,
-чем кажется: у CentOS 7 ядро 2016 года, и часть современных настроек виртуального
-железа оно не понимает. Профиль подбирает то, с чем такое ядро умеет работать.
+`instanceProfile: centos.7` — ein Profil für virtuelle Hardware für ein altes System. Es ist wichtiger, als es aussieht: CentOS 7 läuft mit einem Kernel von 2016, und einige moderne Einstellungen für virtuelle Hardware gehen darüber hinaus. Das Profil wählt jene aus, mit denen ein solcher Kernel umzugehen weiß.
 
-Это, кстати, общий ответ на вопрос «а старую систему вообще потянет». Потянет, если
-сказать платформе, что система старая.
+Das ist übrigens die allgemeine Antwort auf die Frage „läuft darauf überhaupt ein altes System?“. Es läuft — solange Sie der Plattform sagen, dass das System alt ist.

@@ -1,38 +1,33 @@
-## 10. Материалы уже на виртуалке
+## 10. Die Materialien liegen bereits auf dem Bastion
 
-**Ничего клонировать не нужно**
+**Nichts zu klonen**
 
-📍 **Где:** на виртуалке, куда вы только что зашли по SSH.
+📍 **Wo:** auf dem Bastion, auf dem Sie sich gerade per SSH angemeldet haben.
 
-Папка с материалами уже лежит в вашей домашней директории, и **ваш номер тенанта в ней
-уже подставлен**. Заглушки `tenant-workshopXX` заменены на ваш `tenant-workshopNN` при
-подготовке виртуалки — искать и заменять ничего не надо, сразу применяйте файлы как есть.
+Der Materialordner liegt bereits in Ihrem Home-Verzeichnis, und **Ihre Tenant-Nummer ist darin bereits eingetragen**. Die Platzhalter `tenant-workshopXX` wurden bei der Vorbereitung des Bastion durch Ihren `tenant-workshopNN` ersetzt — Sie müssen nichts suchen und ersetzen, wenden Sie die Dateien einfach so an, wie sie sind.
 
-Заходим в папку и смотрим, что внутри:
+Wechseln Sie in den Ordner und sehen Sie sich an, was darin liegt:
 
 ```bash
 cd ~/workshop
 ls manifests scripts
 ```
 
-Должны увидеть четыре манифеста и четыре скрипта — те самые, из карты файлов. Убедиться,
-что номер подставлен именно ваш:
+Sie sollten vier Manifeste und vier Skripte sehen — genau die aus der Dateiübersicht. Vergewissern Sie sich, dass die eingetragene Nummer Ihre ist:
 
 ```bash
 grep -m1 namespace manifests/01-bucket.yaml
 ```
 
-В строке `namespace:` будет ваш `tenant-workshopNN`, а не `tenant-workshopXX`.
+In der Zeile `namespace:` steht Ihr `tenant-workshopNN`, nicht `tenant-workshopXX`.
 
-**Если потерялись** — вернуться всегда одинаково:
+**Wenn Sie sich verlaufen**, führt der Weg zurück immer gleich:
 ```bash
 cd ~/workshop
 ```
 
-**Чем открывать файлы для правки.** Понадобится ровно один раз — вписать presigned-ссылку
-в `manifests/03-app-vm.yaml` на третьей фазе. Годится `nano`:
-`nano manifests/03-app-vm.yaml` (сохранить: `Ctrl+O`, `Enter`, выйти: `Ctrl+X`).
+**Womit Sie Dateien zum Bearbeiten öffnen.** Das brauchen Sie genau einmal — um die presigned URL in der dritten Phase in `manifests/03-app-vm.yaml` einzufügen. `nano` genügt:
+`nano manifests/03-app-vm.yaml` (speichern: `Ctrl+O`, `Enter`, beenden: `Ctrl+X`).
 
-Единственная заглушка, которая осталась намеренно, — в `manifests/03-app-vm.yaml` строка
-`url: "ВСТАВЬТЕ_PRESIGNED_URL"`. Эту ссылку вы получите, когда сконвертируете образ. Пока
-просто знайте, что она вас там ждёт.
+Der einzige Platzhalter, der absichtlich stehen geblieben ist, befindet sich in `manifests/03-app-vm.yaml`, in der Zeile
+`url: "ВСТАВЬТЕ_PRESIGNED_URL"`. Diese URL erhalten Sie, sobald Sie das Image konvertiert haben. Für den Moment sollten Sie nur wissen, dass sie dort auf Sie wartet.

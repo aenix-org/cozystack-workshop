@@ -217,3 +217,10 @@ Fixed callouts (CONVENTIONS, verbatim everywhere):
 - Step (Шаг, numbered steps) → **N단계** (number before 단계: 2단계, not 단계 2, not 스텝)
 - managed service → **관리형 서비스** (natural Korean; not 매니지드 / raw "managed")
 - The pinned spoiler callout 「답과, 이 오류보다 더 넓은 교훈」 is ONLY for spoilers whose English is exactly "The answer, and a lesson broader than this error" — never overwrite a spoiler that has its own specific heading.
+
+### German (de) — resolved renderings
+Fixed callouts (CONVENTIONS, verbatim everywhere):
+- spoiler <summary> heading = 「Die Antwort und eine Lehre, die über diesen Fehler hinausgeht」 (Lehre never Lektion; verb hinausgeht never hinausreicht/weiter reicht; no comma/en-dash after Antwort)
+- lesson-opener bold = 「Die Lehre reicht über diesen Fehler hinaus.」
+- 'error' → **Fehler** (the term everywhere)
+German quotes: opening low „ (U+201E) + closing high " (U+201C) — never a straight ASCII close. Straight quotes inside code fences stay.

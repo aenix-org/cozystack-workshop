@@ -1,13 +1,13 @@
-## 3. Перед началом: что понадобится
+## 3. Bevor Sie beginnen: was Sie brauchen
 
-**Готовимся к работе**
+**Vorbereitung**
 
-Ставить на свой ноутбук ничего не нужно. Вся работа идёт на общей **виртуалке** — на ней
-уже стоят `kubectl`, `virtctl` и `git`, а доступ к вашему тенанту уже настроен.
+Auf Ihrem Laptop müssen Sie nichts installieren. Die gesamte Arbeit findet auf einem gemeinsamen **Bastion** statt — dort sind
+`kubectl`, `virtctl` und `git` bereits installiert, und der Zugriff auf Ihren Tenant ist bereits eingerichtet.
 
-От вас нужен только SSH-клиент, он есть в любой системе:
+Sie brauchen lediglich einen SSH-Client, und den hat jedes System:
 
-• **macOS / Linux** — терминал уже умеет `ssh`, ничего ставить не надо.
-• **Windows** — подойдёт встроенный `ssh` в PowerShell, либо PuTTY/Windows Terminal.
+• **macOS / Linux** — das Terminal beherrscht `ssh` bereits, nichts zu installieren.
+• **Windows** — das eingebaute `ssh` in PowerShell genügt, oder PuTTY / Windows Terminal.
 
-Ведущий выдаст вам логин, пароль и адрес виртуалки. Следующим сообщением — как зайти.
+Die Lehrkraft gibt Ihnen einen Login, ein Passwort und die Adresse des Bastion. In der nächsten Nachricht — wie Sie sich anmelden.
