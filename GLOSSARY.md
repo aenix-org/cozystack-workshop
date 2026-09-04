@@ -202,3 +202,12 @@ stay in English in all languages.
 | error (in the pinned callout) | **エラー** | not 誤り/ミス/間違い |
 | credential labels in code (login:/password:) | keep **login: / password:** verbatim (as en) | do not localize the label |
 Fixed callout (CONVENTIONS, verbatim everywhere): spoiler heading = 「答えと、このエラーより広い教訓」; stop-and-think = 「読み進める前に、立ち止まって考えてください。」
+
+### Korean (ko) — resolved renderings
+| Concept | 한국어 | not |
+|---|---|---|
+| error | **오류** | not 에러 / 실수 |
+Fixed callouts (CONVENTIONS, verbatim everywhere):
+- spoiler <summary> heading = 「답과, 이 오류보다 더 넓은 교훈」
+- lesson opener (bold) = 「교훈은 이 오류보다 넓습니다.」
+- stop-and-think = 「더 읽기 전에 멈추고 생각해 보십시오.」
