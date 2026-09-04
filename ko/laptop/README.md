@@ -1,57 +1,58 @@
-# Воркшоп: миграция VMware-VM в Cozystack (со своего ноутбука)
+# 워크숍: VMware VM을 Cozystack으로 마이그레이션하기(자신의 노트북에서)
 
-Берём приложение, которое годами работало на виртуальной машине в VMware, и перевозим
-его в Cozystack. Всё делаете своими руками.
+VMware의 가상 머신에서 수년간 돌아온 애플리케이션을 Cozystack으로 옮깁니다. 전 과정을
+직접 손으로 진행합니다.
 
-> Если ведущий выдал вам общую виртуалку (bastion) с готовыми инструментами и доступом —
-> вам нужен второй набор, [`../bastion/`](../bastion/), там всё уже настроено.
+> 강사가 도구와 접근이 이미 갖춰진 공유 VM(bastion(공유 VM))을 주었다면 — 다른 세트인
+> [`../bastion/`](../bastion/)가 필요합니다. 거기서는 모든 것이 이미 설정되어 있습니다.
 
-Этот файл — маршрут: что за чем идёт, какие команды набирать и что должно получиться.
-Объяснения, почему всё устроено именно так, и разборы манифестов и скриптов построчно
-лежат в папке [`chat/`](chat/) — по одному файлу на сообщение. Ссылки стоят в конце
-каждого шага.
+이 파일은 경로 안내입니다. 무엇 다음에 무엇이 오는지, 어떤 명령을 입력해야 하는지, 그리고
+결과적으로 무엇을 얻어야 하는지를 담고 있습니다. 왜 이런 방식으로 구성했는지에 대한 설명과
+매니페스트·스크립트의 한 줄 한 줄 해설은 [`chat/`](chat/) 폴더에 — 메시지 하나당 파일 하나로 —
+들어 있습니다. 링크는 각 단계 끝에 있습니다.
 
-## Маршрут
+## 경로
 
-Приложение живёт на трёх машинах: само приложение, база данных и очередь сообщений.
-Перевозим только первую — база и очередь останутся в прошлом, вместо них возьмём
-готовые из каталога Cozystack.
+애플리케이션은 세 대의 머신에 걸쳐 있습니다. 애플리케이션 자체, 데이터베이스, 그리고 메시지
+큐입니다. 우리는 첫 번째만 옮깁니다. 데이터베이스와 큐는 그 자리에 남고, 그 대신 Cozystack
+카탈로그에서 이미 만들어진 것을 가져옵니다.
 
-| Фаза | Что делаем | Где |
+| 단계 | 하는 일 | 위치 |
 |---|---|---|
-| 1 | Заводим хранилище под образ | ноутбук |
-| 2 | Переупаковываем диск из формата VMware в формат KVM | временная машина |
-| 3 | Поднимаем машину на новом месте | ноутбук |
-| 4 | Заказываем базу и очередь из каталога | ноутбук |
-| 5 | Чиним сеть и переключаем приложение на новые адреса | ваша машина |
+| 1 | 이미지를 위한 스토리지를 준비합니다 | 노트북에서 |
+| 2 | 디스크를 VMware 포맷에서 KVM 포맷으로 다시 포장합니다 | 임시 머신에서 |
+| 3 | 머신을 새 보금자리에서 띄웁니다 | 노트북에서 |
+| 4 | 카탈로그에서 데이터베이스와 큐를 주문합니다 | 노트북에서 |
+| 5 | 네트워크를 손보고 애플리케이션을 새 주소로 전환합니다 | 여러분의 머신 안에서 |
 
-Дальше — финальная проверка: заказ, созданный в приложении, доезжает до базы и очереди.
+그다음에는 마지막 확인이 이어집니다. 애플리케이션에서 만든 주문이 데이터베이스와 큐까지 온전히
+도달하는지 확인합니다.
 
-## Доступы
+## 강사가 준 것
 
-Выдаёт ведущий:
+강사가 주는 것:
 
-* дашборд https://dashboard.workshop.aenix.io
-* логин `workshopXX`, пароль скажут на месте
-* kubeconfig — в дашборде: `Info` → вкладка `Secrets` → секрет `kubeconfig-tenant-workshopXX`
+* dashboard https://dashboard.workshop.aenix.io
+* 사용자 이름 `workshopXX`, 비밀번호는 현장에서 알려줍니다
+* kubeconfig — dashboard에서: `Info` → `Secrets` 탭 → `kubeconfig-tenant-workshopXX` secret
 
-Везде дальше `workshopXX` меняйте на свой номер.
+아래 모든 곳에서 `workshopXX`를 자신의 번호로 바꾸세요.
 
-## До начала: четыре утилиты
+## 시작하기 전에: 유틸리티 네 가지
 
-Ставятся на ноутбук один раз, до воркшопа.
+워크숍 전에 노트북에 한 번 설치해 둡니다.
 
-| Утилита | Зачем | Установка |
+| 유틸리티 | 용도 | 설치 |
 |---|---|---|
-| `kubectl` | применяет файлы, показывает, что в кластере | [chat/04](chat/04-install-kubectl.md) |
-| `virtctl` | консоль виртуальной машины и проброс порта | [chat/05](chat/05-install-virtctl.md) |
-| `kubelogin` | вход через браузер, без него кластер не пустит | [chat/06](chat/06-install-kubelogin.md) |
-| `git` | забрать этот репозиторий | [chat/09](chat/09-install-git.md) |
+| `kubectl` | 파일을 적용하고, 클러스터에 무엇이 있는지 보여줍니다 | [chat/04](chat/04-install-kubectl.md) |
+| `virtctl` | 가상 머신 콘솔과 포트 포워딩 | [chat/05](chat/05-install-virtctl.md) |
+| `kubelogin` | 브라우저를 통한 로그인, 없으면 클러스터가 들여보내지 않습니다 | [chat/06](chat/06-install-kubelogin.md) |
+| `git` | 이 저장소를 가져오기 위해 | [chat/09](chat/09-install-git.md) |
 
-⚠️ **krew для этого воркшопа не нужен** — почему, в [chat/07](chat/07-about-krew.md).
+⚠️ **이 워크숍에는 krew가 필요 없습니다** — 이유는 [chat/07](chat/07-about-krew.md)에.
 
-Проверка, что всё встало. Каждая команда печатает версию или справку, а не «команда
-не найдена»:
+모든 것이 갖춰졌는지 확인합니다. 각 명령은 "command not found"가 아니라 버전이나 도움말을
+출력합니다:
 
 ```bash
 kubectl version --client
@@ -59,11 +60,11 @@ virtctl version --client
 kubectl oidc-login --help
 ```
 
-## Подключаемся к кластеру
+## 클러스터에 접속하기
 
-Сохраните kubeconfig из дашборда на диск и укажите на него переменной `KUBECONFIG`.
+dashboard에서 받은 kubeconfig를 디스크에 저장하고 `KUBECONFIG` 변수가 그것을 가리키게 합니다.
 
-**macOS и Linux** — содержимое секрета положите в `~/.kube/workshop`, затем:
+**macOS와 Linux** — secret의 내용을 `~/.kube/workshop`에 넣은 뒤:
 
 ```bash
 export KUBECONFIG=~/.kube/workshop
@@ -75,22 +76,22 @@ kubectl get vminstance -n tenant-workshopXX
 
 ```powershell
 New-Item -ItemType Directory -Force "$HOME\.kube" | Out-Null
-notepad "$HOME\.kube\workshop"    # вставьте kubeconfig; тип файла — "Все файлы"
+notepad "$HOME\.kube\workshop"    # kubeconfig를 붙여 넣으세요; 파일 형식 — "모든 파일"
 [Environment]::SetEnvironmentVariable("KUBECONFIG", "$HOME\.kube\workshop", "User")
 $env:KUBECONFIG = "$HOME\.kube\workshop"
 kubectl get vminstance -n tenant-workshopXX
 ```
 
-При первом обращении откроется браузер — залогиньтесь как `workshopXX`.
+첫 요청 때 브라우저가 열립니다 — `workshopXX`로 로그인하세요.
 
-⚠️ **Windows: файл сохранять только в UTF-8.** Блокнот и перенаправление `>` в PowerShell
-пишут UTF-16, и `kubectl` такой файл не прочитает — ответит
-`x509: certificate signed by unknown authority`, хотя с сертификатом всё в порядке.
+⚠️ **Windows: 파일은 반드시 UTF-8로만 저장하세요.** 메모장과 PowerShell의 `>` 리디렉션은
+UTF-16으로 기록하는데, `kubectl`은 그런 파일을 읽지 못합니다 — 인증서에 아무 문제가 없어도
+`x509: certificate signed by unknown authority`라고 응답합니다.
 
-⚠️ Ошибка `dial tcp [::1]:8080 ... refused` означает, что `kubectl` не нашёл kubeconfig,
-а не что кластер недоступен. Разбор обеих — в [chat/08](chat/08-connect-to-cluster.md).
+⚠️ `dial tcp [::1]:8080 ... refused` 오류는 `kubectl`이 kubeconfig를 찾지 못했다는 뜻이지,
+클러스터에 닿을 수 없다는 뜻이 아닙니다. 둘 다에 대한 해설은 [chat/08](chat/08-connect-to-cluster.md)에.
 
-## Забираем материалы
+## 자료 가져오기
 
 ```bash
 cd ~
@@ -98,17 +99,17 @@ git clone https://github.com/aenix-org/cozystack-migration-workshop.git
 cd cozystack-migration-workshop/laptop
 ```
 
-⚠️ Хвост `/laptop` обязателен: в этой папке лежат материалы ноутбучного пути с
-манифестами и скриптами; без него команды не найдут ни `manifests`, ни `scripts`.
+⚠️ `/laptop` 꼬리는 필수입니다: 이 폴더에 매니페스트와 스크립트가 담긴 노트북 경로의 자료가
+들어 있습니다. 이것이 없으면 명령이 `manifests`도 `scripts`도 찾지 못합니다.
 
-Во всех файлах стоит заглушка `tenant-workshopXX`. Подставьте свой номер разом
-(в примере — `workshop03`):
+모든 파일에는 `tenant-workshopXX` 자리 표시자가 있습니다. 자신의 번호로 한꺼번에 바꾸세요
+(예시에서는 — `workshop03`):
 
 ```bash
 # Linux
 find manifests scripts -type f -exec sed -i 's/tenant-workshopXX/tenant-workshop03/g' {} +
 
-# macOS — тот же sed, но требует пустых кавычек после -i
+# macOS — 같은 sed지만, -i 뒤에 빈 따옴표가 필요합니다
 find manifests scripts -type f -exec sed -i '' 's/tenant-workshopXX/tenant-workshop03/g' {} +
 ```
 
@@ -120,217 +121,216 @@ Get-ChildItem -Path manifests,scripts -File -Recurse | ForEach-Object {
 }
 ```
 
-Проверяем, что не осталось ни одной заглушки:
+자리 표시자가 하나도 남지 않았는지 확인합니다:
 
 ```bash
-grep -rn tenant-workshopXX manifests scripts || echo "чисто, можно продолжать"
+grep -rn tenant-workshopXX manifests scripts || echo "all clean, you can continue"
 ```
 
-Одно место команда не тронет намеренно: в `manifests/03-app-vm.yaml` строка
-`url: "ВСТАВЬТЕ_PRESIGNED_URL"` — эту ссылку вы получите после второй фазы.
+한 곳만 명령이 일부러 건드리지 않고 남겨 둡니다: `manifests/03-app-vm.yaml`의
+`url: "ВСТАВЬТЕ_PRESIGNED_URL"` 줄입니다 — 이 링크는 두 번째 단계 이후에 얻습니다.
 
-Подробно: [chat/10](chat/10-clone-and-set-number.md) ·
-карта файлов [chat/11](chat/11-file-map.md)
+자세히: [chat/10](chat/10-clone-and-set-number.md) ·
+파일 맵 [chat/11](chat/11-file-map.md)
 
 ---
 
-## Фаза 1. Хранилище под образ
+## 1단계. 이미지를 위한 스토리지
 
-📍 На ноутбуке.
+📍 노트북에서.
 
-Переупакованный диск нужно положить туда, откуда его заберёт платформа по сети.
-Заводим бакет — объектное хранилище с S3-интерфейсом.
+다시 포장한 디스크는 플랫폼이 네트워크로 가져올 수 있는 곳에 놓여야 합니다. 우리는 bucket —
+S3 인터페이스를 가진 객체 스토리지 — 를 준비합니다.
 
 ```bash
 kubectl apply -f manifests/01-bucket.yaml
 kubectl get buckets.apps.cozystack.io my-images -n tenant-workshopXX
 ```
 
-**Должны увидеть:** `bucket.apps.cozystack.io/my-images created`, затем `READY: True`.
+**이렇게 보여야 합니다:** `bucket.apps.cozystack.io/my-images created`, 이어서 `READY: True`.
 
-⚠️ **Имя типа пишем полностью, не `bucket`.** Слово занято в кластере трижды: наш тип из
-каталога, тип Flux и тип стандарта объектных хранилищ. Какой из трёх подставит `kubectl`
-по короткому имени — заранее не известно, и если чужой, вы получите отказ в правах на
-ресурс, которого не просили: `buckets.source.toolkit.fluxcd.io is forbidden`. Это не
-проблема с доступом, чинить её не надо.
+⚠️ **타입 이름은 `bucket`이 아니라 전체를 적으세요.** 이 단어는 클러스터에서 세 번 쓰입니다:
+카탈로그의 우리 타입, Flux 타입, 그리고 객체 스토리지 표준의 타입입니다. 셋 중 어느 것을
+`kubectl`이 짧은 이름 대신 넣을지는 미리 알 수 없으며, 엉뚱한 것이 걸리면 요청한 적도 없는
+리소스에 대해 권한 거부가 뜹니다: `buckets.source.toolkit.fluxcd.io is forbidden`. 이것은 접근
+문제가 아니며, 고칠 것도 없습니다.
 
-⚠️ **Если `apply` падает с `SchemaError … unknown model in reference`** — спотыкается
-проверка на вашей стороне, а не кластер; манифест верный. Обойти:
-`kubectl apply -f manifests/01-bucket.yaml --validate=false`. Флаг снимает только местную
-проверку, сервер всё равно проверит объект у себя.
+⚠️ **`apply`가 `SchemaError … unknown model in reference`로 실패한다면** — 걸리는 것은
+클라이언트 측 검증이지 클러스터가 아닙니다. 매니페스트는 올바릅니다. 우회하려면:
+`kubectl apply -f manifests/01-bucket.yaml --validate=false`. 이 플래그는 로컬 검사만 끕니다.
+서버는 여전히 자기 쪽에서 객체를 검증합니다.
 
-**Дальше понадобятся ключи:** дашборд → `Bucket` → `my-images` → вкладка `Secrets` →
-секрет `bucket-my-images-app-credentials`. Оттуда берёте `bucketName`, `accessKey`
-и `secretKey` — впишете их в скрипт на следующей фазе.
+**다음에 키가 필요합니다:** dashboard → `Bucket` → `my-images` → `Secrets` 탭 →
+`bucket-my-images-app-credentials` secret. 거기서 `bucketName`, `accessKey`, `secretKey`를
+가져옵니다 — 다음 단계의 스크립트에 넣을 것입니다.
 
-Разбор манифеста: [chat/13](chat/13-bucket-manifest.md) ·
-шаг целиком: [chat/14](chat/14-step-1-bucket.md)
+매니페스트 해설: [chat/13](chat/13-bucket-manifest.md) ·
+단계 전체: [chat/14](chat/14-step-1-bucket.md)
 
 ---
 
-## Фаза 2. Переупаковка диска
+## 2단계. 디스크 다시 포장하기
 
-📍 Сначала на ноутбуке, потом внутри временной машины.
+📍 먼저 노트북에서, 그다음 임시 머신 안에서.
 
-Диск из VMware записан в формате VMDK, а KVM читает QCOW2. Переупаковкой занимается
-`virt-v2v`; ставить его на ноутбук ради одного раза незачем, поэтому поднимаем
-временную машину с уже готовыми инструментами.
+VMware의 디스크는 VMDK 포맷으로 기록되어 있지만, KVM은 QCOW2를 읽습니다. `virt-v2v`가 다시
+포장을 처리합니다. 한 번 쓰자고 노트북에 설치할 이유가 없으니, 도구가 이미 갖춰진 임시 머신을
+띄웁니다.
 
 ```bash
 kubectl apply -f manifests/02-conversion-vm.yaml
 kubectl get vminstance convert -n tenant-workshopXX -w
 ```
 
-**Должны увидеть:** две строки с `created`, затем `Running`.
+**이렇게 보여야 합니다:** `created`가 붙은 두 줄, 이어서 `Running`.
 
-⚠️ `Running` означает «включилась», а не «готова»: внутри ещё несколько минут работает
-`cloudInit` — ставит пакеты и качает `mc`. Зайдёте раньше — не найдёте `virt-v2v`.
+⚠️ `Running`은 "켜졌다"는 뜻이지 "준비됐다"는 뜻이 아닙니다: 내부에서는 `cloudInit`이 몇 분 더
+계속 작동하며 — 패키지를 설치하고 `mc`를 내려받습니다. 너무 일찍 로그인하면 `virt-v2v`를 찾지
+못합니다.
 
-Заходим внутрь (логин `ubuntu`, пароль `ubuntu`):
+로그인합니다(사용자 이름 `ubuntu`, 비밀번호 `ubuntu`):
 
 ```bash
 virtctl console --namespace=tenant-workshopXX vm-instance-convert
 ```
 
-Внутри: `nano convert.sh`, вставить текст `scripts/convert.sh`, вписать свои
-`bucketName`, `accessKey` и `secretKey` вместо `ВСТАВЬТЕ_...`, запустить
-`bash convert.sh`.
+내부에서: `nano convert.sh`로 `scripts/convert.sh`의 내용을 붙여 넣고, `ВСТАВЬТЕ_...` 자리에
+자신의 `bucketName`, `accessKey`, `secretKey`를 넣은 뒤 `bash convert.sh`를 실행합니다.
 
-**Должны увидеть:** в конце вывода после слова `Share:` — подписанную ссылку на образ.
-Она понадобится на следующей фазе.
+**이렇게 보여야 합니다:** 출력의 끝, `Share:`라는 단어 뒤에 — 이미지로 향하는 서명된 링크가 있습니다.
+다음 단계에서 필요합니다.
 
-Разбор манифеста: [chat/15](chat/15-conversion-vm-manifest.md) ·
-разбор скрипта: [chat/17](chat/17-convert-script.md) ·
-шаги целиком: [chat/16](chat/16-step-2-conversion-vm.md),
+매니페스트 해설: [chat/15](chat/15-conversion-vm-manifest.md) ·
+스크립트 해설: [chat/17](chat/17-convert-script.md) ·
+두 단계 전체: [chat/16](chat/16-step-2-conversion-vm.md),
 [chat/18](chat/18-step-3-convert-image.md)
 
 ---
 
-## Фаза 3. Машина на новом месте
+## 3단계. 새 보금자리의 머신
 
-📍 На ноутбуке.
+📍 노트북에서.
 
-⚠️ Сначала погасите машину-конвертер — она своё отработала и держит 8Gi вашей квоты.
-Если её не убрать, новая машина повиснет в `Pending`:
+⚠️ 먼저 변환용 머신을 끄세요 — 할 일을 마쳤고 여러분 쿼터의 8Gi를 붙잡고 있습니다. 없애지
+않으면 새 머신이 `Pending`에 걸린 채 멈춰 있게 됩니다:
 
 ```bash
 kubectl delete vminstance convert --namespace tenant-workshopXX
 kubectl delete vmdisk convert-tools --namespace tenant-workshopXX
 ```
 
-Впишите полученную ссылку в `manifests/03-app-vm.yaml` вместо
-`url: "ВСТАВЬТЕ_PRESIGNED_URL"`, затем:
+받은 링크를 `manifests/03-app-vm.yaml`의 `url: "ВСТАВЬТЕ_PRESIGNED_URL"` 자리에 넣은 뒤:
 
 ```bash
 kubectl apply -f manifests/03-app-vm.yaml
 kubectl get vminstance app-1 -n tenant-workshopXX -w
 ```
 
-**Должны увидеть:** две строки с `created`, затем `Running`. Здесь ожидание дольше —
-платформа скачивает образ по вашей ссылке.
+**이렇게 보여야 합니다:** `created`가 붙은 두 줄, 이어서 `Running`. 여기서는 기다림이 더 깁니다 —
+플랫폼이 여러분의 링크에서 이미지를 내려받고 있습니다.
 
-Заходим внутрь (логин `root`, пароль `cozydemo`):
+로그인합니다(사용자 이름 `root`, 비밀번호 `cozydemo`):
 
 ```bash
 virtctl console --namespace=tenant-workshopXX vm-instance-app-1
 ```
 
-⚠️ **Сети внутри не будет.** Это не поломка стенда — так и должно быть. Чиним
-на пятой фазе.
+⚠️ **내부에는 네트워크가 없습니다.** 이것은 고장 난 테스트베드가 아니라 원래 그래야 하는
+모습입니다. 5단계에서 고칩니다.
 
-Разбор манифеста: [chat/20](chat/20-app-vm-manifest.md) ·
-шаг целиком: [chat/21](chat/21-step-4-your-vm.md)
+매니페스트 해설: [chat/20](chat/20-app-vm-manifest.md) ·
+단계 전체: [chat/21](chat/21-step-4-your-vm.md)
 
 ---
 
-## Фаза 4. База и очередь из каталога
+## 4단계. 카탈로그에서 가져오는 데이터베이스와 큐
 
-📍 На ноутбуке.
+📍 노트북에서.
 
 ```bash
 kubectl apply -f manifests/04-managed.yaml
 kubectl get postgreses.apps.cozystack.io,kafkas.apps.cozystack.io -n tenant-workshopXX
 ```
 
-**Должны увидеть:** `postgres.apps.cozystack.io/db created` и
-`kafka.apps.cozystack.io/kafka created`. Kafka поднимается заметно дольше Postgres.
+**이렇게 보여야 합니다:** `postgres.apps.cozystack.io/db created`와
+`kafka.apps.cozystack.io/kafka created`. Kafka는 Postgres보다 눈에 띄게 더 오래 올라옵니다.
 
-Разбор манифеста: [chat/23](chat/23-managed-manifest.md) ·
-шаг целиком: [chat/24](chat/24-step-5-database-and-queue.md)
+매니페스트 해설: [chat/23](chat/23-managed-manifest.md) ·
+단계 전체: [chat/24](chat/24-step-5-database-and-queue.md)
 
 ---
 
-## Фаза 5. Подключаем приложение
+## 5단계. 애플리케이션 연결하기
 
-📍 Внутри вашей виртуальной машины.
+📍 여러분의 가상 머신 안에서.
 
-Три действия строго по порядку: без сети скрипт не достучится до базы, а без базы
-не примет схему.
+엄격한 순서로 세 가지 작업을 합니다: 네트워크가 없으면 스크립트가 데이터베이스에 닿을 수 없고,
+데이터베이스가 없으면 스키마를 받아들이지 못합니다.
 
-| Шаг | Что чиним | Чем |
+| 단계 | 무엇을 고치나 | 무엇으로 |
 |---|---|---|
-| 5.1 | машина не в сети | `scripts/netfix-dhcp.sh` |
-| 5.2 | приложение ищет старые адреса | `scripts/connect-managed.sh` |
-| 5.3 | в новой базе нет таблиц | `scripts/orders-schema.sql` |
+| 5.1 | 머신에 네트워크가 없다 | `scripts/netfix-dhcp.sh` |
+| 5.2 | 애플리케이션이 옛 주소를 찾는다 | `scripts/connect-managed.sh` |
+| 5.3 | 새 데이터베이스에 테이블이 없다 | `scripts/orders-schema.sql` |
 
-**5.1.** Скрипт меняет `BOOTPROTO=static` на `dhcp` и убирает адрес из сети VMware.
-Набирается руками — сети у машины ещё нет, скачать файл не получится. После этого
-машину нужно **перезагрузить**: CentOS 7 применяет настройки сети при загрузке.
+**5.1.** 이 스크립트는 `BOOTPROTO=static`을 `dhcp`로 바꾸고 VMware 네트워크의 주소를 제거합니다.
+직접 손으로 입력합니다 — 머신에 아직 네트워크가 없어서 파일을 내려받을 수 없기 때문입니다.
+그다음 머신을 **재부팅**해야 합니다: CentOS 7은 부팅 시에 네트워크 설정을 적용합니다.
 
-**5.2.** Скрипт заменяет в `/etc/orders/application.properties` прибитые адреса
-`192.168.10.30` и `192.168.10.40` на имена сервисов и перезапускает приложение.
+**5.2.** 이 스크립트는 `/etc/orders/application.properties`에 하드코딩된 주소 `192.168.10.30`과
+`192.168.10.40`을 서비스 이름으로 바꾸고 애플리케이션을 재시작합니다.
 
-**5.3.** Ставим клиент `psql` и накатываем схему — команды ниже, в финальной проверке.
+**5.3.** `psql` 클라이언트를 설치하고 스키마를 적용합니다 — 명령은 아래 마지막 확인에 있습니다.
 
-Подробно: [chat/25](chat/25-step-6-fix-networking.md) ·
+자세히: [chat/25](chat/25-step-6-fix-networking.md) ·
 [chat/26](chat/26-first-check-fails.md) ·
 [chat/27](chat/27-step-7-switch-app.md)
 
 ---
 
-## Финальная проверка: три шага по порядку
+## 마지막 확인: 순서대로 세 단계
 
-### Шаг 1. Погасить firewalld
+### 1단계. firewalld 끄기
 
-📍 Внутри вашей машины. Правила остались из старой сети и режут обращения к приложению.
+📍 여러분의 머신 안에서. 옛 네트워크에서 남은 규칙들이 애플리케이션으로 가는 요청을 끊고 있습니다.
 
 ```bash
 systemctl stop firewalld && systemctl disable firewalld
 curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/actuator/health
 ```
 
-**Должны увидеть:** `200`. Если `503` — что-то из базы или очереди не подключилось.
+**이렇게 보여야 합니다:** `200`. `503`이면 — 데이터베이스나 큐에서 무언가가 연결되지 않은 것입니다.
 
-### Шаг 2. Схема базы
+### 2단계. 데이터베이스 스키마
 
-📍 Внутри вашей машины. Штатному psql из CentOS 7 версия 9.2, он не умеет SCRAM и
-отвечает `SCRAM authentication requires libpq version 10 or above`. Ставим свежий:
+📍 여러분의 머신 안에서. CentOS 7의 기본 psql은 버전 9.2입니다; SCRAM을 처리하지 못하고
+`SCRAM authentication requires libpq version 10 or above`라고 응답합니다. 새 것을 설치합니다:
 
 ```bash
-# 1. Репозиторий PGDG — источник пакетов PostgreSQL
+# 1. PGDG 저장소 — PostgreSQL 패키지의 출처
 yum install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm
 
-# 2. libzstd: в репозиториях CentOS 7 её нет, берём из архива EPEL
+# 2. libzstd: CentOS 7 저장소에 없으므로 EPEL 아카이브에서 가져옵니다
 yum install -y https://archives.fedoraproject.org/pub/archive/epel/7/x86_64/Packages/l/libzstd-1.5.5-1.el7.x86_64.rpm
 
-# 3. Сам клиент — только из живого репозитория pgdg15
+# 3. 클라이언트 본체 — 살아 있는 pgdg15 저장소에서만
 yum install -y --disablerepo='pgdg*' --enablerepo=pgdg15 postgresql15
 ```
 
-⚠️ Вторая и третья команды не лишние. Без `libzstd` установка падает на
-`Requires: libzstd >= 1.4.0`. Без `--disablerepo`/`--enablerepo` — на
-`HTTPS Error 410 - Gone`: пакет репозитория включает разом все версии PostgreSQL,
-включая снятые с поддержки 12-ю и 13-ю, а `yum` перед установкой обходит каждый
-включённый репозиторий и падает на первом мёртвом.
+⚠️ 두 번째와 세 번째 명령은 군더더기가 아닙니다. `libzstd`가 없으면 설치가
+`Requires: libzstd >= 1.4.0`에서 실패합니다. `--disablerepo`/`--enablerepo`가 없으면 —
+`HTTPS Error 410 - Gone`에서 실패합니다: 저장소 패키지는 수명이 끝난 12와 13을 포함해 모든
+PostgreSQL 버전을 한꺼번에 활성화하며, 설치 전에 `yum`은 활성화된 모든 저장소를 훑다가 첫 번째
+죽은 저장소에서 실패합니다.
 
 ```bash
 psql --version
 ```
 
-Если `command not found` — клиент лёг мимо `PATH`: посмотрите
-`ls /usr/pgsql-*/bin/psql`, затем `export PATH="$PATH:/usr/pgsql-15/bin"`.
+`command not found`가 뜨면 — 클라이언트가 `PATH` 밖에 설치된 것입니다: `ls /usr/pgsql-*/bin/psql`를
+살펴본 뒤 `export PATH="$PATH:/usr/pgsql-15/bin"`.
 
-Забираем схему и накатываем:
+스키마를 가져와서 적용합니다:
 
 ```bash
 curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/laptop/scripts/orders-schema.sql
@@ -343,24 +343,24 @@ PGPASSWORD='Orders2019!' psql \
   -h postgres-db-rw.tenant-workshopXX.svc.cozy.local -U orders -d orders -c '\dt'
 ```
 
-**Должны увидеть:** в последней команде — таблицу `orders`.
+**이렇게 보여야 합니다:** 마지막 명령에서 — `orders` 테이블.
 
-Адрес базы — не IP, а имя: `postgres-db-rw` (сервис `db` на чтение-запись),
-`tenant-workshopXX` (ваш namespace), `svc.cozy.local` (суффикс внутренних имён
-кластера). Пароль задан в `manifests/04-managed.yaml`, искать его нигде не надо.
+데이터베이스 주소는 IP가 아니라 이름입니다: `postgres-db-rw`(`db` 서비스, 읽기-쓰기),
+`tenant-workshopXX`(여러분의 namespace), `svc.cozy.local`(클러스터 내부 이름의 접미사).
+비밀번호는 `manifests/04-managed.yaml`에 설정되어 있으니, 어디선가 뒤질 필요가 없습니다.
 
-Подробно: [chat/28](chat/28-step-8-why-it-still-fails.md) ·
+자세히: [chat/28](chat/28-step-8-why-it-still-fails.md) ·
 [chat/29](chat/29-step-8-apply-schema.md)
 
-### Шаг 3. Проброс порта и проверка снаружи
+### 3단계. 포트 포워딩과 바깥에서 확인하기
 
-📍 На ноутбуке.
+📍 노트북에서.
 
 ```bash
 virtctl port-forward --namespace=tenant-workshopXX vmi/vm-instance-app-1 8080:8080
 ```
 
-Окно не закрывайте — туннель живёт, пока команда работает. Во втором окне:
+창을 닫지 마세요 — 터널은 명령이 실행되는 동안만 살아 있습니다. 다른 창에서:
 
 ```bash
 curl -s http://localhost:8080/actuator/health
@@ -371,50 +371,50 @@ curl -s -X POST http://localhost:8080/api/orders \
 curl -s http://localhost:8080/api/orders
 ```
 
-**Должны увидеть:** заказ в списке. Путь пройден целиком.
+**이렇게 보여야 합니다:** 목록에 그 주문이 있습니다. 여정 전체가 완료되었습니다.
 
-Подробно: [chat/30](chat/30-step-9-verify-chain.md)
+자세히: [chat/30](chat/30-step-9-verify-chain.md)
 
 ---
 
-## Шпаргалка
+## 치트 시트
 
-> **Префикс `vmi/` нужен не везде, и это не опечатка.** У двух команд разный синтаксис
-> цели. `virtctl console` ждёт просто имя и с префиксом отвечает `forbidden`, потому что
-> принимает слово `vmi` за имя машины. `virtctl port-forward` требует `тип/имя` и без
-> префикса отвечает `target must contain type and name separated by '/'`.
+> **`vmi/` 접두사가 모든 명령에 필요한 것은 아니며, 이것은 오타가 아닙니다.** 두 명령은 대상
+> 문법이 다릅니다. `virtctl console`은 이름만 받으며, 접두사를 붙이면 `vmi`라는 단어를 머신
+> 이름으로 여겨 `forbidden`이라고 응답합니다. `virtctl port-forward`는 `type/name`을 요구하며,
+> 접두사가 없으면 `target must contain type and name separated by '/'`라고 응답합니다.
 
 ```bash
-# зайти в app-VM (root / cozydemo)
+# app-VM에 로그인 (root / cozydemo)
 virtctl console --namespace=tenant-workshopXX vm-instance-app-1
 
-# зайти в conversion-VM (ubuntu / ubuntu)
+# conversion-VM에 로그인 (ubuntu / ubuntu)
 virtctl console --namespace=tenant-workshopXX vm-instance-convert
 
-# пробросить порт приложения на ноутбук
+# 애플리케이션의 포트를 노트북으로 포워딩
 virtctl port-forward --namespace=tenant-workshopXX vmi/vm-instance-app-1 8080:8080
 ```
 
-Выйти из консоли — `Ctrl+]`. Если после подключения экран пустой, нажмите Enter.
-То же самое доступно мышкой: кнопка **VNC** на странице машины в дашборде.
+콘솔에서 나가려면 — `Ctrl+]`. 접속한 뒤 화면이 비어 있으면 Enter를 누르세요. 같은 것을 마우스로도
+할 수 있습니다: dashboard의 머신 페이지에 있는 **VNC** 버튼입니다.
 
-## На чём легко застрять
+## 막히기 쉬운 곳
 
-* Для conversion-VM берите только `ubuntu-20.04`. На 24.04 ядро паникует, на 22.04
-  `virt-v2v` не разбирает старую RPM-базу CentOS 7.
-* VMDisk под каталожный образ должен быть больше самого образа, иначе клон не пройдёт,
-  а диск зависнет в `Terminating`. Для `ubuntu-20.04` хватает 25Gi.
-* На свежей app-VM сначала `netfix`, потом `connect` — иначе приложение не увидит
-  managed-сервисы.
-* Не открывайте `.yaml` в Word или Google Docs: они подменяют кавычки и дефисы, файл
-  перестаёт применяться, а ошибка выглядит необъяснимо.
+* conversion-VM에는 `ubuntu-20.04`만 쓰세요. 24.04에서는 커널이 패닉을 일으키고, 22.04에서는
+  `virt-v2v`가 오래된 CentOS 7 RPM 데이터베이스를 파싱하지 못합니다.
+* 카탈로그 이미지용 VMDisk는 이미지 자체보다 커야 합니다. 그렇지 않으면 클론이 통과되지 못하고
+  디스크가 `Terminating`에 걸립니다. `ubuntu-20.04`에는 25Gi면 충분합니다.
+* 새 app-VM에서는 먼저 `netfix`, 그다음 `connect` — 그렇지 않으면 애플리케이션이 매니지드
+  서비스를 보지 못합니다.
+* `.yaml` 파일을 Word나 Google Docs에서 열지 마세요: 따옴표와 대시가 바뀌어 파일이 더 이상
+  적용되지 않고, 오류는 영문을 알 수 없어 보입니다.
 
-Остальные грабли — [chat/31](chat/31-troubleshooting.md).
+나머지 함정들은 — [chat/31](chat/31-troubleshooting.md).
 
-## Для тех, кто разворачивает стенд
+## 테스트베드를 준비하는 분들께
 
-Квоты, порядок создания тенантов и версия платформы — в [REQUIREMENTS.md](../REQUIREMENTS.md).
+쿼터, 테넌트 생성 순서, 플랫폼 버전은 — [REQUIREMENTS.md](../REQUIREMENTS.md)에 있습니다.
 
-## Все сообщения по порядку
+## 모든 메시지를 순서대로
 
-Список из 32 сообщений — [chat/README.md](chat/README.md).
+32개 메시지 목록은 — [chat/README.md](chat/README.md).

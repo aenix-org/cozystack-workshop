@@ -68,7 +68,7 @@ PGPASSWORD='Orders2019!' psql -h postgres-db-rw.tenant-workshopXX.svc.cozy.local
 - `PGPASSWORD='...'` — 비밀번호를 환경 변수로 전달하여, `psql`이 대화형으로 비밀번호를
   묻지 않게 합니다. 스크립트에서는 이렇게 합니다.
 - `-h postgres-db-rw.tenant-workshopXX.svc.cozy.local` — 데이터베이스 주소. 이것은 **IP가 아니라**
-  클러스터 내부 이름입니다. `-rw` 접미사가 중요합니다: managed Postgres에는 여러 개의
+  클러스터 내부 이름입니다. `-rw` 접미사가 중요합니다: 매니지드 Postgres에는 여러 개의
   복제본이 있는데, 이 이름은 항상 **쓰기가 가능한** 복제본을 가리킵니다. `-ro`가 붙은 짝
   이름도 있는데 — 읽기 전용입니다. 복제본 사이에서 역할이 전환되어도 이름은 바뀌지 않으며,
   그래서 애플리케이션 설정에는 특정 서버의 주소가 아니라 이 이름을 적어 둡니다.

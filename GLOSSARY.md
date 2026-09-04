@@ -211,3 +211,9 @@ Fixed callouts (CONVENTIONS, verbatim everywhere):
 - spoiler <summary> heading = 「답과, 이 오류보다 더 넓은 교훈」
 - lesson opener (bold) = 「교훈은 이 오류보다 넓습니다.」
 - stop-and-think = 「더 읽기 전에 멈추고 생각해 보십시오.」
+
+### Korean (ko) — Phase/Step and managed
+- Phase (Фаза, the 3 big migration phases) → **페이즈 N** (keep distinct from Step)
+- Step (Шаг, numbered steps) → **N단계** (number before 단계: 2단계, not 단계 2, not 스텝)
+- managed service → **관리형 서비스** (natural Korean; not 매니지드 / raw "managed")
+- The pinned spoiler callout 「답과, 이 오류보다 더 넓은 교훈」 is ONLY for spoilers whose English is exactly "The answer, and a lesson broader than this error" — never overwrite a spoiler that has its own specific heading.

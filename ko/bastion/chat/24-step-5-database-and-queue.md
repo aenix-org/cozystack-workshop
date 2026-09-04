@@ -1,6 +1,6 @@
 ## 24. 5단계: 카탈로그에서 데이터베이스와 큐 올리기
 
-**관리형 Postgres와 Kafka 띄우기**
+**매니지드 Postgres와 Kafka 띄우기**
 
 📍 **위치:** bastion(공유 VM)에서. 이하 bastion.
 

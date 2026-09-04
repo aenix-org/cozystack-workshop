@@ -89,7 +89,7 @@ cd labs/08-openbao
 | `secrets-demo.yaml` | 최종 버전: 비밀번호가 어디에도 없음 — 평문으로도, base64로도 | 같은 곳에 적용합니다 |
 | `check.sh` | 애플리케이션이 저장소에서 비밀번호를 받아오는지 확인 | 랩 마지막에 실행합니다 |
 
-## 단계 1. 문제를 직접 눈으로 본다
+## 1단계. 문제를 직접 눈으로 본다
 
 📍 **위치:** bastion(공유 VM)에서, lab 클러스터에서.
 
@@ -175,7 +175,7 @@ kubectl logs deploy/secrets-demo --tail=2
 애플리케이션은 동작합니다. 비밀번호는 파일 안에, 파일은 Git 안에 있습니다. 이것이 바로 감사가
 찾아낸 상황입니다.
 
-## 단계 2. 순진한 수정: 비밀번호를 Secret으로 옮기기
+## 2단계. 순진한 수정: 비밀번호를 Secret으로 옮기기
 
 📍 **위치:** bastion에서, lab 클러스터에서.
 
@@ -303,7 +303,7 @@ Kubernetes가 Secret에서 base64를 쓰는 건 바로 이 이유 때문입니�
 
 </details>
 
-## 단계 3. OpenBao를 주문한다
+## 3단계. OpenBao를 주문한다
 
 📍 **위치:** 브라우저에서, Cozystack 대시보드에서, 자기 테넌트에서.
 
@@ -374,7 +374,7 @@ kubectl --kubeconfig ~/.kube/config apply -f openbao.yaml
 
 애플리케이션이 준비 상태에 도달할 때까지 기다리세요. 1~2분 걸립니다.
 
-## 단계 4. 작업용 Pod를 준비하고 연결을 확인한다
+## 4단계. 작업용 Pod를 준비하고 연결을 확인한다
 
 📍 **위치:** bastion에서, lab 클러스터에서.
 
@@ -523,7 +523,7 @@ Initialized        false
 
 </details>
 
-## 단계 5. 초기화하고 봉인을 해제한다
+## 5단계. 초기화하고 봉인을 해제한다
 
 📍 **위치:** bastion에서, lab 클러스터에서.
 
@@ -605,7 +605,7 @@ kubectl exec -it bao-workbench -- bao login
 `kubectl exec bao-workbench -- env BAO_TOKEN='여러분의-토큰' bao status`.
 동작은 하지만, 토큰이 명령 이력에 남습니다 — 랩에서는 참을 만하지만, 프로덕션에서는 아닙니다.
 
-## 단계 6. 엔진을 켜고 비밀번호를 저장한다
+## 6단계. 엔진을 켜고 비밀번호를 저장한다
 
 📍 **위치:** bastion에서, lab 클러스터에서.
 
@@ -661,7 +661,7 @@ kubectl exec bao-workbench -- \
 kubectl exec bao-workbench -- bao kv get secret/passes/db
 ```
 
-## 단계 7. 애플리케이션에 접근을 부여한다 — 정확히 한 줄에만
+## 7단계. 애플리케이션에 접근을 부여한다 — 정확히 한 줄에만
 
 📍 **위치:** bastion에서, lab 클러스터에서.
 
@@ -736,7 +736,7 @@ kubectl exec bao-workbench -- \
 여기서 수명은 형식적인 것이 아닙니다. 토큰이 로그에 흘러 들어가고, 백업에 들어가고, bastion과
 함께 새어 나가도 — 모레면 쓸모없습니다. 매니페스트의 비밀번호에는 그런 성질이 없습니다.
 
-## 단계 8. 토큰을 클러스터에 넣고 매니페스트에서 비밀번호를 제거한다
+## 8단계. 토큰을 클러스터에 넣고 매니페스트에서 비밀번호를 제거한다
 
 📍 **위치:** bastion에서, lab 클러스터에서.
 
@@ -891,7 +891,7 @@ kubectl apply -f secrets-demo.yaml
 kubectl rollout status deploy/secrets-demo
 ```
 
-## 단계 9. 애플리케이션이 저장소에서 비밀번호를 받았는지 확인한다
+## 9단계. 애플리케이션이 저장소에서 비밀번호를 받았는지 확인한다
 
 📍 **위치:** bastion에서, lab 클러스터에서.
 
@@ -927,7 +927,7 @@ kubectl logs deploy/secrets-demo -c app --tail=2
 kubectl delete secret passes-db
 ```
 
-## 단계 10. 로테이션: 파일 하나 건드리지 않고 비밀번호를 바꾼다
+## 10단계. 로테이션: 파일 하나 건드리지 않고 비밀번호를 바꾼다
 
 📍 **위치:** bastion에서, lab 클러스터에서.
 
@@ -977,7 +977,7 @@ kubectl exec bao-workbench -- bao kv get -version=1 secret/passes/db
 교체하는 것. "서비스 계정 비밀번호는 분기에 한 번 바꾼다" 같은 규칙이 달성 불가능한 것에서
 일정표의 한 줄로 바뀝니다.
 
-## 단계 11. 감사 로그: 누가 무엇을 요청했는가
+## 11단계. 감사 로그: 누가 무엇을 요청했는가
 
 📍 **위치:** bastion에서, lab 클러스터에서.
 
