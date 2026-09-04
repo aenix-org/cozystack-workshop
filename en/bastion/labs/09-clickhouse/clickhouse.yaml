@@ -1,46 +1,46 @@
-# Лаба 9 · заказ базы ClickHouse под аналитику по журналу проходов.
-# Описание того, что вы хотите получить; собирает и настраивает сервис платформа.
-# То же самое, что вы закажете мышкой в дашборде — только текстом.
-# Применяется НЕ в лабораторный кластер, а в тенант на управляющем кластере:
+# Lab 9 · order a ClickHouse database for analytics over the access-pass log.
+# A description of what you want to get; the platform assembles and configures the service.
+# The same thing you would order with the mouse in the dashboard — just as text.
+# Applied NOT to the lab cluster, but to a tenant on the management cluster:
 #   kubectl --kubeconfig="$HOME/.kube/config" apply -f clickhouse.yaml
 #
-# ПЕРЕД ПРИМЕНЕНИЕМ: замените tenant-workshopXX на свой namespace,
-# а ЗдесьВашПароль — на пароль, который вы придумаете.
+# BEFORE APPLYING: replace tenant-workshopXX with your namespace,
+# and ЗдесьВашПароль with a password you come up with.
 apiVersion: apps.cozystack.io/v1alpha1
 kind: ClickHouse
 metadata:
   name: analytics
   namespace: tenant-workshopXX
 spec:
-  # Одна копия и один шард. В проде держат минимум две копии, иначе потеря узла
-  # означает недоступность данных, — но нам нужен миллион строк, а не отказо-
-  # устойчивость, и лишняя копия просто съела бы ресурсы стенда.
+  # One copy and one shard. In production you keep at least two copies, otherwise losing a node
+  # means the data becomes unavailable — but we need a million rows, not fault
+  # tolerance, and an extra copy would just eat up the stand's resources.
   replicas: 1
   shards: 1
-  # Диск под данные таблиц. Миллион строк из этой лабы займёт десятки мегабайт:
-  # колоночное хранение со словарями сжимает такой журнал очень сильно.
+  # Disk for the table data. A million rows from this lab will take up tens of megabytes:
+  # columnar storage with dictionaries compresses such a log very heavily.
   size: 5Gi
-  # Отдельный диск под системные журналы сервера, включая журнал запросов.
+  # A separate disk for the server's system logs, including the query log.
   logStorageSize: 2Gi
-  # Через сколько дней выбрасывать журнал запросов. Мы будем в него смотреть.
+  # After how many days to discard the query log. We are going to look into it.
   logTTL: 15
-  # replicated — тома, у которых есть копия на другом узле кластера: узел выпал,
-  # данные остались.
+  # replicated — volumes that have a copy on another cluster node: the node dropped out,
+  # the data stayed.
   storageClass: replicated
-  # 1 процессор, 4 ГБ. ClickHouse считает в памяти, и на группировках по
-  # миллиону строк это заметно.
+  # 1 CPU, 4 GB. ClickHouse computes in memory, and on groupings over
+  # a million rows this is noticeable.
   resourcesPreset: u1.small
-  # Пользователь базы и его пароль. Пароль придумайте свой и запомните: он нужен
-  # рабочему поду (переменная CH_AUTH) и скрипту проверки (переменная CH_PASSWORD).
-  # После создания его видно в дашборде, в секрете clickhouse-analytics-credentials.
+  # The database user and its password. Come up with your own password and remember it: it is needed
+  # by the worker pod (the CH_AUTH variable) and the check script (the CH_PASSWORD variable).
+  # After creation it is visible in the dashboard, in the clickhouse-analytics-credentials secret.
   users:
     analyst:
       password: ЗдесьВашПароль
-  # Резервные копии в объектное хранилище. Данные здесь сгенерированные,
-  # восстанавливать нечего — на учебном стенде выключено.
+  # Backups to object storage. The data here is generated,
+  # there is nothing to restore — disabled on the training stand.
   backup:
     enabled: false
-  # Keeper нужен для согласования между копиями. Копия одна — согласовывать
-  # не с кем, а три пода Keeper заняли бы ресурсы впустую.
+  # Keeper is needed to reconcile between copies. There is one copy — there is no one
+  # to reconcile with, and three Keeper pods would take up resources for nothing.
   clickhouseKeeper:
     enabled: false
