@@ -1,16 +1,16 @@
--- Схема orders для managed Postgres (таблица + история-сид).
+-- managed Postgres के लिए orders स्कीमा (टेबल + इतिहास-सीड)।
 --
--- Роль `orders` и БД `orders` создаёт Postgres-chart (Postgres CR), поэтому здесь
--- НЕТ CREATE USER / CREATE DATABASE — только таблица и немного истории.
+-- `orders` रोल और `orders` DB को Postgres-chart (Postgres CR) बनाता है, इसलिए यहाँ
+-- कोई CREATE USER / CREATE DATABASE नहीं है — केवल टेबल और थोड़ा इतिहास।
 --
--- ВАЖНО (PG 15+): роль orders не может создавать таблицы в схеме public без
--- гранта. Сначала один раз под superuser (secret postgres-db-superuser):
+-- महत्वपूर्ण (PG 15+): orders रोल grant के बिना public स्कीमा में टेबल नहीं बना
+-- सकता। पहले एक बार superuser के रूप में (secret postgres-db-superuser):
 --     GRANT CREATE,USAGE ON SCHEMA public TO orders;
--- и только потом накатывать этот файл от роли orders. Без таблицы приложение
--- отвечает 500 на POST /api/orders (health при этом 200 — он проверяет лишь
--- коннект к PG, а не наличие таблицы).
+-- और उसके बाद ही इस फ़ाइल को orders रोल से लगाएँ। टेबल के बिना एप्लिकेशन
+-- POST /api/orders पर 500 देता है (health तब भी 200 रहता है — यह केवल PG से
+-- कनेक्शन जाँचता है, टेबल की मौजूदगी नहीं)।
 --
--- Запуск (с app-VM или любой машины с доступом к managed PG):
+-- चलाएँ (app-VM से या managed PG तक पहुँच वाली किसी भी मशीन से):
 --     PGPASSWORD='<orders-pw>' psql -h postgres-db-rw -U orders -d orders -f orders-schema.sql
 
 CREATE TABLE IF NOT EXISTS orders (
@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS orders (
     processed_at TIMESTAMPTZ
 );
 
--- немного истории, чтобы список не выглядел пустым на проекторе
+-- थोड़ा इतिहास, ताकि प्रोजेक्टर पर सूची खाली न दिखे
 INSERT INTO orders (item, status, created_by, processed_by, created_at, processed_at)
 SELECT '12x rack rails', 'PROCESSED', 'app-1', 'kafka',
        now() - interval '3 days', now() - interval '3 days' + interval '2 seconds'
