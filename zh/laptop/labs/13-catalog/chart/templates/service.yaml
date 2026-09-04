@@ -1,11 +1,10 @@
-# Лаба 13. Шаблон Service: постоянный адрес приложения.
+# 实验 13. Service 模板：为应用提供稳定的地址。
 #
-# Копии приложения приходят и уходят, их адреса каждый раз новые. Service даёт имя,
-# которое не меняется, и раскидывает запросы по живым копиям. Из соседнего пода
-# к приложению обращаются по имени релиза.
+# 应用的副本来来去去，它们的地址每次都是新的。Service 提供一个不会变化的名字，
+# 并把请求分发到存活的副本上。从相邻的 Pod 中，通过发布名称即可访问该应用。
 #
-# О подстановке в двойных фигурных скобках и о том, откуда берутся имена объектов,
-# написано в templates/deployment.yaml — здесь всё устроено так же.
+# 关于双大括号中的替换，以及对象名称从何而来，
+# 已在 templates/deployment.yaml 中说明——这里的原理完全相同。
 apiVersion: v1
 kind: Service
 metadata:
@@ -14,20 +13,20 @@ metadata:
     app.kubernetes.io/name: guest-pass
     app.kubernetes.io/instance: {{ .Release.Name }}
 spec:
-  # Один флаг в values решает, получит приложение адрес за пределами кластера или нет.
-  # Так же устроены штатные приложения Cozystack: поле external.
-  # Конструкция if/else выбирает одно из двух значений при рендере — в готовый манифест
-  # уходит либо LoadBalancer, либо ClusterIP, и ветвления в нём уже не остаётся.
+  # values 中的一个开关决定应用是否获得集群外部的地址。
+  # Cozystack 的内置应用也是这样工作的：external 字段。
+  # if/else 结构在渲染时从两个值中选择其一——最终生成的清单里
+  # 要么是 LoadBalancer，要么是 ClusterIP，其中不再保留任何分支。
   type: {{ if .Values.external }}LoadBalancer{{ else }}ClusterIP{{ end }}
-  # Кому отдавать трафик. Service отбирает поды по меткам, а не по именам, поэтому
-  # ему всё равно, сколько копий и как они называются. Метки те же, что Deployment
-  # ставит своим копиям.
+  # 把流量发给谁。Service 按标签而不是按名字来筛选 Pod，所以
+  # 它不关心有多少副本、它们叫什么名字。这些标签与 Deployment
+  # 给自己的副本打上的标签相同。
   selector:
     app.kubernetes.io/name: guest-pass
     app.kubernetes.io/instance: {{ .Release.Name }}
-  # port — на каком порту слушает сам Service, targetPort — куда он стучится внутрь пода.
-  # targetPort записан именем: порт с именем http объявлен в шаблоне Deployment.
-  # Поменяется номер там — здесь править не придётся.
+  # port——Service 自身监听的端口，targetPort——它向 Pod 内部敲的端口。
+  # targetPort 用名字来写：名为 http 的端口在 Deployment 模板中声明。
+  # 那里的端口号变了，这里也不需要改动。
   ports:
     - name: http
       port: 80

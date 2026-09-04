@@ -1,5 +1,5 @@
-# Перед применением замените tenant-workshopXX на свой namespace.
-# Проще разом по всем файлам: см. README, раздел про подстановку номера.
+# 应用前，请将 tenant-workshopXX 替换为你自己的 namespace。
+# 更简单的做法是一次性替换所有文件：参见 README 中关于替换编号的章节。
 #
 apiVersion: apps.cozystack.io/v1alpha1
 kind: Bucket
