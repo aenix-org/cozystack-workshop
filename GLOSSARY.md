@@ -224,3 +224,13 @@ Fixed callouts (CONVENTIONS, verbatim everywhere):
 - lesson-opener bold = 「Die Lehre reicht über diesen Fehler hinaus.」
 - 'error' → **Fehler** (the term everywhere)
 German quotes: opening low „ (U+201E) + closing high " (U+201C) — never a straight ASCII close. Straight quotes inside code fences stay.
+
+### Hindi (hi) — resolved renderings
+| Concept | हिन्दी | not |
+|---|---|---|
+| queue | **क़तार** (with nuqta) | not raw "queue" / क्यू / कतार |
+| catalog | **कैटलॉग** | not raw "catalog" |
+| managed service | **प्रबंधित सेवा** | not raw "managed" |
+| application (spelling) | **एप्लिकेशन** | not ऐप्लिकेशन |
+Fixed callout (CONVENTIONS): stop-and-think = **आगे पढ़ने से पहले रुककर सोचिए।**
+Reader-facing password placeholders localized like the rest (e.g. CH_PASSWORD='आपका-analyst-पासवर्ड').
