@@ -94,7 +94,7 @@ if cache != nil {
     raw, found, err := cache.Get(key)
     switch {
     case err != nil:
-        log.Printf("кеш недоступен (%v), иду в справочник", err)
+        log.Printf("キャッシュが利用できません (%v)、名簿へ行きます", err)
     case found:
         if json.Unmarshal([]byte(raw), &emp) == nil {
             fromCache = true
@@ -220,7 +220,7 @@ kubectl run probe --rm -i --restart=Never --image=curlimages/curl:8.11.1 --quiet
 **見えるはずのもの：**
 
 ```json
-{"cache":"off","cached":false,"dept":"Логистика","id":"42","name":"Попова Е. К.",
+{"cache":"off","cached":false,"dept":"物流部","id":"42","name":"加藤",
  "pod":"passes-api-6f8b9c7d5-x2ktm","took_ms":803,"ttl_s":60}
 ```
 
@@ -483,8 +483,8 @@ kubectl logs -l app=passes-api --tail=20
 ```
 
 ```
-кеш недоступен (redis: NOAUTH Authentication required.), иду в справочник
-кеш недоступен (redis: NOAUTH Authentication required.), иду в справочник
+キャッシュが利用できません (redis: NOAUTH Authentication required.)、名簿へ行きます
+キャッシュが利用できません (redis: NOAUTH Authentication required.)、名簿へ行きます
 ```
 
 そこに答えがあります。Redis のアドレスは指定しましたが、パスワードは指定しませんでした。Redis は認証を要求します — 作成時に自分で `Auth enabled` をオンにしたのであり、それは正しい設定です。アプリケーションは正直に試み、拒否され、それをログに書き、名簿へ行きました。

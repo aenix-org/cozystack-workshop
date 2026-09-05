@@ -4,7 +4,7 @@
 // 向けのプログラムです。ノートパソコン上、ラボクラスタ内で、README の短い
 // `mo` コマンドで実行します（作業ポッド内で mongosh を起動します）:
 //     cd labs/10-mongodb && mo < passes.js
-// 応答として「документов в коллекции: 4」という行が表示されます。
+// 応答として「コレクション内のドキュメント数: 4」という行が表示されます。
 //
 // このファイルを 2 回実行するとドキュメントは 8 件になります。insertMany は追加するだけです。
 
@@ -24,12 +24,12 @@ db.passes.insertMany([
     // バイナリの BSON 形式で保存し、そこでは値に型があります: 日付、整数、浮動小数、論理値。
     // 日付は比較もソートもできますが、文字列「2026-09-01」でそれができるのは
     // 記録形式に恵まれた場合だけです。
-    type: "разовый",
-    guest: "Иванов Иван Иванович",
-    host: "petrov@corp.ru",
-    entrance: "Северная",
+    type: "一回券",
+    guest: "田中 太郎",
+    host: "petrov@corp.example",
+    entrance: "北口",
     valid_on: ISODate("2026-09-01T09:00:00Z"),
-    purpose: "собеседование"
+    purpose: "面接"
   },
   {
     // 週間パス。valid_on の代わりに valid_from と valid_to のペア、単一の入口の
@@ -39,27 +39,27 @@ db.passes.insertMany([
     // badge_returned フィールドが現れました。これは一回きりのパスにはまったく
     // 存在しません: NULL でも空でもなく、そのドキュメントにそういうフィールドが
     // ないというだけです。これらは別のものであり、検索の仕方も異なります。
-    type: "недельный",
-    guest: "Сидорова Анна Петровна",
-    host: "petrov@corp.ru",
-    entrances: ["Северная", "Южная"],
+    type: "週間券",
+    guest: "佐藤 恵子",
+    host: "petrov@corp.example",
+    entrances: ["北口", "南口"],
     valid_from: ISODate("2026-09-01T00:00:00Z"),
     valid_to: ISODate("2026-09-07T23:59:59Z"),
-    purpose: "внешний аудит",
+    purpose: "外部監査",
     badge_returned: false
   },
   {
     // 自動車パス。車に関するすべては 1 つのフィールド car の中に置かれます。
     // これは JSON を内部に持つ文字列ではなく、れっきとしたネストされた構造です:
     // car.plate で検索でき、それに対してインデックスを構築できます。
-    type: "автомобильный",
-    guest: "Кузнецов Виктор Сергеевич",
-    host: "logistics@corp.ru",
-    entrance: "Западная",
+    type: "車両券",
+    guest: "鈴木 健一",
+    host: "logistics@corp.example",
+    entrance: "西口",
     valid_on: ISODate("2026-09-02T07:30:00Z"),
     car: {
-      plate: "А123ВС174",
-      model: "ГАЗель Next",
+      plate: "品川 300 あ 12-34",
+      model: "トヨタ ハイエース",
       trailer: false,
       weight_kg: 3500
     },
@@ -73,17 +73,17 @@ db.passes.insertMany([
     // 1 つのフィールドの違いではなく、本質的に異なります。この点は後でラボに
     // 響いてきます: ドキュメント検証ルールはすべてから guest を要求することが
     // できません。さもなければ正当な団体パスが通らなくなるからです。
-    type: "групповой",
-    organization: "Гимназия № 1",
-    contact: "Смирнова Ольга Владимировна",
-    host: "hr@corp.ru",
-    entrance: "Северная",
+    type: "団体券",
+    organization: "市立第一高等学校",
+    contact: "高橋 由美",
+    host: "hr@corp.example",
+    entrance: "北口",
     valid_on: ISODate("2026-09-03T10:00:00Z"),
-    escort: "Петров Алексей Алексеевич",
+    escort: "渡辺 明",
     members: [
-      { name: "Орлов Пётр", age: 16 },
-      { name: "Волкова Мария", age: 15 },
-      { name: "Зайцев Илья", age: 17 }
+      { name: "伊藤 修", age: 16 },
+      { name: "山本 真理", age: 15 },
+      { name: "中村 勇", age: 17 }
     ]
   }
 ]);
@@ -92,4 +92,4 @@ db.passes.insertMany([
 // 意味します。print が必要なのはファイルに目に見える結果を持たせるためです:
 // insertMany 自体は発行された識別子のリストを返しますが、その中で実際に何件の
 // ドキュメントが入ったのかを見落としやすいのです。
-print("документов в коллекции: " + db.passes.countDocuments({}));
+print("コレクション内のドキュメント数: " + db.passes.countDocuments({}));

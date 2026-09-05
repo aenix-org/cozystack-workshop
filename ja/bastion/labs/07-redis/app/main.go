@@ -67,7 +67,7 @@ func envInt(key string, fallback int) int {
 		if n, err := strconv.Atoi(v); err == nil {
 			return n
 		}
-		log.Printf("значение %s=%q не число, беру %d", key, v, fallback)
+		log.Printf("値 %s=%q は数値ではありません。%d を使います", key, v, fallback)
 	}
 	return fallback
 }
@@ -177,7 +177,7 @@ func (r *redisClient) readReplyLocked() (string, bool, error) {
 	}
 	line = strings.TrimRight(line, "\r\n")
 	if line == "" {
-		return "", false, errors.New("redis: пустой ответ")
+		return "", false, errors.New("redis: 空の応答")
 	}
 	switch line[0] {
 	case '+', ':': // 単純な文字列、または数値
@@ -198,7 +198,7 @@ func (r *redisClient) readReplyLocked() (string, bool, error) {
 		}
 		return string(buf[:n]), true, nil
 	default:
-		return "", false, fmt.Errorf("redis: непонятный ответ %q", line)
+		return "", false, fmt.Errorf("redis: 解釈できない応答 %q", line)
 	}
 }
 
@@ -227,13 +227,13 @@ type employee struct {
 
 // データは架空のもの。学習用スタンドに本物の人事情報はないし、あってはならない。
 var surnames = []string{
-	"Иванов И. И.", "Петрова А. С.", "Сидоров П. Н.", "Кузнецова М. В.",
-	"Смирнов Д. А.", "Попова Е. К.", "Волков С. Ю.", "Морозова Н. Г.",
+	"田中", "佐藤", "斎藤", "鈴木",
+	"高橋", "加藤", "吉田", "松本",
 }
 
 var departments = []string{
-	"Служба безопасности", "Бухгалтерия", "Разработка",
-	"Логистика", "Отдел кадров", "Административный отдел",
+	"警備部", "経理部", "開発部",
+	"物流部", "人事部", "総務部",
 }
 
 // データは架空だが、同じ識別子に対しては同一だ:
@@ -262,7 +262,7 @@ func writeJSON(w http.ResponseWriter, code int, v any) {
 	enc := json.NewEncoder(w)
 	enc.SetEscapeHTML(false)
 	if err := enc.Encode(v); err != nil {
-		log.Printf("не удалось отдать ответ: %v", err)
+		log.Printf("応答を返せませんでした: %v", err)
 	}
 }
 
@@ -285,7 +285,7 @@ func employeeID(r *http.Request) string {
 func main() {
 	mode := env("MODE", "api")
 	port := env("PORT", "8080")
-	pod := env("POD_NAME", "неизвестно")
+	pod := env("POD_NAME", "不明")
 
 	mux := http.NewServeMux()
 	// /healthz は両方の役割にある: マニフェストに書かれた readiness プローブがここを叩く。
@@ -305,7 +305,7 @@ func main() {
 	case "api":
 		setupAPI(mux, pod)
 	default:
-		log.Fatalf("неизвестный MODE=%q, допустимы hr и api", mode)
+		log.Fatalf("不明な MODE=%q、許される値は hr と api です", mode)
 	}
 
 	// ReadHeaderTimeout は、クライアントがリクエストを始めて黙り込んだら接続を閉じる。これがないと、
@@ -315,7 +315,7 @@ func main() {
 		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
-	log.Printf("режим %s, порт %s, под %s", mode, port, pod)
+	log.Printf("モード %s、ポート %s、ポッド %s", mode, port, pod)
 	log.Fatal(srv.ListenAndServe())
 }
 
@@ -324,10 +324,10 @@ func main() {
 func setupHR(mux *http.ServeMux, pod string) {
 	delay, err := time.ParseDuration(env("HR_DELAY", "800ms"))
 	if err != nil {
-		log.Printf("HR_DELAY=%q не разобрался, беру 800ms", os.Getenv("HR_DELAY"))
+		log.Printf("HR_DELAY=%q を解釈できませんでした。800ms を使います", os.Getenv("HR_DELAY"))
 		delay = 800 * time.Millisecond
 	}
-	log.Printf("справочник отвечает за %s", delay)
+	log.Printf("名簿は %s で応答します", delay)
 
 	// この役割の唯一のアドレス。time.Sleep こそが「レガシーシステム」の全てだ: ラボに
 	// キャッシュが登場するのは、まさにこの数百ミリ秒のためだ。応答の source フィールドは、
@@ -359,9 +359,9 @@ func setupAPI(mux *http.ServeMux, pod string) {
 	var cache *redisClient
 	if addr := os.Getenv("REDIS_ADDR"); addr != "" {
 		cache = &redisClient{addr: addr, password: os.Getenv("REDIS_PASSWORD")}
-		log.Printf("кеш включён: %s, срок жизни записи %d с", addr, ttl)
+		log.Printf("キャッシュ有効: %s、レコードの生存期間 %d 秒", addr, ttl)
 	} else {
-		log.Printf("кеш выключен: REDIS_ADDR не задан, каждый запрос пойдёт в справочник")
+		log.Printf("キャッシュ無効: REDIS_ADDR が未設定のため、すべてのリクエストが名簿へ行きます")
 	}
 
 	// 接続プールを大きくした別のクライアント: さもなければ負荷のもとで、
@@ -378,9 +378,9 @@ func setupAPI(mux *http.ServeMux, pod string) {
 			"service":   "passes-api",
 			"version":   version,
 			"pod":       pod,
-			"node":      env("NODE_NAME", "неизвестно"),
-			"namespace": env("POD_NAMESPACE", "неизвестно"),
-			"registry":  env("IMAGE_REGISTRY", "не указан"),
+			"node":      env("NODE_NAME", "不明"),
+			"namespace": env("POD_NAMESPACE", "不明"),
+			"registry":  env("IMAGE_REGISTRY", "未設定"),
 			"cache":     cacheMode(cache),
 			"cache_ttl": ttl,
 			"hr_url":    hrURL,
@@ -408,12 +408,12 @@ func setupAPI(mux *http.ServeMux, pod string) {
 			case err != nil:
 				// キャッシュが利用できない — これはユーザーにエラーを返す理由にはならない。
 				// 名簿へ行く: 遅いが、正しい。
-				log.Printf("кеш недоступен (%v), иду в справочник", err)
+				log.Printf("キャッシュが利用できません (%v)。名簿へ行きます", err)
 			case found:
 				if json.Unmarshal([]byte(raw), &emp) == nil {
 					fromCache = true
 				} else {
-					log.Printf("в кеше по ключу %s лежит мусор, иду в справочник", key)
+					log.Printf("キャッシュのキー %s にゴミが入っています。名簿へ行きます", key)
 				}
 			}
 		}
@@ -425,9 +425,9 @@ func setupAPI(mux *http.ServeMux, pod string) {
 		if !fromCache {
 			fetched, err := fetchEmployee(hrClient, hrURL, id)
 			if err != nil {
-				log.Printf("справочник не ответил: %v", err)
+				log.Printf("名簿が応答しませんでした: %v", err)
 				writeJSON(w, http.StatusBadGateway, map[string]any{
-					"error": "справочник сотрудников недоступен",
+					"error": "社員名簿が利用できません",
 					"pod":   pod,
 				})
 				return
@@ -436,7 +436,7 @@ func setupAPI(mux *http.ServeMux, pod string) {
 			if cache != nil {
 				if b, err := json.Marshal(emp); err == nil {
 					if err := cache.SetTTL(key, string(b), ttl); err != nil {
-						log.Printf("не удалось положить в кеш: %v", err)
+						log.Printf("キャッシュに書き込めませんでした: %v", err)
 					}
 				}
 			}
@@ -477,7 +477,7 @@ func fetchEmployee(c *http.Client, base, id string) (employee, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return employee{}, fmt.Errorf("справочник ответил %s", resp.Status)
+		return employee{}, fmt.Errorf("名簿が %s を返しました", resp.Status)
 	}
 	var emp employee
 	if err := json.NewDecoder(resp.Body).Decode(&emp); err != nil {

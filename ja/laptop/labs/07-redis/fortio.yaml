@@ -10,7 +10,7 @@
 # `---` で区切られた2つのオブジェクト: Deployment（生成ツール本体）と Service（それに
 # 到達するための名前）。apiVersion、kind、metadata.name は以降コメントしない。
 #
-# イメージはあなたの Harbor ではなく公開 Docker Hub から取得される: Fortio は「Пропуск」
+# イメージはあなたの Harbor ではなく公開 Docker Hub から取得される: Fortio は「ゲストパス」
 # サービスの一部ではなく、クラスタに一時的に住む計測器だからだ。
 apiVersion: apps/v1
 kind: Deployment

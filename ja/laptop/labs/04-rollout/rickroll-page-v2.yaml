@@ -30,7 +30,7 @@ data:
   # 文字通りの内容だ。これはもう YAML ではない：ここにコメントはないし、
   # あってはならない、ハッシュ記号はただのテキストとしてページに現れてしまう。
   #
-  # マークアップで重要なのは check.sh が見る2つのこと：見出し «ВЕРСИЯ 2» —
+  # マークアップで重要なのは check.sh が見る2つのこと：見出し «バージョン2» —
   # チェックはこれで第2バージョンを第1と区別する、そしてプレースホルダ __POD__ —
   # これは rickroll-conf ConfigMap（ラボ1）のルールに従って nginx ポッド名に置き換えられる。
   # どちらかを消すとラボのチェックは通らない、ロールアウト自体は成功したとしても。
@@ -56,9 +56,9 @@ data:
       .pod b{display:block;margin-top:.4em;color:#00ffa3;font-size:1.35em;word-break:break-all}
       .hint{margin-top:3em;color:#3f5561;font-size:14px}
     </style>
-    <div class="tag">ВЕРСИЯ 2</div>
+    <div class="tag">バージョン2</div>
     <h1>We're No Strangers To Love</h1>
     <p class="lyr">You know the rules &middot; And so do I</p>
-    <div class="pod">вас обслужил под<b>__POD__</b></div>
-    <p class="hint">Обновление прошло под нагрузкой. Посмотрите в Fortio: ошибок ноль.</p>
+    <div class="pod">対応したPod<b>__POD__</b></div>
+    <p class="hint">ロールアウトは負荷をかけたまま完了しました。Fortio を見てください：エラーはゼロです。</p>
     </html>

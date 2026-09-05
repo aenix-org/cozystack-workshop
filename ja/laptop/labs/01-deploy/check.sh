@@ -117,7 +117,7 @@ fi
 BODY="$(in_cluster_curl_many 'http://rickroll/' 8)"
 # マーカーはページごとに厳密に1回だけ現れなければならない。さもないと応答カウンタが
 # 嘘をつく: 「Never Gonna Give You Up」は <title> にも <h1> にもあり、二重計上を招いた。
-ANSWERS="$(printf '%s' "$BODY" | grep -c 'вас обслужил под')"
+ANSWERS="$(printf '%s' "$BODY" | grep -c '対応したPod')"
 TOTAL_LINES="$(printf '%s' "$BODY" | grep -c '<title>')"
 if [ "${ANSWERS:-0}" -ge 1 ] && [ "${ANSWERS:-0}" -eq "${TOTAL_LINES:-0}" ]; then
   ok "アプリケーションは HTTP で応答し、自身のページを配信しています (${ANSWERS} 件のリクエストで確認)"

@@ -166,7 +166,7 @@ kubectl logs deploy/secrets-demo --tail=2
 **見えるはず** — こんなもの。
 
 ```
-08:14:31 подключаюсь к passes-db.internal как passes_app, отпечаток пароля sha256:a609df223d57
+08:14:31 passes_app として passes-db.internal に接続、パスワードのフィンガープリント sha256:a609df223d57
 ```
 
 アプリケーションは動いています。パスワードはファイルの中、ファイルは Git の中。これがまさに、監査が
@@ -896,7 +896,7 @@ kubectl logs deploy/secrets-demo -c fetch-secret
 **見えるはず:**
 
 ```
-пароль получен из OpenBao, в манифесте его нет
+パスワードは OpenBao から取得、マニフェストには存在しない
 ```
 
 さてサービス自体。
@@ -929,7 +929,7 @@ kubectl delete secret passes-db
 ```bash
 # 同じ kv put。レコードの前のバージョンは消されない——その隣に 2 つ目が現れる。
 kubectl exec bao-workbench -- \
-  bao kv put secret/passes/db password=Propusk2026-осень username=passes_app
+  bao kv put secret/passes/db password=Propusk2026-秋 username=passes_app
 # rollout restart は、記述の一行も変えずにアプリケーションの Pod を作り直す。
 # これがすべての目的だった: 新しいパスワードは次回起動時に拾い上げられる。
 kubectl rollout restart deploy/secrets-demo

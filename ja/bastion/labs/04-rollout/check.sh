@@ -154,7 +154,7 @@ else
   # 両バージョンを、それぞれ固有のマーカーで肯定的に判定する。「v2 でなければ
   # v1」という分岐は、何でも最初のバージョンとして数えていた: デフォルトの nginx ページ、404、他人の
   # アプリケーション、ゴミ — 検証済みで、ゴミに対してもスクリプトは「ラボ合格」と表示していた。
-  if printf '%s' "$BODY" | grep -q 'ВЕРСИЯ 2'; then
+  if printf '%s' "$BODY" | grep -q 'バージョン2'; then
     SERVED_VER="rickroll-page-v2"
   elif printf '%s' "$BODY" | grep -q 'Never Gonna Give You Up'; then
     SERVED_VER="rickroll-page-v1"
@@ -187,7 +187,7 @@ else
 
   evidence "返されたページ (抜粋)" \
     "$(printf '%s' "$BODY" | grep -o '<h1>[^<]*</h1>' | head -1)
-$(printf '%s' "$BODY" | grep -o "вас обслужил под<b>${APP}-[a-z0-9-]*</b>" | head -1)"
+$(printf '%s' "$BODY" | grep -o "対応したPod<b>${APP}-[a-z0-9-]*</b>" | head -1)"
 fi
 
 # --- 次のラボへの準備 ------------------------------------------

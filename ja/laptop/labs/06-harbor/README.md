@@ -233,8 +233,8 @@ Login Succeeded
 ありません**。起動時にクラスターがそれらを環境変数に入れているのです：
 
 ```go
-Pod:  env("POD_NAME", "неизвестно"),
-Node: env("NODE_NAME", "неизвестно"),
+Pod:  env("POD_NAME", "不明"),
+Node: env("NODE_NAME", "不明"),
 ```
 
 そしてマニフェストには、そこに何を入れるかが書かれています：

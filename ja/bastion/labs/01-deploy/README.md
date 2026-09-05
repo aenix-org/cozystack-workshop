@@ -128,7 +128,7 @@ metadata:
   name: rickroll-page-v1
 data:
   index.html: |
-    ...<div class="pod">вас обслужил под<b>__POD__</b></div>...
+    ...<div class="pod">対応したPod<b>__POD__</b></div>...
 ```
 
 nginx が置き換えることになる、あの `__POD__` です。名前の `-v1` は偶然ではありません。バージョンの

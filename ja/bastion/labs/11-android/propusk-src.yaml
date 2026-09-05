@@ -1,5 +1,5 @@
 ---
-# ラボ11。モバイルアプリ「Пропуск」のソース — ビルドに入力として渡されるもの。
+# ラボ11。モバイルアプリ「ゲストパス」のソース — ビルドに入力として渡されるもの。
 #
 # これは管理クラスタ上のテナントではなく、あなたの学習用クラスタ `lab` に適用します:
 #     export KUBECONFIG=~/lab.kubeconfig
@@ -164,6 +164,6 @@ data:
   strings.xml: |
     <?xml version="1.0" encoding="utf-8"?>
     <resources>
-      <string name="app_name">Пропуск</string>
-      <string name="greeting">Заказать пропуск для гостя</string>
+      <string name="app_name">ゲストパス</string>
+      <string name="greeting">ゲストパスを申請する</string>
     </resources>

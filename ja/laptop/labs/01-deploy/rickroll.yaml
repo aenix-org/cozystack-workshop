@@ -76,8 +76,8 @@ data:
     </style>
     <h1>Never Gonna Give You Up</h1>
     <p class="lyr">Never gonna let you down &middot; Never gonna run around and desert you</p>
-    <div class="pod">вас обслужил под<b>__POD__</b></div>
-    <p class="hint">Обновите страницу. Когда реплик станет больше — имя начнёт меняться.</p>
+    <div class="pod">対応したPod<b>__POD__</b></div>
+    <p class="hint">ページを更新してください。レプリカが増えると、名前が変わり始めます。</p>
     </html>
 ---
 # アプリ本体。Deployment は望ましい状態を記述する — どのイメージを起動するか、

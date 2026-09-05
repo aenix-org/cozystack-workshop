@@ -58,7 +58,7 @@ BODY="$(curl -s --max-time 10 "$URL" 2>/dev/null)"
 case "$CODE" in
   200)
     case "$BODY" in
-      *"Справочник сотрудников"*)
+      *"社員名簿"*)
         ok "名簿が公開されている: ${URL} は 200 を返し、名簿ページを配信している"
         evidence "ドメイン経由の応答" "リクエスト: ${URL}
 応答コード: ${CODE}

@@ -929,7 +929,7 @@ kubectl delete secret passes-db
 ```bash
 # 同じ kv put。レコードの前のバージョンは消されない——その隣に 2 つ目が現れる。
 kubectl exec bao-workbench -- \
-  bao kv put secret/passes/db password=Propusk2026-осень username=passes_app
+  bao kv put secret/passes/db password=Propusk2026-秋 username=passes_app
 # rollout restart は、記述の一行も変えずにアプリケーションの Pod を作り直す。
 # これがすべての目的だった: 新しいパスワードは次回起動時に拾い上げられる。
 kubectl rollout restart deploy/secrets-demo

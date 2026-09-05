@@ -438,8 +438,8 @@ FROM numbers(1000000)
 ⚠️ ClickHouseの配列の添字は、0ではなく1から始まります。ゆえに `1 + …`。
 
 ```sql
-    ['Северная', 'Северная', 'Северная',
-     'Южная', 'Южная', 'Западная'][1 + cityHash64(number, 'entrance') % 6] AS entrance
+    ['北口', '北口', '北口',
+     '南口', '南口', '西口'][1 + cityHash64(number, 'entrance') % 6] AS entrance
 ```
 
 不均一な分布のための同じ手口。北の入口が流量の半分、南が三分の一、西が残りを受け持ちます。均一な
@@ -841,7 +841,7 @@ ClickHouseは必要な区間を除くすべてのパートを捨てました。�
 ch <<'SQL'
 -- 1行のゲストの名前を変える。このコマンドはすぐに制御を返すが、作業はそこで終わらない：
 -- ClickHouseはそれをキューに入れ、バックグラウンドで実行する。
-ALTER TABLE passes UPDATE guest_name = 'Иванов И. И.' WHERE pass_id = 424242
+ALTER TABLE passes UPDATE guest_name = '田中' WHERE pass_id = 424242
 SQL
 ```
 

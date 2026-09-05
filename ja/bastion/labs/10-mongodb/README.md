@@ -367,7 +367,7 @@ cd labs/10-mongodb
 mo < passes.js
 ```
 
-**表示されるはず** — `документов в коллекции: 4`。
+**表示されるはず** — `コレクション内のドキュメント数: 4`。
 
 <details>
 <summary><b>入れたものを一通り見る</b></summary>
@@ -382,12 +382,12 @@ mo < passes.js
 
 ```js
   {
-    type: "разовый",
-    guest: "Иванов Иван Иванович",
-    host: "petrov@corp.ru",
-    entrance: "Северная",
+    type: "一回券",
+    guest: "田中 太郎",
+    host: "petrov@corp.example",
+    entrance: "北口",
     valid_on: ISODate("2026-09-01T09:00:00Z"),
-    purpose: "собеседование"
+    purpose: "面接"
   }
 ```
 
@@ -402,7 +402,7 @@ mo < passes.js
 `entrances` は今や **リスト** です：
 
 ```js
-    entrances: ["Северная", "Южная"],
+    entrances: ["北口", "南口"],
     badge_returned: false
 ```
 
@@ -417,8 +417,8 @@ mo < passes.js
 
 ```js
     car: {
-      plate: "А123ВС174",
-      model: "ГАЗель Next",
+      plate: "品川 300 あ 12-34",
+      model: "トヨタ ハイエース",
       trailer: false,
       weight_kg: 3500
     },
@@ -431,9 +431,9 @@ mo < passes.js
 
 ```js
     members: [
-      { name: "Орлов Пётр", age: 16 },
-      { name: "Волкова Мария", age: 15 },
-      { name: "Зайцев Илья", age: 17 }
+      { name: "伊藤 修", age: 16 },
+      { name: "山本 真理", age: 15 },
+      { name: "中村 勇", age: 17 }
     ]
 ```
 
@@ -469,7 +469,7 @@ db.passes.find({ valid_on: ISODate("2026-09-02T07:30:00Z") })
 
 ```js
 // 普通の文字列フィールドに対する条件：完全一致で、ここに大文字小文字の区別なしはない
-db.passes.find({ type: "автомобильный" })
+db.passes.find({ type: "車両券" })
 ```
 
 **ナンバープレートで検索する——ドットを介して入れ子のオブジェクトの中へ到達する：**
@@ -477,7 +477,7 @@ db.passes.find({ type: "автомобильный" })
 ```js
 // "car.plate" — ドキュメントへのパス：car オブジェクト内部の plate フィールド。
 // パスを囲むクォートは必須。さもないと JavaScript はドットを自分流に解釈してしまう
-db.passes.find({ "car.plate": "А123ВС174" })
+db.passes.find({ "car.plate": "品川 300 あ 12-34" })
 ```
 
 <details>
@@ -487,7 +487,7 @@ db.passes.find({ "car.plate": "А123ВС174" })
 入れ子のオブジェクトをひとかたまりのテキストとして保存するのではなく、その中へ到達できます。
 
 違いは実際的です。もし `car` がリレーショナルなテーブルに、中に JSON を入れた `TEXT` 列として置かれて
-いたら、プレートでの検索は `LIKE '%А123ВС174%'` を意味します——インデックスなしのフルスキャンで、
+いたら、プレートでの検索は `LIKE '%品川 300 あ 12-34%'` を意味します——インデックスなしのフルスキャンで、
 誤検出付き。ここではインデックスを張れる普通の条件であり、実際に張ります。
 
 ⚠️ `"car.plate"` を囲むクォートは必須です：それがないと JavaScript はドットをオブジェクトのプロパティへの
@@ -498,12 +498,12 @@ db.passes.find({ "car.plate": "А123ВС174" })
 **複数の入口で有効な通行証：**
 
 ```js
-// entrances は文字列ではなくリスト：["Северная", "Южная"]。条件は普通のフィールドと
+// entrances は文字列ではなくリスト：["北口", "南口"]。条件は普通のフィールドと
 // 同じように書き、MongoDB がリストの各要素に対して自分で照合してくれる
-db.passes.find({ entrances: "Южная" })
+db.passes.find({ entrances: "南口" })
 ```
 
-注意：条件は、あたかも `entrances` が値 `"Южная"` を持つ普通のフィールドであるかのように書かれて
+注意：条件は、あたかも `entrances` が値 `"南口"` を持つ普通のフィールドであるかのように書かれて
 いますが、実際にはリストです。**フィールドがリストなら条件は各要素に対して照合されるべきだと、MongoDB は
 自分で理解します。** 「含む」のための別の構文は要りません。
 
@@ -562,7 +562,7 @@ db.passes.aggregate([
 ])
 ```
 
-**表示されるはず** — `{ _id: 'разовый', count: 1 }` という形の四行。
+**表示されるはず** — `{ _id: '一回券', count: 1 }` という形の四行。
 
 ## ステップ 5. 大半が持たないフィールドへのインデックス
 
@@ -577,7 +577,7 @@ db.passes.aggregate([
 //   .executionStats      答えの全部を読まなくて済むよう、ちょうどこのセクションだけ取り出す
 // レポートでは totalDocsExamined を見る——1 件を返すために
 // データベースが何件のドキュメントを読んだか
-db.passes.find({ "car.plate": "А123ВС174" }).explain("executionStats").executionStats
+db.passes.find({ "car.plate": "品川 300 あ 12-34" }).explain("executionStats").executionStats
 ```
 
 **表示されるはず** — `totalDocsExamined` がコレクション内のドキュメント数と等しくなります。データベースは
@@ -595,7 +595,7 @@ db.passes.find({ "car.plate": "А123ВС174" }).explain("executionStats").execut
 db.passes.createIndex({ "car.plate": 1 }, { name: "car_plate", sparse: true })
 
 // 同じレポートを繰り返し、前のものと比べる
-db.passes.find({ "car.plate": "А123ВС174" }).explain("executionStats").executionStats
+db.passes.find({ "car.plate": "品川 300 あ 12-34" }).explain("executionStats").executionStats
 ```
 
 **表示されるはず** — `totalDocsExamined` が 1 に等しくなり、計画では `COLLSCAN` の代わりに `IXSCAN` が
@@ -639,9 +639,9 @@ db.passes.find({ "car.plate": "А123ВС174" }).explain("executionStats").execut
 ```js
 // insertOne = 「ドキュメントを 1 件追加する」。どんなフィールドが入っているか、データベースは尋ねない
 db.passes.insertOne({
-  tipe: "разовый",
-  guest: "Николаев Сергей Игоревич",
-  host: "petrov@corp.ru",
+  tipe: "一回券",
+  guest: "小林 誠",
+  host: "petrov@corp.example",
   data: ISODate("2026-09-04T09:00:00Z")
 })
 ```
@@ -659,8 +659,8 @@ db.passes.countDocuments({})
 
 ```js
 // 検索のステップと同じ type による絞り込み：type フィールドが
-// "разовый" と等しい通行証を見せる
-db.passes.find({ type: "разовый" })
+// "一回券" と等しい通行証を見せる
+db.passes.find({ type: "一回券" })
 ```
 
 > **読み進める前に、立ち止まって考えてください。**
@@ -739,7 +739,7 @@ db.runCommand({
 
 ```js
         type: {
-          enum: ["разовый", "недельный", "автомобильный", "групповой"],
+          enum: ["一回券", "週間券", "車両券", "団体券"],
         },
 ```
 
@@ -780,14 +780,14 @@ db.runCommand({
 mo < validator.js
 ```
 
-**表示されるはず** — `правило установлено`。
+**表示されるはず** — `ルールを設定しました`。
 
 同じタイプミスを繰り返してみます——今度はルールの監視下で：
 
 ```js
 // tipe フィールドはルールにとって未知で、ドキュメントに必須の type がない。
 // 以前なら、こういうドキュメントは黙ってコレクションに収まっていた
-db.passes.insertOne({ tipe: "разовый", guest: "Проверка", host: "x@corp.ru" })
+db.passes.insertOne({ tipe: "一回券", guest: "確認", host: "x@corp.example" })
 ```
 
 **表示されるはず** — `MongoServerError: Document failed validation`。今度はタイプミスが通りません。
@@ -867,7 +867,7 @@ db.passes.aggregate([
 // host フィールドは意味の上では従業員を指す。そんな従業員は存在しない——
 // データベースはこれを確認するだろうか? このドキュメントは前のステップのルールを満たす：type は
 // あってリストの中にあり、host は文字列
-db.passes.insertOne({ type: "разовый", host: "не-существует@corp.ru", guest: "Тест" })
+db.passes.insertOne({ type: "一回券", host: "存在しない@corp.example", guest: "テスト" })
 ```
 
 ドキュメントは挿入されます。そんな email の従業員はいませんが、データベースはそれを見ようとしません。
@@ -884,7 +884,7 @@ db.passes.insertOne({ type: "разовый", host: "не-существует@c
 
 ```js
 // deleteOne = 「条件に一致するドキュメントを 1 件削除する」、一度に全部ではなく
-db.passes.deleteOne({ host: "не-существует@corp.ru" })
+db.passes.deleteOne({ host: "存在しない@corp.example" })
 ```
 
 </details>

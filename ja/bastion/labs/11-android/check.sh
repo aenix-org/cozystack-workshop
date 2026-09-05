@@ -156,7 +156,7 @@ else
     if [ -n "$UPLOADED" ]; then
       ok "APK はバケットへ届いた: ${UPLOADED}"
       evidence "ビルド後のバケットの中身" \
-        "$(printf '%s' "$LOGS" | sed -n '/5\/5 кладу APK в бакет/,$p' | grep -v '^APK-UPLOADED ' | head -20)"
+        "$(printf '%s' "$LOGS" | sed -n '/5\/5 APK をバケットにアップロード中/,$p' | grep -v '^APK-UPLOADED ' | head -20)"
     else
       fail "APK はビルドされたが、バケットへは届かなかった" \
            "ログの末尾を見る: kubectl logs job/${JOB} --tail=20; 犯人はたいてい bucketName だ — 'builds' ではなく、ダッシュボードにある長い名前が必要"

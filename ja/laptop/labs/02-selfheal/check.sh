@@ -154,7 +154,7 @@ else
   elif kubectl get pod "$SERVED" >/dev/null 2>&1; then
     ok "Service はページを返し、それを生きたレプリカ ${SERVED} が処理しました"
     evidence "Service のレスポンス（断片）" \
-      "$(printf '%s' "$BODY" | grep -o "вас обслужил под<b>${APP}-[a-z0-9-]*</b>" | head -1)"
+      "$(printf '%s' "$BODY" | grep -o "対応したPod<b>${APP}-[a-z0-9-]*</b>" | head -1)"
   else
     fail "ページはレプリカ ${SERVED} が処理しましたが、その Pod はもうクラスタに存在しません" \
          "10秒ほど待ってからチェックを再実行してください — おそらくレプリカがちょうど入れ替わっていました"

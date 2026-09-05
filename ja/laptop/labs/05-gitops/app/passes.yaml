@@ -1,5 +1,5 @@
 ---
-# ラボ 5 · Git の中のインフラ。「Пропуск」サービスそのもの: 1 つのファイルに 4 つのオブジェクト。
+# ラボ 5 · Git の中のインフラ。「ゲストパス」サービスそのもの: 1 つのファイルに 4 つのオブジェクト。
 #
 # クラスタには手作業では適用しない。ファイルは GitHub 上の専用リポジトリの apps/ フォルダに、
 # namespace.yaml のとなりに置かれ、Flux が `lab` クラスタへ運び込む — 自分で:
@@ -66,7 +66,7 @@ data:
     <html lang="ru">
     <head>
       <meta charset="utf-8">
-      <title>Пропуск</title>
+      <title>ゲストパス</title>
       <style>
         body { font-family: system-ui, sans-serif; margin: 4rem auto; max-width: 40rem;
                color: #222; }
@@ -78,10 +78,10 @@ data:
       </style>
     </head>
     <body>
-      <h1>Сервис «Пропуск»</h1>
-      <p>Заказ пропуска для гостя. Версия <span class="v">v1</span></p>
-      <p>Развёрнуто из Git. Руками сюда никто не ходил.</p>
-      <div class="pod">вас обслужил под <b>__POD__</b></div>
+      <h1>「ゲストパス」サービス</h1>
+      <p>ゲストパスの申請. バージョン <span class="v">v1</span></p>
+      <p>Git からデプロイ済み. ここは誰も手作業では触っていない.</p>
+      <div class="pod">対応したPod <b>__POD__</b></div>
     </body>
     </html>
 ---

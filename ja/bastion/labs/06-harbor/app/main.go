@@ -57,7 +57,7 @@ type identity struct {
 
 // 環境変数を読み、それが存在しないか空の場合は予備の値を返す。これは、プログラムを
 // クラスターの外でも、設定を一つもせずに実行できるようにするために必要だ。プログラムは
-// 落ちず、正直に応答に「неизвестно」と書く。
+// 落ちず、正直に応答に「不明」と書く。
 func env(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
@@ -90,10 +90,10 @@ func main() {
 		body := identity{
 			Service:   "passes-api",
 			Version:   env("APP_VERSION", "v1"),
-			Pod:       env("POD_NAME", "неизвестно"),
-			Node:      env("NODE_NAME", "неизвестно"),
-			Namespace: env("POD_NAMESPACE", "неизвестно"),
-			Registry:  env("IMAGE_REGISTRY", "не указан"),
+			Pod:       env("POD_NAME", "不明"),
+			Node:      env("NODE_NAME", "不明"),
+			Namespace: env("POD_NAMESPACE", "不明"),
+			Registry:  env("IMAGE_REGISTRY", "未設定"),
 			Time:      time.Now().UTC().Format(time.RFC3339),
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -103,7 +103,7 @@ func main() {
 		// なってしまい、応答がターミナルで読めなくなる。
 		enc.SetEscapeHTML(false)
 		if err := enc.Encode(body); err != nil {
-			log.Printf("не удалось отдать ответ: %v", err)
+			log.Printf("応答を返せませんでした: %v", err)
 		}
 	})
 
@@ -119,8 +119,8 @@ func main() {
 
 	// kubectl logs で最初に目にするもの。この行は「アプリケーションが起動しなかった」と
 	// 「起動したが応答しない」を区別するために必要だ。これらは別々の診断である。
-	log.Printf("passes-api %s слушает порт %s, под %s",
-		env("APP_VERSION", "v1"), port, env("POD_NAME", "неизвестно"))
+	log.Printf("passes-api %s がポート %s で待ち受けています、ポッド %s",
+		env("APP_VERSION", "v1"), port, env("POD_NAME", "不明"))
 	// サーバーを起動し、止められるまで動作する。ポートが使用中か、サーバーが落ちた
 	// 場合は、原因を書き出してエラーで終了する。クラスターは終了したプロセスを見て、
 	// レプリカを新たに立ち上げる。再起動をプログラム内部で直す必要はない。

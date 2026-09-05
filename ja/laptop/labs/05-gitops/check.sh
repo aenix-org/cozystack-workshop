@@ -163,10 +163,10 @@ PODS="$(kget pods -n "$NS_APP" -l app=passes --no-headers)"
 PODS_READY="$(printf '%s' "$PODS" | awk '$3=="Running"' | grep -c .)"
 BODY="$(in_cluster_curl "http://passes.${NS_APP}.svc.cluster.local/")"
 
-if printf '%s' "$BODY" | grep -q 'Пропуск'; then
-  ok "«Пропуск» サービスがクラスタ内部で HTTP 応答しています (稼働中のレプリカ: ${PODS_READY})"
+if printf '%s' "$BODY" | grep -q 'ゲストパス'; then
+  ok "«ゲストパス» サービスがクラスタ内部で HTTP 応答しています (稼働中のレプリカ: ${PODS_READY})"
 else
-  fail "«Пропуск» サービスが passes.${NS_APP}.svc.cluster.local で応答しません" \
+  fail "«ゲストパス» サービスが passes.${NS_APP}.svc.cluster.local で応答しません" \
        "kubectl get pods -n ${NS_APP} と kubectl logs -n ${NS_APP} deploy/passes を確認してください"
 fi
 

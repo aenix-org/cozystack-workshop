@@ -91,7 +91,7 @@ ssh_pwauth: true
 write_files:
   - path: /opt/directory/index.html
     content: |
-      <!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Справочник</title></head><body><h1>Справочник сотрудников</h1><ul><li>Иванов И. — 101</li><li>Петров П. — 102</li></ul></body></html>
+      <!doctype html><html lang="ru"><head><meta charset="utf-8"><title>名簿</title></head><body><h1>社員名簿</h1><ul><li>田中 — 101</li><li>山田 — 102</li></ul></body></html>
   - path: /etc/systemd/system/directory.service
     content: |
       [Unit]
@@ -286,7 +286,7 @@ curl http://spravochnik.workshopXX.workshop.aenix.io
 **見えるはずのもの** — 名簿ページの HTML:
 
 ```html
-<h1>Справочник сотрудников</h1><ul><li>Иванов И. — 101</li><li>Петров П. — 102</li></ul>
+<h1>社員名簿</h1><ul><li>田中 — 101</li><li>山田 — 102</li></ul>
 ```
 
 このアドレスをブラウザで開けば、同じ一覧が見えます。名簿は、人にやさしいドメイン名で、プラットフォームからの HTTPS つきで、ネットワークへの申請票も証明書への申請票も一枚も出さずに、外部から見えています。

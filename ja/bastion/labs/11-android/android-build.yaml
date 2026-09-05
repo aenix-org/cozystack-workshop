@@ -67,7 +67,7 @@ data:
     CMDLINE_TOOLS_URL="https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"
     MC_URL="https://dl.min.io/client/mc/release/linux-amd64/mc"
 
-    echo "== 1/5 ставлю Android command-line tools =="
+    echo "== 1/5 Android command-line tools をインストール中 =="
     mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
     cd "$ANDROID_SDK_ROOT/cmdline-tools"
     curl -fsSL -o tools.zip "$CMDLINE_TOOLS_URL"
@@ -77,7 +77,7 @@ data:
     mv cmdline-tools latest
     export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
 
-    echo "== 2/5 принимаю лицензии и качаю SDK (самый долгий шаг) =="
+    echo "== 2/5 ライセンスに同意して SDK をダウンロード中（最も時間のかかるステップ） =="
     # `yes` は sdkmanager が入力を閉じたときに SIGPIPE を受け取り、非ゼロの
     # コードを返す。set -o pipefail があると、これが理由もなくビルドを失敗させて
     # しまうので、戻りコードはここで意図的に握りつぶしている。もしライセンスが実際に
@@ -86,7 +86,7 @@ data:
     sdkmanager --sdk_root="$ANDROID_SDK_ROOT" \
       "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
-    echo "== 3/5 собираю APK =="
+    echo "== 3/5 APK をビルド中 =="
     # ConfigMap は読み取り専用でマウントされ、Gradleはソースの隣に書き込むので、
     # ツリーはまずディスクにコピーされる。
     # -L はシンボリックリンクを解決する: ConfigMap はファイルとしてではなく、
@@ -100,7 +100,7 @@ data:
     APK="$WORK/project/app/build/outputs/apk/debug/app-debug.apk"
     ls -l "$APK"
 
-    echo "== 4/5 ставлю клиент S3 =="
+    echo "== 4/5 S3 クライアントをインストール中 =="
     # クライアントを /usr/local/bin ではなく作業フォルダに置く。Podは非特権
     # ユーザーとして実行され、イメージのシステムフォルダはrootに属している:
     # そこへの書き込みは Permission denied で終わる — しかもここ、4番目のステップ、
@@ -112,7 +112,7 @@ data:
     # フルパスではなく単に `mc` と書けるようにする。
     export PATH="$WORK/bin:$PATH"
 
-    echo "== 5/5 кладу APK в бакет =="
+    echo "== 5/5 APK をバケットにアップロード中 =="
     # 変数 accessKey/secretKey/endpoint/bucketName は envFrom を通じて Secret から
     # 来る。alias set の出力は握りつぶす: ログに何かを表示する必要はない。
     # 同じ理由でスクリプトに set -x はない — それはキーを表示してしまう。

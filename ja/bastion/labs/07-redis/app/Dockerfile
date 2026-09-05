@@ -6,8 +6,8 @@
 # タグでバージョン管理されます。
 #
 # ビルドはクラスターではなく VM 上で行います（README のビルド手順を参照）:
-#   docker build --platform linux/amd64 -t <ваш-harbor>/passes/passes-api:v2 app/
-#   docker push  <ваш-harbor>/passes/passes-api:v2
+#   docker build --platform linux/amd64 -t <your-harbor>/passes/passes-api:v2 app/
+#   docker push  <your-harbor>/passes/passes-api:v2
 #
 # --platform linux/amd64 は Apple Silicon の Mac では必須です。これがないとイメージは
 # ARM 向けにビルドされ、何の文句も言わずにプッシュされ、クラスターで「exec format error」で落ちます。

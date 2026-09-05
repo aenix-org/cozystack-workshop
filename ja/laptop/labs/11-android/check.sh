@@ -156,7 +156,7 @@ else
     if [ -n "$UPLOADED" ]; then
       ok "APK がバケットに到達した: ${UPLOADED}"
       evidence "ビルド後のバケットの内容" \
-        "$(printf '%s' "$LOGS" | sed -n '/5\/5 кладу APK в бакет/,$p' | grep -v '^APK-UPLOADED ' | head -20)"
+        "$(printf '%s' "$LOGS" | sed -n '/5\/5 APK をバケットにアップロード中/,$p' | grep -v '^APK-UPLOADED ' | head -20)"
     else
       fail "APK はビルドされたが、バケットに到達しなかった" \
            "ログの末尾を見てください: kubectl logs job/${JOB} --tail=20; 多くの場合 bucketName が原因です — 'builds' ではなく、ダッシュボードの長い名前が必要です"

@@ -60,7 +60,7 @@ spec:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # イメージはディレクトリと「Пропуск」サービス本体で同じものです。
+          # イメージはディレクトリと「ゲストパス」サービス本体で同じものです。
           # どのプロセスが実際に起動するかは、下の MODE 変数が決めます。
           image: HARBOR-HOST/passes/passes-api:v2
           # ポートには番号だけでなく名前があります: レディネスプローブと下の Service は
