@@ -156,7 +156,7 @@ else
     if [ -n "$UPLOADED" ]; then
       ok "APK बकेट तक पहुँचा: ${UPLOADED}"
       evidence "बिल्ड के बाद बकेट की सामग्री" \
-        "$(printf '%s' "$LOGS" | sed -n '/5\/5 кладу APK в бакет/,$p' | grep -v '^APK-UPLOADED ' | head -20)"
+        "$(printf '%s' "$LOGS" | sed -n '/5\/5 APK को bucket में अपलोड कर रहा हूँ/,$p' | grep -v '^APK-UPLOADED ' | head -20)"
     else
       fail "APK बना, पर बकेट तक नहीं पहुँचा" \
            "लॉग का अंत देखें: kubectl logs job/${JOB} --tail=20; अक्सर bucketName ही दोषी होता है — इसमें डैशबोर्ड का लंबा नाम चाहिए, 'builds' नहीं"

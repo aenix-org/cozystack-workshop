@@ -1,4 +1,4 @@
-# लैब 7 · सर्विस «Пропуск» की इमेज बनाने की रेसिपी, वर्शन v2.
+# लैब 7 · सर्विस «गेस्ट पास» की इमेज बनाने की रेसिपी, वर्शन v2.
 #
 # Dockerfile — यह चरणों की एक सूची है जिनसे सोर्स कोड से एक इमेज बनती है: फ़ाइल सिस्टम का
 # एक अपरिवर्तनीय स्नैपशॉट, साथ में एक स्टार्टअप कमांड। आपके लिए सबसे परिचित तुलना है
@@ -6,8 +6,8 @@
 # एक रजिस्ट्री में और एक टैग से वर्शन की जाती है।
 #
 # इसे लैपटॉप पर बनाया जाता है, क्लस्टर में नहीं (README में बिल्ड वाला चरण देखें):
-#   docker build --platform linux/amd64 -t <ваш-harbor>/passes/passes-api:v2 app/
-#   docker push  <ваш-harbor>/passes/passes-api:v2
+#   docker build --platform linux/amd64 -t <आपका-harbor>/passes/passes-api:v2 app/
+#   docker push  <आपका-harbor>/passes/passes-api:v2
 #
 # --platform linux/amd64 Apple Silicon वाले Mac पर अनिवार्य है: इसके बिना इमेज
 # ARM के लिए बनेगी, बिना किसी शिकायत के पुश हो जाएगी, और क्लस्टर में «exec format error» के साथ क्रैश होगी।

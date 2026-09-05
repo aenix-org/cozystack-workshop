@@ -154,7 +154,7 @@ else
   # हम दोनों संस्करणों को सकारात्मक रूप से, प्रत्येक को उसके अपने मार्कर से पहचानते हैं। शाखा
   # «यदि v2 नहीं, तो v1» किसी भी चीज़ को पहला संस्करण गिन लेती थी: डिफ़ॉल्ट nginx पृष्ठ, 404,
   # किसी और का एप्लिकेशन, कचरा — परखा गया, कचरे पर स्क्रिप्ट «लैब पास» छाप देती थी।
-  if printf '%s' "$BODY" | grep -q 'ВЕРСИЯ 2'; then
+  if printf '%s' "$BODY" | grep -q 'संस्करण 2'; then
     SERVED_VER="rickroll-page-v2"
   elif printf '%s' "$BODY" | grep -q 'Never Gonna Give You Up'; then
     SERVED_VER="rickroll-page-v1"
@@ -187,7 +187,7 @@ else
 
   evidence "परोसा गया पृष्ठ (अंश)" \
     "$(printf '%s' "$BODY" | grep -o '<h1>[^<]*</h1>' | head -1)
-$(printf '%s' "$BODY" | grep -o "вас обслужил под<b>${APP}-[a-z0-9-]*</b>" | head -1)"
+$(printf '%s' "$BODY" | grep -o "सेवा प्रदान करने वाला Pod<b>${APP}-[a-z0-9-]*</b>" | head -1)"
 fi
 
 # --- अगली लैब के लिए तैयारी ------------------------------------------

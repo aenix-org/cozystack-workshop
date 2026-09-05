@@ -1,5 +1,5 @@
 ---
-# लैब 11. मोबाइल एप्लिकेशन «Пропуск» के सोर्स — यही बिल्ड को इनपुट के रूप में दिया जाता है।
+# लैब 11. मोबाइल एप्लिकेशन «गेस्ट पास» के सोर्स — यही बिल्ड को इनपुट के रूप में दिया जाता है।
 #
 # यह आपके प्रशिक्षण क्लस्टर `lab` पर लागू किया जाता है, न कि प्रबंधन क्लस्टर के टेनेंट में:
 #     export KUBECONFIG=~/lab.kubeconfig
@@ -164,6 +164,6 @@ data:
   strings.xml: |
     <?xml version="1.0" encoding="utf-8"?>
     <resources>
-      <string name="app_name">Пропуск</string>
-      <string name="greeting">Заказать пропуск для гостя</string>
+      <string name="app_name">गेस्ट पास</string>
+      <string name="greeting">अतिथि के लिए पास का अनुरोध करें</string>
     </resources>

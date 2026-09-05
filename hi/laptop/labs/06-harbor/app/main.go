@@ -57,7 +57,7 @@ type identity struct {
 
 // पर्यावरण चर पढ़ें, और यदि वह मौजूद नहीं या खाली है — तो एक बैकअप
 // मान लौटाएँ। यह इसलिए ज़रूरी है ताकि प्रोग्राम को क्लस्टर के बाहर भी, बिना एक भी
-// सेटिंग के चलाया जा सके: यह क्रैश नहीं होगा, बल्कि ईमानदारी से जवाब में «неизвестно» लिखेगा।
+// सेटिंग के चलाया जा सके: यह क्रैश नहीं होगा, बल्कि ईमानदारी से जवाब में «अज्ञात» लिखेगा।
 func env(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
@@ -90,10 +90,10 @@ func main() {
 		body := identity{
 			Service:   "passes-api",
 			Version:   env("APP_VERSION", "v1"),
-			Pod:       env("POD_NAME", "неизвестно"),
-			Node:      env("NODE_NAME", "неизвестно"),
-			Namespace: env("POD_NAMESPACE", "неизвестно"),
-			Registry:  env("IMAGE_REGISTRY", "не указан"),
+			Pod:       env("POD_NAME", "अज्ञात"),
+			Node:      env("NODE_NAME", "अज्ञात"),
+			Namespace: env("POD_NAMESPACE", "अज्ञात"),
+			Registry:  env("IMAGE_REGISTRY", "निर्दिष्ट नहीं"),
 			Time:      time.Now().UTC().Format(time.RFC3339),
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -103,7 +103,7 @@ func main() {
 		// और जवाब टर्मिनल में अपठनीय हो जाता।
 		enc.SetEscapeHTML(false)
 		if err := enc.Encode(body); err != nil {
-			log.Printf("не удалось отдать ответ: %v", err)
+			log.Printf("जवाब भेजने में विफल: %v", err)
 		}
 	})
 
@@ -119,8 +119,8 @@ func main() {
 
 	// पहली चीज़ जो आप kubectl logs में देखेंगे। यह पंक्ति «एप्लिकेशन शुरू नहीं हुआ» को
 	// «शुरू हुआ, पर जवाब नहीं देता» से अलग करने के लिए ज़रूरी है — ये अलग-अलग निदान हैं।
-	log.Printf("passes-api %s слушает порт %s, под %s",
-		env("APP_VERSION", "v1"), port, env("POD_NAME", "неизвестно"))
+	log.Printf("passes-api %s पोर्ट %s पर सुन रहा है, पॉड %s",
+		env("APP_VERSION", "v1"), port, env("POD_NAME", "अज्ञात"))
 	// हम सर्वर शुरू करते हैं और तब तक काम करते हैं जब तक हमें रोका न जाए। यदि पोर्ट व्यस्त हो या सर्वर
 	// क्रैश हो गया — तो हम कारण लिखते हैं और त्रुटि के साथ बाहर निकलते हैं। क्लस्टर समाप्त हुई प्रक्रिया
 	// देखेगा और प्रतिलिपि को फिर से उठाएगा; प्रोग्राम के भीतर पुनरारंभ ठीक करने की ज़रूरत नहीं।

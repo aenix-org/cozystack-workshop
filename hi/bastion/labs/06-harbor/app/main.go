@@ -90,10 +90,10 @@ func main() {
 		body := identity{
 			Service:   "passes-api",
 			Version:   env("APP_VERSION", "v1"),
-			Pod:       env("POD_NAME", "неизвестно"),
-			Node:      env("NODE_NAME", "неизвестно"),
-			Namespace: env("POD_NAMESPACE", "неизвестно"),
-			Registry:  env("IMAGE_REGISTRY", "не указан"),
+			Pod:       env("POD_NAME", "अज्ञात"),
+			Node:      env("NODE_NAME", "अज्ञात"),
+			Namespace: env("POD_NAMESPACE", "अज्ञात"),
+			Registry:  env("IMAGE_REGISTRY", "निर्दिष्ट नहीं"),
 			Time:      time.Now().UTC().Format(time.RFC3339),
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -103,7 +103,7 @@ func main() {
 		// और उत्तर टर्मिनल में अपठनीय हो जाएगा।
 		enc.SetEscapeHTML(false)
 		if err := enc.Encode(body); err != nil {
-			log.Printf("не удалось отдать ответ: %v", err)
+			log.Printf("उत्तर लौटाने में विफल: %v", err)
 		}
 	})
 
@@ -119,8 +119,8 @@ func main() {
 
 	// kubectl logs में सबसे पहले आप यही देखेंगे। यह पंक्ति इसलिए ज़रूरी है ताकि «एप्लिकेशन
 	// शुरू नहीं हुआ» को «शुरू हुआ, लेकिन उत्तर नहीं देता» से अलग किया जा सके — ये अलग-अलग निदान हैं।
-	log.Printf("passes-api %s слушает порт %s, под %s",
-		env("APP_VERSION", "v1"), port, env("POD_NAME", "неизвестно"))
+	log.Printf("passes-api %s पोर्ट %s पर सुन रहा है, पॉड %s",
+		env("APP_VERSION", "v1"), port, env("POD_NAME", "अज्ञात"))
 	// हम सर्वर शुरू करते हैं और तब तक काम करते हैं जब तक हमें रोका न जाए। यदि पोर्ट व्यस्त है या सर्वर
 	// गिर गया — तो हम कारण लिखते हैं और त्रुटि के साथ बाहर निकलते हैं। क्लस्टर समाप्त हुई प्रक्रिया देखेगा
 	// और प्रतिलिपि को फिर से उठाएगा; पुनरारंभ को प्रोग्राम के अंदर ठीक करने की ज़रूरत नहीं।

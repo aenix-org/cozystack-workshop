@@ -167,7 +167,7 @@ kubectl logs deploy/secrets-demo --tail=2
 **आपको क्या दिखना चाहिए** — कुछ ऐसा:
 
 ```
-08:14:31 подключаюсь к passes-db.internal как passes_app, отпечаток пароля sha256:a609df223d57
+08:14:31 passes-db.internal से passes_app के रूप में जुड़ रहा हूँ, पासवर्ड फ़िंगरप्रिंट sha256:a609df223d57
 ```
 
 एप्लिकेशन काम करता है। पासवर्ड एक फ़ाइल में है, फ़ाइल Git में है। यह ठीक वही स्थिति है जो ऑडिट को मिली।
@@ -898,7 +898,7 @@ kubectl logs deploy/secrets-demo -c fetch-secret
 **आपको क्या दिखना चाहिए:**
 
 ```
-пароль получен из OpenBao, в манифесте его нет
+पासवर्ड OpenBao से लिया गया, मैनिफ़ेस्ट में मौजूद नहीं
 ```
 
 अब ख़ुद सर्विस:
@@ -931,7 +931,7 @@ kubectl delete secret passes-db
 ```bash
 # वही kv put। रिकॉर्ड का पिछला वर्शन मिटता नहीं — उसके बग़ल में एक दूसरा प्रकट हो जाता है।
 kubectl exec bao-workbench -- \
-  bao kv put secret/passes/db password=Propusk2026-осень username=passes_app
+  bao kv put secret/passes/db password=Propusk2026-शरद username=passes_app
 # rollout restart एप्लिकेशन के Pods को उसके विवरण की एक भी पंक्ति बदले बिना दोबारा बनाता है।
 # यह सब इसी के लिए था: नया पासवर्ड अगले स्टार्ट पर उठा लिया जाता है।
 kubectl rollout restart deploy/secrets-demo

@@ -60,7 +60,7 @@ spec:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # इमेज निर्देशिका और खुद "Пропуск" सेवा के लिए एक ही है।
+          # इमेज निर्देशिका और खुद "गेस्ट पास" सेवा के लिए एक ही है।
           # असल में कौन-सी प्रोसेस शुरू होगी, यह नीचे दिए MODE वेरिएबल से तय होता है।
           image: HARBOR-HOST/passes/passes-api:v2
           # पोर्ट का सिर्फ़ नंबर नहीं, एक नाम भी है: नीचे readiness प्रोब और Service

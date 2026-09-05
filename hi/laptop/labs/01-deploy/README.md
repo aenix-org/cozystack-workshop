@@ -139,7 +139,7 @@ metadata:
   name: rickroll-page-v1
 data:
   index.html: |
-    ...<div class="pod">вас обслужил под<b>__POD__</b></div>...
+    ...<div class="pod">सेवा प्रदान करने वाला Pod<b>__POD__</b></div>...
 ```
 
 वही `__POD__` जिसे nginx बदल देगा। नाम में `-v1` संयोग नहीं है: संस्करणों की रोलआउट वाली लैब में एक

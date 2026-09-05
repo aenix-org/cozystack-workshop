@@ -115,7 +115,7 @@ fi
 BODY="$(in_cluster_curl_many 'http://rickroll/' 8)"
 # मार्कर पेज पर ठीक एक बार आना चाहिए, वरना जवाबों का काउंटर झूठ बोलता है:
 # «Never Gonna Give You Up» <title> में भी है और <h1> में भी, और इससे दुगुनापन आ रहा था।
-ANSWERS="$(printf '%s' "$BODY" | grep -c 'вас обслужил под')"
+ANSWERS="$(printf '%s' "$BODY" | grep -c 'सेवा प्रदान करने वाला Pod')"
 TOTAL_LINES="$(printf '%s' "$BODY" | grep -c '<title>')"
 if [ "${ANSWERS:-0}" -ge 1 ] && [ "${ANSWERS:-0}" -eq "${TOTAL_LINES:-0}" ]; then
   ok "एप्लिकेशन HTTP पर जवाब देता है और अपना पेज परोसता है (${ANSWERS} अनुरोध जाँचे गए)"

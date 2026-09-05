@@ -67,7 +67,7 @@ func envInt(key string, fallback int) int {
 		if n, err := strconv.Atoi(v); err == nil {
 			return n
 		}
-		log.Printf("значение %s=%q не число, беру %d", key, v, fallback)
+		log.Printf("मान %s=%q संख्या नहीं है, %d ले रहा हूँ", key, v, fallback)
 	}
 	return fallback
 }
@@ -177,7 +177,7 @@ func (r *redisClient) readReplyLocked() (string, bool, error) {
 	}
 	line = strings.TrimRight(line, "\r\n")
 	if line == "" {
-		return "", false, errors.New("redis: пустой ответ")
+		return "", false, errors.New("redis: खाली उत्तर")
 	}
 	switch line[0] {
 	case '+', ':': // एक सरल स्ट्रिंग या एक संख्या
@@ -198,7 +198,7 @@ func (r *redisClient) readReplyLocked() (string, bool, error) {
 		}
 		return string(buf[:n]), true, nil
 	default:
-		return "", false, fmt.Errorf("redis: непонятный ответ %q", line)
+		return "", false, fmt.Errorf("redis: समझ में न आने वाला उत्तर %q", line)
 	}
 }
 
@@ -227,13 +227,13 @@ type employee struct {
 
 // डेटा काल्पनिक है। प्रशिक्षण स्टैंड में असली कर्मचारी जानकारी नहीं है और न होनी चाहिए।
 var surnames = []string{
-	"Иванов И. И.", "Петрова А. С.", "Сидоров П. Н.", "Кузнецова М. В.",
-	"Смирнов Д. А.", "Попова Е. К.", "Волков С. Ю.", "Морозова Н. Г.",
+	"शर्मा आर.", "वर्मा अ.", "सिन्हा प्र.", "गुप्ता वि.",
+	"अग्रवाल दी.", "पटेल ई.", "रेड्डी सा.", "भट्ट नी.",
 }
 
 var departments = []string{
-	"Служба безопасности", "Бухгалтерия", "Разработка",
-	"Логистика", "Отдел кадров", "Административный отдел",
+	"सुरक्षा विभाग", "लेखा", "इंजीनियरिंग",
+	"लॉजिस्टिक्स", "मानव संसाधन विभाग", "प्रशासन विभाग",
 }
 
 // डेटा काल्पनिक है, लेकिन एक ही पहचानकर्ता के लिए एक जैसा:
@@ -262,7 +262,7 @@ func writeJSON(w http.ResponseWriter, code int, v any) {
 	enc := json.NewEncoder(w)
 	enc.SetEscapeHTML(false)
 	if err := enc.Encode(v); err != nil {
-		log.Printf("не удалось отдать ответ: %v", err)
+		log.Printf("उत्तर देने में विफल: %v", err)
 	}
 }
 
@@ -285,7 +285,7 @@ func employeeID(r *http.Request) string {
 func main() {
 	mode := env("MODE", "api")
 	port := env("PORT", "8080")
-	pod := env("POD_NAME", "неизвестно")
+	pod := env("POD_NAME", "अज्ञात")
 
 	mux := http.NewServeMux()
 	// /healthz दोनों भूमिकाओं में मौजूद है: यहीं मैनिफ़ेस्ट में वर्णित तैयारी-जाँच दस्तक देती है।
@@ -305,7 +305,7 @@ func main() {
 	case "api":
 		setupAPI(mux, pod)
 	default:
-		log.Fatalf("неизвестный MODE=%q, допустимы hr и api", mode)
+		log.Fatalf("अज्ञात MODE=%q, मान्य मान hr और api हैं", mode)
 	}
 
 	// ReadHeaderTimeout कनेक्शन बंद कर देता है यदि क्लाइंट ने अनुरोध शुरू किया और चुप हो गया। इसके बिना
@@ -315,7 +315,7 @@ func main() {
 		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
-	log.Printf("режим %s, порт %s, под %s", mode, port, pod)
+	log.Printf("मोड %s, पोर्ट %s, पॉड %s", mode, port, pod)
 	log.Fatal(srv.ListenAndServe())
 }
 
@@ -324,10 +324,10 @@ func main() {
 func setupHR(mux *http.ServeMux, pod string) {
 	delay, err := time.ParseDuration(env("HR_DELAY", "800ms"))
 	if err != nil {
-		log.Printf("HR_DELAY=%q не разобрался, беру 800ms", os.Getenv("HR_DELAY"))
+		log.Printf("HR_DELAY=%q पार्स नहीं हुआ, 800ms ले रहा हूँ", os.Getenv("HR_DELAY"))
 		delay = 800 * time.Millisecond
 	}
-	log.Printf("справочник отвечает за %s", delay)
+	log.Printf("निर्देशिका %s में जवाब देती है", delay)
 
 	// इस भूमिका का एकमात्र पता। time.Sleep ही पूरी «लेगेसी प्रणाली» है: वही
 	// सैकड़ों मिलीसेकंड, जिनके लिए लैब में कैश प्रकट होता है। उत्तर में source फ़ील्ड
@@ -359,9 +359,9 @@ func setupAPI(mux *http.ServeMux, pod string) {
 	var cache *redisClient
 	if addr := os.Getenv("REDIS_ADDR"); addr != "" {
 		cache = &redisClient{addr: addr, password: os.Getenv("REDIS_PASSWORD")}
-		log.Printf("кеш включён: %s, срок жизни записи %d с", addr, ttl)
+		log.Printf("कैश चालू: %s, प्रविष्टि का जीवनकाल %d सेकंड", addr, ttl)
 	} else {
-		log.Printf("кеш выключен: REDIS_ADDR не задан, каждый запрос пойдёт в справочник")
+		log.Printf("कैश बंद: REDIS_ADDR निर्दिष्ट नहीं, हर अनुरोध निर्देशिका जाएगा")
 	}
 
 	// बढ़े हुए कनेक्शन पूल वाला एक अलग क्लाइंट: अन्यथा भार के तहत
@@ -378,9 +378,9 @@ func setupAPI(mux *http.ServeMux, pod string) {
 			"service":   "passes-api",
 			"version":   version,
 			"pod":       pod,
-			"node":      env("NODE_NAME", "неизвестно"),
-			"namespace": env("POD_NAMESPACE", "неизвестно"),
-			"registry":  env("IMAGE_REGISTRY", "не указан"),
+			"node":      env("NODE_NAME", "अज्ञात"),
+			"namespace": env("POD_NAMESPACE", "अज्ञात"),
+			"registry":  env("IMAGE_REGISTRY", "निर्दिष्ट नहीं"),
 			"cache":     cacheMode(cache),
 			"cache_ttl": ttl,
 			"hr_url":    hrURL,
@@ -409,12 +409,12 @@ func setupAPI(mux *http.ServeMux, pod string) {
 			case err != nil:
 				// कैश अनुपलब्ध है — यह उपयोगकर्ता को त्रुटि लौटाने का बहाना नहीं।
 				// निर्देशिका जाते हैं: धीमा, पर सही।
-				log.Printf("кеш недоступен (%v), иду в справочник", err)
+				log.Printf("कैश अनुपलब्ध (%v), निर्देशिका जा रहा हूँ", err)
 			case found:
 				if json.Unmarshal([]byte(raw), &emp) == nil {
 					fromCache = true
 				} else {
-					log.Printf("в кеше по ключу %s лежит мусор, иду в справочник", key)
+					log.Printf("कुंजी %s पर कैश में कचरा है, निर्देशिका जा रहा हूँ", key)
 				}
 			}
 		}
@@ -426,9 +426,9 @@ func setupAPI(mux *http.ServeMux, pod string) {
 		if !fromCache {
 			fetched, err := fetchEmployee(hrClient, hrURL, id)
 			if err != nil {
-				log.Printf("справочник не ответил: %v", err)
+				log.Printf("निर्देशिका ने जवाब नहीं दिया: %v", err)
 				writeJSON(w, http.StatusBadGateway, map[string]any{
-					"error": "справочник сотрудников недоступен",
+					"error": "कर्मचारी निर्देशिका अनुपलब्ध है",
 					"pod":   pod,
 				})
 				return
@@ -437,7 +437,7 @@ func setupAPI(mux *http.ServeMux, pod string) {
 			if cache != nil {
 				if b, err := json.Marshal(emp); err == nil {
 					if err := cache.SetTTL(key, string(b), ttl); err != nil {
-						log.Printf("не удалось положить в кеш: %v", err)
+						log.Printf("कैश में डालने में विफल: %v", err)
 					}
 				}
 			}
@@ -478,7 +478,7 @@ func fetchEmployee(c *http.Client, base, id string) (employee, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return employee{}, fmt.Errorf("справочник ответил %s", resp.Status)
+		return employee{}, fmt.Errorf("निर्देशिका ने %s जवाब दिया", resp.Status)
 	}
 	var emp employee
 	if err := json.NewDecoder(resp.Body).Decode(&emp); err != nil {

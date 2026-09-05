@@ -76,8 +76,8 @@ data:
     </style>
     <h1>Never Gonna Give You Up</h1>
     <p class="lyr">Never gonna let you down &middot; Never gonna run around and desert you</p>
-    <div class="pod">вас обслужил под<b>__POD__</b></div>
-    <p class="hint">Обновите страницу. Когда реплик станет больше — имя начнёт меняться.</p>
+    <div class="pod">सेवा प्रदान करने वाला Pod<b>__POD__</b></div>
+    <p class="hint">पेज को रिफ़्रेश करें। जब रेप्लिका ज़्यादा हो जाएँगी — नाम बदलने लगेगा।</p>
     </html>
 ---
 # स्वयं ऐप। Deployment वांछित स्थिति का वर्णन करता है — कौन-सी इमेज चलानी है,

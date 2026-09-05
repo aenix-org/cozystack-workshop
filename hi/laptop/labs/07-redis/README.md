@@ -107,7 +107,7 @@ if cache != nil {
     raw, found, err := cache.Get(key)
     switch {
     case err != nil:
-        log.Printf("кеш недоступен (%v), иду в справочник", err)
+        log.Printf("कैश उपलब्ध नहीं (%v), निर्देशिका तक जा रहा हूँ", err)
     case found:
         if json.Unmarshal([]byte(raw), &emp) == nil {
             fromCache = true
@@ -254,7 +254,7 @@ kubectl run probe --rm -i --restart=Never --image=curlimages/curl:8.11.1 --quiet
 **आपको यह दिखना चाहिए:**
 
 ```json
-{"cache":"off","cached":false,"dept":"Логистика","id":"42","name":"Попова Е. К.",
+{"cache":"off","cached":false,"dept":"लॉजिस्टिक्स","id":"42","name":"पटेल ई.",
  "pod":"passes-api-6f8b9c7d5-x2ktm","took_ms":803,"ttl_s":60}
 ```
 
@@ -568,8 +568,8 @@ kubectl logs -l app=passes-api --tail=20
 ```
 
 ```
-кеш недоступен (redis: NOAUTH Authentication required.), иду в справочник
-кеш недоступен (redis: NOAUTH Authentication required.), иду в справочник
+कैश उपलब्ध नहीं (redis: NOAUTH Authentication required.), निर्देशिका तक जा रहा हूँ
+कैश उपलब्ध नहीं (redis: NOAUTH Authentication required.), निर्देशिका तक जा रहा हूँ
 ```
 
 यह रहा जवाब। हमने Redis का पता तो बताया, पर पासवर्ड नहीं। Redis प्रमाणीकरण माँगता है — आपने

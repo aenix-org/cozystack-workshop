@@ -91,7 +91,7 @@ ssh_pwauth: true
 write_files:
   - path: /opt/directory/index.html
     content: |
-      <!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Справочник</title></head><body><h1>Справочник сотрудников</h1><ul><li>Иванов И. — 101</li><li>Петров П. — 102</li></ul></body></html>
+      <!doctype html><html lang="ru"><head><meta charset="utf-8"><title>निर्देशिका</title></head><body><h1>कर्मचारी निर्देशिका</h1><ul><li>शर्मा आर. — 101</li><li>पाण्डेय प. — 102</li></ul></body></html>
   - path: /etc/systemd/system/directory.service
     content: |
       [Unit]
@@ -286,7 +286,7 @@ curl http://spravochnik.workshopXX.workshop.aenix.io
 **आपको क्या दिखना चाहिए** — डायरेक्टरी पेज का HTML:
 
 ```html
-<h1>Справочник сотрудников</h1><ul><li>Иванов И. — 101</li><li>Петров П. — 102</li></ul>
+<h1>कर्मचारी निर्देशिका</h1><ul><li>शर्मा आर. — 101</li><li>पाण्डेय प. — 102</li></ul>
 ```
 
 इस पते को ब्राउज़र में खोलें और आपको वही सूची दिखेगी। डायरेक्टरी बाहर से एक मानव-अनुकूल डोमेन नाम से दिखाई देती है, प्लेटफ़ॉर्म से मिले HTTPS के साथ, नेटवर्किंग को या सर्टिफ़िकेट के लिए एक भी टिकट भरे बिना।

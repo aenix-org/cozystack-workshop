@@ -30,7 +30,7 @@ data:
   # जो कंटेनर के अंदर जाएगी। यह अब YAML नहीं है: यहाँ कोई टिप्पणी नहीं है
   # और हो भी नहीं सकती — हैश चिह्न पेज पर सामान्य टेक्स्ट की तरह आ जाता।
   #
-  # मार्कअप में दो चीज़ें check.sh के लिए मायने रखती हैं: लेबल «ВЕРСИЯ 2» —
+  # मार्कअप में दो चीज़ें check.sh के लिए मायने रखती हैं: लेबल «संस्करण 2» —
   # इसी से जाँच दूसरे संस्करण को पहले से अलग पहचानती है, और प्लेसहोल्डर __POD__ — इसे
   # ConfigMap rickroll-conf (लैब 1) के नियम के अनुसार nginx पॉड के नाम से बदला जाता है।
   # इनमें से किसी एक को हटा देंगे तो लैब की जाँच पास नहीं होगी, भले ही रोलआउट सफल हो जाए।
@@ -56,9 +56,9 @@ data:
       .pod b{display:block;margin-top:.4em;color:#00ffa3;font-size:1.35em;word-break:break-all}
       .hint{margin-top:3em;color:#3f5561;font-size:14px}
     </style>
-    <div class="tag">ВЕРСИЯ 2</div>
+    <div class="tag">संस्करण 2</div>
     <h1>We're No Strangers To Love</h1>
     <p class="lyr">You know the rules &middot; And so do I</p>
-    <div class="pod">вас обслужил под<b>__POD__</b></div>
-    <p class="hint">Обновление прошло под нагрузкой. Посмотрите в Fortio: ошибок ноль.</p>
+    <div class="pod">सेवा प्रदान करने वाला Pod<b>__POD__</b></div>
+    <p class="hint">अपडेट लोड के तहत रोलआउट हुआ। Fortio में देखें: शून्य त्रुटियाँ।</p>
     </html>

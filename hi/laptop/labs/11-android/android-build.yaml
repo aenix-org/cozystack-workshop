@@ -67,7 +67,7 @@ data:
     CMDLINE_TOOLS_URL="https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"
     MC_URL="https://dl.min.io/client/mc/release/linux-amd64/mc"
 
-    echo "== 1/5 ставлю Android command-line tools =="
+    echo "== 1/5 Android command-line tools इंस्टॉल कर रहा हूँ =="
     mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
     cd "$ANDROID_SDK_ROOT/cmdline-tools"
     curl -fsSL -o tools.zip "$CMDLINE_TOOLS_URL"
@@ -77,7 +77,7 @@ data:
     mv cmdline-tools latest
     export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
 
-    echo "== 2/5 принимаю лицензии и качаю SDK (самый долгий шаг) =="
+    echo "== 2/5 लाइसेंस स्वीकार कर रहा हूँ और SDK डाउनलोड कर रहा हूँ (सबसे लंबा चरण) =="
     # `yes` को SIGPIPE मिलता है जब sdkmanager अपना इनपुट बंद करता है, और वह
     # एक गैर-शून्य कोड लौटाता है। set -o pipefail के साथ यह बिल्ड को बिना किसी कारण विफल कर देता,
     # इसलिए यहाँ रिटर्न कोड को जानबूझकर दबा दिया गया है। यदि लाइसेंस वास्तव में
@@ -86,7 +86,7 @@ data:
     sdkmanager --sdk_root="$ANDROID_SDK_ROOT" \
       "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
-    echo "== 3/5 собираю APK =="
+    echo "== 3/5 APK बना रहा हूँ =="
     # ConfigMap केवल-पढ़ने के लिए माउंट होता है, और Gradle स्रोतों के पास लिखता है,
     # इसलिए पेड़ पहले डिस्क पर कॉपी किया जाता है।
     # -L सांकेतिक लिंक को हल करता है: ConfigMap फ़ाइलों के रूप में नहीं,
@@ -100,7 +100,7 @@ data:
     APK="$WORK/project/app/build/outputs/apk/debug/app-debug.apk"
     ls -l "$APK"
 
-    echo "== 4/5 ставлю клиент S3 =="
+    echo "== 4/5 S3 क्लाइंट इंस्टॉल कर रहा हूँ =="
     # हम क्लाइंट को कार्यशील डायरेक्टरी में रखते हैं, /usr/local/bin में नहीं। पॉड एक
     # अविशेषाधिकृत यूज़र के रूप में चलता है, और इमेज की सिस्टम डायरेक्टरियाँ root की हैं:
     # वहाँ लिखने का अंत Permission denied में होगा — और ठीक यहीं, चौथे चरण पर,
@@ -112,7 +112,7 @@ data:
     # पूरे पथ के बजाय बस `mc` लिखा जा सके।
     export PATH="$WORK/bin:$PATH"
 
-    echo "== 5/5 кладу APK в бакет =="
+    echo "== 5/5 APK को bucket में अपलोड कर रहा हूँ =="
     # accessKey/secretKey/endpoint/bucketName चर Secret से envFrom के माध्यम से
     # आते हैं। हम alias set का आउटपुट दबाते हैं: उसे लॉग में कुछ भी छापने की ज़रूरत नहीं।
     # इसी कारण से स्क्रिप्ट में कोई set -x नहीं है — वह कुंजियाँ छाप देता।

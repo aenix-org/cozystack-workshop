@@ -154,7 +154,7 @@ else
   elif kubectl get pod "$SERVED" >/dev/null 2>&1; then
     ok "Service पेज देता है, उसे जीवित कॉपी ${SERVED} ने सेवा दी"
     evidence "Service का जवाब (अंश)" \
-      "$(printf '%s' "$BODY" | grep -o "вас обслужил под<b>${APP}-[a-z0-9-]*</b>" | head -1)"
+      "$(printf '%s' "$BODY" | grep -o "सेवा प्रदान करने वाला Pod<b>${APP}-[a-z0-9-]*</b>" | head -1)"
   else
     fail "पेज को कॉपी ${SERVED} ने दिया, लेकिन ऐसा पॉड क्लस्टर में अब नहीं है" \
          "दस सेकंड इंतज़ार करें और जाँच फिर चलाएँ — शायद कॉपी अभी ही बदल रही थी"
