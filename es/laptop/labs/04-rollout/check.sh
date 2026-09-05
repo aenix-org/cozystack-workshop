@@ -154,7 +154,7 @@ else
   # Identificamos ambas versiones POSITIVAMENTE, cada una por su propio marcador. La rama «si no es v2,
   # entonces v1» contaba cualquier cosa como la primera versión: la página por defecto de nginx, un 404,
   # la app de otro, basura — comprobado, con basura el script informaba «LAB APROBADO».
-  if printf '%s' "$BODY" | grep -q 'ВЕРСИЯ 2'; then
+  if printf '%s' "$BODY" | grep -q 'VERSIÓN 2'; then
     SERVED_VER="rickroll-page-v2"
   elif printf '%s' "$BODY" | grep -q 'Never Gonna Give You Up'; then
     SERVED_VER="rickroll-page-v1"
@@ -187,7 +187,7 @@ else
 
   evidence "Página servida (fragmento)" \
     "$(printf '%s' "$BODY" | grep -o '<h1>[^<]*</h1>' | head -1)
-$(printf '%s' "$BODY" | grep -o "вас обслужил под<b>${APP}-[a-z0-9-]*</b>" | head -1)"
+$(printf '%s' "$BODY" | grep -o "te atendió el Pod<b>${APP}-[a-z0-9-]*</b>" | head -1)"
 fi
 
 # --- preparación para los siguientes labs ------------------------------------

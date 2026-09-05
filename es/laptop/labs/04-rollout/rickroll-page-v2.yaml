@@ -30,7 +30,7 @@ data:
   # que acabará dentro del contenedor. Esto ya no es YAML: aquí no hay comentarios
   # ni puede haberlos, una almohadilla aparecería en la página como texto normal.
   #
-  # En el marcado importan dos cosas que check.sh mira: el rótulo «ВЕРСИЯ 2» —
+  # En el marcado importan dos cosas que check.sh mira: el rótulo «VERSIÓN 2» —
   # por él la comprobación distingue la segunda versión de la primera, y el marcador __POD__ — que se
   # sustituye por el nombre del pod nginx según la regla del ConfigMap rickroll-conf (lab 1).
   # Si eliminas cualquiera de ellos, la comprobación de la lab no pasará, aunque el despliegue tenga éxito.
@@ -56,9 +56,9 @@ data:
       .pod b{display:block;margin-top:.4em;color:#00ffa3;font-size:1.35em;word-break:break-all}
       .hint{margin-top:3em;color:#3f5561;font-size:14px}
     </style>
-    <div class="tag">ВЕРСИЯ 2</div>
+    <div class="tag">VERSIÓN 2</div>
     <h1>We're No Strangers To Love</h1>
     <p class="lyr">You know the rules &middot; And so do I</p>
-    <div class="pod">вас обслужил под<b>__POD__</b></div>
-    <p class="hint">Обновление прошло под нагрузкой. Посмотрите в Fortio: ошибок ноль.</p>
+    <div class="pod">te atendió el Pod<b>__POD__</b></div>
+    <p class="hint">El despliegue se realizó bajo carga. Mira en Fortio: cero errores.</p>
     </html>

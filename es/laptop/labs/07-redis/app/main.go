@@ -1,8 +1,8 @@
-// El servicio «Пропуск», versión con caché. Un único ejecutable, dos roles.
+// El servicio «Pase de invitado», versión con caché. Un único ejecutable, dos roles.
 //
 //	MODE=hr   — un stub del directorio legado de empleados. Responde despacio,
 //	            exactamente como lo hace el real: HR_DELAY es 800 ms por defecto.
-//	MODE=api  — el propio servicio «Пропуск». Consulta el directorio y, si REDIS_ADDR
+//	MODE=api  — el propio servicio «Pase de invitado». Consulta el directorio y, si REDIS_ADDR
 //	            está definida, primero mira en la caché.
 //
 // Un solo rol para ambos casos, porque la imagen debe ser única: dos imágenes casi idénticas
@@ -67,7 +67,7 @@ func envInt(key string, fallback int) int {
 		if n, err := strconv.Atoi(v); err == nil {
 			return n
 		}
-		log.Printf("значение %s=%q не число, беру %d", key, v, fallback)
+		log.Printf("%s=%q no es un número, uso %d", key, v, fallback)
 	}
 	return fallback
 }
@@ -177,7 +177,7 @@ func (r *redisClient) readReplyLocked() (string, bool, error) {
 	}
 	line = strings.TrimRight(line, "\r\n")
 	if line == "" {
-		return "", false, errors.New("redis: пустой ответ")
+		return "", false, errors.New("redis: respuesta vacía")
 	}
 	switch line[0] {
 	case '+', ':': // una cadena simple o un número
@@ -198,7 +198,7 @@ func (r *redisClient) readReplyLocked() (string, bool, error) {
 		}
 		return string(buf[:n]), true, nil
 	default:
-		return "", false, fmt.Errorf("redis: непонятный ответ %q", line)
+		return "", false, fmt.Errorf("redis: respuesta inesperada %q", line)
 	}
 }
 
@@ -227,13 +227,13 @@ type employee struct {
 
 // Los datos son inventados. No hay datos de personal reales en el banco de pruebas de entrenamiento, ni debe haberlos.
 var surnames = []string{
-	"Иванов И. И.", "Петрова А. С.", "Сидоров П. Н.", "Кузнецова М. В.",
-	"Смирнов Д. А.", "Попова Е. К.", "Волков С. Ю.", "Морозова Н. Г.",
+	"Herrera J.", "Prado A.", "Soler P.", "Marín M.",
+	"Serrano D.", "Pardo E.", "Vega S.", "Navarro N.",
 }
 
 var departments = []string{
-	"Служба безопасности", "Бухгалтерия", "Разработка",
-	"Логистика", "Отдел кадров", "Административный отдел",
+	"Seguridad", "Contabilidad", "Ingeniería",
+	"Logística", "Recursos Humanos", "Administración",
 }
 
 // Los datos son inventados, pero iguales para el mismo identificador:
@@ -262,7 +262,7 @@ func writeJSON(w http.ResponseWriter, code int, v any) {
 	enc := json.NewEncoder(w)
 	enc.SetEscapeHTML(false)
 	if err := enc.Encode(v); err != nil {
-		log.Printf("не удалось отдать ответ: %v", err)
+		log.Printf("no se pudo enviar la respuesta: %v", err)
 	}
 }
 
@@ -285,7 +285,7 @@ func employeeID(r *http.Request) string {
 func main() {
 	mode := env("MODE", "api")
 	port := env("PORT", "8080")
-	pod := env("POD_NAME", "неизвестно")
+	pod := env("POD_NAME", "desconocido")
 
 	mux := http.NewServeMux()
 	// /healthz existe en ambos roles: la sonda de readiness descrita en los manifiestos llama aquí.
@@ -305,7 +305,7 @@ func main() {
 	case "api":
 		setupAPI(mux, pod)
 	default:
-		log.Fatalf("неизвестный MODE=%q, допустимы hr и api", mode)
+		log.Fatalf("MODE=%q desconocido, los valores admitidos son hr y api", mode)
 	}
 
 	// ReadHeaderTimeout cierra la conexión si un cliente empezó una petición y se quedó callado. Sin él
@@ -315,7 +315,7 @@ func main() {
 		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
-	log.Printf("режим %s, порт %s, под %s", mode, port, pod)
+	log.Printf("modo %s, puerto %s, pod %s", mode, port, pod)
 	log.Fatal(srv.ListenAndServe())
 }
 
@@ -324,10 +324,10 @@ func main() {
 func setupHR(mux *http.ServeMux, pod string) {
 	delay, err := time.ParseDuration(env("HR_DELAY", "800ms"))
 	if err != nil {
-		log.Printf("HR_DELAY=%q не разобрался, беру 800ms", os.Getenv("HR_DELAY"))
+		log.Printf("no se pudo interpretar HR_DELAY=%q, uso 800ms", os.Getenv("HR_DELAY"))
 		delay = 800 * time.Millisecond
 	}
-	log.Printf("справочник отвечает за %s", delay)
+	log.Printf("el directorio responde en %s", delay)
 
 	// La única dirección de este rol. time.Sleep es todo el «sistema legado»: esos mismos
 	// cientos de milisegundos por los que aparece la caché en el laboratorio. El campo source en la respuesta
@@ -346,7 +346,7 @@ func setupHR(mux *http.ServeMux, pod string) {
 	})
 }
 
-// setupAPI — el propio servicio «Пропуск». Aquí vive la lógica de la caché, y aquí también está la respuesta
+// setupAPI — el propio servicio «Pase de invitado». Aquí vive la lógica de la caché, y aquí también está la respuesta
 // a la pregunta «por qué la respuesta dice cache: off».
 func setupAPI(mux *http.ServeMux, pod string) {
 	hrURL := env("HR_URL", "http://hr-legacy")
@@ -359,9 +359,9 @@ func setupAPI(mux *http.ServeMux, pod string) {
 	var cache *redisClient
 	if addr := os.Getenv("REDIS_ADDR"); addr != "" {
 		cache = &redisClient{addr: addr, password: os.Getenv("REDIS_PASSWORD")}
-		log.Printf("кеш включён: %s, срок жизни записи %d с", addr, ttl)
+		log.Printf("caché activada: %s, TTL de la entrada %d s", addr, ttl)
 	} else {
-		log.Printf("кеш выключен: REDIS_ADDR не задан, каждый запрос пойдёт в справочник")
+		log.Printf("caché desactivada: REDIS_ADDR no está definida, cada petición irá al directorio")
 	}
 
 	// Un cliente aparte con un pool de conexiones ampliado: de lo contrario, bajo carga
@@ -378,9 +378,9 @@ func setupAPI(mux *http.ServeMux, pod string) {
 			"service":   "passes-api",
 			"version":   version,
 			"pod":       pod,
-			"node":      env("NODE_NAME", "неизвестно"),
-			"namespace": env("POD_NAMESPACE", "неизвестно"),
-			"registry":  env("IMAGE_REGISTRY", "не указан"),
+			"node":      env("NODE_NAME", "desconocido"),
+			"namespace": env("POD_NAMESPACE", "desconocido"),
+			"registry":  env("IMAGE_REGISTRY", "sin especificar"),
 			"cache":     cacheMode(cache),
 			"cache_ttl": ttl,
 			"hr_url":    hrURL,
@@ -409,12 +409,12 @@ func setupAPI(mux *http.ServeMux, pod string) {
 			case err != nil:
 				// La caché no está disponible — eso no es motivo para devolver un error al usuario.
 				// Vamos al directorio: lento, pero correcto.
-				log.Printf("кеш недоступен (%v), иду в справочник", err)
+				log.Printf("caché no disponible (%v), voy al directorio", err)
 			case found:
 				if json.Unmarshal([]byte(raw), &emp) == nil {
 					fromCache = true
 				} else {
-					log.Printf("в кеше по ключу %s лежит мусор, иду в справочник", key)
+					log.Printf("la caché contiene basura para la clave %s, voy al directorio", key)
 				}
 			}
 		}
@@ -426,9 +426,9 @@ func setupAPI(mux *http.ServeMux, pod string) {
 		if !fromCache {
 			fetched, err := fetchEmployee(hrClient, hrURL, id)
 			if err != nil {
-				log.Printf("справочник не ответил: %v", err)
+				log.Printf("el directorio no respondió: %v", err)
 				writeJSON(w, http.StatusBadGateway, map[string]any{
-					"error": "справочник сотрудников недоступен",
+					"error": "el directorio de empleados no está disponible",
 					"pod":   pod,
 				})
 				return
@@ -437,7 +437,7 @@ func setupAPI(mux *http.ServeMux, pod string) {
 			if cache != nil {
 				if b, err := json.Marshal(emp); err == nil {
 					if err := cache.SetTTL(key, string(b), ttl); err != nil {
-						log.Printf("не удалось положить в кеш: %v", err)
+						log.Printf("no se pudo escribir en la caché: %v", err)
 					}
 				}
 			}
@@ -478,7 +478,7 @@ func fetchEmployee(c *http.Client, base, id string) (employee, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return employee{}, fmt.Errorf("справочник ответил %s", resp.Status)
+		return employee{}, fmt.Errorf("el directorio respondió %s", resp.Status)
 	}
 	var emp employee
 	if err := json.NewDecoder(resp.Body).Decode(&emp); err != nil {

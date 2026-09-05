@@ -18,7 +18,7 @@ nano convert.sh
 ```
 
 **Aquí es donde te sirven los tres valores que anotaste en el paso 1.** Cerca del inicio del
-archivo hay un bloque titulado «ВСТАВЬТЕ СВОИ ЗНАЧЕНИЯ» — reemplaza en él los marcadores por los
+archivo hay un bloque titulado «PEGA TUS VALORES» — reemplaza en él los marcadores por los
 tuyos, dejando las comillas en su lugar:
 
 ```

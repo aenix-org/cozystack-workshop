@@ -76,8 +76,8 @@ data:
     </style>
     <h1>Never Gonna Give You Up</h1>
     <p class="lyr">Never gonna let you down &middot; Never gonna run around and desert you</p>
-    <div class="pod">вас обслужил под<b>__POD__</b></div>
-    <p class="hint">Обновите страницу. Когда реплик станет больше — имя начнёт меняться.</p>
+    <div class="pod">te atendió el Pod<b>__POD__</b></div>
+    <p class="hint">Actualiza la página. Cuando haya más réplicas, el nombre empezará a cambiar.</p>
     </html>
 ---
 # La aplicación en sí. Un Deployment describe el estado deseado — qué imagen ejecutar,

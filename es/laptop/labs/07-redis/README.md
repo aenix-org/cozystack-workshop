@@ -108,7 +108,7 @@ if cache != nil {
     raw, found, err := cache.Get(key)
     switch {
     case err != nil:
-        log.Printf("кеш недоступен (%v), иду в справочник", err)
+        log.Printf("caché no disponible (%v), voy al directorio", err)
     case found:
         if json.Unmarshal([]byte(raw), &emp) == nil {
             fromCache = true
@@ -257,7 +257,7 @@ kubectl run probe --rm -i --restart=Never --image=curlimages/curl:8.11.1 --quiet
 **Lo que deberías ver:**
 
 ```json
-{"cache":"off","cached":false,"dept":"Логистика","id":"42","name":"Попова Е. К.",
+{"cache":"off","cached":false,"dept":"Logística","id":"42","name":"Pardo E.",
  "pod":"passes-api-6f8b9c7d5-x2ktm","took_ms":803,"ttl_s":60}
 ```
 
@@ -574,8 +574,8 @@ kubectl logs -l app=passes-api --tail=20
 ```
 
 ```
-кеш недоступен (redis: NOAUTH Authentication required.), иду в справочник
-кеш недоступен (redis: NOAUTH Authentication required.), иду в справочник
+caché no disponible (redis: NOAUTH Authentication required.), voy al directorio
+caché no disponible (redis: NOAUTH Authentication required.), voy al directorio
 ```
 
 Ahí está la respuesta. Especificamos la dirección de Redis pero no la contraseña. Redis exige

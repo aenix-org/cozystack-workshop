@@ -235,8 +235,8 @@ clúster llama aquí y no envía tráfico a una réplica hasta que recibe una re
 arrancar, en variables de entorno:
 
 ```go
-Pod:  env("POD_NAME", "неизвестно"),
-Node: env("NODE_NAME", "неизвестно"),
+Pod:  env("POD_NAME", "desconocido"),
+Node: env("NODE_NAME", "desconocido"),
 ```
 
 Y el manifiesto dice qué poner ahí:

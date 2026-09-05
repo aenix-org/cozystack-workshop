@@ -60,7 +60,7 @@ spec:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # La imagen es la misma para el directorio y para el propio servicio «Пропуск».
+          # La imagen es la misma para el directorio y para el propio servicio «Pase de invitado».
           # Qué proceso arranca realmente lo decide la variable MODE de abajo.
           image: HARBOR-HOST/passes/passes-api:v2
           # El puerto tiene un nombre, no solo un número: la sonda de readiness y el Service de abajo

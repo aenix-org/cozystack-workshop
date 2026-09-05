@@ -95,13 +95,13 @@ metadata:
 data:
   index.html: |
     ...
-    <div class="tag">ВЕРСИЯ 2</div>
+    <div class="tag">VERSIÓN 2</div>
     <h1>We're No Strangers To Love</h1>
     ...
-    <div class="pod">вас обслужил под<b>__POD__</b></div>
+    <div class="pod">te atendió el Pod<b>__POD__</b></div>
 ```
 
-Dentro hay una sola página: otro encabezado, otra gama de colores, una llamativa insignia «ВЕРСИЯ 2». Las diferencias se hicieron deliberadamente vistosas — estarás mirando el navegador, no un diff.
+Dentro hay una sola página: otro encabezado, otra gama de colores, una llamativa insignia «VERSIÓN 2». Las diferencias se hicieron deliberadamente vistosas — estarás mirando el navegador, no un diff.
 
 Fíjate en dos cosas.
 
@@ -327,7 +327,7 @@ Abre un túnel a la aplicación:
 kubectl port-forward svc/rickroll 8080:80
 ```
 
-📍 **En el navegador** <http://localhost:8080> — la página verde con la insignia «ВЕРСИЯ 2». Refréscala unas cuantas veces: el nombre de la copia al pie cambia, porque el Service distribuye las peticiones entre las tres copias.
+📍 **En el navegador** <http://localhost:8080> — la página verde con la insignia «VERSIÓN 2». Refréscala unas cuantas veces: el nombre de la copia al pie cambia, porque el Service distribuye las peticiones entre las tres copias.
 
 Cierra el túnel (`Ctrl+C`).
 

@@ -50,21 +50,21 @@ SELECT
     ) AS created_at,
     -- Cada fila tiene su propio nombre de invitado: un millón de valores distintos en una columna.
     -- Un poco más adelante en el lab verás que en disco esta es la columna más pesada.
-    concat('Гость № ', toString(number)) AS guest_name,
+    concat('Invitado n.º ', toString(number)) AS guest_name,
     -- El departamento del empleado anfitrión: cinco valores, distribuidos por igual.
-    ['Продажи', 'Разработка', 'Бухгалтерия',
-     'Кадры', 'Логистика'][1 + cityHash64(number, 'dept') % 5] AS host_dept,
-    -- Puerta de entrada. El mismo truco, pero la distribución es desigual: «Северная» ocupa
-    -- tres celdas de seis y recibe la mitad del flujo, «Южная» un tercio, «Западная» el
+    ['Ventas', 'Ingeniería', 'Contabilidad',
+     'Recursos Humanos', 'Logística'][1 + cityHash64(number, 'dept') % 5] AS host_dept,
+    -- Puerta de entrada. El mismo truco, pero la distribución es desigual: «Norte» ocupa
+    -- tres celdas de seis y recibe la mitad del flujo, «Sur» un tercio, «Oeste» el
     -- resto. Los datos distribuidos por igual resultan poco verosímiles en un informe y no muestran
     -- nada.
-    ['Северная', 'Северная', 'Северная',
-     'Южная', 'Южная', 'Западная'][1 + cityHash64(number, 'entrance') % 6] AS entrance,
-    -- Tipo de pase: seis celdas de diez van a «разовый», dos a «недельный»,
-    -- una a «автомобильный» y otra a «групповой» — así es como se ve en la portería.
-    ['разовый', 'разовый', 'разовый', 'разовый', 'разовый', 'разовый',
-     'недельный', 'недельный',
-     'автомобильный', 'групповой'][1 + cityHash64(number, 'type') % 10] AS pass_type,
+    ['Norte', 'Norte', 'Norte',
+     'Sur', 'Sur', 'Oeste'][1 + cityHash64(number, 'entrance') % 6] AS entrance,
+    -- Tipo de pase: seis celdas de diez van a «puntual», dos a «semanal»,
+    -- una a «vehicular» y otra a «grupal» — así es como se ve en la portería.
+    ['puntual', 'puntual', 'puntual', 'puntual', 'puntual', 'puntual',
+     'semanal', 'semanal',
+     'vehicular', 'grupal'][1 + cityHash64(number, 'type') % 10] AS pass_type,
     -- Duración de la visita de 30 a 329 minutos. toUInt16 es necesario porque la columna
     -- está declarada como UInt16, mientras que el resultado de la aritmética es más ancho y no se estrecha solo.
     toUInt16(30 + cityHash64(number, 'duration') % 300) AS duration_min

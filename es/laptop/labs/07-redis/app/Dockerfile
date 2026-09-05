@@ -1,4 +1,4 @@
-# Lab 7 · receta de construcción de la imagen del servicio «Пропуск», versión v2.
+# Lab 7 · receta de construcción de la imagen del servicio «Pase de invitado», versión v2.
 #
 # Un Dockerfile es una lista de pasos que convierten las fuentes en una imagen: una instantánea
 # inmutable de un sistema de archivos junto con un comando de arranque. La analogía más familiar es
@@ -6,8 +6,8 @@
 # en un registro y se versiona mediante una etiqueta.
 #
 # Se construye en el portátil, no en el clúster (véase el paso de construcción en el README):
-#   docker build --platform linux/amd64 -t <ваш-harbor>/passes/passes-api:v2 app/
-#   docker push  <ваш-harbor>/passes/passes-api:v2
+#   docker build --platform linux/amd64 -t <tu-harbor>/passes/passes-api:v2 app/
+#   docker push  <tu-harbor>/passes/passes-api:v2
 #
 # --platform linux/amd64 es obligatorio en un Mac con Apple Silicon: sin él la imagen se construirá
 # para ARM, se subirá sin una sola queja y se caerá en el clúster con «exec format error».

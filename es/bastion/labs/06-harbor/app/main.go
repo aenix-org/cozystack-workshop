@@ -90,10 +90,10 @@ func main() {
 		body := identity{
 			Service:   "passes-api",
 			Version:   env("APP_VERSION", "v1"),
-			Pod:       env("POD_NAME", "неизвестно"),
-			Node:      env("NODE_NAME", "неизвестно"),
-			Namespace: env("POD_NAMESPACE", "неизвестно"),
-			Registry:  env("IMAGE_REGISTRY", "не указан"),
+			Pod:       env("POD_NAME", "desconocido"),
+			Node:      env("NODE_NAME", "desconocido"),
+			Namespace: env("POD_NAMESPACE", "desconocido"),
+			Registry:  env("IMAGE_REGISTRY", "sin especificar"),
 			Time:      time.Now().UTC().Format(time.RFC3339),
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -103,7 +103,7 @@ func main() {
 		// y la respuesta se volvería ilegible en la terminal.
 		enc.SetEscapeHTML(false)
 		if err := enc.Encode(body); err != nil {
-			log.Printf("не удалось отдать ответ: %v", err)
+			log.Printf("no se pudo entregar la respuesta: %v", err)
 		}
 	})
 
@@ -119,8 +119,8 @@ func main() {
 
 	// Lo primero que verás en kubectl logs. La línea hace falta para distinguir «la aplicación
 	// no arrancó» de «arrancó, pero no responde» — son diagnósticos distintos.
-	log.Printf("passes-api %s слушает порт %s, под %s",
-		env("APP_VERSION", "v1"), port, env("POD_NAME", "неизвестно"))
+	log.Printf("passes-api %s escucha el puerto %s, pod %s",
+		env("APP_VERSION", "v1"), port, env("POD_NAME", "desconocido"))
 	// Arrancamos el servidor y trabajamos hasta que nos detengan. Si el puerto está ocupado o el servidor
 	// se cayó — escribimos la causa y salimos con error. El clúster verá el proceso terminado
 	// y levantará una réplica de nuevo; no hace falta arreglar el reinicio dentro del programa.

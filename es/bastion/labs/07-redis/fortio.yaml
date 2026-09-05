@@ -11,7 +11,7 @@
 # por el que se llega a él). apiVersion, kind y metadata.name no se comentan más abajo.
 #
 # La imagen se descarga del Docker Hub público, no de tu Harbor: Fortio no es parte
-# del servicio «Пропуск», sino un instrumento de medición que vive en el clúster temporalmente.
+# del servicio «Pase de invitado», sino un instrumento de medición que vive en el clúster temporalmente.
 apiVersion: apps/v1
 kind: Deployment
 metadata:

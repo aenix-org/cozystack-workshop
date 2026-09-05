@@ -389,7 +389,7 @@ cd labs/10-mongodb
 mo < passes.js
 ```
 
-**Lo que deberías ver** — `документов в коллекции: 4`.
+**Lo que deberías ver** — `documentos en la colección: 4`.
 
 <details>
 <summary><b>Recorriendo lo que pusimos</b></summary>
@@ -404,12 +404,12 @@ Ahora a los documentos.
 
 ```js
   {
-    type: "разовый",
-    guest: "Иванов Иван Иванович",
-    host: "petrov@corp.ru",
-    entrance: "Северная",
+    type: "puntual",
+    guest: "Javier P. Herrera",
+    host: "petrov@corp.example",
+    entrance: "Norte",
     valid_on: ISODate("2026-09-01T09:00:00Z"),
-    purpose: "собеседование"
+    purpose: "entrevista de trabajo"
   }
 ```
 
@@ -425,7 +425,7 @@ forma en que fue escrita.
 de una sola entrada, `entrances` ahora es **una lista**:
 
 ```js
-    entrances: ["Северная", "Южная"],
+    entrances: ["Norte", "Sur"],
     badge_returned: false
 ```
 
@@ -440,8 +440,8 @@ El pase de una sola vez no tiene el campo `badge_returned` en absoluto. Ni `NULL
 
 ```js
     car: {
-      plate: "А123ВС174",
-      model: "ГАЗель Next",
+      plate: "1174 BCD",
+      model: "Ford Transit",
       trailer: false,
       weight_kg: 3500
     },
@@ -455,9 +455,9 @@ construir un índice sobre él.
 
 ```js
     members: [
-      { name: "Орлов Пётр", age: 16 },
-      { name: "Волкова Мария", age: 15 },
-      { name: "Зайцев Илья", age: 17 }
+      { name: "Pedro Álvarez", age: 16 },
+      { name: "María Vega", age: 15 },
+      { name: "Isaac Ferrer", age: 17 }
     ]
 ```
 
@@ -495,7 +495,7 @@ db.passes.find({ valid_on: ISODate("2026-09-02T07:30:00Z") })
 
 ```js
 // Una condición sobre un campo de cadena ordinario: coincidencia completa, aquí no existe la insensibilidad a mayúsculas y minúsculas
-db.passes.find({ type: "автомобильный" })
+db.passes.find({ type: "vehicular" })
 ```
 
 **Búsqueda por número de matrícula — llegando dentro de un objeto anidado a través de un
@@ -504,7 +504,7 @@ punto:**
 ```js
 // "car.plate" — una ruta dentro del documento: el campo plate dentro del objeto car.
 // Las comillas alrededor de la ruta son obligatorias, de lo contrario JavaScript leerá el punto a su manera
-db.passes.find({ "car.plate": "А123ВС174" })
+db.passes.find({ "car.plate": "1174 BCD" })
 ```
 
 <details>
@@ -515,7 +515,7 @@ estructura del documento y puede llegar hacia adentro, en lugar de almacenar el 
 como un bloque de texto.
 
 La diferencia es práctica. Si `car` estuviera en una tabla relacional como una columna `TEXT`
-con JSON dentro, buscar por matrícula significaría `LIKE '%А123ВС174%'` — un escaneo completo
+con JSON dentro, buscar por matrícula significaría `LIKE '%1174 BCD%'` — un escaneo completo
 sin índice, con falsos positivos. Aquí es una condición ordinaria sobre la que se puede
 construir un índice, y lo haremos.
 
@@ -527,13 +527,13 @@ punto como un acceso a una propiedad de objeto y no entenderá qué se le pide.
 **Pases válidos en varias entradas:**
 
 ```js
-// entrances no es una cadena sino una lista: ["Северная", "Южная"]. La condición se escribe igual
+// entrances no es una cadena sino una lista: ["Norte", "Sur"]. La condición se escribe igual
 // que para un campo ordinario, MongoDB misma la comprobará contra cada elemento de la lista
-db.passes.find({ entrances: "Южная" })
+db.passes.find({ entrances: "Sur" })
 ```
 
 Fíjate: la condición está escrita como si `entrances` fuera un campo ordinario con el valor
-`"Южная"`, cuando en realidad es una lista. **MongoDB entiende por sí sola que si un campo es
+`"Sur"`, cuando en realidad es una lista. **MongoDB entiende por sí sola que si un campo es
 una lista, la condición debe comprobarse contra cada elemento.** No se requiere una sintaxis
 aparte para «contiene».
 
@@ -596,7 +596,7 @@ db.passes.aggregate([
 ])
 ```
 
-**Lo que deberías ver** — cuatro filas de la forma `{ _id: 'разовый', count: 1 }`.
+**Lo que deberías ver** — cuatro filas de la forma `{ _id: 'puntual', count: 1 }`.
 
 ## Paso 5. Un índice sobre un campo que la mayoría no tiene
 
@@ -612,7 +612,7 @@ de cómo la base de datos los buscó.
 //   .executionStats      tomamos justamente esta sección de la respuesta, para no leerla toda
 // En el informe miramos totalDocsExamined — cuántos documentos leyó la base de datos
 // para devolver uno
-db.passes.find({ "car.plate": "А123ВС174" }).explain("executionStats").executionStats
+db.passes.find({ "car.plate": "1174 BCD" }).explain("executionStats").executionStats
 ```
 
 **Lo que deberías ver** — `totalDocsExamined` es igual al número de documentos en la colección.
@@ -630,7 +630,7 @@ documentos que necesita sin leerlos todos de corrido:
 db.passes.createIndex({ "car.plate": 1 }, { name: "car_plate", sparse: true })
 
 // Repetimos el mismo informe y lo comparamos con el anterior
-db.passes.find({ "car.plate": "А123ВС174" }).explain("executionStats").executionStats
+db.passes.find({ "car.plate": "1174 BCD" }).explain("executionStats").executionStats
 ```
 
 **Lo que deberías ver** — `totalDocsExamined` es igual a uno, y en el plan apareció `IXSCAN` en
@@ -679,9 +679,9 @@ vez — mediante un script escrito con prisas:
 ```js
 // insertOne = «agrega un documento». Qué campos tiene, la base de datos no lo pregunta
 db.passes.insertOne({
-  tipe: "разовый",
-  guest: "Николаев Сергей Игоревич",
-  host: "petrov@corp.ru",
+  tipe: "puntual",
+  guest: "Nicolás S. Gálvez",
+  host: "petrov@corp.example",
   data: ISODate("2026-09-04T09:00:00Z")
 })
 ```
@@ -700,8 +700,8 @@ Cinco. Ahora lo que seguridad hace cada mañana — abre la lista de pases de un
 
 ```js
 // La misma selección por tipo que en el paso de búsqueda: mostrar los pases cuyo
-// campo type es igual a "разовый"
-db.passes.find({ type: "разовый" })
+// campo type es igual a "puntual"
+db.passes.find({ type: "puntual" })
 ```
 
 > **Detente y piensa antes de seguir leyendo.**
@@ -783,7 +783,7 @@ conjunto.
 
 ```js
         type: {
-          enum: ["разовый", "недельный", "автомобильный", "групповой"],
+          enum: ["puntual", "semanal", "vehicular", "grupal"],
         },
 ```
 
@@ -825,14 +825,14 @@ Aplicamos la regla:
 mo < validator.js
 ```
 
-**Lo que deberías ver** — `правило установлено`.
+**Lo que deberías ver** — `regla instalada`.
 
 Intentamos repetir la misma errata — ahora bajo la vigilancia de la regla:
 
 ```js
 // El campo tipe le es desconocido a la regla, y no hay type obligatorio en el documento.
 // Antes, un documento así se posaba silenciosamente en la colección
-db.passes.insertOne({ tipe: "разовый", guest: "Проверка", host: "x@corp.ru" })
+db.passes.insertOne({ tipe: "puntual", guest: "Comprobación", host: "x@corp.example" })
 ```
 
 **Lo que deberías ver** — `MongoServerError: Document failed validation`. Ahora la errata no
@@ -916,7 +916,7 @@ Pruébalo:
 // El campo host, por su significado, se refiere a un empleado. Tal empleado no existe —
 // ¿comprobará esto la base de datos? El documento cumple la regla del último paso: type está
 // en su sitio y es de la lista, host es una cadena
-db.passes.insertOne({ type: "разовый", host: "не-существует@corp.ru", guest: "Тест" })
+db.passes.insertOne({ type: "puntual", host: "no-existe@corp.example", guest: "Prueba" })
 ```
 
 El documento se insertará. No hay ningún empleado con ese email, y la base de datos no lo
@@ -934,7 +934,7 @@ No olvides quitar el documento de prueba:
 
 ```js
 // deleteOne = «elimina un documento que cumple la condición», no todos de una vez
-db.passes.deleteOne({ host: "не-существует@corp.ru" })
+db.passes.deleteOne({ host: "no-existe@corp.example" })
 ```
 
 </details>

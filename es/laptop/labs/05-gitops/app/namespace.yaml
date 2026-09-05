@@ -1,5 +1,5 @@
 ---
-# Lab 5 · Infraestructura en Git. Espacio de nombres para el servicio «Пропуск».
+# Lab 5 · Infraestructura en Git. Espacio de nombres para el servicio «Pase de invitado».
 #
 # Este archivo no se aplica al clúster a mano. Lo colocas en tu repositorio en
 # GitHub, en la carpeta apps/, y Flux lo lleva al clúster `lab` — por sí solo, según un calendario:
@@ -22,7 +22,7 @@ kind: Namespace
 metadata:
   name: passes
   # La etiqueta no afecta al funcionamiento del servicio — sirve para que con un solo comando se pueda encontrar todo
-  # lo relacionado con «Пропуск»: kubectl get all -A -l app.kubernetes.io/part-of=passes.
+  # lo relacionado con «Pase de invitado»: kubectl get all -A -l app.kubernetes.io/part-of=passes.
   # El nombre part-of está tomado del conjunto común de etiquetas de Kubernetes, no lo inventamos nosotros:
   # otras herramientas (monitorización, exportaciones) buscan exactamente ese.
   labels:

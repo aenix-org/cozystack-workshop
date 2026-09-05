@@ -50,7 +50,7 @@ ENGINE = MergeTree
 --
 -- Del mundo conocido: la misma decisión que en un archivo de papel — ordenar los pases por fechas
 -- o por apellidos. Ordenados por fechas, la carpeta de marzo se saca al instante, mientras que un
--- Иванов concreto se busca recorriéndolo todo. Y nadie va a reordenar un millón de hojas de papel
+-- García concreto se busca recorriéndolo todo. Y nadie va a reordenar un millón de hojas de papel
 -- a posteriori.
 --
 -- No hay PARTITION BY en el archivo, a propósito. Una partición es un conjunto aparte de partes

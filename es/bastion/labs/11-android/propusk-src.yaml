@@ -1,5 +1,5 @@
 ---
-# Lab 11. Fuentes de la app móvil «Пропуск» — lo que se entrega a la compilación como entrada.
+# Lab 11. Fuentes de la app móvil «Pase de invitado» — lo que se entrega a la compilación como entrada.
 #
 # Se aplica en tu clúster de formación `lab`, no en el tenant del clúster de gestión:
 #     export KUBECONFIG=~/lab.kubeconfig
@@ -164,6 +164,6 @@ data:
   strings.xml: |
     <?xml version="1.0" encoding="utf-8"?>
     <resources>
-      <string name="app_name">Пропуск</string>
-      <string name="greeting">Заказать пропуск для гостя</string>
+      <string name="app_name">Pase de invitado</string>
+      <string name="greeting">Solicitar un pase de invitado</string>
     </resources>

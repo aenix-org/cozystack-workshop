@@ -66,7 +66,7 @@ data:
     <html lang="ru">
     <head>
       <meta charset="utf-8">
-      <title>Пропуск</title>
+      <title>Pase de invitado</title>
       <style>
         body { font-family: system-ui, sans-serif; margin: 4rem auto; max-width: 40rem;
                color: #222; }
@@ -78,10 +78,10 @@ data:
       </style>
     </head>
     <body>
-      <h1>Сервис «Пропуск»</h1>
-      <p>Заказ пропуска для гостя. Версия <span class="v">v1</span></p>
-      <p>Развёрнуто из Git. Руками сюда никто не ходил.</p>
-      <div class="pod">вас обслужил под <b>__POD__</b></div>
+      <h1>Servicio «Pase de invitado»</h1>
+      <p>Solicitud de pase de invitado. Versión <span class="v">v1</span></p>
+      <p>Desplegado desde Git. Nadie lo tocó a mano.</p>
+      <div class="pod">te atendió el Pod <b>__POD__</b></div>
     </body>
     </html>
 ---

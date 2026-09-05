@@ -3,7 +3,7 @@
 // Un programa para mongosh — el shell de MongoDB. Se ejecuta en el portátil,
 // en el clúster de laboratorio, con el comando corto `mo` del README:
 //     cd labs/10-mongodb && mo < validator.js
-// En respuesta verás la línea «правило установлено».
+// En respuesta verás la línea «regla instalada».
 //
 // Qué es un esquema de validación. Por defecto una colección no tiene esquema: la base de datos acepta
 // un documento de cualquier forma y guarda en silencio una errata en el nombre de un campo («tipe» en vez de «type») —
@@ -43,14 +43,14 @@ db.runCommand({
         // El tipo de pase — solo uno de los cuatro valores enumerados. Un quinto tipo
         // requerirá cambiar esta regla, y eso es bueno: el cambio se vuelve deliberado.
         type: {
-          enum: ["разовый", "недельный", "автомобильный", "групповой"],
-          description: "тип пропуска, только из списка"
+          enum: ["puntual", "semanal", "vehicular", "grupal"],
+          description: "tipo de pase, solo de la lista permitida"
         },
         // Qué empleado pidió el pase. El campo es obligatorio, y debe ser
         // una cadena.
         host: {
           bsonType: "string",
-          description: "кто из сотрудников заказал"
+          description: "qué empleado hizo el pedido"
         },
         // guest está en properties pero no en required: si el campo está presente en el documento,
         // debe ser una cadena; si está ausente — el documento sigue siendo válido.
@@ -60,7 +60,7 @@ db.runCommand({
         // Las reglas también funcionan dentro de objetos anidados. No hay campo car — sin
         // requisitos. Si lo hay — debe ser un objeto, y la matrícula del coche en él
         // es obligatoria, mientras que el remolque, si se indica, es un valor booleano, no la cadena
-        // «нет».
+        // «no».
         car: {
           bsonType: "object",
           required: ["plate"],
@@ -101,4 +101,4 @@ db.runCommand({
 
 // runCommand responde con un objeto en el que el éxito tiene el aspecto de { ok: 1 }. Imprimimos
 // nuestra propia línea para que el resultado de aplicar el archivo se lea de un vistazo.
-print("правило установлено");
+print("regla instalada");

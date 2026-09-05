@@ -91,7 +91,7 @@ ssh_pwauth: true
 write_files:
   - path: /opt/directory/index.html
     content: |
-      <!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Справочник</title></head><body><h1>Справочник сотрудников</h1><ul><li>Иванов И. — 101</li><li>Петров П. — 102</li></ul></body></html>
+      <!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Directorio</title></head><body><h1>Directorio de personal</h1><ul><li>Herrera J. — 101</li><li>Pérez P. — 102</li></ul></body></html>
   - path: /etc/systemd/system/directory.service
     content: |
       [Unit]
@@ -286,7 +286,7 @@ curl http://spravochnik.workshopXX.workshop.aenix.io
 **Lo que deberías ver**: el HTML de la página del directorio:
 
 ```html
-<h1>Справочник сотрудников</h1><ul><li>Иванов И. — 101</li><li>Петров П. — 102</li></ul>
+<h1>Directorio de personal</h1><ul><li>Herrera J. — 101</li><li>Pérez P. — 102</li></ul>
 ```
 
 Abre esta dirección en un navegador y verás la misma lista. El directorio es visible desde fuera por un nombre de dominio amigable, con HTTPS de la plataforma, sin un solo ticket a redes ni para un certificado.

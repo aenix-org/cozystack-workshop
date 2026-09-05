@@ -5,7 +5,7 @@
 // laboratorio, con el comando corto `mo` del README (lanza mongosh dentro del pod de
 // trabajo):
 //     cd labs/10-mongodb && mo < passes.js
-// En respuesta verás la línea «документов в коллекции: 4».
+// En respuesta verás la línea «documentos en la colección: 4».
 //
 // Ejecuta el archivo dos veces y habrá ocho documentos: insertMany solo añade.
 
@@ -27,12 +27,12 @@ db.passes.insertMany([
     // decimal, booleano.
     // Por fecha se puede comparar y ordenar; por la cadena «2026-09-01» solo si tuviste
     // suerte con el formato de escritura.
-    type: "разовый",
-    guest: "Иванов Иван Иванович",
-    host: "petrov@corp.ru",
-    entrance: "Северная",
+    type: "puntual",
+    guest: "Javier P. Herrera",
+    host: "petrov@corp.example",
+    entrance: "Norte",
     valid_on: ISODate("2026-09-01T09:00:00Z"),
-    purpose: "собеседование"
+    purpose: "entrevista de trabajo"
   },
   {
     // Un pase semanal. En lugar de valid_on hay un par valid_from y valid_to, en lugar de
@@ -42,27 +42,27 @@ db.passes.insertMany([
     // Ha aparecido un campo badge_returned, que el pase de entrada única no tiene en
     // absoluto: no es NULL ni está vacío, sino que literalmente no existe tal campo en ese
     // documento. Son cosas distintas, y se buscan de forma distinta.
-    type: "недельный",
-    guest: "Сидорова Анна Петровна",
-    host: "petrov@corp.ru",
-    entrances: ["Северная", "Южная"],
+    type: "semanal",
+    guest: "Elena L. Prado",
+    host: "petrov@corp.example",
+    entrances: ["Norte", "Sur"],
     valid_from: ISODate("2026-09-01T00:00:00Z"),
     valid_to: ISODate("2026-09-07T23:59:59Z"),
-    purpose: "внешний аудит",
+    purpose: "auditoría externa",
     badge_returned: false
   },
   {
     // Un pase de vehículo. Todo lo relativo al coche yace dentro de un único campo
     // car. Esto no es una cadena con JSON dentro, sino una estructura anidada de pleno
     // derecho: por car.plate se puede buscar y construir un índice sobre él.
-    type: "автомобильный",
-    guest: "Кузнецов Виктор Сергеевич",
-    host: "logistics@corp.ru",
-    entrance: "Западная",
+    type: "vehicular",
+    guest: "Víctor S. Marín",
+    host: "logistics@corp.example",
+    entrance: "Oeste",
     valid_on: ISODate("2026-09-02T07:30:00Z"),
     car: {
-      plate: "А123ВС174",
-      model: "ГАЗель Next",
+      plate: "1174 BCD",
+      model: "Ford Transit",
       trailer: false,
       weight_kg: 3500
     },
@@ -76,17 +76,17 @@ db.passes.insertMany([
     // no en un campo, sino en esencia. Esto tendrá eco más adelante en la lab: la regla de
     // validación de documentos no podrá exigir guest a todos, de lo contrario un pase de
     // grupo legítimo no pasaría.
-    type: "групповой",
-    organization: "Гимназия № 1",
-    contact: "Смирнова Ольга Владимировна",
-    host: "hr@corp.ru",
-    entrance: "Северная",
+    type: "grupal",
+    organization: "Instituto Municipal N.º 1",
+    contact: "Olivia V. Serrano",
+    host: "hr@corp.example",
+    entrance: "Norte",
     valid_on: ISODate("2026-09-03T10:00:00Z"),
-    escort: "Петров Алексей Алексеевич",
+    escort: "Alejandro A. Fuentes",
     members: [
-      { name: "Орлов Пётр", age: 16 },
-      { name: "Волкова Мария", age: 15 },
-      { name: "Зайцев Илья", age: 17 }
+      { name: "Pedro Álvarez", age: 16 },
+      { name: "María Vega", age: 15 },
+      { name: "Isaac Ferrer", age: 17 }
     ]
   }
 ]);
@@ -95,4 +95,4 @@ db.passes.insertMany([
 // significa «todos». La impresión hace falta para que el archivo tenga un resultado
 // visible: insertMany mismo responde con una lista de identificadores emitidos, y en ella
 // es fácil no percibir cuántos documentos realmente quedaron.
-print("документов в коллекции: " + db.passes.countDocuments({}));
+print("documentos en la colección: " + db.passes.countDocuments({}));

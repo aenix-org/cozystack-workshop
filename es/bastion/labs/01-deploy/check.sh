@@ -115,7 +115,7 @@ fi
 BODY="$(in_cluster_curl_many 'http://rickroll/' 8)"
 # El marcador debe aparecer EXACTAMENTE UNA VEZ por página, de lo contrario el contador de respuestas miente:
 # «Never Gonna Give You Up» está tanto en <title> como en <h1>, y daba una duplicación.
-ANSWERS="$(printf '%s' "$BODY" | grep -c 'вас обслужил под')"
+ANSWERS="$(printf '%s' "$BODY" | grep -c 'te atendió el Pod')"
 TOTAL_LINES="$(printf '%s' "$BODY" | grep -c '<title>')"
 if [ "${ANSWERS:-0}" -ge 1 ] && [ "${ANSWERS:-0}" -eq "${TOTAL_LINES:-0}" ]; then
   ok "la aplicación responde por HTTP y sirve su página (${ANSWERS} peticiones comprobadas)"

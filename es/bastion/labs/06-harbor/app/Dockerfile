@@ -1,4 +1,4 @@
-# Lab 6 · Tu propio registro privado de imágenes. Receta de construcción de la imagen del servicio «Пропуск».
+# Lab 6 · Tu propio registro privado de imágenes. Receta de construcción de la imagen del servicio «Pase de invitado».
 #
 # Qué es un Dockerfile: una receta paso a paso que convierte las fuentes en una imagen —
 # una instantánea del sistema de archivos lista para ejecutar junto con las instrucciones de qué ejecutar dentro.

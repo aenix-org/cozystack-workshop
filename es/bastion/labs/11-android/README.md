@@ -252,7 +252,7 @@ junto con la descripción de la tarea.
 El código fuente vive ahí por la misma razón: la compilación necesita archivos, y no tiene
 sentido montar un disco de red para seis archivos de texto.
 
-La app hace una sola cosa: muestra la línea «Заказать пропуск для гостя». Con eso basta, porque
+La app hace una sola cosa: muestra la línea «Solicitar un pase de invitado». Con eso basta, porque
 la lab no va sobre Android sino sobre dónde se compila.
 
 **Un APK** es lo que sale al final. Es un archivo comprimido que contiene la aplicación
@@ -647,9 +647,9 @@ kubectl logs -f job/propusk-build
 
 | Marca en el registro | Cuándo aproximadamente |
 |---|---|
-| `== 1/5 ставлю Android command-line tools ==` | de inmediato |
-| `== 2/5 принимаю лицензии и качаю SDK (самый долгий шаг) ==` | +1–2 minutos, y se queda colgado lo que más |
-| `== 3/5 собираю APK ==` | +5–15 minutos desde el inicio |
+| `== 1/5 instalando las herramientas de línea de comandos de Android ==` | de inmediato |
+| `== 2/5 aceptando las licencias y descargando el SDK (el paso más largo) ==` | +1–2 minutos, y se queda colgado lo que más |
+| `== 3/5 compilando el APK ==` | +5–15 minutos desde el inicio |
 | `BUILD SUCCESSFUL in ...` | +10–25 minutos desde el inicio |
 | `APK-UPLOADED bucket-.../propusk/propusk-...apk` | justo después |
 

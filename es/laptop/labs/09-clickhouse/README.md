@@ -451,8 +451,8 @@ dirección nos pidió encontrar, y está bien que los datos de prueba contengan 
 ⚠️ La indexación de arrays en ClickHouse empieza en uno, no en cero. De ahí el `1 + …`.
 
 ```sql
-    ['Северная', 'Северная', 'Северная',
-     'Южная', 'Южная', 'Западная'][1 + cityHash64(number, 'entrance') % 6] AS entrance
+    ['Norte', 'Norte', 'Norte',
+     'Sur', 'Sur', 'Oeste'][1 + cityHash64(number, 'entrance') % 6] AS entrance
 ```
 
 El mismo truco para una distribución desigual: la entrada norte se lleva la mitad del flujo, la sur un
@@ -877,7 +877,7 @@ fila sino un cambio en la tabla.**
 ch <<'SQL'
 -- Cambiamos el nombre de un invitado en una fila. El comando devuelve el control de inmediato, pero el trabajo
 -- no termina ahí: ClickHouse lo pondrá en cola y lo llevará a cabo en segundo plano.
-ALTER TABLE passes UPDATE guest_name = 'Иванов И. И.' WHERE pass_id = 424242
+ALTER TABLE passes UPDATE guest_name = 'Herrera J.' WHERE pass_id = 424242
 SQL
 ```
 

@@ -156,7 +156,7 @@ else
   elif kubectl get pod "$SERVED" >/dev/null 2>&1; then
     ok "el Service sirve una página, la atendió la réplica viva ${SERVED}"
     evidence "Respuesta del Service (fragmento)" \
-      "$(printf '%s' "$BODY" | grep -o "вас обслужил под<b>${APP}-[a-z0-9-]*</b>" | head -1)"
+      "$(printf '%s' "$BODY" | grep -o "te atendió el Pod<b>${APP}-[a-z0-9-]*</b>" | head -1)"
   else
     fail "la página la sirvió la réplica ${SERVED}, pero ese pod ya no existe en el clúster" \
          "espere una decena de segundos y ejecute la verificación de nuevo — probablemente la réplica estaba cambiando justo ahora"
