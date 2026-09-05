@@ -161,10 +161,10 @@ PODS="$(kget pods -n "$NS_APP" -l app=passes --no-headers)"
 PODS_READY="$(printf '%s' "$PODS" | awk '$3=="Running"' | grep -c .)"
 BODY="$(in_cluster_curl "http://passes.${NS_APP}.svc.cluster.local/")"
 
-if printf '%s' "$BODY" | grep -q 'Пропуск'; then
-  ok "«Пропуск» 服务在集群内部通过 HTTP 响应（运行中的副本数：${PODS_READY}）"
+if printf '%s' "$BODY" | grep -q '通行证'; then
+  ok "«通行证» 服务在集群内部通过 HTTP 响应（运行中的副本数：${PODS_READY}）"
 else
-  fail "«Пропуск» 服务在 passes.${NS_APP}.svc.cluster.local 上没有响应" \
+  fail "«通行证» 服务在 passes.${NS_APP}.svc.cluster.local 上没有响应" \
        "查看 kubectl get pods -n ${NS_APP} 以及 kubectl logs -n ${NS_APP} deploy/passes"
 fi
 

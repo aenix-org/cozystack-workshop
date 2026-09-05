@@ -59,7 +59,7 @@ spec:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # 目录服务和「Пропуск」服务本身使用的是同一个镜像。
+          # 目录服务和「通行证」服务本身使用的是同一个镜像。
           # 究竟启动哪个进程，由下面的 MODE 变量决定。
           image: HARBOR-HOST/passes/passes-api:v2
           # 端口除了编号还有名称：就绪探针和下面的 Service 引用的是名称。

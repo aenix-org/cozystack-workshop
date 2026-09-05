@@ -90,10 +90,10 @@ func main() {
 		body := identity{
 			Service:   "passes-api",
 			Version:   env("APP_VERSION", "v1"),
-			Pod:       env("POD_NAME", "неизвестно"),
-			Node:      env("NODE_NAME", "неизвестно"),
-			Namespace: env("POD_NAMESPACE", "неизвестно"),
-			Registry:  env("IMAGE_REGISTRY", "не указан"),
+			Pod:       env("POD_NAME", "未知"),
+			Node:      env("NODE_NAME", "未知"),
+			Namespace: env("POD_NAMESPACE", "未知"),
+			Registry:  env("IMAGE_REGISTRY", "未设置"),
 			Time:      time.Now().UTC().Format(time.RFC3339),
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -103,7 +103,7 @@ func main() {
 		// 使得响应在终端里变得不可读。
 		enc.SetEscapeHTML(false)
 		if err := enc.Encode(body); err != nil {
-			log.Printf("не удалось отдать ответ: %v", err)
+			log.Printf("无法返回响应: %v", err)
 		}
 	})
 
@@ -119,8 +119,8 @@ func main() {
 
 	// 你在 kubectl logs 里看到的第一样东西。这一行是为了把「应用
 	// 没有启动」和「启动了，但不作答」区分开——这是不同的诊断。
-	log.Printf("passes-api %s слушает порт %s, под %s",
-		env("APP_VERSION", "v1"), port, env("POD_NAME", "неизвестно"))
+	log.Printf("passes-api %s 正在监听端口 %s, pod %s",
+		env("APP_VERSION", "v1"), port, env("POD_NAME", "未知"))
 	// 我们启动服务器并一直运行，直到被停止。如果端口被占用或服务器
 	// 崩溃——我们写下原因并以错误退出。集群会看到结束了的进程
 	// 并重新拉起一个副本；不需要在程序内部去修复重启。

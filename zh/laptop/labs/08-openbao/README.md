@@ -162,7 +162,7 @@ kubectl logs deploy/secrets-demo --tail=2
 **你应该看到** —— 大致如下：
 
 ```
-08:14:31 подключаюсь к passes-db.internal как passes_app, отпечаток пароля sha256:a609df223d57
+08:14:31 正在连接 passes-db.internal，身份为 passes_app，密码指纹 sha256:a609df223d57
 ```
 
 应用运转正常。密码在一个文件里，文件在 Git 里。这正是审计所发现的情形。
@@ -878,7 +878,7 @@ kubectl logs deploy/secrets-demo -c fetch-secret
 **你应该看到：**
 
 ```
-пароль получен из OpenBao, в манифесте его нет
+密码已从 OpenBao 获取，清单里没有它
 ```
 
 现在看服务本身：
@@ -911,7 +911,7 @@ kubectl delete secret passes-db
 ```bash
 # 还是那个 kv put。记录的上一个版本不会被抹掉——旁边会出现第二个。
 kubectl exec bao-workbench -- \
-  bao kv put secret/passes/db password=Propusk2026-осень username=passes_app
+  bao kv put secret/passes/db password=Propusk2026-秋 username=passes_app
 # rollout restart 会重新创建应用的 Pod，而不改动它描述里的任何一行。
 # 这一切都是为了这个：新密码会在下一次启动时被取走。
 kubectl rollout restart deploy/secrets-demo

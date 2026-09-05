@@ -361,8 +361,8 @@ FROM numbers(1000000)
 ⚠️ ClickHouse 里数组下标从一开始，而不是从零。所以有 `1 + …`。
 
 ```sql
-    ['Северная', 'Северная', 'Северная',
-     'Южная', 'Южная', 'Западная'][1 + cityHash64(number, 'entrance') % 6] AS entrance
+    ['北门', '北门', '北门',
+     '南门', '南门', '西门'][1 + cityHash64(number, 'entrance') % 6] AS entrance
 ```
 
 同样的技巧用于制造不均匀的分布：北入口获得一半的人流，南入口三分之一，西入口是剩下的。均匀的数据在报表里显得不真实，也什么都说明不了。
@@ -702,7 +702,7 @@ FORMAT JSON
 ch <<'SQL'
 -- 我们在一行里改一位访客的姓名。命令会立即交回控制权，但工作
 -- 并没有到此结束：ClickHouse 会把它排进队列，在后台执行。
-ALTER TABLE passes UPDATE guest_name = 'Иванов И. И.' WHERE pass_id = 424242
+ALTER TABLE passes UPDATE guest_name = '王军' WHERE pass_id = 424242
 SQL
 ```
 

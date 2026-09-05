@@ -154,7 +154,7 @@ else
   elif kubectl get pod "$SERVED" >/dev/null 2>&1; then
     ok "Service 返回了页面，是由活副本 ${SERVED} 提供的"
     evidence "Service 响应（片段）" \
-      "$(printf '%s' "$BODY" | grep -o "вас обслужил под<b>${APP}-[a-z0-9-]*</b>" | head -1)"
+      "$(printf '%s' "$BODY" | grep -o "为您服务的 Pod<b>${APP}-[a-z0-9-]*</b>" | head -1)"
   else
     fail "页面是由副本 ${SERVED} 提供的，但集群里已经没有这个 Pod 了" \
          "等十来秒再运行一次检查——很可能副本正好在此刻发生变化"

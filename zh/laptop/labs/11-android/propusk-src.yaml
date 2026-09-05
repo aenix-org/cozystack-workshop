@@ -1,5 +1,5 @@
 ---
-# 实验 11。移动应用「Пропуск」的源码 —— 作为输入喂给构建的内容。
+# 实验 11。移动应用「通行证」的源码 —— 作为输入喂给构建的内容。
 #
 # 在你的培训集群 `lab` 上应用，而不是在管理集群的租户里：
 #     export KUBECONFIG=~/lab.kubeconfig
@@ -164,6 +164,6 @@ data:
   strings.xml: |
     <?xml version="1.0" encoding="utf-8"?>
     <resources>
-      <string name="app_name">Пропуск</string>
-      <string name="greeting">Заказать пропуск для гостя</string>
+      <string name="app_name">通行证</string>
+      <string name="greeting">申请访客通行证</string>
     </resources>

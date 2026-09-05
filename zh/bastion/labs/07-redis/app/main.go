@@ -67,7 +67,7 @@ func envInt(key string, fallback int) int {
 		if n, err := strconv.Atoi(v); err == nil {
 			return n
 		}
-		log.Printf("значение %s=%q не число, беру %d", key, v, fallback)
+		log.Printf("值 %s=%q 不是数字，采用 %d", key, v, fallback)
 	}
 	return fallback
 }
@@ -177,7 +177,7 @@ func (r *redisClient) readReplyLocked() (string, bool, error) {
 	}
 	line = strings.TrimRight(line, "\r\n")
 	if line == "" {
-		return "", false, errors.New("redis: пустой ответ")
+		return "", false, errors.New("redis: 空响应")
 	}
 	switch line[0] {
 	case '+', ':': // 一个简单字符串或一个数字
@@ -198,7 +198,7 @@ func (r *redisClient) readReplyLocked() (string, bool, error) {
 		}
 		return string(buf[:n]), true, nil
 	default:
-		return "", false, fmt.Errorf("redis: непонятный ответ %q", line)
+		return "", false, fmt.Errorf("redis: 无法识别的响应 %q", line)
 	}
 }
 
@@ -227,13 +227,13 @@ type employee struct {
 
 // 数据是虚构的。教学台架里没有、也不应有真实的人事资料。
 var surnames = []string{
-	"Иванов И. И.", "Петрова А. С.", "Сидоров П. Н.", "Кузнецова М. В.",
-	"Смирнов Д. А.", "Попова Е. К.", "Волков С. Ю.", "Морозова Н. Г.",
+	"王军", "林安", "郑平", "陈梅",
+	"赵东", "高艳", "徐帅", "冯宁",
 }
 
 var departments = []string{
-	"Служба безопасности", "Бухгалтерия", "Разработка",
-	"Логистика", "Отдел кадров", "Административный отдел",
+	"保卫处", "财务部", "研发部",
+	"物流部", "人事处", "行政处",
 }
 
 // 数据是虚构的，但对同一个标识符是一致的：
@@ -262,7 +262,7 @@ func writeJSON(w http.ResponseWriter, code int, v any) {
 	enc := json.NewEncoder(w)
 	enc.SetEscapeHTML(false)
 	if err := enc.Encode(v); err != nil {
-		log.Printf("не удалось отдать ответ: %v", err)
+		log.Printf("返回响应失败: %v", err)
 	}
 }
 
@@ -285,7 +285,7 @@ func employeeID(r *http.Request) string {
 func main() {
 	mode := env("MODE", "api")
 	port := env("PORT", "8080")
-	pod := env("POD_NAME", "неизвестно")
+	pod := env("POD_NAME", "未知")
 
 	mux := http.NewServeMux()
 	// /healthz 在两种角色里都有：清单里描述的就绪探针就是敲这里。
@@ -305,7 +305,7 @@ func main() {
 	case "api":
 		setupAPI(mux, pod)
 	default:
-		log.Fatalf("неизвестный MODE=%q, допустимы hr и api", mode)
+		log.Fatalf("未知的 MODE=%q，允许的取值为 hr 和 api", mode)
 	}
 
 	// ReadHeaderTimeout 会在客户端开始了请求却沉默时关闭连接。没有它，
@@ -315,7 +315,7 @@ func main() {
 		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
-	log.Printf("режим %s, порт %s, под %s", mode, port, pod)
+	log.Printf("模式 %s，端口 %s，pod %s", mode, port, pod)
 	log.Fatal(srv.ListenAndServe())
 }
 
@@ -324,10 +324,10 @@ func main() {
 func setupHR(mux *http.ServeMux, pod string) {
 	delay, err := time.ParseDuration(env("HR_DELAY", "800ms"))
 	if err != nil {
-		log.Printf("HR_DELAY=%q не разобрался, беру 800ms", os.Getenv("HR_DELAY"))
+		log.Printf("HR_DELAY=%q 无法解析，采用 800ms", os.Getenv("HR_DELAY"))
 		delay = 800 * time.Millisecond
 	}
-	log.Printf("справочник отвечает за %s", delay)
+	log.Printf("目录响应耗时 %s", delay)
 
 	// 这个角色唯一的地址。time.Sleep 就是整个“遗留系统”：正是那几百
 	// 毫秒，为了它实验里才出现了缓存。响应里的 source 字段
@@ -359,9 +359,9 @@ func setupAPI(mux *http.ServeMux, pod string) {
 	var cache *redisClient
 	if addr := os.Getenv("REDIS_ADDR"); addr != "" {
 		cache = &redisClient{addr: addr, password: os.Getenv("REDIS_PASSWORD")}
-		log.Printf("кеш включён: %s, срок жизни записи %d с", addr, ttl)
+		log.Printf("缓存已启用: %s，记录生存期 %d 秒", addr, ttl)
 	} else {
-		log.Printf("кеш выключен: REDIS_ADDR не задан, каждый запрос пойдёт в справочник")
+		log.Printf("缓存已禁用: 未设置 REDIS_ADDR，每个请求都会去查目录")
 	}
 
 	// 一个单独的、连接池更大的客户端：否则在负载下
@@ -378,9 +378,9 @@ func setupAPI(mux *http.ServeMux, pod string) {
 			"service":   "passes-api",
 			"version":   version,
 			"pod":       pod,
-			"node":      env("NODE_NAME", "неизвестно"),
-			"namespace": env("POD_NAMESPACE", "неизвестно"),
-			"registry":  env("IMAGE_REGISTRY", "не указан"),
+			"node":      env("NODE_NAME", "未知"),
+			"namespace": env("POD_NAMESPACE", "未知"),
+			"registry":  env("IMAGE_REGISTRY", "未设置"),
 			"cache":     cacheMode(cache),
 			"cache_ttl": ttl,
 			"hr_url":    hrURL,
@@ -409,12 +409,12 @@ func setupAPI(mux *http.ServeMux, pod string) {
 			case err != nil:
 				// 缓存不可用 —— 这不足以成为给用户返回错误的理由。
 				// 我们去查目录：慢，但正确。
-				log.Printf("кеш недоступен (%v), иду в справочник", err)
+				log.Printf("缓存不可用 (%v)，改为去查目录", err)
 			case found:
 				if json.Unmarshal([]byte(raw), &emp) == nil {
 					fromCache = true
 				} else {
-					log.Printf("в кеше по ключу %s лежит мусор, иду в справочник", key)
+					log.Printf("缓存中键 %s 下存放的是垃圾数据，改为去查目录", key)
 				}
 			}
 		}
@@ -426,9 +426,9 @@ func setupAPI(mux *http.ServeMux, pod string) {
 		if !fromCache {
 			fetched, err := fetchEmployee(hrClient, hrURL, id)
 			if err != nil {
-				log.Printf("справочник не ответил: %v", err)
+				log.Printf("目录未响应: %v", err)
 				writeJSON(w, http.StatusBadGateway, map[string]any{
-					"error": "справочник сотрудников недоступен",
+					"error": "员工目录不可用",
 					"pod":   pod,
 				})
 				return
@@ -437,7 +437,7 @@ func setupAPI(mux *http.ServeMux, pod string) {
 			if cache != nil {
 				if b, err := json.Marshal(emp); err == nil {
 					if err := cache.SetTTL(key, string(b), ttl); err != nil {
-						log.Printf("не удалось положить в кеш: %v", err)
+						log.Printf("写入缓存失败: %v", err)
 					}
 				}
 			}
@@ -478,7 +478,7 @@ func fetchEmployee(c *http.Client, base, id string) (employee, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return employee{}, fmt.Errorf("справочник ответил %s", resp.Status)
+		return employee{}, fmt.Errorf("目录返回 %s", resp.Status)
 	}
 	var emp employee
 	if err := json.NewDecoder(resp.Body).Decode(&emp); err != nil {

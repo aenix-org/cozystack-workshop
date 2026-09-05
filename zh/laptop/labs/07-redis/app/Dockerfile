@@ -1,4 +1,4 @@
-# 实验 7 · 服务「Пропуск」镜像的构建配方，版本 v2。
+# 实验 7 · 服务「通行证」镜像的构建配方，版本 v2。
 #
 # Dockerfile 是一份步骤清单，按它把源码变成镜像：文件系统的不可变
 # 快照，连同启动命令一起。你最熟悉的类比就是——
@@ -6,8 +6,8 @@
 # 在镜像仓库里，并用标签做版本管理。
 #
 # 它在笔记本上构建，而不是在集群里（见 README 中关于构建的步骤）：
-#   docker build --platform linux/amd64 -t <ваш-harbor>/passes/passes-api:v2 app/
-#   docker push  <ваш-harbor>/passes/passes-api:v2
+#   docker build --platform linux/amd64 -t <你的-harbor>/passes/passes-api:v2 app/
+#   docker push  <你的-harbor>/passes/passes-api:v2
 #
 # --platform linux/amd64 在使用 Apple Silicon 的 Mac 上是必需的：没有它镜像会被构建
 # 成 ARM 版，推送时不会有半点抱怨，却会在集群里以「exec format error」崩溃。

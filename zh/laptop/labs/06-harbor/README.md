@@ -223,8 +223,8 @@ Login Succeeded
 放进环境变量里：
 
 ```go
-Pod:  env("POD_NAME", "неизвестно"),
-Node: env("NODE_NAME", "неизвестно"),
+Pod:  env("POD_NAME", "未知"),
+Node: env("NODE_NAME", "未知"),
 ```
 
 而清单（manifest）里写明了要往里放什么：

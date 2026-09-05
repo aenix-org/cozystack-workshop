@@ -1,4 +1,4 @@
-// 实验 6 · 你自己的私有镜像仓库。「通行证（Пропуск）」服务，教学版本。
+// 实验 6 · 你自己的私有镜像仓库。「通行证（通行证）」服务，教学版本。
 //
 // 这个程序做什么。它启动一个 Web 服务器，并在两个地址上作出响应。
 // /healthz 地址返回一个简短的「ok」：集群通过它来判断某个副本是否存活，
@@ -57,7 +57,7 @@ type identity struct {
 
 // 读取一个环境变量，如果它缺失或为空——就返回一个备用
 // 值。它的作用是让程序也能在集群之外运行，无需任何一项
-// 配置：它不会崩溃，而会老实地在响应里写上「неизвестно」。
+// 配置：它不会崩溃，而会老实地在响应里写上「未知」。
 func env(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
@@ -90,10 +90,10 @@ func main() {
 		body := identity{
 			Service:   "passes-api",
 			Version:   env("APP_VERSION", "v1"),
-			Pod:       env("POD_NAME", "неизвестно"),
-			Node:      env("NODE_NAME", "неизвестно"),
-			Namespace: env("POD_NAMESPACE", "неизвестно"),
-			Registry:  env("IMAGE_REGISTRY", "не указан"),
+			Pod:       env("POD_NAME", "未知"),
+			Node:      env("NODE_NAME", "未知"),
+			Namespace: env("POD_NAMESPACE", "未知"),
+			Registry:  env("IMAGE_REGISTRY", "未设置"),
 			Time:      time.Now().UTC().Format(time.RFC3339),
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -103,7 +103,7 @@ func main() {
 		// 响应就会在终端里变得无法阅读。
 		enc.SetEscapeHTML(false)
 		if err := enc.Encode(body); err != nil {
-			log.Printf("не удалось отдать ответ: %v", err)
+			log.Printf("未能返回响应: %v", err)
 		}
 	})
 
@@ -119,8 +119,8 @@ func main() {
 
 	// 你在 kubectl logs 里看到的第一样东西。这一行是为了区分「应用
 	// 没有启动」和「启动了，但不响应」——这是两种不同的诊断。
-	log.Printf("passes-api %s слушает порт %s, под %s",
-		env("APP_VERSION", "v1"), port, env("POD_NAME", "неизвестно"))
+	log.Printf("passes-api %s 正在监听端口 %s，pod %s",
+		env("APP_VERSION", "v1"), port, env("POD_NAME", "未知"))
 	// 我们启动服务器并一直工作，直到被停止。如果端口被占用或服务器
 	// 崩溃了——我们写下原因并以错误退出。集群会看到已结束的进程
 	// 并重新拉起副本；无需在程序内部去修复重启这件事。

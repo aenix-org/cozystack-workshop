@@ -151,7 +151,7 @@ else
     if [ -n "$UPLOADED" ]; then
       ok "APK 进了 bucket: ${UPLOADED}"
       evidence "构建后 bucket 的内容" \
-        "$(printf '%s' "$LOGS" | sed -n '/5\/5 кладу APK в бакет/,$p' | grep -v '^APK-UPLOADED ' | head -20)"
+        "$(printf '%s' "$LOGS" | sed -n '/5\/5 正在将 APK 上传到 Bucket/,$p' | grep -v '^APK-UPLOADED ' | head -20)"
     else
       fail "APK 构建出来了，但没进 bucket" \
            "查看日志尾部: kubectl logs job/${JOB} --tail=20；最常见的元凶是 bucketName——它需要仪表盘里那个长名字，而不是 'builds'"

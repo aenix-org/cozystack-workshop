@@ -16,7 +16,7 @@ curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-work
 nano convert.sh
 ```
 
-**你在步骤 1 记下的那三个值，现在派上用场了。** 文件靠前的位置有一个标着「ВСТАВЬТЕ СВОИ ЗНАЧЕНИЯ」的代码块——把里面的占位符换成你自己的，引号保留原样：
+**你在步骤 1 记下的那三个值，现在派上用场了。** 文件靠前的位置有一个标着「粘贴你的值」的代码块——把里面的占位符换成你自己的，引号保留原样：
 
 ```
 BUCKET="your-bucket-name"

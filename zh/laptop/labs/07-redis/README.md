@@ -94,7 +94,7 @@ if cache != nil {
     raw, found, err := cache.Get(key)
     switch {
     case err != nil:
-        log.Printf("кеш недоступен (%v), иду в справочник", err)
+        log.Printf("缓存不可用 (%v)，转去目录服务", err)
     case found:
         if json.Unmarshal([]byte(raw), &emp) == nil {
             fromCache = true
@@ -220,7 +220,7 @@ kubectl run probe --rm -i --restart=Never --image=curlimages/curl:8.11.1 --quiet
 **你应该看到：**
 
 ```json
-{"cache":"off","cached":false,"dept":"Логистика","id":"42","name":"Попова Е. К.",
+{"cache":"off","cached":false,"dept":"物流部","id":"42","name":"高艳",
  "pod":"passes-api-6f8b9c7d5-x2ktm","took_ms":803,"ttl_s":60}
 ```
 
@@ -483,8 +483,8 @@ kubectl logs -l app=passes-api --tail=20
 ```
 
 ```
-кеш недоступен (redis: NOAUTH Authentication required.), иду в справочник
-кеш недоступен (redis: NOAUTH Authentication required.), иду в справочник
+缓存不可用 (redis: NOAUTH Authentication required.)，转去目录服务
+缓存不可用 (redis: NOAUTH Authentication required.)，转去目录服务
 ```
 
 答案就在这里。我们指定了 Redis 地址，却没指定密码。Redis 要求认证——是你自己在创建时打开了 `Auth enabled`，而这是正确的设置。应用老老实实地尝试了，被拒绝了，把这事写进日志，然后去了目录服务。

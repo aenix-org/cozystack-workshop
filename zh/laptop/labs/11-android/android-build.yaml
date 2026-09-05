@@ -67,7 +67,7 @@ data:
     CMDLINE_TOOLS_URL="https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"
     MC_URL="https://dl.min.io/client/mc/release/linux-amd64/mc"
 
-    echo "== 1/5 ставлю Android command-line tools =="
+    echo "== 1/5 正在安装 Android 命令行工具 =="
     mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
     cd "$ANDROID_SDK_ROOT/cmdline-tools"
     curl -fsSL -o tools.zip "$CMDLINE_TOOLS_URL"
@@ -77,7 +77,7 @@ data:
     mv cmdline-tools latest
     export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
 
-    echo "== 2/5 принимаю лицензии и качаю SDK (самый долгий шаг) =="
+    echo "== 2/5 正在接受许可协议并下载 SDK（最耗时的一步） =="
     # 当 sdkmanager 关闭其输入时，`yes` 会收到 SIGPIPE，并返回
     # 非零码。在 set -o pipefail 下，这会无缘无故地使构建失败，
     # 所以这里故意抑制了返回码。如果许可确实
@@ -86,7 +86,7 @@ data:
     sdkmanager --sdk_root="$ANDROID_SDK_ROOT" \
       "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
-    echo "== 3/5 собираю APK =="
+    echo "== 3/5 正在构建 APK =="
     # ConfigMap 以只读方式挂载，而 Gradle 会在源码旁边写入，
     # 所以先把整棵树复制到磁盘。
     # -L 会解引用符号链接：ConfigMap 挂载的不是文件，
@@ -100,7 +100,7 @@ data:
     APK="$WORK/project/app/build/outputs/apk/debug/app-debug.apk"
     ls -l "$APK"
 
-    echo "== 4/5 ставлю клиент S3 =="
+    echo "== 4/5 正在安装 S3 客户端 =="
     # 我们把客户端放在工作目录，而不是 /usr/local/bin。Pod 以
     # 非特权用户运行，而镜像的系统目录属于 root：
     # 往那里写会以 Permission denied 告终——而且恰好在这里，第四步，
@@ -112,7 +112,7 @@ data:
     # 就可以直接写 `mc`，而不是完整路径。
     export PATH="$WORK/bin:$PATH"
 
-    echo "== 5/5 кладу APK в бакет =="
+    echo "== 5/5 正在将 APK 上传到 Bucket =="
     # accessKey/secretKey/endpoint/bucketName 变量来自 Secret，
     # 通过 envFrom 传入。我们抑制 alias set 的输出：没必要让它往日志里打印任何东西。
     # 同样的原因，脚本里没有 set -x——它会打印出密钥。

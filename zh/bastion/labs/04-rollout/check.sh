@@ -153,7 +153,7 @@ else
   # 我们对两个版本都做肯定式判定，各按自己的标记。“如果不是 v2，就是
   # v1” 那种分支会把任何东西都算成第一个版本：nginx 默认页、404、别人的
   # 应用、垃圾内容——已验证，遇到垃圾内容时脚本会打印 “实验通过”。
-  if printf '%s' "$BODY" | grep -q 'ВЕРСИЯ 2'; then
+  if printf '%s' "$BODY" | grep -q '版本 2'; then
     SERVED_VER="rickroll-page-v2"
   elif printf '%s' "$BODY" | grep -q 'Never Gonna Give You Up'; then
     SERVED_VER="rickroll-page-v1"
@@ -186,7 +186,7 @@ else
 
   evidence "所提供的页面（片段）" \
     "$(printf '%s' "$BODY" | grep -o '<h1>[^<]*</h1>' | head -1)
-$(printf '%s' "$BODY" | grep -o "вас обслужил под<b>${APP}-[a-z0-9-]*</b>" | head -1)"
+$(printf '%s' "$BODY" | grep -o "为您服务的 Pod<b>${APP}-[a-z0-9-]*</b>" | head -1)"
 fi
 
 # --- 为后续实验做好准备 ------------------------------------

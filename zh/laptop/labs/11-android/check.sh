@@ -152,7 +152,7 @@ else
     if [ -n "$UPLOADED" ]; then
       ok "APK 已送达存储桶：${UPLOADED}"
       evidence "构建后存储桶的内容" \
-        "$(printf '%s' "$LOGS" | sed -n '/5\/5 кладу APK в бакет/,$p' | grep -v '^APK-UPLOADED ' | head -20)"
+        "$(printf '%s' "$LOGS" | sed -n '/5\/5 正在将 APK 上传到 Bucket/,$p' | grep -v '^APK-UPLOADED ' | head -20)"
     else
       fail "APK 已构建，但没有送达存储桶" \
            "查看日志尾部：kubectl logs job/${JOB} --tail=20；多数情况是 bucketName 的锅 —— 它需要仪表盘里的长名字，而不是 'builds'"

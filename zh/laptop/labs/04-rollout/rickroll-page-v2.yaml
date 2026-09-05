@@ -30,7 +30,7 @@ data:
   # 它最终会出现在容器里。这已经不是 YAML 了：这里没有注释，
   # 也不可能有，井号会作为普通文本落到页面上。
   #
-  # 标记中有两处对 check.sh 很重要：字样「ВЕРСИЯ 2」——
+  # 标记中有两处对 check.sh 很重要：字样「版本 2」——
   # 检查凭它把第二个版本与第一个区分开；以及占位符 __POD__——它会
   # 按 ConfigMap rickroll-conf（实验 1）中的规则替换为 nginx 的 Pod 名称。
   # 去掉其中任何一个，实验检查都会不通过，尽管滚动发布会成功。
@@ -56,9 +56,9 @@ data:
       .pod b{display:block;margin-top:.4em;color:#00ffa3;font-size:1.35em;word-break:break-all}
       .hint{margin-top:3em;color:#3f5561;font-size:14px}
     </style>
-    <div class="tag">ВЕРСИЯ 2</div>
+    <div class="tag">版本 2</div>
     <h1>We're No Strangers To Love</h1>
     <p class="lyr">You know the rules &middot; And so do I</p>
-    <div class="pod">вас обслужил под<b>__POD__</b></div>
-    <p class="hint">Обновление прошло под нагрузкой. Посмотрите в Fortio: ошибок ноль.</p>
+    <div class="pod">为您服务的 Pod<b>__POD__</b></div>
+    <p class="hint">更新在负载下完成。看看 Fortio：零错误。</p>
     </html>

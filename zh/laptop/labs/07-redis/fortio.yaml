@@ -10,7 +10,7 @@
 # 用 `---` 分隔的两个对象：Deployment（生成器本身）和 Service（用来访问它的
 # 名称）。apiVersion、kind 和 metadata.name 后面不再注释。
 #
-# 镜像从公共 Docker Hub 拉取，而不是从你的 Harbor：Fortio 不是「Пропуск」
+# 镜像从公共 Docker Hub 拉取，而不是从你的 Harbor：Fortio 不是「通行证」
 # 服务的一部分，而是一台临时驻留在集群里的测量仪器。
 apiVersion: apps/v1
 kind: Deployment

@@ -135,7 +135,7 @@ metadata:
   name: rickroll-page-v1
 data:
   index.html: |
-    ...<div class="pod">вас обслужил под<b>__POD__</b></div>...
+    ...<div class="pod">为您服务的 Pod<b>__POD__</b></div>...
 ```
 
 就是那个将被 nginx 替换的 `__POD__`。名字里的 `-v1` 并非偶然：在关于滚动发布版本的

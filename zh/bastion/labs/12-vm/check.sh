@@ -57,7 +57,7 @@ BODY="$(curl -s --max-time 10 "$URL" 2>/dev/null)"
 case "$CODE" in
   200)
     case "$BODY" in
-      *"Справочник сотрудников"*)
+      *"员工通讯录"*)
         ok "通讯录已发布：${URL} 返回 200 并提供通讯录页面"
         evidence "域名响应" "请求：${URL}
 响应码：${CODE}

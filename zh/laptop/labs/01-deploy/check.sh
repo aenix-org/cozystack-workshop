@@ -115,7 +115,7 @@ fi
 BODY="$(in_cluster_curl_many 'http://rickroll/' 8)"
 # 这个标记每个页面必须恰好出现一次，否则响应计数器会说谎：
 #「Never Gonna Give You Up」同时出现在 <title> 和 <h1> 里，曾导致重复计数。
-ANSWERS="$(printf '%s' "$BODY" | grep -c 'вас обслужил под')"
+ANSWERS="$(printf '%s' "$BODY" | grep -c '为您服务的 Pod')"
 TOTAL_LINES="$(printf '%s' "$BODY" | grep -c '<title>')"
 if [ "${ANSWERS:-0}" -ge 1 ] && [ "${ANSWERS:-0}" -eq "${TOTAL_LINES:-0}" ]; then
   ok "应用通过 HTTP 响应并返回自己的页面（已验证 ${ANSWERS} 次请求）"

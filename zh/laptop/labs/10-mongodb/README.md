@@ -348,7 +348,7 @@ cd labs/10-mongodb
 mo < passes.js
 ```
 
-**你应该看到** —— `документов в коллекции: 4`。
+**你应该看到** —— `集合中的文档数: 4`。
 
 <details>
 <summary><b>逐一解析我们放进去的内容</b></summary>
@@ -362,12 +362,12 @@ mo < passes.js
 
 ```js
   {
-    type: "разовый",
-    guest: "Иванов Иван Иванович",
-    host: "petrov@corp.ru",
-    entrance: "Северная",
+    type: "一次性",
+    guest: "王建国",
+    host: "petrov@corp.example",
+    entrance: "北门",
     valid_on: ISODate("2026-09-01T09:00:00Z"),
-    purpose: "собеседование"
+    purpose: "面试"
   }
 ```
 
@@ -381,7 +381,7 @@ mo < passes.js
 `entrances` 现在是**一个列表**：
 
 ```js
-    entrances: ["Северная", "Южная"],
+    entrances: ["北门", "南门"],
     badge_returned: false
 ```
 
@@ -395,8 +395,8 @@ mo < passes.js
 
 ```js
     car: {
-      plate: "А123ВС174",
-      model: "ГАЗель Next",
+      plate: "京A12345",
+      model: "福特全顺",
       trailer: false,
       weight_kg: 3500
     },
@@ -409,9 +409,9 @@ mo < passes.js
 
 ```js
     members: [
-      { name: "Орлов Пётр", age: 16 },
-      { name: "Волкова Мария", age: 15 },
-      { name: "Зайцев Илья", age: 17 }
+      { name: "孙鹏", age: 16 },
+      { name: "周敏", age: 15 },
+      { name: "吴浩", age: 17 }
     ]
 ```
 
@@ -446,7 +446,7 @@ db.passes.find({ valid_on: ISODate("2026-09-02T07:30:00Z") })
 
 ```js
 // 针对普通字符串字段的条件：整体匹配，这里没有不区分大小写这回事
-db.passes.find({ type: "автомобильный" })
+db.passes.find({ type: "车辆" })
 ```
 
 **按车牌号搜索——通过点号深入嵌套对象内部：**
@@ -454,7 +454,7 @@ db.passes.find({ type: "автомобильный" })
 ```js
 // "car.plate" —— 通往文档内部的路径：car 对象里的 plate 字段。
 // 路径两边的引号是必需的，否则 JavaScript 会按自己的方式理解这个点号
-db.passes.find({ "car.plate": "А123ВС174" })
+db.passes.find({ "car.plate": "京A12345" })
 ```
 
 <details>
@@ -464,7 +464,7 @@ db.passes.find({ "car.plate": "А123ВС174" })
 而不是把嵌套对象当作一段文本来存。
 
 这个区别很实际。如果 `car` 作为一个内部塞了 JSON 的 `TEXT` 列放在关系表里，按车牌搜索就
-意味着 `LIKE '%А123ВС174%'` —— 没有索引的全表扫描，还带误报。这里它是一个可以在其上建索引
+意味着 `LIKE '%京A12345%'` —— 没有索引的全表扫描，还带误报。这里它是一个可以在其上建索引
 的普通条件，而我们也会这么做。
 
 ⚠️ `"car.plate"` 两边的引号是必需的：没有它们，JavaScript 会把点号理解成访问对象属性，
@@ -475,12 +475,12 @@ db.passes.find({ "car.plate": "А123ВС174" })
 **在多个入口处有效的通行证：**
 
 ```js
-// entrances 不是字符串，而是一个列表：["Северная", "Южная"]。条件仍然像对
+// entrances 不是字符串，而是一个列表：["北门", "南门"]。条件仍然像对
 // 普通字段那样书写，MongoDB 会自己对列表的每个元素逐一检查
-db.passes.find({ entrances: "Южная" })
+db.passes.find({ entrances: "南门" })
 ```
 
-注意：条件写得就好像 `entrances` 是一个值为 `"Южная"` 的普通字段，而实际上它是一个列表。
+注意：条件写得就好像 `entrances` 是一个值为 `"南门"` 的普通字段，而实际上它是一个列表。
 **MongoDB 自己就明白，如果一个字段是列表，条件就要对每个元素逐一检查。** 不需要单独的
 「包含」语法。
 
@@ -538,7 +538,7 @@ db.passes.aggregate([
 ])
 ```
 
-**你应该看到** —— 四行，形如 `{ _id: 'разовый', count: 1 }`。
+**你应该看到** —— 四行，形如 `{ _id: '一次性', count: 1 }`。
 
 ## 第 5 步。为一个大多数文档都没有的字段建索引
 
@@ -553,7 +553,7 @@ db.passes.aggregate([
 //   .executionStats      我们从回答里只取这一节，免得把全部都读一遍
 // 报告里我们看 totalDocsExamined —— 为了返回一个文档，数据库读了
 // 多少个文档
-db.passes.find({ "car.plate": "А123ВС174" }).explain("executionStats").executionStats
+db.passes.find({ "car.plate": "京A12345" }).explain("executionStats").executionStats
 ```
 
 **你应该看到** —— `totalDocsExamined` 等于集合中的文档数。数据库把它们全都过了一遍，才
@@ -569,7 +569,7 @@ db.passes.find({ "car.plate": "А123ВС174" }).explain("executionStats").execut
 db.passes.createIndex({ "car.plate": 1 }, { name: "car_plate", sparse: true })
 
 // 我们重复同一份报告，并和上一份比较
-db.passes.find({ "car.plate": "А123ВС174" }).explain("executionStats").executionStats
+db.passes.find({ "car.plate": "京A12345" }).explain("executionStats").executionStats
 ```
 
 **你应该看到** —— `totalDocsExamined` 等于一，而计划里出现了 `IXSCAN` 而不是 `COLLSCAN`。
@@ -610,9 +610,9 @@ db.passes.find({ "car.plate": "А123ВС174" }).explain("executionStats").execut
 ```js
 // insertOne = 「添加一个文档」。里面有哪些字段，数据库不过问
 db.passes.insertOne({
-  tipe: "разовый",
-  guest: "Николаев Сергей Игоревич",
-  host: "petrov@corp.ru",
+  tipe: "一次性",
+  guest: "韩明宇",
+  host: "petrov@corp.example",
   data: ISODate("2026-09-04T09:00:00Z")
 })
 ```
@@ -630,8 +630,8 @@ db.passes.countDocuments({})
 
 ```js
 // 和搜索那一步一样的按类型筛选：显示 type 字段等于
-// "разовый" 的通行证
-db.passes.find({ type: "разовый" })
+// "一次性" 的通行证
+db.passes.find({ type: "一次性" })
 ```
 
 > **在继续读下去之前，停下来想一想。**
@@ -705,7 +705,7 @@ db.runCommand({
 
 ```js
         type: {
-          enum: ["разовый", "недельный", "автомобильный", "групповой"],
+          enum: ["一次性", "每周", "车辆", "团体"],
         },
 ```
 
@@ -744,14 +744,14 @@ db.runCommand({
 mo < validator.js
 ```
 
-**你应该看到** —— `правило установлено`。
+**你应该看到** —— `规则已安装`。
 
 我们试着重复同样的拼写错误——现在有规则盯着：
 
 ```js
 // tipe 字段规则并不认识，而文档里没有必填的 type。
 // 以前，这样的文档会悄无声息地落进集合
-db.passes.insertOne({ tipe: "разовый", guest: "Проверка", host: "x@corp.ru" })
+db.passes.insertOne({ tipe: "一次性", guest: "检查", host: "x@corp.example" })
 ```
 
 **你应该看到** —— `MongoServerError: Document failed validation`。现在拼写错误过不去了。
@@ -827,7 +827,7 @@ db.passes.aggregate([
 // host 字段按含义指向一名员工。这样的员工并不存在——
 // 数据库会检查这件事吗？文档满足上一步的规则：type 在
 // 且来自列表，host 是字符串
-db.passes.insertOne({ type: "разовый", host: "не-существует@corp.ru", guest: "Тест" })
+db.passes.insertOne({ type: "一次性", host: "不存在@corp.example", guest: "测试" })
 ```
 
 文档会被插入。没有哪个员工用这个邮箱，而数据库不会去管这个。
@@ -842,7 +842,7 @@ db.passes.insertOne({ type: "разовый", host: "не-существует@c
 
 ```js
 // deleteOne = 「删除一个符合条件的文档」，而不是一次删掉全部
-db.passes.deleteOne({ host: "не-существует@corp.ru" })
+db.passes.deleteOne({ host: "不存在@corp.example" })
 ```
 
 </details>

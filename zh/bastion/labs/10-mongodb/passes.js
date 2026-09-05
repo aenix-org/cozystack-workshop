@@ -4,7 +4,7 @@
 // shell，它能理解 JavaScript。它在虚拟机上、在实验集群中运行，通过 README 里
 // 那条简短的命令 `mo` 启动（它会在工作 Pod 内部启动 mongosh）：
 //     cd labs/10-mongodb && mo < passes.js
-// 作为响应，你会看到这样一行「документов в коллекции: 4」。
+// 作为响应，你会看到这样一行「集合中的文档数: 4」。
 //
 // 把这个文件运行两次，文档就会变成八个：insertMany 只会追加。
 
@@ -23,12 +23,12 @@ db.passes.insertMany([
     // 存储文档，其中的值都带有类型：日期、整数、浮点数、布尔值。
     // 按日期可以比较和排序，而按字符串「2026-09-01」只有在记录格式
     // 恰好走运时才行。
-    type: "разовый",
-    guest: "Иванов Иван Иванович",
-    host: "petrov@corp.ru",
-    entrance: "Северная",
+    type: "一次性",
+    guest: "王建国",
+    host: "petrov@corp.example",
+    entrance: "北门",
     valid_on: ISODate("2026-09-01T09:00:00Z"),
-    purpose: "собеседование"
+    purpose: "面试"
   },
   {
     // 周通行证。这里没有 valid_on，取而代之的是 valid_from 和 valid_to 这一对；
@@ -38,27 +38,27 @@ db.passes.insertMany([
     // 出现了一个 badge_returned 字段，一次性通行证里根本没有它：
     // 不是 NULL 也不是空，而是那份文档里就是没有这个字段。这是不同的
     // 概念，检索方式也不一样。
-    type: "недельный",
-    guest: "Сидорова Анна Петровна",
-    host: "petrov@corp.ru",
-    entrances: ["Северная", "Южная"],
+    type: "每周",
+    guest: "林晓梅",
+    host: "petrov@corp.example",
+    entrances: ["北门", "南门"],
     valid_from: ISODate("2026-09-01T00:00:00Z"),
     valid_to: ISODate("2026-09-07T23:59:59Z"),
-    purpose: "внешний аудит",
+    purpose: "外部审计",
     badge_returned: false
   },
   {
     // 车辆通行证。所有与车相关的内容都放在一个字段 car 里面。
     // 这不是一个内部塞着 JSON 的字符串，而是一个完整的嵌套结构：
     // 按 car.plate 可以检索，也可以为它建立索引。
-    type: "автомобильный",
-    guest: "Кузнецов Виктор Сергеевич",
-    host: "logistics@corp.ru",
-    entrance: "Западная",
+    type: "车辆",
+    guest: "陈志强",
+    host: "logistics@corp.example",
+    entrance: "西门",
     valid_on: ISODate("2026-09-02T07:30:00Z"),
     car: {
-      plate: "А123ВС174",
-      model: "ГАЗель Next",
+      plate: "京A12345",
+      model: "福特全顺",
       trailer: false,
       weight_kg: 3500
     },
@@ -71,17 +71,17 @@ db.passes.insertMany([
     // 一个组织和一个联系人。它的形态与其它文档的差别不在于某一个字段，
     // 而是本质上的不同。这一点在实验后面会有回响：文档校验规则
     // 无法要求所有人都有 guest，否则一张合法的团体通行证就通不过了。
-    type: "групповой",
-    organization: "Гимназия № 1",
-    contact: "Смирнова Ольга Владимировна",
-    host: "hr@corp.ru",
-    entrance: "Северная",
+    type: "团体",
+    organization: "市第一中学",
+    contact: "赵丽娟",
+    host: "hr@corp.example",
+    entrance: "北门",
     valid_on: ISODate("2026-09-03T10:00:00Z"),
-    escort: "Петров Алексей Алексеевич",
+    escort: "刘伟明",
     members: [
-      { name: "Орлов Пётр", age: 16 },
-      { name: "Волкова Мария", age: 15 },
-      { name: "Зайцев Илья", age: 17 }
+      { name: "孙鹏", age: 16 },
+      { name: "周敏", age: 15 },
+      { name: "吴浩", age: 17 }
     ]
   }
 ]);
@@ -90,4 +90,4 @@ db.passes.insertMany([
 // 之所以需要打印，是为了让这个文件有一个可见的结果：insertMany 本身
 // 返回的是一份已签发标识符的列表，在其中很容易看不出到底有多少
 // 文档真正落库了。
-print("документов в коллекции: " + db.passes.countDocuments({}));
+print("集合中的文档数: " + db.passes.countDocuments({}));

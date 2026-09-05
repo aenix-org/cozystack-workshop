@@ -95,13 +95,13 @@ metadata:
 data:
   index.html: |
     ...
-    <div class="tag">ВЕРСИЯ 2</div>
+    <div class="tag">版本 2</div>
     <h1>We're No Strangers To Love</h1>
     ...
-    <div class="pod">вас обслужил под<b>__POD__</b></div>
+    <div class="pod">为您服务的 Pod<b>__POD__</b></div>
 ```
 
-里面就一个页面：不同的标题、不同的配色、一枚醒目的「ВЕРСИЯ 2」标记。差异是故意做得扎眼的——你会盯着浏览器看，而不是盯着 diff。
+里面就一个页面：不同的标题、不同的配色、一枚醒目的「版本 2」标记。差异是故意做得扎眼的——你会盯着浏览器看，而不是盯着 diff。
 
 注意两点。
 
@@ -327,7 +327,7 @@ rickroll-7c5d4f9b21   3         3         3       40s
 kubectl port-forward svc/rickroll 8080:80
 ```
 
-📍 **在浏览器里** <http://localhost:8080> ——带「ВЕРСИЯ 2」标记的绿色页面。刷新几次：底部的副本名字会变，因为 Service 把请求分摊到三个副本上。
+📍 **在浏览器里** <http://localhost:8080> ——带「版本 2」标记的绿色页面。刷新几次：底部的副本名字会变，因为 Service 把请求分摊到三个副本上。
 
 关闭隧道（`Ctrl+C`）。
 

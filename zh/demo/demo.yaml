@@ -1,7 +1,7 @@
-# Демо-стенд Cozystack — набор managed-сервисов для показа каталога и метрик.
-# Применение одной командой:
+# Cozystack 演示环境 —— 一组用于展示目录和指标的托管服务。
+# 使用单条命令应用：
 #   kubectl apply -f https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/demo/demo.yaml
-# Все объекты создаются в tenant-workshop00.
+# 所有对象都创建在 tenant-workshop00 中。
 ---
 apiVersion: apps.cozystack.io/v1alpha1
 kind: Postgres

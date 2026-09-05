@@ -76,8 +76,8 @@ data:
     </style>
     <h1>Never Gonna Give You Up</h1>
     <p class="lyr">Never gonna let you down &middot; Never gonna run around and desert you</p>
-    <div class="pod">вас обслужил под<b>__POD__</b></div>
-    <p class="hint">Обновите страницу. Когда реплик станет больше — имя начнёт меняться.</p>
+    <div class="pod">为您服务的 Pod<b>__POD__</b></div>
+    <p class="hint">刷新页面。当副本变多时，名字就会开始变化。</p>
     </html>
 ---
 # 应用本身。Deployment 描述期望状态——运行哪个镜像、

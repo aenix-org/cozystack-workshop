@@ -91,7 +91,7 @@ ssh_pwauth: true
 write_files:
   - path: /opt/directory/index.html
     content: |
-      <!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Справочник</title></head><body><h1>Справочник сотрудников</h1><ul><li>Иванов И. — 101</li><li>Петров П. — 102</li></ul></body></html>
+      <!doctype html><html lang="ru"><head><meta charset="utf-8"><title>通讯录</title></head><body><h1>员工通讯录</h1><ul><li>王军 — 101</li><li>潘平 — 102</li></ul></body></html>
   - path: /etc/systemd/system/directory.service
     content: |
       [Unit]
@@ -286,7 +286,7 @@ curl http://spravochnik.workshopXX.workshop.aenix.io
 **你应当看到**——通讯录页面的 HTML：
 
 ```html
-<h1>Справочник сотрудников</h1><ul><li>Иванов И. — 101</li><li>Петров П. — 102</li></ul>
+<h1>员工通讯录</h1><ul><li>王军 — 101</li><li>潘平 — 102</li></ul>
 ```
 
 在浏览器里打开这个地址，你会看到同样的列表。通讯录以一个对人友好的域名从外部可见，带着来自平台的 HTTPS，没有向网络部门或证书部门提过一张工单。
