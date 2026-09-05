@@ -60,7 +60,7 @@ spec:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # Das Image ist dasselbe für das Verzeichnis und für den Dienst «Пропуск» selbst.
+          # Das Image ist dasselbe für das Verzeichnis und für den Dienst «Gästeausweis» selbst.
           # Welcher Prozess tatsächlich startet, entscheidet die Variable MODE unten.
           image: HARBOR-HOST/passes/passes-api:v2
           # Der Port hat einen Namen, nicht nur eine Nummer: die Readiness-Probe und der Service unten

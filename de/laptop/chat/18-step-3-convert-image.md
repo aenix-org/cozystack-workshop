@@ -18,7 +18,7 @@ nano convert.sh
 ```
 
 **Jetzt kommen die drei Werte ins Spiel, die Sie sich in Schritt 1 notiert haben.** Am Anfang der
-Datei gibt es einen Block „FÜGEN SIE IHRE WERTE EIN" (im Skript «ВСТАВЬТЕ СВОИ ЗНАЧЕНИЯ») — ersetzen Sie die dortigen
+Datei gibt es einen Block „FÜGEN SIE IHRE WERTE EIN" (im Skript «FÜGEN SIE IHRE WERTE EIN») — ersetzen Sie die dortigen
 Platzhalter durch Ihre eigenen und lassen Sie die Anführungszeichen stehen:
 
 ```

@@ -3,7 +3,7 @@
 // Ein Programm für mongosh — die MongoDB-Shell. Läuft auf dem Laptop,
 // im Lab-Cluster, mit dem kurzen Befehl `mo` aus der README:
 //     cd labs/10-mongodb && mo < validator.js
-// Als Antwort sehen Sie die Zeile «правило установлено».
+// Als Antwort sehen Sie die Zeile «Regel installiert».
 //
 // Was ein Prüfschema ist. Standardmäßig hat eine Collection kein Schema: die Datenbank nimmt
 // ein Dokument beliebiger Form an und legt einen Tippfehler im Feldnamen («tipe» statt «type») still ab —
@@ -43,14 +43,14 @@ db.runCommand({
         // Der Pass-Typ — nur einer der vier aufgeführten Werte. Ein fünfter Typ
         // erfordert eine Änderung dieser Regel, und das ist gut: die Änderung wird bewusst.
         type: {
-          enum: ["разовый", "недельный", "автомобильный", "групповой"],
-          description: "тип пропуска, только из списка"
+          enum: ["Einmalausweis", "Wochenausweis", "Fahrzeugausweis", "Gruppenausweis"],
+          description: "Ausweistyp, nur aus der erlaubten Liste"
         },
         // Welcher Mitarbeiter den Pass bestellt hat. Das Feld ist Pflicht, und es muss eine
         // Zeichenkette sein.
         host: {
           bsonType: "string",
-          description: "кто из сотрудников заказал"
+          description: "welcher Mitarbeiter die Bestellung aufgegeben hat"
         },
         // guest steht in properties, aber nicht in required: wenn das Feld im Dokument vorhanden ist,
         // muss es eine Zeichenkette sein; wenn es fehlt — ist das Dokument dennoch gültig.
@@ -60,7 +60,7 @@ db.runCommand({
         // Regeln funktionieren auch innerhalb verschachtelter Objekte. Es gibt kein Feld car — keine
         // Anforderungen. Gibt es eines — muss es ein Objekt sein, und das Kennzeichen des Wagens darin
         // ist Pflicht, während der Anhänger, falls angegeben, ein Boolescher Wert ist, keine Zeichenkette
-        // «нет».
+        // „nein“.
         car: {
           bsonType: "object",
           required: ["plate"],
@@ -101,4 +101,4 @@ db.runCommand({
 
 // runCommand antwortet mit einem Objekt, in dem der Erfolg wie { ok: 1 } aussieht. Wir drucken
 // unsere eigene Zeile, damit das Ergebnis der Anwendung der Datei auf einen Blick lesbar ist.
-print("правило установлено");
+print("Regel installiert");

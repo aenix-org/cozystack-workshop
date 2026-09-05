@@ -59,7 +59,7 @@ BODY="$(curl -s --max-time 10 "$URL" 2>/dev/null)"
 case "$CODE" in
   200)
     case "$BODY" in
-      *"Справочник сотрудников"*)
+      *"Mitarbeiterverzeichnis"*)
         ok "Verzeichnis veröffentlicht: ${URL} antwortet mit 200 und liefert die Verzeichnis-Seite"
         evidence "Antwort über die Domain" "Anfrage: ${URL}
 Antwortcode: ${CODE}

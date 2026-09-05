@@ -50,21 +50,21 @@ SELECT
     ) AS created_at,
     -- Jede Zeile hat ihren eigenen Gästenamen: eine Million verschiedene Werte in einer Spalte.
     -- Etwas später im Lab werden Sie sehen, dass dies auf der Festplatte die schwerste Spalte ist.
-    concat('Гость № ', toString(number)) AS guest_name,
+    concat('Gast Nr. ', toString(number)) AS guest_name,
     -- Die Abteilung des empfangenden Mitarbeiters: fünf Werte, gleichmäßig verteilt.
-    ['Продажи', 'Разработка', 'Бухгалтерия',
-     'Кадры', 'Логистика'][1 + cityHash64(number, 'dept') % 5] AS host_dept,
-    -- Eingangspforte. Derselbe Trick, aber die Verteilung ist ungleichmäßig: «Северная» nimmt
-    -- drei von sechs Zellen und erhält die Hälfte des Stroms, «Южная» ein Drittel, «Западная» den
+    ['Vertrieb', 'Entwicklung', 'Buchhaltung',
+     'Personal', 'Logistik'][1 + cityHash64(number, 'dept') % 5] AS host_dept,
+    -- Eingangspforte. Derselbe Trick, aber die Verteilung ist ungleichmäßig: «Nord» nimmt
+    -- drei von sechs Zellen und erhält die Hälfte des Stroms, «Süd» ein Drittel, «West» den
     -- Rest. Gleichmäßig verteilte Daten wirken im Bericht unglaubwürdig und zeigen
     -- nichts.
-    ['Северная', 'Северная', 'Северная',
-     'Южная', 'Южная', 'Западная'][1 + cityHash64(number, 'entrance') % 6] AS entrance,
-    -- Ausweistyp: sechs von zehn Zellen gehen an «разовый», zwei an «недельный»,
-    -- je eine an «автомобильный» und «групповой» — genau so sieht es an der Pforte aus.
-    ['разовый', 'разовый', 'разовый', 'разовый', 'разовый', 'разовый',
-     'недельный', 'недельный',
-     'автомобильный', 'групповой'][1 + cityHash64(number, 'type') % 10] AS pass_type,
+    ['Nord', 'Nord', 'Nord',
+     'Süd', 'Süd', 'West'][1 + cityHash64(number, 'entrance') % 6] AS entrance,
+    -- Ausweistyp: sechs von zehn Zellen gehen an «Einmalausweis», zwei an «Wochenausweis»,
+    -- je eine an «Fahrzeugausweis» und «Gruppenausweis» — genau so sieht es an der Pforte aus.
+    ['Einmalausweis', 'Einmalausweis', 'Einmalausweis', 'Einmalausweis', 'Einmalausweis', 'Einmalausweis',
+     'Wochenausweis', 'Wochenausweis',
+     'Fahrzeugausweis', 'Gruppenausweis'][1 + cityHash64(number, 'type') % 10] AS pass_type,
     -- Besuchsdauer von 30 bis 329 Minuten. toUInt16 wird benötigt, weil die Spalte
     -- als UInt16 deklariert ist, während das Ergebnis der Arithmetik breiter ist und sich nicht von selbst verengt.
     toUInt16(30 + cityHash64(number, 'duration') % 300) AS duration_min

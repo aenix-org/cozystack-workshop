@@ -378,7 +378,7 @@ cd labs/10-mongodb
 mo < passes.js
 ```
 
-**Was Sie sehen sollten** — `документов в коллекции: 4`.
+**Was Sie sehen sollten** — `Dokumente in der Sammlung: 4`.
 
 <details>
 <summary><b>Durchgehen, was wir eingelegt haben</b></summary>
@@ -393,12 +393,12 @@ Nun zu den Dokumenten.
 
 ```js
   {
-    type: "разовый",
-    guest: "Иванов Иван Иванович",
-    host: "petrov@corp.ru",
-    entrance: "Северная",
+    type: "Einmalausweis",
+    guest: "Johannes M. Weber",
+    host: "petrov@corp.example",
+    entrance: "Nord",
     valid_on: ISODate("2026-09-01T09:00:00Z"),
-    purpose: "собеседование"
+    purpose: "Vorstellungsgespräch"
   }
 ```
 
@@ -413,7 +413,7 @@ dem String `"2026-09-01"` aber nur, wenn Sie Glück mit der Schreibweise haben.
 einzelnen Eingangs ist `entrances` jetzt **eine Liste**:
 
 ```js
-    entrances: ["Северная", "Южная"],
+    entrances: ["Nord", "Süd"],
     badge_returned: false
 ```
 
@@ -427,8 +427,8 @@ solches Feld in diesem Dokument.** Das sind verschiedene Dinge, und sie werden v
 
 ```js
     car: {
-      plate: "А123ВС174",
-      model: "ГАЗель Next",
+      plate: "M-AB 1234",
+      model: "Ford Transit",
       trailer: false,
       weight_kg: 3500
     },
@@ -442,9 +442,9 @@ darauf aufbauen.
 
 ```js
     members: [
-      { name: "Орлов Пётр", age: 16 },
-      { name: "Волкова Мария", age: 15 },
-      { name: "Зайцев Илья", age: 17 }
+      { name: "Peter Adler", age: 16 },
+      { name: "Maria Wolf", age: 15 },
+      { name: "Elias Hartmann", age: 17 }
     ]
 ```
 
@@ -481,7 +481,7 @@ db.passes.find({ valid_on: ISODate("2026-09-02T07:30:00Z") })
 
 ```js
 // Eine Bedingung auf ein gewöhnliches String-Feld: eine vollständige Übereinstimmung, hier gibt es keine Groß-/Kleinschreibungs-Toleranz
-db.passes.find({ type: "автомобильный" })
+db.passes.find({ type: "Fahrzeugausweis" })
 ```
 
 **Suche nach Kennzeichen — durch einen Punkt in ein verschachteltes Objekt hineinreichen:**
@@ -489,7 +489,7 @@ db.passes.find({ type: "автомобильный" })
 ```js
 // "car.plate" — ein Pfad in das Dokument: das Feld plate innerhalb des Objekts car.
 // Die Anführungszeichen um den Pfad sind verpflichtend, sonst liest JavaScript den Punkt auf seine eigene Weise
-db.passes.find({ "car.plate": "А123ВС174" })
+db.passes.find({ "car.plate": "M-AB 1234" })
 ```
 
 <details>
@@ -499,7 +499,7 @@ db.passes.find({ "car.plate": "А123ВС174" })
 Dokuments und kann hineinreichen, statt das verschachtelte Objekt als einen Brocken Text zu speichern.
 
 Der Unterschied ist praktisch. Läge `car` in einer relationalen Tabelle als `TEXT`-Spalte mit JSON darin,
-würde die Suche nach dem Kennzeichen `LIKE '%А123ВС174%'` bedeuten — ein Full Scan ohne Index, mit
+würde die Suche nach dem Kennzeichen `LIKE '%M-AB 1234%'` bedeuten — ein Full Scan ohne Index, mit
 Fehltreffern. Hier ist es eine gewöhnliche Bedingung, auf die man einen Index aufbauen kann, und das
 werden wir.
 
@@ -511,13 +511,13 @@ Zugriff auf eine Objekteigenschaft und versteht nicht, was von ihm verlangt wird
 **Ausweise, die an mehreren Eingängen gültig sind:**
 
 ```js
-// entrances ist kein String, sondern eine Liste: ["Северная", "Южная"]. Die Bedingung wird trotzdem
+// entrances ist kein String, sondern eine Liste: ["Nord", "Süd"]. Die Bedingung wird trotzdem
 // wie für ein gewöhnliches Feld geschrieben, MongoDB prüft sie selbst gegen jedes Element der Liste
-db.passes.find({ entrances: "Южная" })
+db.passes.find({ entrances: "Süd" })
 ```
 
 Beachten Sie: die Bedingung wird geschrieben, als wäre `entrances` ein gewöhnliches Feld mit dem Wert
-`"Южная"`, obwohl es in Wirklichkeit eine Liste ist. **MongoDB versteht von selbst, dass die Bedingung,
+`"Süd"`, obwohl es in Wirklichkeit eine Liste ist. **MongoDB versteht von selbst, dass die Bedingung,
 wenn ein Feld eine Liste ist, gegen jedes Element geprüft werden muss.** Es ist keine gesonderte Syntax
 für „enthält“ nötig.
 
@@ -579,7 +579,7 @@ db.passes.aggregate([
 ])
 ```
 
-**Was Sie sehen sollten** — vier Zeilen der Form `{ _id: 'разовый', count: 1 }`.
+**Was Sie sehen sollten** — vier Zeilen der Form `{ _id: 'Einmalausweis', count: 1 }`.
 
 ## Schritt 5. Ein Index auf einem Feld, das die meisten nicht haben
 
@@ -595,7 +595,7 @@ wie die Datenbank nach ihnen gesucht hat.
 //   .executionStats      wir nehmen genau diesen Abschnitt aus der Antwort, um nicht alles zu lesen
 // Im Bericht schauen wir auf totalDocsExamined — wie viele Dokumente die Datenbank gelesen hat,
 // um eines zurückzugeben
-db.passes.find({ "car.plate": "А123ВС174" }).explain("executionStats").executionStats
+db.passes.find({ "car.plate": "M-AB 1234" }).explain("executionStats").executionStats
 ```
 
 **Was Sie sehen sollten** — `totalDocsExamined` ist gleich der Anzahl der Dokumente in der Collection.
@@ -613,7 +613,7 @@ zu finden, ohne alle der Reihe nach zu lesen:
 db.passes.createIndex({ "car.plate": 1 }, { name: "car_plate", sparse: true })
 
 // Wir wiederholen denselben Bericht und vergleichen ihn mit dem vorherigen
-db.passes.find({ "car.plate": "А123ВС174" }).explain("executionStats").executionStats
+db.passes.find({ "car.plate": "M-AB 1234" }).explain("executionStats").executionStats
 ```
 
 **Was Sie sehen sollten** — `totalDocsExamined` ist gleich eins, und im Plan ist `IXSCAN` statt
@@ -659,9 +659,9 @@ geschriebenes Skript:
 ```js
 // insertOne = "ein Dokument hinzufügen". Welche Felder darin sind, fragt die Datenbank nicht
 db.passes.insertOne({
-  tipe: "разовый",
-  guest: "Николаев Сергей Игоревич",
-  host: "petrov@corp.ru",
+  tipe: "Einmalausweis",
+  guest: "Sebastian I. Neumann",
+  host: "petrov@corp.example",
   data: ISODate("2026-09-04T09:00:00Z")
 })
 ```
@@ -680,8 +680,8 @@ Fünf. Nun das, was der Sicherheitsdienst jeden Morgen tut — er öffnet die Li
 
 ```js
 // Dieselbe Auswahl nach type wie im Suchschritt: zeig die Ausweise, deren
-// Feld type gleich "разовый" ist
-db.passes.find({ type: "разовый" })
+// Feld type gleich "Einmalausweis" ist
+db.passes.find({ type: "Einmalausweis" })
 ```
 
 > **Halten Sie inne und denken Sie nach, bevor Sie weiterlesen.**
@@ -761,7 +761,7 @@ Dokumente sind, desto weniger können Sie von allen gemeinsam verlangen.
 
 ```js
         type: {
-          enum: ["разовый", "недельный", "автомобильный", "групповой"],
+          enum: ["Einmalausweis", "Wochenausweis", "Fahrzeugausweis", "Gruppenausweis"],
         },
 ```
 
@@ -803,14 +803,14 @@ Wir wenden die Regel an:
 mo < validator.js
 ```
 
-**Was Sie sehen sollten** — `правило установлено`.
+**Was Sie sehen sollten** — `Regel installiert`.
 
 Wir versuchen, denselben Tippfehler zu wiederholen — jetzt unter der Aufsicht der Regel:
 
 ```js
 // Das Feld tipe ist der Regel unbekannt, und im Dokument gibt es kein Pflichtfeld type.
 // Früher hätte sich ein solches Dokument stumm in die Collection gesetzt
-db.passes.insertOne({ tipe: "разовый", guest: "Проверка", host: "x@corp.ru" })
+db.passes.insertOne({ tipe: "Einmalausweis", guest: "Kontrolle", host: "x@corp.example" })
 ```
 
 **Was Sie sehen sollten** — `MongoServerError: Document failed validation`. Jetzt kommt der Tippfehler
@@ -894,7 +894,7 @@ Probieren Sie es:
 // Das Feld host verweist seinem Sinn nach auf einen Mitarbeiter. Es gibt keinen solchen Mitarbeiter —
 // wird die Datenbank das prüfen? Das Dokument erfüllt die Regel aus dem letzten Schritt: type ist
 // vorhanden und aus der Liste, host ist ein String
-db.passes.insertOne({ type: "разовый", host: "не-существует@corp.ru", guest: "Тест" })
+db.passes.insertOne({ type: "Einmalausweis", host: "existiert-nicht@corp.example", guest: "Test" })
 ```
 
 Das Dokument wird eingefügt. Es gibt keinen Mitarbeiter mit einer solchen E-Mail, und die Datenbank wird
@@ -913,7 +913,7 @@ Vergessen Sie nicht, das Testdokument zu entfernen:
 
 ```js
 // deleteOne = "ein Dokument löschen, das der Bedingung entspricht", nicht alle auf einmal
-db.passes.deleteOne({ host: "не-существует@corp.ru" })
+db.passes.deleteOne({ host: "existiert-nicht@corp.example" })
 ```
 
 </details>

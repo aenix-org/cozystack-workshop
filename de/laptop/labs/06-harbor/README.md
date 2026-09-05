@@ -232,8 +232,8 @@ Woher kennt die Anwendung ihren eigenen Namen, Node und namespace? Sie **findet 
 legt sie beim Start hinein, in Umgebungsvariablen:
 
 ```go
-Pod:  env("POD_NAME", "неизвестно"),
-Node: env("NODE_NAME", "неизвестно"),
+Pod:  env("POD_NAME", "unbekannt"),
+Node: env("NODE_NAME", "unbekannt"),
 ```
 
 Und das Manifest gibt an, was dort hineinzulegen ist:

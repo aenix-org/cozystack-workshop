@@ -4,7 +4,7 @@
 // die JavaScript versteht. Es läuft auf der VM, im Lab-Cluster, über den kurzen
 // Befehl `mo` aus der README (er startet mongosh innerhalb des Arbeits-Pods):
 //     cd labs/10-mongodb && mo < passes.js
-// Als Antwort sehen Sie die Zeile «документов в коллекции: 4».
+// Als Antwort sehen Sie die Zeile «Dokumente in der Sammlung: 4».
 //
 // Führen Sie die Datei zweimal aus, und es werden acht Dokumente: insertMany hängt nur an.
 
@@ -24,12 +24,12 @@ db.passes.insertMany([
     // binären BSON-Format, in dem ein Wert einen Typ hat: Datum, Ganzzahl, Fließkommazahl, Boolean.
     // Nach Datum kann man vergleichen und sortieren; nach der Zeichenkette «2026-09-01» nur, wenn
     // man mit dem Aufzeichnungsformat Glück hatte.
-    type: "разовый",
-    guest: "Иванов Иван Иванович",
-    host: "petrov@corp.ru",
-    entrance: "Северная",
+    type: "Einmalausweis",
+    guest: "Johannes M. Weber",
+    host: "petrov@corp.example",
+    entrance: "Nord",
     valid_on: ISODate("2026-09-01T09:00:00Z"),
-    purpose: "собеседование"
+    purpose: "Vorstellungsgespräch"
   },
   {
     // Ein Wochen-Ausweis. Statt valid_on gibt es ein Paar valid_from und valid_to, statt
@@ -39,27 +39,27 @@ db.passes.insertMany([
     // Ein Feld badge_returned ist aufgetaucht, das der Einmal-Ausweis überhaupt nicht hat:
     // nicht NULL und nicht leer, sondern buchstäblich kein solches Feld in diesem Dokument. Das sind
     // verschiedene Dinge, und sie werden unterschiedlich gesucht.
-    type: "недельный",
-    guest: "Сидорова Анна Петровна",
-    host: "petrov@corp.ru",
-    entrances: ["Северная", "Южная"],
+    type: "Wochenausweis",
+    guest: "Anna L. Bergmann",
+    host: "petrov@corp.example",
+    entrances: ["Nord", "Süd"],
     valid_from: ISODate("2026-09-01T00:00:00Z"),
     valid_to: ISODate("2026-09-07T23:59:59Z"),
-    purpose: "внешний аудит",
+    purpose: "externe Prüfung",
     badge_returned: false
   },
   {
     // Ein Fahrzeug-Ausweis. Alles, was das Auto betrifft, liegt innerhalb eines einzigen Feldes
     // car. Das ist keine Zeichenkette mit JSON darin, sondern eine vollwertige verschachtelte Struktur:
     // nach car.plate kann man suchen und darauf einen Index aufbauen.
-    type: "автомобильный",
-    guest: "Кузнецов Виктор Сергеевич",
-    host: "logistics@corp.ru",
-    entrance: "Западная",
+    type: "Fahrzeugausweis",
+    guest: "Viktor S. Schmidt",
+    host: "logistics@corp.example",
+    entrance: "West",
     valid_on: ISODate("2026-09-02T07:30:00Z"),
     car: {
-      plate: "А123ВС174",
-      model: "ГАЗель Next",
+      plate: "M-AB 1234",
+      model: "Ford Transit",
       trailer: false,
       weight_kg: 3500
     },
@@ -73,17 +73,17 @@ db.passes.insertMany([
     // ein Feld, sondern im Wesen. Weiter in der Lab wird sich das auswirken: die Regel zur Prüfung von
     // Dokumenten wird guest nicht von allen verlangen können, sonst käme ein rechtmäßiger
     // Gruppen-Ausweis nicht durch.
-    type: "групповой",
-    organization: "Гимназия № 1",
-    contact: "Смирнова Ольга Владимировна",
-    host: "hr@corp.ru",
-    entrance: "Северная",
+    type: "Gruppenausweis",
+    organization: "Gymnasium Nr. 1",
+    contact: "Olivia W. Fischer",
+    host: "hr@corp.example",
+    entrance: "Nord",
     valid_on: ISODate("2026-09-03T10:00:00Z"),
-    escort: "Петров Алексей Алексеевич",
+    escort: "Alexander A. Fuchs",
     members: [
-      { name: "Орлов Пётр", age: 16 },
-      { name: "Волкова Мария", age: 15 },
-      { name: "Зайцев Илья", age: 17 }
+      { name: "Peter Adler", age: 16 },
+      { name: "Maria Wolf", age: 15 },
+      { name: "Elias Hartmann", age: 17 }
     ]
   }
 ]);
@@ -92,4 +92,4 @@ db.passes.insertMany([
 // bedeutet «alle». Die Ausgabe wird gebraucht, damit die Datei ein sichtbares Ergebnis hat: insertMany
 // selbst antwortet mit einer Liste der vergebenen Bezeichner, und darin übersieht man leicht, wie viele
 // Dokumente tatsächlich abgelegt wurden.
-print("документов в коллекции: " + db.passes.countDocuments({}));
+print("Dokumente in der Sammlung: " + db.passes.countDocuments({}));

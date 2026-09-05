@@ -164,6 +164,6 @@ data:
   strings.xml: |
     <?xml version="1.0" encoding="utf-8"?>
     <resources>
-      <string name="app_name">Пропуск</string>
-      <string name="greeting">Заказать пропуск для гостя</string>
+      <string name="app_name">Gästeausweis</string>
+      <string name="greeting">Gästeausweis anfordern</string>
     </resources>

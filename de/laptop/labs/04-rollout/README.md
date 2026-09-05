@@ -95,13 +95,13 @@ metadata:
 data:
   index.html: |
     ...
-    <div class="tag">ВЕРСИЯ 2</div>
+    <div class="tag">VERSION 2</div>
     <h1>We're No Strangers To Love</h1>
     ...
-    <div class="pod">вас обслужил под<b>__POD__</b></div>
+    <div class="pod">bedient von Pod<b>__POD__</b></div>
 ```
 
-Darin steckt eine einzige Seite: eine andere Überschrift, ein anderes Farbschema, eine auffällige Plakette „ВЕРСИЯ 2“. Die Unterschiede sind bewusst ins Auge fallend gemacht — Sie werden in den Browser schauen, nicht in ein Diff.
+Darin steckt eine einzige Seite: eine andere Überschrift, ein anderes Farbschema, eine auffällige Plakette „VERSION 2“. Die Unterschiede sind bewusst ins Auge fallend gemacht — Sie werden in den Browser schauen, nicht in ein Diff.
 
 Beachten Sie zwei Dinge.
 
@@ -327,7 +327,7 @@ rickroll-7c5d4f9b21   3         3         3       40s
 kubectl port-forward svc/rickroll 8080:80
 ```
 
-📍 **Im Browser** <http://localhost:8080> — die grüne Seite mit der Plakette „ВЕРСИЯ 2“. Aktualisieren Sie sie ein paar Mal: Der Kopienname unten ändert sich, weil der Service die Anfragen über die drei Kopien verteilt.
+📍 **Im Browser** <http://localhost:8080> — die grüne Seite mit der Plakette „VERSION 2“. Aktualisieren Sie sie ein paar Mal: Der Kopienname unten ändert sich, weil der Service die Anfragen über die drei Kopien verteilt.
 
 Schließen Sie den Tunnel (`Ctrl+C`).
 

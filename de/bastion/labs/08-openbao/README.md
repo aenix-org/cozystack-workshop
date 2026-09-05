@@ -943,7 +943,7 @@ Jetzt:
 ```bash
 # Dasselbe kv put. Die vorige Version des Eintrags wird nicht gelöscht — daneben erscheint eine zweite.
 kubectl exec bao-workbench -- \
-  bao kv put secret/passes/db password=Propusk2026-осень username=passes_app
+  bao kv put secret/passes/db password=Propusk2026-herbst username=passes_app
 # rollout restart erstellt die Pods der Anwendung neu, ohne eine einzige Zeile in ihrer Beschreibung zu ändern.
 # Dafür war das alles: das neue Passwort wird beim nächsten Start übernommen.
 kubectl rollout restart deploy/secrets-demo

@@ -1,5 +1,5 @@
 ---
-# Labor 7 · Dienst «Пропуск», Version v2 — die, die mit dem Cache arbeiten kann.
+# Labor 7 · Dienst «Gästeausweis», Version v2 — die, die mit dem Cache arbeiten kann.
 # Der Cache ist hier noch NICHT aktiviert: zuerst messen wir, wie schlecht es ohne ihn ist. Aktiviert
 # wird er später, mit dem Patch cache-patch.yaml aus demselben Ordner.
 #
@@ -60,7 +60,7 @@ spec:
           # REDIS_ADDR und REDIS_PASSWORD stehen nicht in der Liste — und genau deshalb ist der Cache aus,
           # und jede Anfrage geht brav in das langsame Verzeichnis.
           env:
-            # MODE=api — diese Instanz arbeitet als der Dienst «Пропуск» selbst.
+            # MODE=api — diese Instanz arbeitet als der Dienst «Gästeausweis» selbst.
             - name: MODE
               value: "api"
             # Version und Registry braucht die Anwendung zum Laufen nicht — sie sind in der Antwort auf «/» sichtbar

@@ -67,7 +67,7 @@ data:
     CMDLINE_TOOLS_URL="https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"
     MC_URL="https://dl.min.io/client/mc/release/linux-amd64/mc"
 
-    echo "== 1/5 ставлю Android command-line tools =="
+    echo "== 1/5 installiere Android command-line tools =="
     mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
     cd "$ANDROID_SDK_ROOT/cmdline-tools"
     curl -fsSL -o tools.zip "$CMDLINE_TOOLS_URL"
@@ -77,7 +77,7 @@ data:
     mv cmdline-tools latest
     export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
 
-    echo "== 2/5 принимаю лицензии и качаю SDK (самый долгий шаг) =="
+    echo "== 2/5 akzeptiere Lizenzen und lade das SDK herunter (der längste Schritt) =="
     # `yes` erhält SIGPIPE, wenn sdkmanager seine Eingabe schließt, und gibt
     # einen von null verschiedenen Code zurück. Mit set -o pipefail würde das den Build grundlos scheitern lassen,
     # deshalb wird der Rückgabecode hier absichtlich unterdrückt. Wenn die Lizenzen wirklich
@@ -86,7 +86,7 @@ data:
     sdkmanager --sdk_root="$ANDROID_SDK_ROOT" \
       "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
-    echo "== 3/5 собираю APK =="
+    echo "== 3/5 baue das APK =="
     # Die ConfigMap wird schreibgeschützt gemountet, und Gradle schreibt neben die Quellen,
     # deshalb wird der Baum zuerst auf die Platte kopiert.
     # -L dereferenziert symbolische Links: eine ConfigMap wird nicht als Dateien gemountet,
@@ -100,7 +100,7 @@ data:
     APK="$WORK/project/app/build/outputs/apk/debug/app-debug.apk"
     ls -l "$APK"
 
-    echo "== 4/5 ставлю клиент S3 =="
+    echo "== 4/5 installiere den S3-Client =="
     # Wir legen den Client ins Arbeitsverzeichnis, NICHT nach /usr/local/bin. Der Pod läuft als
     # unprivilegierter Benutzer, und die System-Verzeichnisse des Images gehören root:
     # das Schreiben dorthin würde mit Permission denied enden — und zwar genau hier, im vierten Schritt,
@@ -112,7 +112,7 @@ data:
     # einfach `mc` schreiben kann statt des vollen Pfads.
     export PATH="$WORK/bin:$PATH"
 
-    echo "== 5/5 кладу APK в бакет =="
+    echo "== 5/5 lade das APK in den Bucket =="
     # Die Variablen accessKey/secretKey/endpoint/bucketName kommen aus dem Secret
     # über envFrom. Die Ausgabe von alias set unterdrücken wir: es braucht nichts ins Log zu drucken.
     # Aus demselben Grund gibt es kein set -x im Skript — es würde die Schlüssel ausgeben.

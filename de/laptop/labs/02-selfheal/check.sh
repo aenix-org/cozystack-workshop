@@ -154,7 +154,7 @@ else
   elif kubectl get pod "$SERVED" >/dev/null 2>&1; then
     ok "der Service liefert eine Seite, sie wurde von der lebenden Kopie ${SERVED} bedient"
     evidence "Antwort des Service (Fragment)" \
-      "$(printf '%s' "$BODY" | grep -o "вас обслужил под<b>${APP}-[a-z0-9-]*</b>" | head -1)"
+      "$(printf '%s' "$BODY" | grep -o "bedient von Pod<b>${APP}-[a-z0-9-]*</b>" | head -1)"
   else
     fail "die Seite wurde von der Kopie ${SERVED} geliefert, aber einen solchen Pod gibt es im Cluster nicht mehr" \
          "warten Sie ein Dutzend Sekunden und starten Sie die Prüfung erneut — wahrscheinlich wechselte die Kopie gerade eben"

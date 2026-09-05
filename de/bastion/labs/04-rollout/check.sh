@@ -154,7 +154,7 @@ else
   # Wir erkennen beide Versionen POSITIV, jede an ihrem eigenen Marker. Der Zweig „wenn nicht v2, dann
   # v1" zählte alles als erste Version: die nginx-Standardseite, einen 404, eine fremde
   # Anwendung, Müll — geprüft, bei Müll gab das Skript „LAB BESTANDEN" aus.
-  if printf '%s' "$BODY" | grep -q 'ВЕРСИЯ 2'; then
+  if printf '%s' "$BODY" | grep -q 'VERSION 2'; then
     SERVED_VER="rickroll-page-v2"
   elif printf '%s' "$BODY" | grep -q 'Never Gonna Give You Up'; then
     SERVED_VER="rickroll-page-v1"
@@ -187,7 +187,7 @@ else
 
   evidence "Ausgelieferte Seite (Fragment)" \
     "$(printf '%s' "$BODY" | grep -o '<h1>[^<]*</h1>' | head -1)
-$(printf '%s' "$BODY" | grep -o "вас обслужил под<b>${APP}-[a-z0-9-]*</b>" | head -1)"
+$(printf '%s' "$BODY" | grep -o "bedient von Pod<b>${APP}-[a-z0-9-]*</b>" | head -1)"
 fi
 
 # --- Bereitschaft für die nächsten Labs ------------------------------------------

@@ -1,5 +1,5 @@
 ---
-# Lab 5 · Infrastruktur in Git. Namespace für den Dienst «Пропуск».
+# Lab 5 · Infrastruktur in Git. Namespace für den Dienst «Gästeausweis».
 #
 # Diese Datei wird nicht von Hand auf den Cluster angewendet. Sie legen sie in Ihr Repository auf
 # GitHub, in den Ordner apps/, und in den Cluster `lab` überträgt sie Flux — von selbst, nach Zeitplan:
@@ -22,7 +22,7 @@ kind: Namespace
 metadata:
   name: passes
   # Das Label beeinflusst den Betrieb des Dienstes nicht — es dient dazu, mit einem einzigen Befehl alles zu finden,
-  # was zum «Пропуск» gehört: kubectl get all -A -l app.kubernetes.io/part-of=passes.
+  # was zum «Gästeausweis» gehört: kubectl get all -A -l app.kubernetes.io/part-of=passes.
   # Der Name part-of stammt aus dem allgemein üblichen Satz von Kubernetes-Labels und ist nicht von uns erdacht:
   # fremde Werkzeuge (Monitoring, Exporte) suchen genau danach.
   labels:

@@ -57,7 +57,7 @@ type identity struct {
 
 // Eine Umgebungsvariable lesen, und falls sie fehlt oder leer ist — einen Ersatzwert
 // zurückgeben. Nötig, damit sich das Programm auch außerhalb des Clusters starten lässt, ohne eine einzige
-// Einstellung: es stürzt nicht ab, sondern schreibt ehrlich «неизвестно» in die Antwort.
+// Einstellung: es stürzt nicht ab, sondern schreibt ehrlich «unbekannt» in die Antwort.
 func env(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
@@ -90,10 +90,10 @@ func main() {
 		body := identity{
 			Service:   "passes-api",
 			Version:   env("APP_VERSION", "v1"),
-			Pod:       env("POD_NAME", "неизвестно"),
-			Node:      env("NODE_NAME", "неизвестно"),
-			Namespace: env("POD_NAMESPACE", "неизвестно"),
-			Registry:  env("IMAGE_REGISTRY", "не указан"),
+			Pod:       env("POD_NAME", "unbekannt"),
+			Node:      env("NODE_NAME", "unbekannt"),
+			Namespace: env("POD_NAMESPACE", "unbekannt"),
+			Registry:  env("IMAGE_REGISTRY", "nicht angegeben"),
 			Time:      time.Now().UTC().Format(time.RFC3339),
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -103,7 +103,7 @@ func main() {
 		// und die Antwort würde im Terminal unlesbar.
 		enc.SetEscapeHTML(false)
 		if err := enc.Encode(body); err != nil {
-			log.Printf("не удалось отдать ответ: %v", err)
+			log.Printf("Antwort konnte nicht gesendet werden: %v", err)
 		}
 	})
 
@@ -119,8 +119,8 @@ func main() {
 
 	// Das Erste, was du in kubectl logs siehst. Die Zeile ist nötig, um «die Anwendung
 	// ist nicht gestartet» von «gestartet, aber antwortet nicht» zu unterscheiden — das sind verschiedene Diagnosen.
-	log.Printf("passes-api %s слушает порт %s, под %s",
-		env("APP_VERSION", "v1"), port, env("POD_NAME", "неизвестно"))
+	log.Printf("passes-api %s lauscht auf Port %s, Pod %s",
+		env("APP_VERSION", "v1"), port, env("POD_NAME", "unbekannt"))
 	// Wir starten den Server und arbeiten, bis wir gestoppt werden. Ist der Port belegt oder der Server
 	// abgestürzt — schreiben wir den Grund und beenden mit einem Fehler. Der Cluster sieht den beendeten Prozess
 	// und bringt die Kopie erneut hoch; den Neustart innerhalb des Programms zu reparieren ist nicht nötig.

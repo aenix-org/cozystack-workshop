@@ -1,4 +1,4 @@
-# Lab 6 · Ihre eigene private Image-Registry. Build-Rezept für das Image des Dienstes «Пропуск».
+# Lab 6 · Ihre eigene private Image-Registry. Build-Rezept für das Image des Dienstes «Gästeausweis».
 #
 # Was ein Dockerfile ist: ein Schritt-für-Schritt-Rezept, das aus Quellcode ein Image macht —
 # ein startbereiter Schnappschuss des Dateisystems zusammen mit der Angabe, was darin ausgeführt werden soll.

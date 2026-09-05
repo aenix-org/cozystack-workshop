@@ -49,7 +49,7 @@ ENGINE = MergeTree
 --
 -- Aus der vertrauten Welt: dieselbe Entscheidung wie in einem Papierarchiv — die Ausweise
 -- nach Datum oder nach Nachnamen sortieren. Nach Datum sortiert, ist die März-Mappe
--- sofort zur Hand, während ein bestimmter Иванов durch Durchsuchen gefunden wird. Und eine
+-- sofort zur Hand, während ein bestimmter Müller durch Durchsuchen gefunden wird. Und eine
 -- Million Blatt Papier wird niemand nachträglich umsortieren.
 --
 -- Ein PARTITION BY gibt es in der Datei absichtlich nicht. Eine Partition ist ein separater Satz von Parts

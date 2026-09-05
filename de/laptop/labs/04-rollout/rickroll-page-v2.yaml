@@ -30,7 +30,7 @@ data:
   # die im Container landet. Das ist kein YAML mehr: Kommentare gibt es hier nicht
   # und kann es nicht geben — eine Raute würde als gewöhnlicher Text auf der Seite landen.
   #
-  # Zwei Dinge sind im Markup wichtig, auf die check.sh schaut: die Aufschrift «ВЕРСИЯ 2» —
+  # Zwei Dinge sind im Markup wichtig, auf die check.sh schaut: die Aufschrift «VERSION 2» —
   # daran unterscheidet die Prüfung die zweite Version von der ersten, und der Platzhalter __POD__ — er wird
   # nach der Regel aus der ConfigMap rickroll-conf (Labor 1) durch den Namen des nginx-Pods ersetzt.
   # Entfernst du eines von beiden, besteht die Laborprüfung nicht, obwohl der Rollout erfolgreich ist.
@@ -56,9 +56,9 @@ data:
       .pod b{display:block;margin-top:.4em;color:#00ffa3;font-size:1.35em;word-break:break-all}
       .hint{margin-top:3em;color:#3f5561;font-size:14px}
     </style>
-    <div class="tag">ВЕРСИЯ 2</div>
+    <div class="tag">VERSION 2</div>
     <h1>We're No Strangers To Love</h1>
     <p class="lyr">You know the rules &middot; And so do I</p>
-    <div class="pod">вас обслужил под<b>__POD__</b></div>
-    <p class="hint">Обновление прошло под нагрузкой. Посмотрите в Fortio: ошибок ноль.</p>
+    <div class="pod">bedient von Pod<b>__POD__</b></div>
+    <p class="hint">Das Rollout erfolgte unter Last. Schau in Fortio: null Fehler.</p>
     </html>

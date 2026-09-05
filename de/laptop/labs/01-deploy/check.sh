@@ -116,7 +116,7 @@ fi
 BODY="$(in_cluster_curl_many 'http://rickroll/' 8)"
 # Der Marker muss GENAU EINMAL pro Seite vorkommen, sonst lügt der Antwortzähler:
 # „Never Gonna Give You Up" steht sowohl im <title> als auch im <h1> und ergab eine Verdopplung.
-ANSWERS="$(printf '%s' "$BODY" | grep -c 'вас обслужил под')"
+ANSWERS="$(printf '%s' "$BODY" | grep -c 'bedient von Pod')"
 TOTAL_LINES="$(printf '%s' "$BODY" | grep -c '<title>')"
 if [ "${ANSWERS:-0}" -ge 1 ] && [ "${ANSWERS:-0}" -eq "${TOTAL_LINES:-0}" ]; then
   ok "Anwendung antwortet über HTTP und liefert ihre eigene Seite aus (${ANSWERS} Anfragen geprüft)"

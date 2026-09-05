@@ -456,8 +456,8 @@ enthalten, wonach wir gleich suchen.
 ⚠️ Die Array-Indizierung in ClickHouse beginnt bei eins, nicht bei null. Daher das `1 + …`.
 
 ```sql
-    ['Северная', 'Северная', 'Северная',
-     'Южная', 'Южная', 'Западная'][1 + cityHash64(number, 'entrance') % 6] AS entrance
+    ['Nord', 'Nord', 'Nord',
+     'Süd', 'Süd', 'West'][1 + cityHash64(number, 'entrance') % 6] AS entrance
 ```
 
 Derselbe Trick für eine ungleichmäßige Verteilung: der Nordeingang erhält die Hälfte des Stroms, der
@@ -888,7 +888,7 @@ Zeilenaktualisierung, sondern eine Änderung an der Tabelle.**
 ch <<'SQL'
 -- Wir ändern den Namen eines Gastes in einer Zeile. Der Befehl gibt die Kontrolle sofort zurück, aber die Arbeit
 -- endet damit nicht: ClickHouse stellt sie in eine Warteschlange und führt sie im Hintergrund aus.
-ALTER TABLE passes UPDATE guest_name = 'Иванов И. И.' WHERE pass_id = 424242
+ALTER TABLE passes UPDATE guest_name = 'Weber J.' WHERE pass_id = 424242
 SQL
 ```
 

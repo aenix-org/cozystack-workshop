@@ -11,7 +11,7 @@
 # über den er erreicht wird). apiVersion, kind und metadata.name werden weiter unten nicht kommentiert.
 #
 # Das Image wird vom öffentlichen Docker Hub bezogen, nicht aus deinem Harbor: Fortio ist nicht Teil
-# des Dienstes «Пропуск», sondern ein Messgerät, das nur vorübergehend im Cluster lebt.
+# des Dienstes «Gästeausweis», sondern ein Messgerät, das nur vorübergehend im Cluster lebt.
 apiVersion: apps/v1
 kind: Deployment
 metadata:

@@ -67,7 +67,7 @@ func envInt(key string, fallback int) int {
 		if n, err := strconv.Atoi(v); err == nil {
 			return n
 		}
-		log.Printf("значение %s=%q не число, беру %d", key, v, fallback)
+		log.Printf("%s=%q ist keine Zahl, verwende %d", key, v, fallback)
 	}
 	return fallback
 }
@@ -177,7 +177,7 @@ func (r *redisClient) readReplyLocked() (string, bool, error) {
 	}
 	line = strings.TrimRight(line, "\r\n")
 	if line == "" {
-		return "", false, errors.New("redis: пустой ответ")
+		return "", false, errors.New("redis: leere Antwort")
 	}
 	switch line[0] {
 	case '+', ':': // eine einfache Zeichenkette oder eine Zahl
@@ -198,7 +198,7 @@ func (r *redisClient) readReplyLocked() (string, bool, error) {
 		}
 		return string(buf[:n]), true, nil
 	default:
-		return "", false, fmt.Errorf("redis: непонятный ответ %q", line)
+		return "", false, fmt.Errorf("redis: unerwartete Antwort %q", line)
 	}
 }
 
@@ -227,13 +227,13 @@ type employee struct {
 
 // Die Daten sind erfunden. Es gibt keine echten Personaldaten in einem Schulungsstand, und es darf keine geben.
 var surnames = []string{
-	"Иванов И. И.", "Петрова А. С.", "Сидоров П. Н.", "Кузнецова М. В.",
-	"Смирнов Д. А.", "Попова Е. К.", "Волков С. Ю.", "Морозова Н. Г.",
+	"Weber J.", "Bergmann A.", "Sander P.", "Krüger M.",
+	"Schulz D.", "Pohl E.", "Wolf S.", "Winter N.",
 }
 
 var departments = []string{
-	"Служба безопасности", "Бухгалтерия", "Разработка",
-	"Логистика", "Отдел кадров", "Административный отдел",
+	"Sicherheitsdienst", "Buchhaltung", "Entwicklung",
+	"Logistik", "Personalabteilung", "Verwaltung",
 }
 
 // Die Daten sind erfunden, aber gleich für denselben Bezeichner:
@@ -262,7 +262,7 @@ func writeJSON(w http.ResponseWriter, code int, v any) {
 	enc := json.NewEncoder(w)
 	enc.SetEscapeHTML(false)
 	if err := enc.Encode(v); err != nil {
-		log.Printf("не удалось отдать ответ: %v", err)
+		log.Printf("Antwort konnte nicht gesendet werden: %v", err)
 	}
 }
 
@@ -285,7 +285,7 @@ func employeeID(r *http.Request) string {
 func main() {
 	mode := env("MODE", "api")
 	port := env("PORT", "8080")
-	pod := env("POD_NAME", "неизвестно")
+	pod := env("POD_NAME", "unbekannt")
 
 	mux := http.NewServeMux()
 	// /healthz existiert in beiden Rollen: hierher klopft die Readiness-Probe, die in den Manifesten beschrieben ist.
@@ -305,7 +305,7 @@ func main() {
 	case "api":
 		setupAPI(mux, pod)
 	default:
-		log.Fatalf("неизвестный MODE=%q, допустимы hr и api", mode)
+		log.Fatalf("unbekannter MODE=%q, zulässig sind hr und api", mode)
 	}
 
 	// ReadHeaderTimeout schließt die Verbindung, wenn ein Client eine Anfrage begonnen hat und verstummt ist. Ohne ihn
@@ -315,7 +315,7 @@ func main() {
 		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
-	log.Printf("режим %s, порт %s, под %s", mode, port, pod)
+	log.Printf("Modus %s, Port %s, Pod %s", mode, port, pod)
 	log.Fatal(srv.ListenAndServe())
 }
 
@@ -324,10 +324,10 @@ func main() {
 func setupHR(mux *http.ServeMux, pod string) {
 	delay, err := time.ParseDuration(env("HR_DELAY", "800ms"))
 	if err != nil {
-		log.Printf("HR_DELAY=%q не разобрался, беру 800ms", os.Getenv("HR_DELAY"))
+		log.Printf("HR_DELAY=%q konnte nicht verarbeitet werden, verwende 800ms", os.Getenv("HR_DELAY"))
 		delay = 800 * time.Millisecond
 	}
-	log.Printf("справочник отвечает за %s", delay)
+	log.Printf("Verzeichnis antwortet in %s", delay)
 
 	// Die einzige Adresse dieser Rolle. time.Sleep ist das ganze „Legacy-System": genau jene
 	// Hunderte von Millisekunden, um derentwillen in der Übung der Cache erscheint. Das Feld source in der Antwort
@@ -359,9 +359,9 @@ func setupAPI(mux *http.ServeMux, pod string) {
 	var cache *redisClient
 	if addr := os.Getenv("REDIS_ADDR"); addr != "" {
 		cache = &redisClient{addr: addr, password: os.Getenv("REDIS_PASSWORD")}
-		log.Printf("кеш включён: %s, срок жизни записи %d с", addr, ttl)
+		log.Printf("Cache aktiviert: %s, Lebensdauer des Eintrags %d s", addr, ttl)
 	} else {
-		log.Printf("кеш выключен: REDIS_ADDR не задан, каждый запрос пойдёт в справочник")
+		log.Printf("Cache deaktiviert: REDIS_ADDR ist nicht gesetzt, jede Anfrage geht ins Verzeichnis")
 	}
 
 	// Ein separater Client mit vergrößertem Verbindungspool: sonst würde unter Last
@@ -378,9 +378,9 @@ func setupAPI(mux *http.ServeMux, pod string) {
 			"service":   "passes-api",
 			"version":   version,
 			"pod":       pod,
-			"node":      env("NODE_NAME", "неизвестно"),
-			"namespace": env("POD_NAMESPACE", "неизвестно"),
-			"registry":  env("IMAGE_REGISTRY", "не указан"),
+			"node":      env("NODE_NAME", "unbekannt"),
+			"namespace": env("POD_NAMESPACE", "unbekannt"),
+			"registry":  env("IMAGE_REGISTRY", "nicht angegeben"),
 			"cache":     cacheMode(cache),
 			"cache_ttl": ttl,
 			"hr_url":    hrURL,
@@ -409,12 +409,12 @@ func setupAPI(mux *http.ServeMux, pod string) {
 			case err != nil:
 				// Der Cache ist nicht verfügbar — das ist kein Grund, dem Benutzer einen Fehler zurückzugeben.
 				// Wir gehen zum Verzeichnis: langsam, aber korrekt.
-				log.Printf("кеш недоступен (%v), иду в справочник", err)
+				log.Printf("Cache nicht verfügbar (%v), gehe ins Verzeichnis", err)
 			case found:
 				if json.Unmarshal([]byte(raw), &emp) == nil {
 					fromCache = true
 				} else {
-					log.Printf("в кеше по ключу %s лежит мусор, иду в справочник", key)
+					log.Printf("Cache enthält Müll für Schlüssel %s, gehe ins Verzeichnis", key)
 				}
 			}
 		}
@@ -426,9 +426,9 @@ func setupAPI(mux *http.ServeMux, pod string) {
 		if !fromCache {
 			fetched, err := fetchEmployee(hrClient, hrURL, id)
 			if err != nil {
-				log.Printf("справочник не ответил: %v", err)
+				log.Printf("Verzeichnis hat nicht geantwortet: %v", err)
 				writeJSON(w, http.StatusBadGateway, map[string]any{
-					"error": "справочник сотрудников недоступен",
+					"error": "Mitarbeiterverzeichnis ist nicht verfügbar",
 					"pod":   pod,
 				})
 				return
@@ -437,7 +437,7 @@ func setupAPI(mux *http.ServeMux, pod string) {
 			if cache != nil {
 				if b, err := json.Marshal(emp); err == nil {
 					if err := cache.SetTTL(key, string(b), ttl); err != nil {
-						log.Printf("не удалось положить в кеш: %v", err)
+						log.Printf("Ablegen in den Cache fehlgeschlagen: %v", err)
 					}
 				}
 			}
@@ -478,7 +478,7 @@ func fetchEmployee(c *http.Client, base, id string) (employee, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return employee{}, fmt.Errorf("справочник ответил %s", resp.Status)
+		return employee{}, fmt.Errorf("Verzeichnis hat geantwortet %s", resp.Status)
 	}
 	var emp employee
 	if err := json.NewDecoder(resp.Body).Decode(&emp); err != nil {

@@ -50,21 +50,21 @@ SELECT
     ) AS created_at,
     -- Der Gastname ist für jede Zeile eindeutig: eine Million verschiedene Werte in einer einzigen Spalte.
     -- Etwas weiter in der Lab wird sich zeigen, dass dies auf der Festplatte die schwerste Spalte ist.
-    concat('Гость № ', toString(number)) AS guest_name,
+    concat('Gast Nr. ', toString(number)) AS guest_name,
     -- Die Abteilung des empfangenden Mitarbeiters: fünf Werte, gleichmäßig verteilt.
-    ['Продажи', 'Разработка', 'Бухгалтерия',
-     'Кадры', 'Логистика'][1 + cityHash64(number, 'dept') % 5] AS host_dept,
-    -- Der Eingang. Derselbe Trick, aber die Verteilung ist ungleichmäßig: „Северная" nimmt
-    -- drei Zellen von sechs ein und erhält die Hälfte des Stroms, „Южная" ein Drittel, „Западная"
+    ['Vertrieb', 'Entwicklung', 'Buchhaltung',
+     'Personal', 'Logistik'][1 + cityHash64(number, 'dept') % 5] AS host_dept,
+    -- Der Eingang. Derselbe Trick, aber die Verteilung ist ungleichmäßig: „Nord" nimmt
+    -- drei Zellen von sechs ein und erhält die Hälfte des Stroms, „Süd" ein Drittel, „West"
     -- den Rest. Gleichmäßige Daten wirken in einem Bericht unglaubwürdig und zeigen
     -- nichts.
-    ['Северная', 'Северная', 'Северная',
-     'Южная', 'Южная', 'Западная'][1 + cityHash64(number, 'entrance') % 6] AS entrance,
+    ['Nord', 'Nord', 'Nord',
+     'Süd', 'Süd', 'West'][1 + cityHash64(number, 'entrance') % 6] AS entrance,
     -- Ausweistyp: sechs Zellen von zehn gehen an den Einmal-Ausweis, je zwei an den Wochen-,
     -- je einer an den Fahrzeug- und den Gruppen-Ausweis — so sieht es am Eingang aus.
-    ['разовый', 'разовый', 'разовый', 'разовый', 'разовый', 'разовый',
-     'недельный', 'недельный',
-     'автомобильный', 'групповой'][1 + cityHash64(number, 'type') % 10] AS pass_type,
+    ['Einmalausweis', 'Einmalausweis', 'Einmalausweis', 'Einmalausweis', 'Einmalausweis', 'Einmalausweis',
+     'Wochenausweis', 'Wochenausweis',
+     'Fahrzeugausweis', 'Gruppenausweis'][1 + cityHash64(number, 'type') % 10] AS pass_type,
     -- Besuchsdauer von 30 bis 329 Minuten. toUInt16 wird benötigt, weil die Spalte
     -- als UInt16 deklariert ist, das Ergebnis der Arithmetik aber breiter ist und sich nicht selbst verengt.
     toUInt16(30 + cityHash64(number, 'duration') % 300) AS duration_min

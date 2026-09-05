@@ -1,4 +1,4 @@
-# Lab 7 · Build-Rezept für das Image des Dienstes «Пропуск», Version v2.
+# Lab 7 · Build-Rezept für das Image des Dienstes «Gästeausweis», Version v2.
 #
 # Ein Dockerfile ist eine Liste von Schritten, aus denen aus dem Quellcode ein Image entsteht: ein
 # unveränderlicher Abzug des Dateisystems zusammen mit dem Startbefehl. Die naheliegendste bekannte
