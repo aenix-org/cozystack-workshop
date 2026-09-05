@@ -5,9 +5,11 @@ understand **Cozystack** — not from slides, but with their hands on a real
 cluster. Kubernetes knowledge is not required: everything is explained along the
 way, through what you already know from vSphere.
 
-This repository holds the workshop in **several languages**. The content is the
-same everywhere; only the prose is translated. Commands, manifests, scripts and
-technical terms are identical across languages.
+This repository holds the workshop in **several languages**. Every language is a
+fully localized experience — the prose, the on-screen output, and the demo
+applications' data and interface all read natively — while the executable content
+(commands, manifests, code) stays byte-identical, so a lab runs the same in every
+language.
 
 ## Languages
 
@@ -56,22 +58,28 @@ At the root of each language:
 - `REQUIREMENTS.md` — what a venue needs to run the workshop
 - `demo/` — a small demo the host can run
 
-## What gets translated, and what does not
+## What is localized, and what stays identical
 
-Translated: prose only — every `README.md`, the `chat/*.md` messages,
-`CONVENTIONS.md`, `REQUIREMENTS.md`, and the human-language **comments inside
-code blocks** (a `# …` in a bash block is teaching, so it is translated).
+Localized into every language: all prose (each `README.md`, the `chat/*.md`
+messages, `CONVENTIONS.md`, `REQUIREMENTS.md`), the human-language **comments**
+inside the shipped manifests, scripts and code, the **on-screen output** of each
+`check.sh`, and the **demo applications' content** — the guest-pass sample data,
+the text the apps print and render, and the reader-facing interface. Each
+language uses one canonical demo dataset (native names, departments, entrances,
+pass types), so a lab's seed data, its queries, its `check.sh` and the
+surrounding prose all agree.
 
-Never translated: commands, code, YAML manifests, file and directory names,
-command output, the demo apps' data and UI strings, and the technical terms
-fixed in [`GLOSSARY.md`](GLOSSARY.md). A lab must run identically in every
-language — the executable content of every code block is byte-identical across
-languages.
+Kept byte-identical across every language, so a lab runs the same everywhere:
+commands, code, YAML keys and identifiers, control flow, file and directory
+names, format specifiers, exit codes, the strings a `check.sh` matches against
+program output, and the functional fill-in placeholders. The executable content
+of every code block is identical across languages, and the technical terms fixed
+in [`GLOSSARY.md`](GLOSSARY.md) are kept verbatim.
 
-The shipped assets under `scripts/`, `manifests/` and each lab's `check.sh`
-are the Russian originals in every language tree (their in-file comments and
-`check.sh` on-screen output are not yet localized); the labs run the same in
-all languages, and the prose that surrounds them is fully translated.
+Real-world markers are deliberately neutral: the sample scenario carries no
+country-specific car plates, vehicle brands or email domains — each is rendered
+in a form natural to the language (or a neutral one), including in the Russian
+source.
 
 ## How the translations were made
 
@@ -90,8 +98,10 @@ Licensed under the [Apache License, Version 2.0](LICENSE). See [`NOTICE`](NOTICE
 ## Contributing a fix or a translation
 
 1. Edit the **Russian** source under `ru/` (that is where meaning is decided).
-2. Re-generate or hand-carry the change into `en/`, then into `zh/` and `es/`.
+2. Re-generate or hand-carry the change into `en/` (the pivot), then into the
+   other language trees.
 3. Keep terminology in line with [`GLOSSARY.md`](GLOSSARY.md) and the voice in
    [`STYLE.md`](STYLE.md).
-4. Never let the code diverge between languages — if you change a manifest or a
-   script, copy it verbatim into every language.
+4. Never let the executable content diverge between languages — if you change a
+   manifest or a script's code, copy it verbatim into every language; only prose,
+   comments, on-screen output and demo content are localized per language.
