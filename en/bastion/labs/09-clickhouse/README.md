@@ -447,8 +447,8 @@ asked us to find, and it's good when the test data contains what we're about to 
 ⚠️ Array indexing in ClickHouse starts at one, not zero. Hence the `1 + …`.
 
 ```sql
-    ['Северная', 'Северная', 'Северная',
-     'Южная', 'Южная', 'Западная'][1 + cityHash64(number, 'entrance') % 6] AS entrance
+    ['North', 'North', 'North',
+     'South', 'South', 'West'][1 + cityHash64(number, 'entrance') % 6] AS entrance
 ```
 
 The same trick for an uneven distribution: the north entrance gets half the flow, the south a
@@ -868,7 +868,7 @@ table.**
 ch <<'SQL'
 -- We change a guest's name in one row. The command returns control immediately, but the work
 -- doesn't end there: ClickHouse will queue it and carry it out in the background.
-ALTER TABLE passes UPDATE guest_name = 'Иванов И. И.' WHERE pass_id = 424242
+ALTER TABLE passes UPDATE guest_name = 'Whitfield J.' WHERE pass_id = 424242
 SQL
 ```
 

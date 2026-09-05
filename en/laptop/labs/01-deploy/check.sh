@@ -116,7 +116,7 @@ fi
 BODY="$(in_cluster_curl_many 'http://rickroll/' 8)"
 # The marker must appear EXACTLY ONCE per page, otherwise the response counter lies:
 # "Never Gonna Give You Up" is in both <title> and <h1>, and that caused a doubling.
-ANSWERS="$(printf '%s' "$BODY" | grep -c 'вас обслужил под')"
+ANSWERS="$(printf '%s' "$BODY" | grep -c 'served by pod')"
 TOTAL_LINES="$(printf '%s' "$BODY" | grep -c '<title>')"
 if [ "${ANSWERS:-0}" -ge 1 ] && [ "${ANSWERS:-0}" -eq "${TOTAL_LINES:-0}" ]; then
   ok "application responds over HTTP and serves its own page (${ANSWERS} requests verified)"

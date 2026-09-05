@@ -1,4 +1,4 @@
-# Lab 7 · build recipe for the «Пропуск» service image, version v2.
+# Lab 7 · build recipe for the «Guest Pass» service image, version v2.
 #
 # A Dockerfile is a list of steps that turn sources into an image: an immutable
 # snapshot of a filesystem together with a startup command. The closest familiar analogy is
@@ -6,8 +6,8 @@
 # in a registry and is versioned by a tag.
 #
 # It is built on the laptop, not in the cluster (see the build step in the README):
-#   docker build --platform linux/amd64 -t <ваш-harbor>/passes/passes-api:v2 app/
-#   docker push  <ваш-harbor>/passes/passes-api:v2
+#   docker build --platform linux/amd64 -t <your-harbor>/passes/passes-api:v2 app/
+#   docker push  <your-harbor>/passes/passes-api:v2
 #
 # --platform linux/amd64 is mandatory on a Mac with Apple Silicon: without it the image will be built
 # for ARM, will push without a single complaint, and will crash in the cluster with «exec format error».

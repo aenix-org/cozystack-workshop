@@ -252,7 +252,7 @@ description.
 The source code lives there for the same reason: the build needs files, and there's no point
 setting up a network disk for six text files.
 
-The app does one thing: it displays the line «Заказать пропуск для гостя». That's enough,
+The app does one thing: it displays the line «Request a guest pass». That's enough,
 because the lab isn't about Android but about where it gets built.
 
 **An APK** is what comes out at the end. It's an archive containing the compiled application,
@@ -645,9 +645,9 @@ kubectl logs -f job/propusk-build
 
 | Log marker | Roughly when |
 |---|---|
-| `== 1/5 ставлю Android command-line tools ==` | immediately |
-| `== 2/5 принимаю лицензии и качаю SDK (самый долгий шаг) ==` | +1–2 minutes, and hangs the longest |
-| `== 3/5 собираю APK ==` | +5–15 minutes from the start |
+| `== 1/5 installing Android command-line tools ==` | immediately |
+| `== 2/5 accepting licenses and downloading the SDK (the longest step) ==` | +1–2 minutes, and hangs the longest |
+| `== 3/5 building the APK ==` | +5–15 minutes from the start |
 | `BUILD SUCCESSFUL in ...` | +10–25 minutes from the start |
 | `APK-UPLOADED bucket-.../propusk/propusk-...apk` | right after it |
 

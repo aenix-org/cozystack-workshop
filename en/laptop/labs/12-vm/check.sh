@@ -59,7 +59,7 @@ BODY="$(curl -s --max-time 10 "$URL" 2>/dev/null)"
 case "$CODE" in
   200)
     case "$BODY" in
-      *"Справочник сотрудников"*)
+      *"Staff directory"*)
         ok "directory published: ${URL} responds 200 and serves the directory page"
         evidence "Response over the domain" "request: ${URL}
 response code: ${CODE}

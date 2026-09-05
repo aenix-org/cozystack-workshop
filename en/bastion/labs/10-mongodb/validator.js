@@ -3,7 +3,7 @@
 // A program for mongosh — the MongoDB shell. It runs on the VM,
 // in the lab cluster, with the short command `mo` from the README:
 //     cd labs/10-mongodb && mo < validator.js
-// In response you will see the line «правило установлено».
+// In response you will see the line «rule installed».
 //
 // What a validation schema is. By default a collection has no schema: the database accepts
 // a document of any shape and silently stores a typo in a field name («tipe» instead of «type») —
@@ -43,14 +43,14 @@ db.runCommand({
         // The pass type — only one of the four listed values. A fifth type
         // will require changing this rule, and that is good: the change will become deliberate.
         type: {
-          enum: ["разовый", "недельный", "автомобильный", "групповой"],
-          description: "тип пропуска, только из списка"
+          enum: ["single-use", "weekly", "vehicle", "group"],
+          description: "pass type, only from the list"
         },
         // Which employee ordered the pass. The field is required, and it must be
         // a string.
         host: {
           bsonType: "string",
-          description: "кто из сотрудников заказал"
+          description: "which employee placed the order"
         },
         // guest is in properties, but not in required: if the field is present in the document,
         // it must be a string; if it is absent — the document is still valid.
@@ -60,7 +60,7 @@ db.runCommand({
         // Rules work inside nested objects too. There is no car field — no
         // requirements. If there is one — it must be an object, and the car plate in it
         // is required, while the trailer, if specified, — is a boolean value, not the string
-        // «нет».
+        // «no».
         car: {
           bsonType: "object",
           required: ["plate"],
@@ -101,4 +101,4 @@ db.runCommand({
 
 // runCommand replies with an object in which success looks like { ok: 1 }. We print
 // our own line so that the result of applying the file reads at a glance.
-print("правило установлено");
+print("rule installed");

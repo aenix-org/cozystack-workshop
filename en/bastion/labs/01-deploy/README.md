@@ -132,7 +132,7 @@ metadata:
   name: rickroll-page-v1
 data:
   index.html: |
-    ...<div class="pod">вас обслужил под<b>__POD__</b></div>...
+    ...<div class="pod">served by pod<b>__POD__</b></div>...
 ```
 
 That same `__POD__` that nginx will substitute. The `-v1` in the name is no accident: in the

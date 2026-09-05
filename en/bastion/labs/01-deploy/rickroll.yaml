@@ -76,8 +76,8 @@ data:
     </style>
     <h1>Never Gonna Give You Up</h1>
     <p class="lyr">Never gonna let you down &middot; Never gonna run around and desert you</p>
-    <div class="pod">вас обслужил под<b>__POD__</b></div>
-    <p class="hint">Обновите страницу. Когда реплик станет больше — имя начнёт меняться.</p>
+    <div class="pod">served by pod<b>__POD__</b></div>
+    <p class="hint">Refresh the page. Once there are more replicas, the name will start changing.</p>
     </html>
 ---
 # The application itself. A Deployment describes the desired state — which image to run,

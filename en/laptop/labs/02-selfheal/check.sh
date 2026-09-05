@@ -154,7 +154,7 @@ else
   elif kubectl get pod "$SERVED" >/dev/null 2>&1; then
     ok "the Service serves a page, it was served by the live replica ${SERVED}"
     evidence "Service response (fragment)" \
-      "$(printf '%s' "$BODY" | grep -o "вас обслужил под<b>${APP}-[a-z0-9-]*</b>" | head -1)"
+      "$(printf '%s' "$BODY" | grep -o "served by pod<b>${APP}-[a-z0-9-]*</b>" | head -1)"
   else
     fail "the page was served by replica ${SERVED}, but there is no such pod in the cluster anymore" \
          "wait ten seconds or so and run the check again — the replica was probably changing right now"

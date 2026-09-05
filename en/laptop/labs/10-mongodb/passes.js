@@ -24,12 +24,12 @@ db.passes.insertMany([
     // BSON format, where a value has a type: date, integer, float, boolean.
     // A date can be compared and sorted; the string "2026-09-01" only if you are
     // lucky with how it was written.
-    type: "разовый",
-    guest: "Иванов Иван Иванович",
-    host: "petrov@corp.ru",
-    entrance: "Северная",
+    type: "single-use",
+    guest: "James P. Whitfield",
+    host: "petrov@corp.example",
+    entrance: "North",
     valid_on: ISODate("2026-09-01T09:00:00Z"),
-    purpose: "собеседование"
+    purpose: "job interview"
   },
   {
     // A weekly pass. Instead of valid_on there is a pair valid_from and valid_to, and
@@ -39,27 +39,27 @@ db.passes.insertMany([
     // A badge_returned field has appeared, which the single-visit pass does not have
     // at all: not NULL and not empty, but simply no such field in that document. These
     // are different things, and they are searched for differently.
-    type: "недельный",
-    guest: "Сидорова Анна Петровна",
-    host: "petrov@corp.ru",
-    entrances: ["Северная", "Южная"],
+    type: "weekly",
+    guest: "Emma L. Prescott",
+    host: "petrov@corp.example",
+    entrances: ["North", "South"],
     valid_from: ISODate("2026-09-01T00:00:00Z"),
     valid_to: ISODate("2026-09-07T23:59:59Z"),
-    purpose: "внешний аудит",
+    purpose: "external audit",
     badge_returned: false
   },
   {
     // A vehicle pass. Everything related to the car lives inside a single field car.
     // This is not a string with JSON inside, but a full nested structure: you can
     // search by car.plate and build an index on it.
-    type: "автомобильный",
-    guest: "Кузнецов Виктор Сергеевич",
-    host: "logistics@corp.ru",
-    entrance: "Западная",
+    type: "vehicle",
+    guest: "Victor S. Marsh",
+    host: "logistics@corp.example",
+    entrance: "West",
     valid_on: ISODate("2026-09-02T07:30:00Z"),
     car: {
-      plate: "А123ВС174",
-      model: "ГАЗель Next",
+      plate: "AB-1174-CD",
+      model: "Ford Transit",
       trailer: false,
       weight_kg: 3500
     },
@@ -73,17 +73,17 @@ db.passes.insertMany([
     // others not by one field but in essence. This will echo later in the lab: the
     // document validation rule will not be able to require guest from everyone,
     // otherwise a legitimate group pass would not pass.
-    type: "групповой",
-    organization: "Гимназия № 1",
-    contact: "Смирнова Ольга Владимировна",
-    host: "hr@corp.ru",
-    entrance: "Северная",
+    type: "group",
+    organization: "City High School No. 1",
+    contact: "Olivia W. Grant",
+    host: "hr@corp.example",
+    entrance: "North",
     valid_on: ISODate("2026-09-03T10:00:00Z"),
-    escort: "Петров Алексей Алексеевич",
+    escort: "Alan A. Foster",
     members: [
-      { name: "Орлов Пётр", age: 16 },
-      { name: "Волкова Мария", age: 15 },
-      { name: "Зайцев Илья", age: 17 }
+      { name: "Peter Hale", age: 16 },
+      { name: "Mary Fenwick", age: 15 },
+      { name: "Isaac Hart", age: 17 }
     ]
   }
 ]);
@@ -92,4 +92,4 @@ db.passes.insertMany([
 // means "all". The print is needed so the file has a visible result: insertMany itself
 // replies with a list of issued identifiers, and in it you can easily miss how many
 // documents actually landed.
-print("документов в коллекции: " + db.passes.countDocuments({}));
+print("documents in collection: " + db.passes.countDocuments({}));

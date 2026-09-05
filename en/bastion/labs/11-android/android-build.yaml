@@ -67,7 +67,7 @@ data:
     CMDLINE_TOOLS_URL="https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"
     MC_URL="https://dl.min.io/client/mc/release/linux-amd64/mc"
 
-    echo "== 1/5 ставлю Android command-line tools =="
+    echo "== 1/5 installing Android command-line tools =="
     mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
     cd "$ANDROID_SDK_ROOT/cmdline-tools"
     curl -fsSL -o tools.zip "$CMDLINE_TOOLS_URL"
@@ -77,7 +77,7 @@ data:
     mv cmdline-tools latest
     export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
 
-    echo "== 2/5 принимаю лицензии и качаю SDK (самый долгий шаг) =="
+    echo "== 2/5 accepting licenses and downloading the SDK (the longest step) =="
     # `yes` receives SIGPIPE when sdkmanager closes its input, and returns
     # a non-zero code. With set -o pipefail this would fail the build for no reason,
     # so the return code is suppressed deliberately. If the licenses really
@@ -86,7 +86,7 @@ data:
     sdkmanager --sdk_root="$ANDROID_SDK_ROOT" \
       "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
-    echo "== 3/5 собираю APK =="
+    echo "== 3/5 building the APK =="
     # The ConfigMap is mounted read-only, and Gradle writes next to the sources,
     # so the tree is first copied onto the disk.
     # -L dereferences symbolic links: the ConfigMap is mounted not as files
@@ -100,7 +100,7 @@ data:
     APK="$WORK/project/app/build/outputs/apk/debug/app-debug.apk"
     ls -l "$APK"
 
-    echo "== 4/5 ставлю клиент S3 =="
+    echo "== 4/5 installing the S3 client =="
     # We put the client in the working folder, NOT in /usr/local/bin. The pod runs as an
     # unprivileged user, and the image's system folders belong to root:
     # writing there would end in Permission denied — and right here, on the fourth step,
@@ -112,7 +112,7 @@ data:
     # we can just write `mc` instead of the full path.
     export PATH="$WORK/bin:$PATH"
 
-    echo "== 5/5 кладу APK в бакет =="
+    echo "== 5/5 uploading the APK to the bucket =="
     # The variables accessKey/secretKey/endpoint/bucketName come from the Secret
     # via envFrom. We suppress the output of alias set: no need for it to print anything to the log.
     # For the same reason there is no set -x in the script — it would print the keys.

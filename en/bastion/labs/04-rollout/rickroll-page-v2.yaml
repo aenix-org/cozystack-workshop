@@ -30,7 +30,7 @@ data:
   # that will end up inside the container. This is no longer YAML: there are no comments here
   # and there can be none — a hash would land on the page as ordinary text.
   #
-  # Two things in the markup matter to check.sh: the label «ВЕРСИЯ 2» —
+  # Two things in the markup matter to check.sh: the label «VERSION 2» —
   # by it the check tells the second version from the first, and the placeholder __POD__ — it is
   # replaced with the nginx pod name by the rule from the ConfigMap rickroll-conf (lab 1).
   # Remove either of them and the lab check will not pass, even though the rollout will succeed.
@@ -56,9 +56,9 @@ data:
       .pod b{display:block;margin-top:.4em;color:#00ffa3;font-size:1.35em;word-break:break-all}
       .hint{margin-top:3em;color:#3f5561;font-size:14px}
     </style>
-    <div class="tag">ВЕРСИЯ 2</div>
+    <div class="tag">VERSION 2</div>
     <h1>We're No Strangers To Love</h1>
     <p class="lyr">You know the rules &middot; And so do I</p>
-    <div class="pod">вас обслужил под<b>__POD__</b></div>
-    <p class="hint">Обновление прошло под нагрузкой. Посмотрите в Fortio: ошибок ноль.</p>
+    <div class="pod">served by pod<b>__POD__</b></div>
+    <p class="hint">The update rolled out under load. Check Fortio: zero errors.</p>
     </html>

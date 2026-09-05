@@ -18,7 +18,7 @@ nano convert.sh
 ```
 
 **Now those three values you jotted down in step 1 come in handy.** Near the top of the
-file there's a block labeled «ВСТАВЬТЕ СВОИ ЗНАЧЕНИЯ» — replace the placeholders in it with your
+file there's a block labeled «PASTE YOUR VALUES» — replace the placeholders in it with your
 own, leaving the quotes in place:
 
 ```

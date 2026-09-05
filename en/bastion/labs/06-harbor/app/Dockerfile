@@ -1,4 +1,4 @@
-# Lab 6 · Your own private image registry. Build recipe for the «Пропуск» service image.
+# Lab 6 · Your own private image registry. Build recipe for the «Guest Pass» service image.
 #
 # What a Dockerfile is: a step-by-step recipe that turns sources into an image —
 # a ready-to-run filesystem snapshot together with instructions on what to run inside it.

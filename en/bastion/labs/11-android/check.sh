@@ -156,7 +156,7 @@ completed: ${DURATION:-unknown}"
     if [ -n "$UPLOADED" ]; then
       ok "the APK went to the bucket: ${UPLOADED}"
       evidence "Bucket contents after the build" \
-        "$(printf '%s' "$LOGS" | sed -n '/5\/5 кладу APK в бакет/,$p' | grep -v '^APK-UPLOADED ' | head -20)"
+        "$(printf '%s' "$LOGS" | sed -n '/5\/5 uploading the APK to the bucket/,$p' | grep -v '^APK-UPLOADED ' | head -20)"
     else
       fail "the APK was built, but did not go to the bucket" \
            "look at the tail of the log: kubectl logs job/${JOB} --tail=20; most often bucketName is to blame — it needs the long name from the dashboard, not 'builds'"

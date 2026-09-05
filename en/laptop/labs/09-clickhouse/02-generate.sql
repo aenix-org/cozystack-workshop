@@ -50,21 +50,21 @@ SELECT
     ) AS created_at,
     -- The guest name is unique to each row: a million different values in a single column.
     -- A bit further into the lab it will be clear that on disk this is the heaviest column.
-    concat('Гость № ', toString(number)) AS guest_name,
+    concat('Guest No. ', toString(number)) AS guest_name,
     -- The host employee's department: five values, distributed equally.
-    ['Продажи', 'Разработка', 'Бухгалтерия',
-     'Кадры', 'Логистика'][1 + cityHash64(number, 'dept') % 5] AS host_dept,
-    -- The entrance. The same trick, but the distribution is uneven: "Северная" takes
-    -- three cells out of six and gets half the flow, "Южная" a third, "Западная"
+    ['Sales', 'Engineering', 'Accounting',
+     'HR', 'Logistics'][1 + cityHash64(number, 'dept') % 5] AS host_dept,
+    -- The entrance. The same trick, but the distribution is uneven: "North" takes
+    -- three cells out of six and gets half the flow, "South" a third, "West"
     -- the rest. Uniform data looks implausible in a report and shows
     -- nothing.
-    ['Северная', 'Северная', 'Северная',
-     'Южная', 'Южная', 'Западная'][1 + cityHash64(number, 'entrance') % 6] AS entrance,
+    ['North', 'North', 'North',
+     'South', 'South', 'West'][1 + cityHash64(number, 'entrance') % 6] AS entrance,
     -- Pass type: six cells out of ten go to single-use, two each to weekly,
     -- one each to vehicle and group — that is how it looks at the entrance.
-    ['разовый', 'разовый', 'разовый', 'разовый', 'разовый', 'разовый',
-     'недельный', 'недельный',
-     'автомобильный', 'групповой'][1 + cityHash64(number, 'type') % 10] AS pass_type,
+    ['single-use', 'single-use', 'single-use', 'single-use', 'single-use', 'single-use',
+     'weekly', 'weekly',
+     'vehicle', 'group'][1 + cityHash64(number, 'type') % 10] AS pass_type,
     -- Visit duration from 30 to 329 minutes. toUInt16 is needed because the column
     -- is declared as UInt16, while the result of the arithmetic is wider and will not narrow itself.
     toUInt16(30 + cityHash64(number, 'duration') % 300) AS duration_min

@@ -49,7 +49,7 @@ ENGINE = MergeTree
 --
 -- From the familiar world: the same decision as in a paper archive — sort the passes
 -- by date or by surname. Sorted by date, the March folder is pulled instantly, while a
--- particular Иванов is found by scanning. And nobody is going to re-sort a million
+-- particular Smith is found by scanning. And nobody is going to re-sort a million
 -- sheets of paper after the fact.
 --
 -- There is no PARTITION BY in the file, deliberately. A partition is a separate set of parts

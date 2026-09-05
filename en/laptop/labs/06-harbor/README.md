@@ -237,8 +237,8 @@ How does the application know its own name, node and namespace? It **doesn't fin
 The cluster puts them there at launch, into environment variables:
 
 ```go
-Pod:  env("POD_NAME", "неизвестно"),
-Node: env("NODE_NAME", "неизвестно"),
+Pod:  env("POD_NAME", "unknown"),
+Node: env("NODE_NAME", "unknown"),
 ```
 
 And the manifest says what to put there:

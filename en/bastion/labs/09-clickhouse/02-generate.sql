@@ -50,21 +50,21 @@ SELECT
     ) AS created_at,
     -- Each row has its own guest name: a million different values in one column.
     -- A bit later in the lab you'll see that on disk this is the heaviest column.
-    concat('Гость № ', toString(number)) AS guest_name,
+    concat('Guest No. ', toString(number)) AS guest_name,
     -- The host employee's department: five values, distributed evenly.
-    ['Продажи', 'Разработка', 'Бухгалтерия',
-     'Кадры', 'Логистика'][1 + cityHash64(number, 'dept') % 5] AS host_dept,
-    -- Entry gate. The same trick, but the distribution is uneven: «Северная» takes
-    -- three cells out of six and gets half the flow, «Южная» a third, «Западная» the
+    ['Sales', 'Engineering', 'Accounting',
+     'HR', 'Logistics'][1 + cityHash64(number, 'dept') % 5] AS host_dept,
+    -- Entry gate. The same trick, but the distribution is uneven: «North» takes
+    -- three cells out of six and gets half the flow, «South» a third, «West» the
     -- remainder. Evenly distributed data looks implausible in a report and shows
     -- nothing.
-    ['Северная', 'Северная', 'Северная',
-     'Южная', 'Южная', 'Западная'][1 + cityHash64(number, 'entrance') % 6] AS entrance,
-    -- Pass type: six cells out of ten go to «разовый», two to «недельный»,
-    -- one each to «автомобильный» and «групповой» — that's how it looks at the gate.
-    ['разовый', 'разовый', 'разовый', 'разовый', 'разовый', 'разовый',
-     'недельный', 'недельный',
-     'автомобильный', 'групповой'][1 + cityHash64(number, 'type') % 10] AS pass_type,
+    ['North', 'North', 'North',
+     'South', 'South', 'West'][1 + cityHash64(number, 'entrance') % 6] AS entrance,
+    -- Pass type: six cells out of ten go to «single-use», two to «weekly»,
+    -- one each to «vehicle» and «group» — that's how it looks at the gate.
+    ['single-use', 'single-use', 'single-use', 'single-use', 'single-use', 'single-use',
+     'weekly', 'weekly',
+     'vehicle', 'group'][1 + cityHash64(number, 'type') % 10] AS pass_type,
     -- Visit duration from 30 to 329 minutes. toUInt16 is needed because the column
     -- is declared as UInt16, while the arithmetic result is wider and won't narrow itself.
     toUInt16(30 + cityHash64(number, 'duration') % 300) AS duration_min

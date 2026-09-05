@@ -95,13 +95,13 @@ metadata:
 data:
   index.html: |
     ...
-    <div class="tag">ВЕРСИЯ 2</div>
+    <div class="tag">VERSION 2</div>
     <h1>We're No Strangers To Love</h1>
     ...
-    <div class="pod">вас обслужил под<b>__POD__</b></div>
+    <div class="pod">served by pod<b>__POD__</b></div>
 ```
 
-Inside is a single page: a different heading, a different color scheme, a conspicuous "ВЕРСИЯ 2" badge. The differences are made deliberately eye-catching — you'll be looking at the browser, not at a diff.
+Inside is a single page: a different heading, a different color scheme, a conspicuous "VERSION 2" badge. The differences are made deliberately eye-catching — you'll be looking at the browser, not at a diff.
 
 Note two things.
 
@@ -327,7 +327,7 @@ Open a tunnel to the application:
 kubectl port-forward svc/rickroll 8080:80
 ```
 
-📍 **In the browser** <http://localhost:8080> — the green page with the "ВЕРСИЯ 2" badge. Refresh it a few times: the copy's name at the bottom changes, because the Service distributes the requests across the three copies.
+📍 **In the browser** <http://localhost:8080> — the green page with the "VERSION 2" badge. Refresh it a few times: the copy's name at the bottom changes, because the Service distributes the requests across the three copies.
 
 Close the tunnel (`Ctrl+C`).
 

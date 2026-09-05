@@ -154,7 +154,7 @@ else
   # We detect both versions POSITIVELY, each by its own marker. The "if not v2, then
   # v1" branch counted anything as the first version: the default nginx page, a 404, someone else's
   # application, garbage — verified, on garbage the script would print "LAB PASSED".
-  if printf '%s' "$BODY" | grep -q 'ВЕРСИЯ 2'; then
+  if printf '%s' "$BODY" | grep -q 'VERSION 2'; then
     SERVED_VER="rickroll-page-v2"
   elif printf '%s' "$BODY" | grep -q 'Never Gonna Give You Up'; then
     SERVED_VER="rickroll-page-v1"
@@ -187,7 +187,7 @@ else
 
   evidence "Served page (fragment)" \
     "$(printf '%s' "$BODY" | grep -o '<h1>[^<]*</h1>' | head -1)
-$(printf '%s' "$BODY" | grep -o "вас обслужил под<b>${APP}-[a-z0-9-]*</b>" | head -1)"
+$(printf '%s' "$BODY" | grep -o "served by pod<b>${APP}-[a-z0-9-]*</b>" | head -1)"
 fi
 
 # --- readiness for the next labs ------------------------------------------

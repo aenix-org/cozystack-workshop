@@ -163,10 +163,10 @@ PODS="$(kget pods -n "$NS_APP" -l app=passes --no-headers)"
 PODS_READY="$(printf '%s' "$PODS" | awk '$3=="Running"' | grep -c .)"
 BODY="$(in_cluster_curl "http://passes.${NS_APP}.svc.cluster.local/")"
 
-if printf '%s' "$BODY" | grep -q 'Пропуск'; then
-  ok "the «Пропуск» service responds over HTTP inside the cluster (running replicas: ${PODS_READY})"
+if printf '%s' "$BODY" | grep -q 'Guest Pass'; then
+  ok "the «Guest Pass» service responds over HTTP inside the cluster (running replicas: ${PODS_READY})"
 else
-  fail "the «Пропуск» service does not respond at passes.${NS_APP}.svc.cluster.local" \
+  fail "the «Guest Pass» service does not respond at passes.${NS_APP}.svc.cluster.local" \
        "check kubectl get pods -n ${NS_APP} and kubectl logs -n ${NS_APP} deploy/passes"
 fi
 

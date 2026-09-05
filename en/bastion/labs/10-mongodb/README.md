@@ -380,7 +380,7 @@ cd labs/10-mongodb
 mo < passes.js
 ```
 
-**What you should see** — `документов в коллекции: 4`.
+**What you should see** — `documents in collection: 4`.
 
 <details>
 <summary><b>Walking through what we put in</b></summary>
@@ -395,12 +395,12 @@ Now to the documents.
 
 ```js
   {
-    type: "разовый",
-    guest: "Иванов Иван Иванович",
-    host: "petrov@corp.ru",
-    entrance: "Северная",
+    type: "single-use",
+    guest: "James P. Whitfield",
+    host: "petrov@corp.example",
+    entrance: "North",
     valid_on: ISODate("2026-09-01T09:00:00Z"),
-    purpose: "собеседование"
+    purpose: "job interview"
   }
 ```
 
@@ -415,7 +415,7 @@ the string `"2026-09-01"` only if you're lucky with the way it was written.
 instead of a single entrance, `entrances` is now **a list**:
 
 ```js
-    entrances: ["Северная", "Южная"],
+    entrances: ["North", "South"],
     badge_returned: false
 ```
 
@@ -430,8 +430,8 @@ differently.
 
 ```js
     car: {
-      plate: "А123ВС174",
-      model: "ГАЗель Next",
+      plate: "AB-1174-CD",
+      model: "Ford Transit",
       trailer: false,
       weight_kg: 3500
     },
@@ -445,9 +445,9 @@ on it.
 
 ```js
     members: [
-      { name: "Орлов Пётр", age: 16 },
-      { name: "Волкова Мария", age: 15 },
-      { name: "Зайцев Илья", age: 17 }
+      { name: "Peter Hale", age: 16 },
+      { name: "Mary Fenwick", age: 15 },
+      { name: "Isaac Hart", age: 17 }
     ]
 ```
 
@@ -484,7 +484,7 @@ db.passes.find({ valid_on: ISODate("2026-09-02T07:30:00Z") })
 
 ```js
 // A condition on an ordinary string field: a whole match, there's no case-insensitivity here
-db.passes.find({ type: "автомобильный" })
+db.passes.find({ type: "vehicle" })
 ```
 
 **Searching by plate number — reaching inside a nested object through a dot:**
@@ -492,7 +492,7 @@ db.passes.find({ type: "автомобильный" })
 ```js
 // "car.plate" — a path into the document: the plate field inside the car object.
 // The quotes around the path are mandatory, otherwise JavaScript will read the dot its own way
-db.passes.find({ "car.plate": "А123ВС174" })
+db.passes.find({ "car.plate": "AB-1174-CD" })
 ```
 
 <details>
@@ -502,7 +502,7 @@ db.passes.find({ "car.plate": "А123ВС174" })
 structure and can reach inside, rather than storing the nested object as a chunk of text.
 
 The difference is practical. If `car` sat in a relational table as a `TEXT` column with JSON
-inside, searching by plate would mean `LIKE '%А123ВС174%'` — a full scan without an index,
+inside, searching by plate would mean `LIKE '%AB-1174-CD%'` — a full scan without an index,
 with false positives. Here it's an ordinary condition you can build an index on, and we will.
 
 ⚠️ The quotes around `"car.plate"` are mandatory: without them JavaScript will read the dot
@@ -513,13 +513,13 @@ as accessing an object property and won't understand what's being asked of it.
 **Passes valid at several entrances:**
 
 ```js
-// entrances is not a string but a list: ["Северная", "Южная"]. The condition is still written
+// entrances is not a string but a list: ["North", "South"]. The condition is still written
 // as for an ordinary field, MongoDB will check it against each element of the list itself
-db.passes.find({ entrances: "Южная" })
+db.passes.find({ entrances: "South" })
 ```
 
 Note: the condition is written as though `entrances` were an ordinary field with the value
-`"Южная"`, when in fact it's a list. **MongoDB understands on its own that if a field is a
+`"South"`, when in fact it's a list. **MongoDB understands on its own that if a field is a
 list, the condition must be checked against each element.** No separate syntax for "contains"
 is required.
 
@@ -581,7 +581,7 @@ db.passes.aggregate([
 ])
 ```
 
-**What you should see** — four rows of the form `{ _id: 'разовый', count: 1 }`.
+**What you should see** — four rows of the form `{ _id: 'single-use', count: 1 }`.
 
 ## Step 5. An index on a field that most don't have
 
@@ -597,7 +597,7 @@ database looked for them.
 //   .executionStats      we take exactly this section from the answer, so as not to read all of it
 // In the report we look at totalDocsExamined — how many documents the database read,
 // to return one
-db.passes.find({ "car.plate": "А123ВС174" }).explain("executionStats").executionStats
+db.passes.find({ "car.plate": "AB-1174-CD" }).explain("executionStats").executionStats
 ```
 
 **What you should see** — `totalDocsExamined` equals the number of documents in the
@@ -615,7 +615,7 @@ without reading them all in a row:
 db.passes.createIndex({ "car.plate": 1 }, { name: "car_plate", sparse: true })
 
 // We repeat the same report and compare it with the previous one
-db.passes.find({ "car.plate": "А123ВС174" }).explain("executionStats").executionStats
+db.passes.find({ "car.plate": "AB-1174-CD" }).explain("executionStats").executionStats
 ```
 
 **What you should see** — `totalDocsExamined` equals one, and in the plan `IXSCAN` has
@@ -663,9 +663,9 @@ written in a hurry:
 ```js
 // insertOne = "add one document". What fields are in it, the database doesn't ask
 db.passes.insertOne({
-  tipe: "разовый",
-  guest: "Николаев Сергей Игоревич",
-  host: "petrov@corp.ru",
+  tipe: "single-use",
+  guest: "Nathan S. Graham",
+  host: "petrov@corp.example",
   data: ISODate("2026-09-04T09:00:00Z")
 })
 ```
@@ -684,8 +684,8 @@ Five. Now what security does every morning — opens the list of one-time passes
 
 ```js
 // The same selection by type as in the search step: show the passes whose
-// type field equals "разовый"
-db.passes.find({ type: "разовый" })
+// type field equals "single-use"
+db.passes.find({ type: "single-use" })
 ```
 
 > **Stop and think before you read on.**
@@ -765,7 +765,7 @@ less you can demand of all of them together.
 
 ```js
         type: {
-          enum: ["разовый", "недельный", "автомобильный", "групповой"],
+          enum: ["single-use", "weekly", "vehicle", "group"],
         },
 ```
 
@@ -807,14 +807,14 @@ We apply the rule:
 mo < validator.js
 ```
 
-**What you should see** — `правило установлено`.
+**What you should see** — `rule installed`.
 
 We try to repeat the same typo — now under the rule's watch:
 
 ```js
 // The tipe field is unknown to the rule, and there's no required type in the document.
 // Before, such a document would silently settle into the collection
-db.passes.insertOne({ tipe: "разовый", guest: "Проверка", host: "x@corp.ru" })
+db.passes.insertOne({ tipe: "single-use", guest: "Check", host: "x@corp.example" })
 ```
 
 **What you should see** — `MongoServerError: Document failed validation`. Now the typo
@@ -898,7 +898,7 @@ Try it:
 // The host field, by meaning, refers to an employee. No such employee exists —
 // will the database check this? The document satisfies the rule from the last step: type is
 // in place and from the list, host is a string
-db.passes.insertOne({ type: "разовый", host: "не-существует@corp.ru", guest: "Тест" })
+db.passes.insertOne({ type: "single-use", host: "does-not-exist@corp.example", guest: "Test" })
 ```
 
 The document will be inserted. There's no employee with such an email, and the database won't
@@ -916,7 +916,7 @@ Don't forget to remove the test document:
 
 ```js
 // deleteOne = "delete one document that matches the condition", not all of them at once
-db.passes.deleteOne({ host: "не-существует@corp.ru" })
+db.passes.deleteOne({ host: "does-not-exist@corp.example" })
 ```
 
 </details>

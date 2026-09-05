@@ -90,10 +90,10 @@ func main() {
 		body := identity{
 			Service:   "passes-api",
 			Version:   env("APP_VERSION", "v1"),
-			Pod:       env("POD_NAME", "неизвестно"),
-			Node:      env("NODE_NAME", "неизвестно"),
-			Namespace: env("POD_NAMESPACE", "неизвестно"),
-			Registry:  env("IMAGE_REGISTRY", "не указан"),
+			Pod:       env("POD_NAME", "unknown"),
+			Node:      env("NODE_NAME", "unknown"),
+			Namespace: env("POD_NAMESPACE", "unknown"),
+			Registry:  env("IMAGE_REGISTRY", "not set"),
 			Time:      time.Now().UTC().Format(time.RFC3339),
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -103,7 +103,7 @@ func main() {
 		// and the response would become unreadable in the terminal.
 		enc.SetEscapeHTML(false)
 		if err := enc.Encode(body); err != nil {
-			log.Printf("не удалось отдать ответ: %v", err)
+			log.Printf("failed to write response: %v", err)
 		}
 	})
 
@@ -119,8 +119,8 @@ func main() {
 
 	// The first thing you will see in kubectl logs. The line is needed to tell "the application
 	// did not start" from "started, but does not answer" — these are different diagnoses.
-	log.Printf("passes-api %s слушает порт %s, под %s",
-		env("APP_VERSION", "v1"), port, env("POD_NAME", "неизвестно"))
+	log.Printf("passes-api %s listening on port %s, pod %s",
+		env("APP_VERSION", "v1"), port, env("POD_NAME", "unknown"))
 	// We start the server and run until we are stopped. If the port is busy or the server
 	// crashed — we write the reason and exit with an error. The cluster will see the finished process
 	// and bring up a replica anew; there is no need to fix the restart inside the program.
