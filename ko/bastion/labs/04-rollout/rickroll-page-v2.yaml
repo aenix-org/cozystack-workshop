@@ -30,7 +30,7 @@ data:
   # 문자 그대로의 내용이다. 이것은 더 이상 YAML이 아니다: 여기에는 주석이 없고
   # 있을 수도 없다, 해시 기호는 페이지에 일반 텍스트로 찍힐 것이다.
   #
-  # 마크업에서 check.sh가 보는 두 가지가 중요하다: 라벨 «ВЕРСИЯ 2» —
+  # 마크업에서 check.sh가 보는 두 가지가 중요하다: 라벨 «버전 2» —
   # 이것으로 검사가 두 번째 버전을 첫 번째와 구별한다, 그리고 자리표시자 __POD__ — 이것은
   # ConfigMap rickroll-conf(랩 1)의 규칙에 따라 nginx 파드 이름으로 대체된다.
   # 둘 중 하나라도 지우면 롤아웃은 성공하더라도 랩 검사는 통과하지 못한다.
@@ -56,9 +56,9 @@ data:
       .pod b{display:block;margin-top:.4em;color:#00ffa3;font-size:1.35em;word-break:break-all}
       .hint{margin-top:3em;color:#3f5561;font-size:14px}
     </style>
-    <div class="tag">ВЕРСИЯ 2</div>
+    <div class="tag">버전 2</div>
     <h1>We're No Strangers To Love</h1>
     <p class="lyr">You know the rules &middot; And so do I</p>
-    <div class="pod">вас обслужил под<b>__POD__</b></div>
-    <p class="hint">Обновление прошло под нагрузкой. Посмотрите в Fortio: ошибок ноль.</p>
+    <div class="pod">요청을 처리한 Pod<b>__POD__</b></div>
+    <p class="hint">업데이트가 부하 상태에서 롤아웃되었습니다. Fortio를 확인하세요: 오류 0건.</p>
     </html>

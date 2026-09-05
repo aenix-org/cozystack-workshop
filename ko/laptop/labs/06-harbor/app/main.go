@@ -56,7 +56,7 @@ type identity struct {
 
 // 환경 변수를 읽고, 없거나 비어 있으면 — 대체 값을 돌려준다. 프로그램을
 // 클러스터 밖에서도 설정 하나 없이 실행할 수 있게 하기 위해 필요하다: 죽지 않고,
-// 응답에 정직하게 「неизвестно」라고 쓴다.
+// 응답에 정직하게 「알 수 없음」라고 쓴다.
 func env(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
@@ -89,10 +89,10 @@ func main() {
 		body := identity{
 			Service:   "passes-api",
 			Version:   env("APP_VERSION", "v1"),
-			Pod:       env("POD_NAME", "неизвестно"),
-			Node:      env("NODE_NAME", "неизвестно"),
-			Namespace: env("POD_NAMESPACE", "неизвестно"),
-			Registry:  env("IMAGE_REGISTRY", "не указан"),
+			Pod:       env("POD_NAME", "알 수 없음"),
+			Node:      env("NODE_NAME", "알 수 없음"),
+			Namespace: env("POD_NAMESPACE", "알 수 없음"),
+			Registry:  env("IMAGE_REGISTRY", "미지정"),
 			Time:      time.Now().UTC().Format(time.RFC3339),
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -102,7 +102,7 @@ func main() {
 		// 응답이 터미널에서 읽을 수 없게 된다.
 		enc.SetEscapeHTML(false)
 		if err := enc.Encode(body); err != nil {
-			log.Printf("не удалось отдать ответ: %v", err)
+			log.Printf("응답을 보내지 못했습니다: %v", err)
 		}
 	})
 
@@ -118,8 +118,8 @@ func main() {
 
 	// kubectl logs에서 여러분이 처음 보게 될 것. 이 줄은 「애플리케이션이 시작되지 않았다」와
 	// 「시작은 됐지만 응답하지 않는다」를 구분하기 위해 필요하다 — 이 둘은 서로 다른 진단이다.
-	log.Printf("passes-api %s слушает порт %s, под %s",
-		env("APP_VERSION", "v1"), port, env("POD_NAME", "неизвестно"))
+	log.Printf("passes-api %s가 %s 포트에서 수신 중, 파드 %s",
+		env("APP_VERSION", "v1"), port, env("POD_NAME", "알 수 없음"))
 	// 서버를 실행하고 멈춰질 때까지 동작한다. 포트가 점유되었거나 서버가
 	// 죽으면 — 원인을 쓰고 오류와 함께 종료한다. 클러스터는 종료된 프로세스를 보고
 	// 복제본을 다시 띄운다; 프로그램 안에서 재시작을 고칠 필요는 없다.

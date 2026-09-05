@@ -4,7 +4,7 @@
 // 프로그램입니다. 실습 클러스터의 가상머신에서 실행되며, README에 있는 짧은
 // 명령 `mo`로 시작됩니다(작업 파드 안에서 mongosh를 띄웁니다):
 //     cd labs/10-mongodb && mo < passes.js
-// 응답으로 «документов в коллекции: 4» 라는 줄이 보일 것입니다.
+// 응답으로 «컬렉션 문서 수: 4» 라는 줄이 보일 것입니다.
 //
 // 파일을 두 번 실행하면 문서가 여덟 개가 됩니다: insertMany는 추가만 하기 때문입니다.
 
@@ -23,12 +23,12 @@ db.passes.insertMany([
     // BSON 형식으로 저장하며, 거기서 값은 타입을 가집니다: 날짜, 정수, 실수, 불리언.
     // 날짜로는 비교하고 정렬할 수 있지만, 문자열 «2026-09-01»로는 기록 형식이
     // 운 좋게 맞았을 때만 가능합니다.
-    type: "разовый",
-    guest: "Иванов Иван Иванович",
-    host: "petrov@corp.ru",
-    entrance: "Северная",
+    type: "1회용",
+    guest: "김민준",
+    host: "petrov@corp.example",
+    entrance: "북문",
     valid_on: ISODate("2026-09-01T09:00:00Z"),
-    purpose: "собеседование"
+    purpose: "면접"
   },
   {
     // 주간 출입증. valid_on 대신 valid_from과 valid_to 한 쌍이, 하나의 입구 대신
@@ -38,27 +38,27 @@ db.passes.insertMany([
     // badge_returned 필드가 생겼는데, 일회용 출입증에는 아예 없습니다:
     // NULL도 아니고 비어 있는 것도 아니라, 그 문서에 그런 필드가 말 그대로 없는
     // 것입니다. 이것들은 서로 다른 것이며, 검색 방법도 다릅니다.
-    type: "недельный",
-    guest: "Сидорова Анна Петровна",
-    host: "petrov@corp.ru",
-    entrances: ["Северная", "Южная"],
+    type: "주간",
+    guest: "이서연",
+    host: "petrov@corp.example",
+    entrances: ["북문", "남문"],
     valid_from: ISODate("2026-09-01T00:00:00Z"),
     valid_to: ISODate("2026-09-07T23:59:59Z"),
-    purpose: "внешний аудит",
+    purpose: "외부 감사",
     badge_returned: false
   },
   {
     // 차량 출입증. 차에 관한 모든 것이 하나의 필드 car 안에 들어 있습니다. 이것은
     // 안에 JSON이 든 문자열이 아니라 온전한 중첩 구조입니다:
     // car.plate로 검색할 수 있고 그것으로 인덱스를 만들 수 있습니다.
-    type: "автомобильный",
-    guest: "Кузнецов Виктор Сергеевич",
-    host: "logistics@corp.ru",
-    entrance: "Западная",
+    type: "차량",
+    guest: "박지훈",
+    host: "logistics@corp.example",
+    entrance: "서문",
     valid_on: ISODate("2026-09-02T07:30:00Z"),
     car: {
-      plate: "А123ВС174",
-      model: "ГАЗель Next",
+      plate: "34가 1174",
+      model: "현대 스타렉스",
       trailer: false,
       weight_kg: 3500
     },
@@ -71,17 +71,17 @@ db.passes.insertMany([
     // 조직과 담당자가 있습니다. 형태가 다른 것들과 필드 하나가 아니라 본질적으로
     // 다릅니다. 이는 실습 뒤에서 다시 울립니다: 문서 검증 규칙이 모두에게 guest를
     // 요구할 수 없습니다. 그렇지 않으면 정당한 단체 출입증이 통과하지 못합니다.
-    type: "групповой",
-    organization: "Гимназия № 1",
-    contact: "Смирнова Ольга Владимировна",
-    host: "hr@corp.ru",
-    entrance: "Северная",
+    type: "단체",
+    organization: "제1고등학교",
+    contact: "최지우",
+    host: "hr@corp.example",
+    entrance: "북문",
     valid_on: ISODate("2026-09-03T10:00:00Z"),
-    escort: "Петров Алексей Алексеевич",
+    escort: "정도현",
     members: [
-      { name: "Орлов Пётр", age: 16 },
-      { name: "Волкова Мария", age: 15 },
-      { name: "Зайцев Илья", age: 17 }
+      { name: "강현우", age: 16 },
+      { name: "윤하은", age: 15 },
+      { name: "장준서", age: 17 }
     ]
   }
 ]);
@@ -90,4 +90,4 @@ db.passes.insertMany([
 // 의미합니다. 출력이 필요한 이유는 파일에 눈에 보이는 결과가 있게 하기 위함입니다:
 // insertMany 자체는 발급된 식별자 목록으로 응답하며, 그 안에서 실제로 몇 개의
 // 문서가 놓였는지 알아보기 어렵기 때문입니다.
-print("документов в коллекции: " + db.passes.countDocuments({}));
+print("컬렉션 문서 수: " + db.passes.countDocuments({}));

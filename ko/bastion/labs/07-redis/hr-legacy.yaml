@@ -59,7 +59,7 @@ spec:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # 이미지는 디렉터리와 «Пропуск» 서비스 자체에 대해 동일합니다.
+          # 이미지는 디렉터리와 «출입증» 서비스 자체에 대해 동일합니다.
           # 어떤 프로세스가 실제로 시작되는지는 아래의 MODE 변수가 결정합니다.
           image: HARBOR-HOST/passes/passes-api:v2
           # 포트에는 번호뿐 아니라 이름이 있습니다: 준비성 프로브와 아래의 Service가

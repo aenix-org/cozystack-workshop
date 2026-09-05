@@ -107,7 +107,7 @@ if cache != nil {
     raw, found, err := cache.Get(key)
     switch {
     case err != nil:
-        log.Printf("кеш недоступен (%v), иду в справочник", err)
+        log.Printf("캐시 사용 불가 (%v), 명부로 갑니다", err)
     case found:
         if json.Unmarshal([]byte(raw), &emp) == nil {
             fromCache = true
@@ -255,7 +255,7 @@ kubectl run probe --rm -i --restart=Never --image=curlimages/curl:8.11.1 --quiet
 **여러분이 봐야 할 것:**
 
 ```json
-{"cache":"off","cached":false,"dept":"Логистика","id":"42","name":"Попова Е. К.",
+{"cache":"off","cached":false,"dept":"물류팀","id":"42","name":"한은○",
  "pod":"passes-api-6f8b9c7d5-x2ktm","took_ms":803,"ttl_s":60}
 ```
 
@@ -572,8 +572,8 @@ kubectl logs -l app=passes-api --tail=20
 ```
 
 ```
-кеш недоступен (redis: NOAUTH Authentication required.), иду в справочник
-кеш недоступен (redis: NOAUTH Authentication required.), иду в справочник
+캐시 사용 불가 (redis: NOAUTH Authentication required.), 명부로 갑니다
+캐시 사용 불가 (redis: NOAUTH Authentication required.), 명부로 갑니다
 ```
 
 여기 답이 있습니다. 우리는 Redis 주소는 지정했지만 비밀번호는 지정하지 않았습니다. Redis는

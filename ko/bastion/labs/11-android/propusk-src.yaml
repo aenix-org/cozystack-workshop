@@ -1,5 +1,5 @@
 ---
-# 랩 11. 모바일 앱 「Пропуск」의 소스 — 빌드에 입력으로 전달되는 것.
+# 랩 11. 모바일 앱 「출입증」의 소스 — 빌드에 입력으로 전달되는 것.
 #
 # 관리 클러스터의 테넌트가 아니라 여러분의 학습용 클러스터 `lab`에 적용합니다:
 #     export KUBECONFIG=~/lab.kubeconfig
@@ -44,7 +44,7 @@ data:
   # 프로젝트의 최상위 파일: Gradle이 플러그인과 라이브러리를 어디서 가져오는지, 그리고 어떤
   # 모듈이 프로젝트에 포함되는지(여기서는 하나 — app) 나열합니다. 세 저장소는 모두 인터넷상의 공개 저장소입니다:
   # 빌드 컨테이너는 비어 있는 상태로 시작해 거기서 모든 것을 가져오며, 그래서 빌드가 오래 걸립니다.
-  # 이곳은 또한 ИБ가 외부로의 접근을 차단할 때 여러분이 가장 먼저 손볼 곳입니다 — 여기에
+  # 이곳은 또한 정보보안팀이 외부로의 접근을 차단할 때 여러분이 가장 먼저 손볼 곳입니다 — 여기에
   # 내부 프록시 저장소가 기록되는데, Docker Hub를 Harbor로 바꿨던 것과 똑같습니다.
   settings.gradle.kts: |
     pluginManagement {
@@ -164,6 +164,6 @@ data:
   strings.xml: |
     <?xml version="1.0" encoding="utf-8"?>
     <resources>
-      <string name="app_name">Пропуск</string>
-      <string name="greeting">Заказать пропуск для гостя</string>
+      <string name="app_name">출입증</string>
+      <string name="greeting">방문객 출입증 신청하기</string>
     </resources>

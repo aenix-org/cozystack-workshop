@@ -1,5 +1,5 @@
 ---
-# 랩 5 · Git 안의 인프라. 「출입증(Пропуск)」 서비스 자체: 한 파일에 담긴 네 개의 오브젝트.
+# 랩 5 · Git 안의 인프라. 「출입증(출입증)」 서비스 자체: 한 파일에 담긴 네 개의 오브젝트.
 #
 # 클러스터에 손으로 적용하지 않는다. 이 파일은 GitHub의 전용 리포지토리, apps/ 폴더 안에
 # namespace.yaml 옆에 놓이고, `lab` 클러스터로는 Flux가 알아서 옮겨 준다:
@@ -66,7 +66,7 @@ data:
     <html lang="ru">
     <head>
       <meta charset="utf-8">
-      <title>Пропуск</title>
+      <title>출입증</title>
       <style>
         body { font-family: system-ui, sans-serif; margin: 4rem auto; max-width: 40rem;
                color: #222; }
@@ -78,10 +78,10 @@ data:
       </style>
     </head>
     <body>
-      <h1>Сервис «Пропуск»</h1>
-      <p>Заказ пропуска для гостя. Версия <span class="v">v1</span></p>
-      <p>Развёрнуто из Git. Руками сюда никто не ходил.</p>
-      <div class="pod">вас обслужил под <b>__POD__</b></div>
+      <h1>출입증 서비스</h1>
+      <p>방문객 출입증 신청. 버전 <span class="v">v1</span></p>
+      <p>Git에서 배포됨. 아무도 손으로 건드리지 않았다.</p>
+      <div class="pod">요청을 처리한 Pod <b>__POD__</b></div>
     </body>
     </html>
 ---

@@ -1,5 +1,5 @@
 ---
-# 랩 11. 모바일 애플리케이션 "Пропуск"의 소스 — 빌드에 입력으로 넣는 것들.
+# 랩 11. 모바일 애플리케이션 "출입증"의 소스 — 빌드에 입력으로 넣는 것들.
 #
 # 관리 클러스터의 테넌트가 아니라 여러분의 학습 클러스터 `lab`에 적용합니다:
 #     export KUBECONFIG=~/lab.kubeconfig
@@ -164,6 +164,6 @@ data:
   strings.xml: |
     <?xml version="1.0" encoding="utf-8"?>
     <resources>
-      <string name="app_name">Пропуск</string>
-      <string name="greeting">Заказать пропуск для гостя</string>
+      <string name="app_name">출입증</string>
+      <string name="greeting">방문객 출입증 신청하기</string>
     </resources>

@@ -67,7 +67,7 @@ func envInt(key string, fallback int) int {
 		if n, err := strconv.Atoi(v); err == nil {
 			return n
 		}
-		log.Printf("значение %s=%q не число, беру %d", key, v, fallback)
+		log.Printf("값 %s=%q은 숫자가 아니어서 %d를 사용합니다", key, v, fallback)
 	}
 	return fallback
 }
@@ -177,7 +177,7 @@ func (r *redisClient) readReplyLocked() (string, bool, error) {
 	}
 	line = strings.TrimRight(line, "\r\n")
 	if line == "" {
-		return "", false, errors.New("redis: пустой ответ")
+		return "", false, errors.New("redis: 빈 응답")
 	}
 	switch line[0] {
 	case '+', ':': // 단순 문자열 또는 숫자
@@ -198,7 +198,7 @@ func (r *redisClient) readReplyLocked() (string, bool, error) {
 		}
 		return string(buf[:n]), true, nil
 	default:
-		return "", false, fmt.Errorf("redis: непонятный ответ %q", line)
+		return "", false, fmt.Errorf("redis: 알 수 없는 응답 %q", line)
 	}
 }
 
@@ -227,13 +227,13 @@ type employee struct {
 
 // 데이터는 지어낸 것이다. 학습용 스탠드에 실제 인사 기록은 없으며, 있어서도 안 된다.
 var surnames = []string{
-	"Иванов И. И.", "Петрова А. С.", "Сидоров П. Н.", "Кузнецова М. В.",
-	"Смирнов Д. А.", "Попова Е. К.", "Волков С. Ю.", "Морозова Н. Г.",
+	"김민○", "이수○", "임준○", "박서○",
+	"최동○", "한은○", "오상○", "서나○",
 }
 
 var departments = []string{
-	"Служба безопасности", "Бухгалтерия", "Разработка",
-	"Логистика", "Отдел кадров", "Административный отдел",
+	"보안팀", "회계팀", "개발팀",
+	"물류팀", "인사팀", "행정팀",
 }
 
 // 데이터는 지어낸 것이지만 같은 식별자에 대해서는 동일하다:
@@ -262,7 +262,7 @@ func writeJSON(w http.ResponseWriter, code int, v any) {
 	enc := json.NewEncoder(w)
 	enc.SetEscapeHTML(false)
 	if err := enc.Encode(v); err != nil {
-		log.Printf("не удалось отдать ответ: %v", err)
+		log.Printf("응답을 반환하지 못했습니다: %v", err)
 	}
 }
 
@@ -285,7 +285,7 @@ func employeeID(r *http.Request) string {
 func main() {
 	mode := env("MODE", "api")
 	port := env("PORT", "8080")
-	pod := env("POD_NAME", "неизвестно")
+	pod := env("POD_NAME", "알 수 없음")
 
 	mux := http.NewServeMux()
 	// /healthz는 두 역할 모두에 있다: 매니페스트에 기술된 준비성 프로브가 여기로 두드린다.
@@ -305,17 +305,17 @@ func main() {
 	case "api":
 		setupAPI(mux, pod)
 	default:
-		log.Fatalf("неизвестный MODE=%q, допустимы hr и api", mode)
+		log.Fatalf("알 수 없는 MODE=%q, 허용되는 값은 hr과 api입니다", mode)
 	}
 
 	// ReadHeaderTimeout은 클라이언트가 요청을 시작하고 침묵하면 연결을 닫는다. 이것이 없으면
-	// 그런 «клиент» 몇이면 아무것도 요청하지 않고도 서버 전체를 점유하기에 충분하다.
+	// 그런 «클라이언트» 몇이면 아무것도 요청하지 않고도 서버 전체를 점유하기에 충분하다.
 	srv := &http.Server{
 		Addr:              ":" + port,
 		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
-	log.Printf("режим %s, порт %s, под %s", mode, port, pod)
+	log.Printf("모드 %s, 포트 %s, 파드 %s", mode, port, pod)
 	log.Fatal(srv.ListenAndServe())
 }
 
@@ -324,10 +324,10 @@ func main() {
 func setupHR(mux *http.ServeMux, pod string) {
 	delay, err := time.ParseDuration(env("HR_DELAY", "800ms"))
 	if err != nil {
-		log.Printf("HR_DELAY=%q не разобрался, беру 800ms", os.Getenv("HR_DELAY"))
+		log.Printf("HR_DELAY=%q를 해석하지 못해 800ms를 사용합니다", os.Getenv("HR_DELAY"))
 		delay = 800 * time.Millisecond
 	}
-	log.Printf("справочник отвечает за %s", delay)
+	log.Printf("디렉터리가 %s 만에 응답합니다", delay)
 
 	// 이 역할의 유일한 주소. time.Sleep가 «레거시 시스템»의 전부다: 캐시가 랩에
 	// 등장하는 이유가 되는 바로 그 수백 밀리초. 응답의 source 필드는
@@ -359,9 +359,9 @@ func setupAPI(mux *http.ServeMux, pod string) {
 	var cache *redisClient
 	if addr := os.Getenv("REDIS_ADDR"); addr != "" {
 		cache = &redisClient{addr: addr, password: os.Getenv("REDIS_PASSWORD")}
-		log.Printf("кеш включён: %s, срок жизни записи %d с", addr, ttl)
+		log.Printf("캐시 활성화됨: %s, 레코드 수명 %d초", addr, ttl)
 	} else {
-		log.Printf("кеш выключен: REDIS_ADDR не задан, каждый запрос пойдёт в справочник")
+		log.Printf("캐시 비활성화됨: REDIS_ADDR가 설정되지 않아 모든 요청이 디렉터리로 갑니다")
 	}
 
 	// 확장된 연결 풀을 가진 별도의 클라이언트: 그렇지 않으면 부하 상황에서
@@ -378,9 +378,9 @@ func setupAPI(mux *http.ServeMux, pod string) {
 			"service":   "passes-api",
 			"version":   version,
 			"pod":       pod,
-			"node":      env("NODE_NAME", "неизвестно"),
-			"namespace": env("POD_NAMESPACE", "неизвестно"),
-			"registry":  env("IMAGE_REGISTRY", "не указан"),
+			"node":      env("NODE_NAME", "알 수 없음"),
+			"namespace": env("POD_NAMESPACE", "알 수 없음"),
+			"registry":  env("IMAGE_REGISTRY", "미지정"),
 			"cache":     cacheMode(cache),
 			"cache_ttl": ttl,
 			"hr_url":    hrURL,
@@ -409,12 +409,12 @@ func setupAPI(mux *http.ServeMux, pod string) {
 			case err != nil:
 				// 캐시를 사용할 수 없음 — 이는 사용자에게 에러를 반환할 이유가 아니다.
 				// 디렉터리로 간다: 느리지만 올바르다.
-				log.Printf("кеш недоступен (%v), иду в справочник", err)
+				log.Printf("캐시를 사용할 수 없음 (%v), 디렉터리로 갑니다", err)
 			case found:
 				if json.Unmarshal([]byte(raw), &emp) == nil {
 					fromCache = true
 				} else {
-					log.Printf("в кеше по ключу %s лежит мусор, иду в справочник", key)
+					log.Printf("키 %s의 캐시에 쓰레기가 들어 있어 디렉터리로 갑니다", key)
 				}
 			}
 		}
@@ -426,9 +426,9 @@ func setupAPI(mux *http.ServeMux, pod string) {
 		if !fromCache {
 			fetched, err := fetchEmployee(hrClient, hrURL, id)
 			if err != nil {
-				log.Printf("справочник не ответил: %v", err)
+				log.Printf("디렉터리가 응답하지 않았습니다: %v", err)
 				writeJSON(w, http.StatusBadGateway, map[string]any{
-					"error": "справочник сотрудников недоступен",
+					"error": "직원 디렉터리를 사용할 수 없습니다",
 					"pod":   pod,
 				})
 				return
@@ -437,7 +437,7 @@ func setupAPI(mux *http.ServeMux, pod string) {
 			if cache != nil {
 				if b, err := json.Marshal(emp); err == nil {
 					if err := cache.SetTTL(key, string(b), ttl); err != nil {
-						log.Printf("не удалось положить в кеш: %v", err)
+						log.Printf("캐시에 넣지 못했습니다: %v", err)
 					}
 				}
 			}
@@ -478,7 +478,7 @@ func fetchEmployee(c *http.Client, base, id string) (employee, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return employee{}, fmt.Errorf("справочник ответил %s", resp.Status)
+		return employee{}, fmt.Errorf("디렉터리가 %s로 응답했습니다", resp.Status)
 	}
 	var emp employee
 	if err := json.NewDecoder(resp.Body).Decode(&emp); err != nil {

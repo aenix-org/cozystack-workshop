@@ -155,7 +155,7 @@ else
   elif kubectl get pod "$SERVED" >/dev/null 2>&1; then
     ok "Service가 페이지를 반환하고, 살아 있는 복제본 ${SERVED}이(가) 그것을 처리했습니다"
     evidence "Service 응답(일부)" \
-      "$(printf '%s' "$BODY" | grep -o "вас обслужил под<b>${APP}-[a-z0-9-]*</b>" | head -1)"
+      "$(printf '%s' "$BODY" | grep -o "요청을 처리한 Pod<b>${APP}-[a-z0-9-]*</b>" | head -1)"
   else
     fail "페이지를 복제본 ${SERVED}이(가) 반환했지만, 그런 파드는 클러스터에 이미 없습니다" \
          "십여 초 기다렸다가 검사를 다시 실행하세요 — 아마 복제본이 바로 지금 바뀌고 있었을 것입니다"

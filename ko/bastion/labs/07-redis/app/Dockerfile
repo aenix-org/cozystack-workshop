@@ -5,8 +5,8 @@
 # 아니라 바로 이 텍스트로 만들어지며, 레지스트리에 저장되고 태그로 버전이 관리됩니다.
 #
 # 이것은 클러스터가 아니라 VM에서 빌드됩니다(README의 빌드 단계 참고):
-#   docker build --platform linux/amd64 -t <ваш-harbor>/passes/passes-api:v2 app/
-#   docker push  <ваш-harbor>/passes/passes-api:v2
+#   docker build --platform linux/amd64 -t <여러분의-harbor>/passes/passes-api:v2 app/
+#   docker push  <여러분의-harbor>/passes/passes-api:v2
 #
 # --platform linux/amd64은 Apple Silicon Mac에서 필수입니다: 이것 없이는 이미지가
 # ARM용으로 빌드되어, 아무 불평 없이 push되고, 클러스터에서 "exec format error"로 죽습니다.

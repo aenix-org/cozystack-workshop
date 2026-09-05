@@ -1,4 +1,4 @@
-# 랩 7 · «Пропуск» 서비스 이미지 빌드 레시피, 버전 v2.
+# 랩 7 · «출입증» 서비스 이미지 빌드 레시피, 버전 v2.
 #
 # Dockerfile은 소스로부터 이미지를 만들어 내는 단계들의 목록입니다: 시작 명령과 함께
 # 파일 시스템의 불변 스냅샷이죠. 가장 익숙한 비유는
@@ -6,8 +6,8 @@
 # 저장되며 태그로 버전이 관리됩니다.
 #
 # 클러스터가 아니라 노트북에서 빌드합니다 (README의 빌드 단계 참고):
-#   docker build --platform linux/amd64 -t <ваш-harbor>/passes/passes-api:v2 app/
-#   docker push  <ваш-harbor>/passes/passes-api:v2
+#   docker build --platform linux/amd64 -t <여러분의-harbor>/passes/passes-api:v2 app/
+#   docker push  <여러분의-harbor>/passes/passes-api:v2
 #
 # --platform linux/amd64는 Apple Silicon Mac에서 필수입니다: 없으면 이미지가
 # ARM용으로 빌드되어 아무런 불평 없이 푸시되고, 클러스터에서 «exec format error»로 죽습니다.

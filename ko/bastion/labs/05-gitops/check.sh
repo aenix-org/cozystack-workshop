@@ -163,10 +163,10 @@ PODS="$(kget pods -n "$NS_APP" -l app=passes --no-headers)"
 PODS_READY="$(printf '%s' "$PODS" | awk '$3=="Running"' | grep -c .)"
 BODY="$(in_cluster_curl "http://passes.${NS_APP}.svc.cluster.local/")"
 
-if printf '%s' "$BODY" | grep -q 'Пропуск'; then
-  ok "«Пропуск» 서비스가 클러스터 내부에서 HTTP로 응답합니다 (실행 중인 복제본: ${PODS_READY})"
+if printf '%s' "$BODY" | grep -q '출입증'; then
+  ok "«출입증» 서비스가 클러스터 내부에서 HTTP로 응답합니다 (실행 중인 복제본: ${PODS_READY})"
 else
-  fail "«Пропуск» 서비스가 passes.${NS_APP}.svc.cluster.local 주소에서 응답하지 않습니다" \
+  fail "«출입증» 서비스가 passes.${NS_APP}.svc.cluster.local 주소에서 응답하지 않습니다" \
        "kubectl get pods -n ${NS_APP} 및 kubectl logs -n ${NS_APP} deploy/passes 를 확인하세요"
 fi
 

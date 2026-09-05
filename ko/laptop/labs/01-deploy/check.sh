@@ -115,7 +115,7 @@ fi
 BODY="$(in_cluster_curl_many 'http://rickroll/' 8)"
 # 마커는 페이지당 정확히 한 번 나타나야 한다, 그렇지 않으면 응답 카운터가 거짓말을 한다:
 # «Never Gonna Give You Up» 은 <title>에도 <h1>에도 있어 두 배로 세어졌다.
-ANSWERS="$(printf '%s' "$BODY" | grep -c 'вас обслужил под')"
+ANSWERS="$(printf '%s' "$BODY" | grep -c '요청을 처리한 Pod')"
 TOTAL_LINES="$(printf '%s' "$BODY" | grep -c '<title>')"
 if [ "${ANSWERS:-0}" -ge 1 ] && [ "${ANSWERS:-0}" -eq "${TOTAL_LINES:-0}" ]; then
   ok "애플리케이션이 HTTP로 응답하고 자신의 페이지를 제공함 (${ANSWERS}개 요청 검증됨)"

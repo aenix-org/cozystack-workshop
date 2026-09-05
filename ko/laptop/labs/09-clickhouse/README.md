@@ -441,8 +441,8 @@ FROM numbers(1000000)
 ⚠️ ClickHouse에서 배열 인덱스는 0이 아니라 1부터 시작합니다. 그래서 `1 + …`가 붙습니다.
 
 ```sql
-    ['Северная', 'Северная', 'Северная',
-     'Южная', 'Южная', 'Западная'][1 + cityHash64(number, 'entrance') % 6] AS entrance
+    ['북문', '북문', '북문',
+     '남문', '남문', '서문'][1 + cityHash64(number, 'entrance') % 6] AS entrance
 ```
 
 고르지 않은 분포를 위한 같은 기법: 북쪽 출입구가 흐름의 절반을, 남쪽이 3분의 1을, 서쪽이 나머지를
@@ -851,7 +851,7 @@ FORMAT JSON
 ch <<'SQL'
 -- 한 행에서 방문객의 이름을 바꿉니다. 명령은 즉시 제어를 돌려주지만, 작업은 거기서
 -- 끝나지 않습니다: ClickHouse는 그것을 큐에 넣고 백그라운드에서 수행합니다.
-ALTER TABLE passes UPDATE guest_name = 'Иванов И. И.' WHERE pass_id = 424242
+ALTER TABLE passes UPDATE guest_name = '김민○' WHERE pass_id = 424242
 SQL
 ```
 

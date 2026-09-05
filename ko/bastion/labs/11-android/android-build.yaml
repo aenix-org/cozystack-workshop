@@ -67,7 +67,7 @@ data:
     CMDLINE_TOOLS_URL="https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"
     MC_URL="https://dl.min.io/client/mc/release/linux-amd64/mc"
 
-    echo "== 1/5 ставлю Android command-line tools =="
+    echo "== 1/5 Android command-line tools 설치 중 =="
     mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
     cd "$ANDROID_SDK_ROOT/cmdline-tools"
     curl -fsSL -o tools.zip "$CMDLINE_TOOLS_URL"
@@ -77,7 +77,7 @@ data:
     mv cmdline-tools latest
     export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
 
-    echo "== 2/5 принимаю лицензии и качаю SDK (самый долгий шаг) =="
+    echo "== 2/5 라이선스에 동의하고 SDK 내려받는 중 (가장 오래 걸리는 단계) =="
     # `yes`는 sdkmanager가 입력을 닫을 때 SIGPIPE를 받아 0이 아닌
     # 코드를 반환합니다. set -o pipefail이 있으면 이것이 아무 이유 없이 빌드를 실패시키므로,
     # 여기서는 반환 코드를 의도적으로 무시합니다. 라이선스가 실제로
@@ -86,7 +86,7 @@ data:
     sdkmanager --sdk_root="$ANDROID_SDK_ROOT" \
       "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
-    echo "== 3/5 собираю APK =="
+    echo "== 3/5 APK 빌드 중 =="
     # ConfigMap은 읽기 전용으로 마운트되고, Gradle은 소스 옆에 쓰기 때문에,
     # 먼저 트리를 디스크로 복사합니다.
     # -L은 심볼릭 링크를 역참조합니다: ConfigMap은 파일이 아니라
@@ -100,7 +100,7 @@ data:
     APK="$WORK/project/app/build/outputs/apk/debug/app-debug.apk"
     ls -l "$APK"
 
-    echo "== 4/5 ставлю клиент S3 =="
+    echo "== 4/5 S3 클라이언트 설치 중 =="
     # 클라이언트를 /usr/local/bin이 아니라 작업 폴더에 넣습니다. 파드는
     # 비특권 사용자로 실행되고, 이미지의 시스템 폴더는 root 소유입니다:
     # 거기에 쓰면 Permission denied로 끝납니다 — 그것도 여기 네 번째 단계에서,
@@ -112,7 +112,7 @@ data:
     # 쓸 수 있도록 우리 것을 추가합니다.
     export PATH="$WORK/bin:$PATH"
 
-    echo "== 5/5 кладу APK в бакет =="
+    echo "== 5/5 APK를 버킷에 업로드 중 =="
     # accessKey/secretKey/endpoint/bucketName 변수는 envFrom을 통해 Secret에서
     # 옵니다. alias set의 출력은 무시합니다: 그것이 로그에 무언가를 출력할 필요가 없습니다.
     # 같은 이유로 스크립트에는 set -x가 없습니다 — 그것은 키를 출력할 것이기 때문입니다.

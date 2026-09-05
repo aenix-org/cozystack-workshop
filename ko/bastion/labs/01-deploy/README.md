@@ -127,7 +127,7 @@ metadata:
   name: rickroll-page-v1
 data:
   index.html: |
-    ...<div class="pod">вас обслужил под<b>__POD__</b></div>...
+    ...<div class="pod">요청을 처리한 Pod<b>__POD__</b></div>...
 ```
 
 nginx가 치환할 바로 그 `__POD__`입니다. 이름의 `-v1`은 우연이 아닙니다. 버전 롤아웃에 관한 랩에서

@@ -91,7 +91,7 @@ ssh_pwauth: true
 write_files:
   - path: /opt/directory/index.html
     content: |
-      <!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Справочник</title></head><body><h1>Справочник сотрудников</h1><ul><li>Иванов И. — 101</li><li>Петров П. — 102</li></ul></body></html>
+      <!doctype html><html lang="ru"><head><meta charset="utf-8"><title>명부</title></head><body><h1>직원 명부</h1><ul><li>김민○ — 101</li><li>조준○ — 102</li></ul></body></html>
   - path: /etc/systemd/system/directory.service
     content: |
       [Unit]
@@ -286,7 +286,7 @@ curl http://spravochnik.workshopXX.workshop.aenix.io
 **보게 될 것** — 명부 페이지의 HTML:
 
 ```html
-<h1>Справочник сотрудников</h1><ul><li>Иванов И. — 101</li><li>Петров П. — 102</li></ul>
+<h1>직원 명부</h1><ul><li>김민○ — 101</li><li>조준○ — 102</li></ul>
 ```
 
 이 주소를 브라우저에서 열면 똑같은 목록을 보게 됩니다. 명부는 사람이 읽기 좋은 도메인 이름으로 외부에서 보이며, 플랫폼이 제공하는 HTTPS와 함께, 네트워크나 인증서 티켓 하나 없이 그렇습니다.

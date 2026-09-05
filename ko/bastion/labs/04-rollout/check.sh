@@ -154,7 +154,7 @@ else
   # 두 버전 모두 각자의 마커로 긍정적으로 판별합니다. "v2가 아니면 v1"이라는 분기는
   # 무엇이든 첫 번째 버전으로 셌습니다: 기본 nginx 페이지, 404, 남의 애플리케이션,
   # 쓰레기 — 확인된 바, 쓰레기에서도 스크립트가 "랩 통과"를 출력했습니다.
-  if printf '%s' "$BODY" | grep -q 'ВЕРСИЯ 2'; then
+  if printf '%s' "$BODY" | grep -q '버전 2'; then
     SERVED_VER="rickroll-page-v2"
   elif printf '%s' "$BODY" | grep -q 'Never Gonna Give You Up'; then
     SERVED_VER="rickroll-page-v1"
@@ -187,7 +187,7 @@ else
 
   evidence "제공된 페이지 (일부)" \
     "$(printf '%s' "$BODY" | grep -o '<h1>[^<]*</h1>' | head -1)
-$(printf '%s' "$BODY" | grep -o "вас обслужил под<b>${APP}-[a-z0-9-]*</b>" | head -1)"
+$(printf '%s' "$BODY" | grep -o "요청을 처리한 Pod<b>${APP}-[a-z0-9-]*</b>" | head -1)"
 fi
 
 # --- 다음 랩을 위한 준비 상태 ------------------------------------------

@@ -156,7 +156,7 @@ else
     if [ -n "$UPLOADED" ]; then
       ok "APK가 버킷으로 갔다: ${UPLOADED}"
       evidence "빌드 후 버킷 내용" \
-        "$(printf '%s' "$LOGS" | sed -n '/5\/5 кладу APK в бакет/,$p' | grep -v '^APK-UPLOADED ' | head -20)"
+        "$(printf '%s' "$LOGS" | sed -n '/5\/5 APK를 버킷에 업로드 중/,$p' | grep -v '^APK-UPLOADED ' | head -20)"
     else
       fail "APK는 빌드됐지만 버킷으로 가지 않았다" \
            "로그 끝부분을 보세요: kubectl logs job/${JOB} --tail=20; 대개 bucketName 이 원인입니다 — 'builds' 가 아니라 대시보드의 긴 이름이 필요합니다"

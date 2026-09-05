@@ -233,8 +233,8 @@ Login Succeeded
 클러스터가 실행 시 그것들을 환경 변수에 넣어 줍니다:
 
 ```go
-Pod:  env("POD_NAME", "неизвестно"),
-Node: env("NODE_NAME", "неизвестно"),
+Pod:  env("POD_NAME", "알 수 없음"),
+Node: env("NODE_NAME", "알 수 없음"),
 ```
 
 그리고 매니페스트에는 거기에 무엇을 넣을지 적혀 있습니다:

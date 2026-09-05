@@ -76,8 +76,8 @@ data:
     </style>
     <h1>Never Gonna Give You Up</h1>
     <p class="lyr">Never gonna let you down &middot; Never gonna run around and desert you</p>
-    <div class="pod">вас обслужил под<b>__POD__</b></div>
-    <p class="hint">Обновите страницу. Когда реплик станет больше — имя начнёт меняться.</p>
+    <div class="pod">요청을 처리한 Pod<b>__POD__</b></div>
+    <p class="hint">페이지를 새로고침하세요. 복제본이 많아지면 이름이 바뀌기 시작합니다.</p>
     </html>
 ---
 # 애플리케이션 자체. Deployment는 원하는 상태를 기술합니다 — 어떤 이미지를 실행할지,

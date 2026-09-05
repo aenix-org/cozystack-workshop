@@ -376,7 +376,7 @@ cd labs/10-mongodb
 mo < passes.js
 ```
 
-**여러분이 보게 될 것** — `документов в коллекции: 4`.
+**여러분이 보게 될 것** — `컬렉션 문서 수: 4`.
 
 <details>
 <summary><b>우리가 넣은 것 짚어 보기</b></summary>
@@ -391,12 +391,12 @@ mo < passes.js
 
 ```js
   {
-    type: "разовый",
-    guest: "Иванов Иван Иванович",
-    host: "petrov@corp.ru",
-    entrance: "Северная",
+    type: "1회용",
+    guest: "김민준",
+    host: "petrov@corp.example",
+    entrance: "북문",
     valid_on: ISODate("2026-09-01T09:00:00Z"),
-    purpose: "собеседование"
+    purpose: "면접"
   }
 ```
 
@@ -411,7 +411,7 @@ mo < passes.js
 `entrances`가 이제 **목록**입니다:
 
 ```js
-    entrances: ["Северная", "Южная"],
+    entrances: ["북문", "남문"],
     badge_returned: false
 ```
 
@@ -426,8 +426,8 @@ mo < passes.js
 
 ```js
     car: {
-      plate: "А123ВС174",
-      model: "ГАЗель Next",
+      plate: "34가 1174",
+      model: "현대 스타렉스",
       trailer: false,
       weight_kg: 3500
     },
@@ -440,9 +440,9 @@ mo < passes.js
 
 ```js
     members: [
-      { name: "Орлов Пётр", age: 16 },
-      { name: "Волкова Мария", age: 15 },
-      { name: "Зайцев Илья", age: 17 }
+      { name: "강현우", age: 16 },
+      { name: "윤하은", age: 15 },
+      { name: "장준서", age: 17 }
     ]
 ```
 
@@ -478,7 +478,7 @@ db.passes.find({ valid_on: ISODate("2026-09-02T07:30:00Z") })
 
 ```js
 // 평범한 문자열 필드에 대한 조건: 통째로 일치, 여기에 대소문자 무시는 없습니다
-db.passes.find({ type: "автомобильный" })
+db.passes.find({ type: "차량" })
 ```
 
 **번호판으로 검색 — 점을 통해 중첩 객체 안으로 접근:**
@@ -486,7 +486,7 @@ db.passes.find({ type: "автомобильный" })
 ```js
 // "car.plate" — 문서 안으로의 경로: car 객체 안의 plate 필드.
 // 경로를 감싸는 따옴표는 필수입니다, 그러지 않으면 JavaScript가 점을 제멋대로 읽습니다
-db.passes.find({ "car.plate": "А123ВС174" })
+db.passes.find({ "car.plate": "34가 1174" })
 ```
 
 <details>
@@ -496,7 +496,7 @@ db.passes.find({ "car.plate": "А123ВС174" })
 접근할 수 있으며, 중첩 객체를 텍스트 덩어리로 저장하지 않습니다.
 
 차이는 실질적입니다. 만약 `car`가 관계형 테이블에서 JSON을 담은 `TEXT` 컬럼으로 있었다면,
-번호판으로 검색하는 것은 `LIKE '%А123ВС174%'`를 뜻했을 것입니다 — 인덱스 없는 전체 스캔,
+번호판으로 검색하는 것은 `LIKE '%34가 1174%'`를 뜻했을 것입니다 — 인덱스 없는 전체 스캔,
 게다가 거짓 양성까지. 여기서는 인덱스를 만들 수 있는 평범한 조건이고, 실제로 만들 것입니다.
 
 ⚠️ `"car.plate"`를 감싸는 따옴표는 필수입니다: 그것이 없으면 JavaScript는 점을 객체 속성에
@@ -507,12 +507,12 @@ db.passes.find({ "car.plate": "А123ВС174" })
 **여러 출입구에서 유효한 출입증:**
 
 ```js
-// entrances는 문자열이 아니라 목록입니다: ["Северная", "Южная"]. 조건은 여전히 평범한 필드처럼
+// entrances는 문자열이 아니라 목록입니다: ["북문", "남문"]. 조건은 여전히 평범한 필드처럼
 // 적히고, MongoDB가 스스로 목록의 각 원소에 대해 그것을 검사합니다
-db.passes.find({ entrances: "Южная" })
+db.passes.find({ entrances: "남문" })
 ```
 
-주목하세요: 조건은 마치 `entrances`가 값 `"Южная"`를 가진 평범한 필드인 것처럼 적혔지만,
+주목하세요: 조건은 마치 `entrances`가 값 `"남문"`를 가진 평범한 필드인 것처럼 적혔지만,
 실제로는 목록입니다. **MongoDB는 필드가 목록이면 조건을 각 원소에 대해 검사해야 한다는 것을
 스스로 이해합니다.** "포함한다"를 위한 별도의 구문은 필요 없습니다.
 
@@ -573,7 +573,7 @@ db.passes.aggregate([
 ])
 ```
 
-**여러분이 보게 될 것** — `{ _id: 'разовый', count: 1 }` 형태의 네 줄.
+**여러분이 보게 될 것** — `{ _id: '1회용', count: 1 }` 형태의 네 줄.
 
 ## 단계 5. 대부분이 갖고 있지 않은 필드에 대한 인덱스
 
@@ -588,7 +588,7 @@ db.passes.aggregate([
 //   .executionStats      답에서 전부 읽지 않도록 바로 이 부분만 가져옵니다
 // 보고서에서 totalDocsExamined를 봅니다 — 하나를 돌려주려고
 // 데이터베이스가 문서를 몇 개 읽었는지
-db.passes.find({ "car.plate": "А123ВС174" }).explain("executionStats").executionStats
+db.passes.find({ "car.plate": "34가 1174" }).explain("executionStats").executionStats
 ```
 
 **여러분이 보게 될 것** — `totalDocsExamined`가 컬렉션의 문서 수와 같습니다. 데이터베이스는
@@ -606,7 +606,7 @@ db.passes.find({ "car.plate": "А123ВС174" }).explain("executionStats").execut
 db.passes.createIndex({ "car.plate": 1 }, { name: "car_plate", sparse: true })
 
 // 같은 보고서를 되풀이하고 이전 것과 비교합니다
-db.passes.find({ "car.plate": "А123ВС174" }).explain("executionStats").executionStats
+db.passes.find({ "car.plate": "34가 1174" }).explain("executionStats").executionStats
 ```
 
 **여러분이 보게 될 것** — `totalDocsExamined`가 1과 같고, 계획에는 `COLLSCAN` 대신 `IXSCAN`
@@ -653,9 +653,9 @@ MongoDB는 스스로 인덱스를 버리고 스캔으로 돌아가는데; 불쾌
 ```js
 // insertOne = "문서 하나를 추가해라". 그 안에 어떤 필드가 있는지 데이터베이스는 묻지 않습니다
 db.passes.insertOne({
-  tipe: "разовый",
-  guest: "Николаев Сергей Игоревич",
-  host: "petrov@corp.ru",
+  tipe: "1회용",
+  guest: "신재원",
+  host: "petrov@corp.example",
   data: ISODate("2026-09-04T09:00:00Z")
 })
 ```
@@ -672,9 +672,9 @@ db.passes.countDocuments({})
 다섯. 이제 경비가 매일 아침 하는 일 — 일회용 출입증 목록을 엽니다:
 
 ```js
-// 검색 단계와 같은 type 기준 선택: type 필드가 "разовый"와
+// 검색 단계와 같은 type 기준 선택: type 필드가 "1회용"와
 // 같은 출입증을 보여 주기
-db.passes.find({ type: "разовый" })
+db.passes.find({ type: "1회용" })
 ```
 
 > **더 읽기 전에 멈추고 생각해 보십시오.**
@@ -754,7 +754,7 @@ db.runCommand({
 
 ```js
         type: {
-          enum: ["разовый", "недельный", "автомобильный", "групповой"],
+          enum: ["1회용", "주간", "차량", "단체"],
         },
 ```
 
@@ -795,14 +795,14 @@ db.runCommand({
 mo < validator.js
 ```
 
-**여러분이 보게 될 것** — `правило установлено`.
+**여러분이 보게 될 것** — `규칙이 설치됨`.
 
 같은 오타를 되풀이해 봅니다 — 이제 규칙의 감시 아래에서:
 
 ```js
 // tipe 필드는 규칙에게 알려지지 않았고, 문서에는 필수인 type이 없습니다.
 // 전에는 이런 문서가 조용히 컬렉션에 자리 잡았습니다
-db.passes.insertOne({ tipe: "разовый", guest: "Проверка", host: "x@corp.ru" })
+db.passes.insertOne({ tipe: "1회용", guest: "확인", host: "x@corp.example" })
 ```
 
 **여러분이 보게 될 것** — `MongoServerError: Document failed validation`. 이제 오타는
@@ -882,7 +882,7 @@ db.passes.aggregate([
 // host 필드는 의미상 직원을 참조합니다. 그런 직원은 존재하지 않습니다 —
 // 데이터베이스가 이것을 검사할까요? 문서는 지난 단계의 규칙을 충족합니다: type이
 // 제자리에 있고 목록에서 왔으며, host는 문자열입니다
-db.passes.insertOne({ type: "разовый", host: "не-существует@corp.ru", guest: "Тест" })
+db.passes.insertOne({ type: "1회용", host: "존재하지-않음@corp.example", guest: "테스트" })
 ```
 
 문서는 삽입됩니다. 그런 이메일을 가진 직원은 없지만, 데이터베이스는 그것을 보지 않습니다.
@@ -899,7 +899,7 @@ db.passes.insertOne({ type: "разовый", host: "не-существует@c
 
 ```js
 // deleteOne = "조건에 맞는 문서 하나를 삭제해라", 전부를 한꺼번에가 아니라
-db.passes.deleteOne({ host: "не-существует@corp.ru" })
+db.passes.deleteOne({ host: "존재하지-않음@corp.example" })
 ```
 
 </details>

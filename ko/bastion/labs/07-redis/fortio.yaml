@@ -10,7 +10,7 @@
 # `---`로 구분된 두 오브젝트: Deployment(생성기 자체)와 Service(생성기에 접근할 때
 # 쓰는 이름). apiVersion, kind, metadata.name은 아래에서 더 이상 설명하지 않는다.
 #
-# 이미지는 당신의 Harbor가 아니라 공개 Docker Hub에서 가져온다: Fortio는 «Пропуск»
+# 이미지는 당신의 Harbor가 아니라 공개 Docker Hub에서 가져온다: Fortio는 «출입증»
 # 서비스의 일부가 아니라 클러스터에 일시적으로 존재하는 계측 장비이기 때문이다.
 apiVersion: apps/v1
 kind: Deployment
