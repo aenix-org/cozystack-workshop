@@ -1,0 +1,49 @@
+# Лаба 13. Шаблон ConfigMap: сторінка «Перепустки» та конфігурація nginx.
+#
+# ConfigMap зберігає текстові файли й віддає їх Pod. Сторінка лежить тут, а не всередині
+# образу, щоб змінювати текст без перезбирання: значення greeting підставляється під час рендеру,
+# і достатньо оновити реліз.
+#
+# Підстановка працює й усередині блоків `|`: Helm обробляє файл шаблону як простий
+# текст і про структуру YAML нічого не знає. Докладніше — у templates/deployment.yaml.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}
+# Ключі в data — це імена файлів, а те, що під `|`, — їхній вміст цілком.
+# Кожен ключ монтується в контейнер окремим файлом, див. volumeMounts у Deployment.
+data:
+  # Сторінка, яку побачить співробітник. Сюди потрапляють два значення: greeting із форми
+  # замовлення та ім'я релізу — щоб за відкритою сторінкою було видно, чиє це замовлення.
+  index.html: |
+    <!doctype html>
+    <html lang="en">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Guest Pass</title>
+    <style>
+      body{background:#0d1117;color:#e6edf3;font:16px/1.6 system-ui,sans-serif;
+           text-align:center;padding:12vh 5vw;margin:0}
+      h1{font-size:clamp(26px,6vw,56px);margin:0 0 .3em;color:#2f6fed}
+      .pod{font-family:ui-monospace,Menlo,monospace;color:#7d8590;margin-top:3em}
+    </style>
+    <h1>{{ .Values.greeting }}</h1>
+    <p>Guest Pass service, release <b>{{ .Release.Name }}</b></p>
+    <div class="pod">served by __POD__</div>
+    </html>
+  # Конфігурація nginx. sub_filter підмінює мітку __POD__ на ім'я Pod в момент віддачі
+  # сторінки: так за браузером видно, яка з копій відповіла. Окрема відповідь на /healthz
+  # потрібна readinessProbe із Deployment — вона запитує саме цю адресу.
+  default.conf: |
+    server {
+      listen 8080;
+      root /usr/share/nginx/html;
+      location / {
+        sub_filter '__POD__' '$hostname';
+        sub_filter_once off;
+      }
+      location = /healthz {
+        access_log off;
+        return 200 "ok\n";
+      }
+    }

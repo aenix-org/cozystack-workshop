@@ -1,0 +1,11 @@
+# Перед застосуванням замініть tenant-workshopXX на свій namespace.
+# Простіше зробити це одразу в усіх файлах: див. README, розділ про підстановку номера.
+#
+apiVersion: apps.cozystack.io/v1alpha1
+kind: Bucket
+metadata:
+  name: my-images
+  namespace: tenant-workshopXX
+spec:
+  users:
+    app: {}

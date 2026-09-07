@@ -1,0 +1,83 @@
+---
+# Лаба 7 · генератор навантаження з веб-мордою.
+# Той самий, що й у лабі про масштабування: навантаження запускають кнопкою в браузері,
+# а гістограму затримок видно тут же. Якщо він у вас уже розгорнутий — цей файл
+# застосовувати не потрібно, kubectl відповість «unchanged».
+#
+# Де застосовується: ваш кластер `lab` (export KUBECONFIG=~/lab.kubeconfig).
+# Команда: kubectl apply -f fortio.yaml
+#
+# Два об'єкти через `---`: Deployment (сам генератор) і Service (ім'я, за яким
+# до нього дістаються). apiVersion, kind і metadata.name далі не коментуються.
+#
+# Образ береться з публічного Docker Hub, а не з вашого Harbor: Fortio — не частина
+# сервісу «Перепустка», а вимірювальний прилад, який живе в кластері тимчасово.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fortio
+  labels:
+    app: fortio
+spec:
+  # Одна копія. Генератор навантаження не потрібно масштабувати — потрібно, щоб він один
+  # чесно рахував затримки. Дві копії дали б дві незведені гістограми.
+  replicas: 1
+  # Мітка, за якою Deployment впізнає свій Pod. Збігається з міткою в template нижче.
+  selector:
+    matchLabels:
+      app: fortio
+  template:
+    metadata:
+      labels:
+        app: fortio
+    spec:
+      # Ті самі вимоги безпеки, що й у решти: процес не від root,
+      # системні виклики обмежені профілем seccomp.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: fortio
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          # Тег `latest` тут — спрощення для воркшопу, і воно суперечить тому, чого
+          # вчить лаба про свій реєстр: образ під цим тегом може непомітно змінитися
+          # між двома apply, і вчорашній замір стане невідтворюваним. Для
+          # генератора навантаження у тестовому середовищі це припустимо, для робочої системи ні.
+          image: fortio/fortio:latest
+          # `server` — режим, у якому Fortio піднімає веб-інтерфейс і чекає, поки ви
+          # натиснете кнопку. Без цього аргументу образ відпрацює разову команду і вийде.
+          args: ["server"]
+          ports:
+            - containerPort: 8080
+              name: http
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              # Генератору потрібен запас по процесору, інакше він упреться
+              # в себе і ви будете навантажувати не застосунок, а Fortio.
+              cpu: "1"
+              memory: 256Mi
+---
+# Service потрібен, щоб відкрити веб-інтерфейс: до генератора за ім'ям дістаються
+# пробросом порту — kubectl port-forward svc/fortio 8081:8080 — і заходять
+# на localhost:8081. Обстріляти сервіс можна і без Service, командою
+# kubectl exec deploy/fortio, але гістограму в браузері дає тільки цей шлях.
+apiVersion: v1
+kind: Service
+metadata:
+  name: fortio
+spec:
+  selector:
+    app: fortio
+  # Тут номер у Service і порт контейнера збігаються — на відміну від решти
+  # сервісів лаби, де зовні 80, а всередині 8080. Різниця лише в зручності.
+  ports:
+    - port: 8080
+      targetPort: http

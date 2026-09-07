@@ -234,3 +234,51 @@ German quotes: opening low „ (U+201E) + closing high " (U+201C) — never a st
 | application (spelling) | **एप्लिकेशन** | not ऐप्लिकेशन |
 Fixed callout (CONVENTIONS): stop-and-think = **आगे पढ़ने से पहले रुककर सोचिए।**
 Reader-facing password placeholders localized like the rest (e.g. CH_PASSWORD='आपका-analyst-पासवर्ड').
+
+## Ukrainian (uk) — concept terms
+
+Fixed product/CLI/Kubernetes-object names stay verbatim (same never-translate
+list as above). Natural Ukrainian throughout — **no russianisms / surzhyk**
+(вузол not узел, образ not імідж, застосувати not застосовувати-кальки, викочування
+not раскатка). Quotes: use guillemets «…» as in the Russian source.
+
+| Concept | Українська (uk) | not |
+|---|---|---|
+| cluster | кластер | |
+| control plane | площина керування (control plane) | not контрол-плейн |
+| node | вузол | not нода |
+| tenant | тенант | |
+| manifest | маніфест | |
+| apply (kubectl apply) | застосувати | |
+| reconcile | узгодження (reconcile) | |
+| self-healing | самовідновлення | |
+| autoscaling | автомасштабування | |
+| rollout | викочування | not розкатка |
+| image | образ | not імідж |
+| virtual machine (VM) | віртуальна машина (VM) | |
+| container | контейнер | |
+| management cluster | кластер керування | |
+| the bastion (shared VM) | бастіон (спільна ВМ) | |
+| dashboard | дашборд | |
+| quota | квота | |
+| testbed | тестове середовище | |
+| menagerie (metaphor) | звіринець | |
+| the instructor | викладач | |
+| workshop (event) | воркшоп | |
+
+### Ukrainian (uk) — resolved renderings
+| Concept | Українська | not |
+|---|---|---|
+| step (numbered) | **Крок N** | not Шаг / Степ |
+| Phase (the 3 big migration phases) | **Фаза N** | keep distinct from Крок |
+| error | **помилка** | not ерор |
+| managed service | **керований сервіс** | not менеджед |
+| queue | **черга** | |
+| catalog | **каталог** | |
+| bucket | **бакет** | |
+| credential labels in code (login:/password:) | keep **login: / password:** verbatim (as en) | do not localize the label |
+
+Fixed callouts (CONVENTIONS, verbatim everywhere):
+- spoiler `<summary>` heading = «Відповідь і урок, ширший за цю помилку»
+- lesson-opener (bold) = «Урок ширший за цю помилку.»
+- stop-and-think = «Зупиніться і подумайте, перш ніж читати далі.»

@@ -1,0 +1,34 @@
+# Лаба 13. Шаблон Service: постійна адреса застосунку.
+#
+# Копії застосунку з'являються і зникають, їхні адреси щоразу нові. Service дає ім'я,
+# яке не змінюється, і розподіляє запити між живими копіями. Із сусіднього Pod
+# до застосунку звертаються за іменем релізу.
+#
+# Про підстановку в подвійних фігурних дужках і про те, звідки беруться імена об'єктів,
+# написано в templates/deployment.yaml — тут усе влаштовано так само.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    app.kubernetes.io/name: guest-pass
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  # Один прапорець у values вирішує, чи отримає застосунок адресу за межами кластера, чи ні.
+  # Так само влаштовані штатні застосунки Cozystack: поле external.
+  # Конструкція if/else обирає одне з двох значень під час рендерингу — у готовий маніфест
+  # потрапляє або LoadBalancer, або ClusterIP, і розгалуження в ньому вже не лишається.
+  type: {{ if .Values.external }}LoadBalancer{{ else }}ClusterIP{{ end }}
+  # Кому віддавати трафік. Service відбирає Pod за мітками, а не за іменами, тому
+  # йому байдуже, скільки копій і як вони називаються. Мітки ті самі, що Deployment
+  # ставить своїм копіям.
+  selector:
+    app.kubernetes.io/name: guest-pass
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  # port — на якому порту слухає сам Service, targetPort — куди він стукає всередину Pod.
+  # targetPort записаний іменем: порт з іменем http оголошено в шаблоні Deployment.
+  # Зміниться номер там — тут правити не доведеться.
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

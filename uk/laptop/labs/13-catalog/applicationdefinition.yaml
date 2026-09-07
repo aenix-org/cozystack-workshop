@@ -1,0 +1,71 @@
+---
+# Лаба 13. Опис застосунку для каталогу Cozystack — та сама «позиція в каталозі».
+#
+# Сам по собі цей об'єкт нічого не розгортає. Він пов'язує три речі: ваш чарт
+# (що розгортати), новий тип об'єктів в API (чим застосунок замовляють) і картку
+# в дашборді (що при цьому бачить людина). Поки його немає, чарт лишається текою з файлами,
+# про яку платформа не знає, і в списку застосунків поряд з Postgres та Redis порожньо.
+#
+# Застосовується однією командою, без namespace:
+#   kubectl apply -f applicationdefinition.yaml
+#
+# ВАЖЛИВО: цей об'єкт CLUSTER-SCOPED — у нього немає namespace, він один на весь
+# кластер. Тенант застосувати його НЕ МОЖЕ, це перевірено:
+#   kubectl auth can-i create applicationdefinitions   ->   no
+# Ваша робота завершується на тому, що файл написаний і перевірений локально.
+# Застосовує його платформний адмін. Див. README, розділ «Де закінчуються
+# ваші права».
+apiVersion: cozystack.io/v1alpha1
+kind: ApplicationDefinition
+metadata:
+  name: guest-pass
+spec:
+  # --- ЯК ЦЕ ВИГЛЯДАЄ В API ----------------------------------------------
+  application:
+    # Kind нового типу об'єктів. Після застосування в кластері з'явиться
+    # kind: GuestPass, і з ним можна буде працювати звичайним kubectl.
+    kind: GuestPass
+    plural: guestpasses
+    singular: guestpass
+    # Схема значень — та сама, що лежить у чарті файлом values.schema.json,
+    # тільки записана одним рядком. За нею API відмовляє в некоректних
+    # значеннях, а дашборд малює форму створення.
+    openAPISchema: |-
+      {"title":"Chart Values","type":"object","properties":{"replicas":{"description":"Number of application replicas.","type":"integer","default":2},"greeting":{"description":"Text shown on the main page.","type":"string","default":"Order a pass for your guest"},"external":{"description":"Enable external access from outside the cluster.","type":"boolean","default":false},"resources":{"description":"Explicit CPU and memory configuration.","type":"object","default":{},"properties":{"cpu":{"description":"CPU available to each replica.","pattern":"^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$","anyOf":[{"type":"integer"},{"type":"string"}],"x-kubernetes-int-or-string":true},"memory":{"description":"Memory (RAM) available to each replica.","pattern":"^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$","anyOf":[{"type":"integer"},{"type":"string"}],"x-kubernetes-int-or-string":true}}}}}
+
+  # --- ЩО РОЗГОРТАТИ ----------------------------------------------
+  release:
+    # Ім'я релізу = prefix + ім'я об'єкта. Об'єкт GuestPass з ім'ям `main`
+    # розгорнеться релізом `guest-pass-main`. Префікс обов'язковий і потрібен,
+    # щоб релізи різних застосунків не стикалися іменами.
+    prefix: guest-pass-
+    labels:
+      # Тим самим ключем Cozystack розподіляє релізи тенантів по шардах Flux.
+      # Без нього обслуговувати реліз буде нікому.
+      sharding.fluxcd.io/key: tenants
+    chartRef:
+      # Звідки взяти чарт. Допустимі kind: OCIRepository, HelmChart,
+      # ExternalArtifact. Зовнішні каталоги зазвичай приїжджають через
+      # GitRepository -> HelmChart, і namespace у них — cozy-public.
+      kind: HelmChart
+      name: cozystack-guest-pass
+      namespace: cozy-public
+
+  # --- ЯК ЦЕ ВИГЛЯДАЄ В ДАШБОРДІ ------------------------------------------
+  dashboard:
+    # Розділ каталогу. Використовуються PaaS, IaaS, NaaS, Administration,
+    # Networking — беріть наявний, а не вигадуйте свій,
+    # інакше застосунок опиниться в розділі з одного пункту.
+    category: PaaS
+    singular: Guest Pass
+    plural: Guest Passes
+    description: Internal guest pass service for employees and reception
+    tags:
+      - internal
+      - web
+    # Іконка — SVG у base64. Саме base64, не шлях і не URL: дашборд
+    # нікуди нічого не ходить завантажувати. Джерело лежить поряд в icon.svg.
+    icon: PHN2ZyB3aWR0aD0iMTQ0IiBoZWlnaHQ9IjE0NCIgdmlld0JveD0iMCAwIDE0NCAxNDQiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxNDQiIGhlaWdodD0iMTQ0IiByeD0iMjQiIGZpbGw9IiMyRjZGRUQiLz4KPHJlY3QgeD0iMzAiIHk9IjQwIiB3aWR0aD0iODQiIGhlaWdodD0iNjQiIHJ4PSI4IiBmaWxsPSJ3aGl0ZSIvPgo8Y2lyY2xlIGN4PSI1NCIgY3k9IjY0IiByPSIxMSIgZmlsbD0iIzJGNkZFRCIvPgo8cGF0aCBkPSJNMzggOTJjMC05IDcuMi0xNCAxNi0xNHMxNiA1IDE2IDE0djRIMzh2LTR6IiBmaWxsPSIjMkY2RkVEIi8+CjxyZWN0IHg9Ijc4IiB5PSI1OCIgd2lkdGg9IjI2IiBoZWlnaHQ9IjYiIHJ4PSIzIiBmaWxsPSIjOURCQkY3Ii8+CjxyZWN0IHg9Ijc4IiB5PSI3MiIgd2lkdGg9IjI2IiBoZWlnaHQ9IjYiIHJ4PSIzIiBmaWxsPSIjOURCQkY3Ii8+CjxyZWN0IHg9Ijc4IiB5PSI4NiIgd2lkdGg9IjE4IiBoZWlnaHQ9IjYiIHJ4PSIzIiBmaWxsPSIjOURCQkY3Ii8+CjxyZWN0IHg9IjYyIiB5PSIyNCIgd2lkdGg9IjIwIiBoZWlnaHQ9IjIwIiByeD0iNiIgZmlsbD0iIzFCNENDMCIvPgo8L3N2Zz4K
+    # Порядок полів у YAML-представленні об'єкта. Косметика, але без нього
+    # поля вишиковуються абияк і форма читається гірше.
+    keysOrder: [["apiVersion"], ["kind"], ["metadata"], ["metadata", "name"], ["spec", "replicas"], ["spec", "greeting"], ["spec", "external"], ["spec", "resources"]]

@@ -1,0 +1,141 @@
+---
+# Лаба 6 · Свій приватний реєстр образів. РОБОЧИЙ варіант маніфесту.
+#
+# Це той самий файл, що passes-broken.yaml, плюс одне місце, якого там бракувало —
+# воно позначене нижче словами «ОСЬ ЧОГО БРАКУВАЛО». Застосовуйте його після того, як
+# побачили відмову на зламаному варіанті й розібралися, чому вона сталася.
+#
+# Застосовується на вашому кластері `lab` (не на кластері керування Cozystack — там
+# живе лише сам Harbor), у namespace за замовчуванням:
+#     export KUBECONFIG=~/lab.kubeconfig
+#     kubectl delete -f passes-broken.yaml
+#     kubectl apply -f passes.yaml
+#
+# УВАГА: HARBOR-HOST — заглушка, а не робоча адреса. Перед застосуванням підставте адресу
+# свого Harbor; рядок HARBOR-HOST трапляється у файлі двічі, sed замінить обидва:
+#   sed -i    's|HARBOR-HOST|harbor.workshop03.example.org|g' passes.yaml   # Linux
+#   sed -i '' 's|HARBOR-HOST|harbor.workshop03.example.org|g' passes.yaml   # macOS
+#
+# В об'єктах нижче: apiVersion — версія схеми опису, kind — що створюємо,
+# metadata.name — ім'я об'єкта. Окремо далі не пояснюються.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: passes-api
+  labels:
+    app: passes-api
+spec:
+  # Дві копії, а не одна: так у відповіді сервісу буде видно, що запити обслуговують
+  # різні Pod, і що образ завантажився на вузол один раз, а запустився двічі.
+  replicas: 2
+  # Умова «мої копії — це Pod з міткою app: passes-api». Мітка у зразку Pod нижче
+  # має збігатися з цією, інакше кластер відхилить маніфест.
+  selector:
+    matchLabels:
+      app: passes-api
+  # Зразок, за яким штампуються копії. Усе, що всередині, описує один Pod.
+  template:
+    metadata:
+      labels:
+        app: passes-api
+    spec:
+      # Обмеження безпеки на весь Pod: не запускати від root, працювати під
+      # непривілейованим користувачем 10001, обмежити набір системних викликів
+      # стандартним профілем. Образ зібраний під це саме (див. app/Dockerfile, рядок USER).
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      # ОСЬ ЧОГО БРАКУВАЛО в passes-broken.yaml — ці два рядки, і більше нічого.
+      #
+      # Закритий реєстр віддає образ не всякому: спершу треба назватися. Секрет `harbor`
+      # (тип kubernetes.io/dockerconfigjson) зберігає адресу реєстру, логін і пароль; ви
+      # створили його командою kubectl create secret docker-registry. Тут секрет лише
+      # НАЗИВАЄТЬСЯ за ім'ям — бере його звідти не застосунок, а kubelet на вузлі, у той
+      # момент, коли йде завантажувати образ. Тому секрет має лежати в тому самому
+      # namespace, що й Pod: kubelet шукає його саме там і більше ніде.
+      imagePullSecrets:
+        - name: harbor
+      containers:
+        - name: api
+          # Права на рівні контейнера: не додавати собі привілеїв і віддати всі особливі
+          # повноваження ядра. Застосунку потрібен один мережевий порт, решта зайва.
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          # Перша частина імені образу — адреса реєстру, і саме тому переїзд на свій
+          # реєстр змінює маніфести: ім'я образу стає іншим. Не будь адреси на
+          # початку, кластер пішов би за образом у Docker Hub, а ІБ це й заборонила.
+          image: HARBOR-HOST/passes/passes-api:v1
+          # Порт застосунку. Ім'я `http` далі використовують перевірка готовності та Service,
+          # тож номер порту задано в одному місці, а не в трьох.
+          ports:
+            - containerPort: 8080
+              name: http
+          # Змінні оточення, з яких застосунок дізнається, хто він і звідки приїхав.
+          # Саме їх він і друкує у відповіді (див. app/main.go, структура identity).
+          # APP_VERSION та IMAGE_REGISTRY задані текстом — їх пишемо ми самі.
+          env:
+            - name: APP_VERSION
+              value: "v1"
+            - name: IMAGE_REGISTRY
+              value: HARBOR-HOST
+            # Далі — Downward API: кластер сам кладе у змінні те, що знає про Pod.
+            # Застосунку не потрібно ні вгадувати своє ім'я, ні ходити за ним в API кластера,
+            # ні носити із собою права на такий запит. Значення підставляються в момент
+            # запуску копії, тому в кожної копії вони свої.
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          # requests — що зарезервувати під копію: за цими числами планувальник обирає
+          # вузол. limits — стеля: за пам'ять вище стелі контейнер убивають, за
+          # процесор — пригальмовують. 16Mi вистачає тому, що застосунок на Go без
+          # залежностей і майже нічого не тримає в пам'яті; у JVM було б на два порядки
+          # більше. 20m — двадцять тисячних процесорного ядра.
+          resources:
+            requests:
+              cpu: 20m
+              memory: 16Mi
+            limits:
+              cpu: 300m
+              memory: 64Mi
+          # Перевірка готовності: поки застосунок не відповість на /healthz, Service не
+          # пустить на цю копію трафік. Під час викочування нової версії стара копія прибирається
+          # з балансування лише після того, як нова відповіла, — тому запити
+          # не падають на ще не піднятому процесі.
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+---
+# Постійне ім'я, за яким стоять обидві копії. Pod перестворюються й міняють адреси,
+# ім'я passes-api.default.svc.cluster.local не змінюється. Без цього об'єкта застосунок
+# працює, але достукатися до нього всередині кластера немає по чому — і перевірка в check.sh
+# ходить саме сюди, а не в Pod.
+apiVersion: v1
+kind: Service
+metadata:
+  name: passes-api
+spec:
+  # Зв'язок з Pod — не список адрес, а умова за міткою. Нова копія з міткою
+  # app: passes-api потрапляє під балансування сама, реєструвати її не потрібно.
+  selector:
+    app: passes-api
+  # port — на якому порту відповідає сам Service; targetPort посилається на ім'я `http`
+  # з блоку ports вище, а не на номер, тому зв'язок не порветься при зміні номера.
+  ports:
+    - port: 80
+      targetPort: http

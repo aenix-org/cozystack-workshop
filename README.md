@@ -23,6 +23,7 @@ language.
 | [`ko/`](ko/) | Korean | complete |
 | [`de/`](de/) | German | complete |
 | [`hi/`](hi/) | Hindi | complete |
+| [`uk/`](uk/) | Ukrainian | complete |
 
 Russian is where the text is written and edited first. English is translated
 from Russian and polished to flagship quality; the other languages are produced

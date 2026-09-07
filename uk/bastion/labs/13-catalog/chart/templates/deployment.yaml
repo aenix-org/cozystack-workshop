@@ -1,0 +1,117 @@
+# Лаба 13. Шаблон Deployment: що запускати і в скількох копіях.
+#
+# Файли в templates/ — заготовки, а не готові маніфести. Helm підставляє в них значення
+# і віддає результат кластеру: `helm template main chart` показує готовий текст, нічого
+# не застосовуючи, `helm install main chart` — застосовує.
+#
+# Подвійні фігурні дужки — місце підстановки. Всередині них трапляється:
+#   .Values.імʼя  — значення параметра: з values.yaml, якщо замовник його не чіпав,
+#                   або з форми замовлення в дашборді, якщо вибрав своє;
+#   .Release.Name — імʼя релізу, тобто імʼя конкретного розгортання чарта.
+# Текст поза дужками йде в маніфест як є.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  # Імена обʼєктів збираються з імені релізу, а не пишуться жорстко. Один і той самий чарт
+  # розгортають в одному namespace не по разу, і фіксоване імʼя означало б, що
+  # друге замовлення затирає перше. Реліз `main` дає Deployment, Service і ConfigMap
+  # з іменем `main` — по імені одразу видно, що це одна група.
+  name: {{ .Release.Name }}
+  # Мітки: name однаковий у всіх замовлень цього застосунку, instance розрізняє замовлення.
+  # За ними обʼєкти знаходять одне одного і за ними ж відбирають вивід `kubectl get`.
+  labels:
+    app.kubernetes.io/name: guest-pass
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  # Скільки копій тримати запущеними. Якщо копія зникне, кластер створить нову,
+  # не питаючи, — звідси самовідновлення без чергового адміністратора.
+  replicas: {{ .Values.replicas }}
+  # selector каже Deployment, які Pod вважати своїми, — за мітками, а не за іменами.
+  # Мітки тут і мітки в template.metadata.labels зобовʼязані збігатися. Розійшлися —
+  # Deployment не знаходить власні копії і штампує їх знову і знову.
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: guest-pass
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  # template — зразок Pod. Все, що нижче, описує не сам Deployment, а копії
+  # застосунку, які він за цим зразком створює.
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: guest-pass
+        app.kubernetes.io/instance: {{ .Release.Name }}
+      annotations:
+        # Хеш конфігурації в анотації Pod. Без нього правка ConfigMap не перезапускає
+        # Pod, і новий текст не зʼявляється, поки хтось не видалить їх руками.
+        # Це найчастіша скарга на чарти взагалі.
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      # Застосунок працює не від root і з урізаними правами. Чарт з каталогу
+      # розгортають чужі тенанти у своїх namespace, і права контейнера — частина того,
+      # що ви їм обіцяєте разом із застосунком.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: nginx
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          # Образ записаний у шаблоні і в параметри не винесений навмисно: замовник вибирає
+          # розмір і текст, але не підміняє сам застосунок на довільний.
+          image: nginxinc/nginx-unprivileged:1.27-alpine
+          # Без цієї змінної nginx піднімає по робочому процесу на кожне ядро вузла.
+          # На вузлі з кількома десятками ядер їх виявиться десятки, і Pod з лімітом
+          # памʼяті в сотню мегабайтів помре з OOMKilled ще до першого запиту. Чарт їде
+          # в чужі тенанти, де вузли можуть бути будь-якими, тому тут це обовʼязково.
+          env:
+            - name: NGINX_ENTRYPOINT_WORKER_PROCESSES_AUTOTUNE
+              value: "1"
+          # Порт всередині контейнера. Імʼя http далі використовується в пробі і в Service,
+          # щоб номер порту був записаний в одному місці, а не в трьох.
+          ports:
+            - containerPort: 8080
+              name: http
+          # requests — скільки виділити гарантовано, за цими числами планувальник
+          # підбирає вузол. limits тут лише за памʼяттю: перевищив — контейнер вбивають
+          # і піднімають заново. Ліміту на CPU немає навмисно, інакше застосунок упирається
+          # в стелю замість того, щоб відпрацювати повільніше.
+          # Фільтр `| quote` обгортає підставлене значення в лапки: користувач
+          # може ввести 1, і без лапок у маніфест піде число там, де чекають запис
+          # виду "1" або "100m".
+          resources:
+            requests:
+              cpu: {{ .Values.resources.cpu | quote }}
+              memory: {{ .Values.resources.memory | quote }}
+            limits:
+              memory: {{ .Values.resources.memory | quote }}
+          # readinessProbe — питання «готовий приймати запити?». Поки /healthz не відповів,
+          # Service не шле на цю копію трафік. Звідси оновлення без обриву: стару
+          # копію виводять з балансування після того, як відповіла нова.
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 2
+          # Сторінка і конфіг nginx підключаються файлами з ConfigMap. subPath підставляє
+          # рівно один файл: без нього змонтований каталог підмінив би весь /etc/nginx/
+          # conf.d і штатні налаштування образу зникли б.
+          volumeMounts:
+            - name: page
+              mountPath: /usr/share/nginx/html/index.html
+              subPath: index.html
+            - name: conf
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: default.conf
+      # Імʼя ConfigMap зібране з імені релізу, тому Pod завжди монтує конфігурацію
+      # свого замовлення, а не сусіднього.
+      volumes:
+        - name: page
+          configMap:
+            name: {{ .Release.Name }}
+        - name: conf
+          configMap:
+            name: {{ .Release.Name }}

@@ -1,0 +1,104 @@
+---
+# Лаба 12. Віртуальна машина під легасі-довідник співробітників: диск і сама машина,
+# два об'єкти в одному файлі, розділені рядком `---`.
+#
+# Це тенантні об'єкти: вони живуть НЕ в кластері `lab`, а у вашому namespace
+# на кластері керування. Kubeconfig потрібен тенантний.
+#
+# Перед застосуванням замініть tenant-workshopXX на свій namespace, інакше замовлення поїде
+# не у ваш тенант.
+#
+#     export KUBECONFIG=~/.kube/workshop
+#     kubectl apply -f staff-directory-vm.yaml
+#
+# Те саме робиться мишкою в дашборді тенанта (Створити застосунок -> VM Disk,
+# потім VM Instance) — результат однаковий.
+#
+# УВАГА: ім'я, за яким машину звуть далі, НЕ збігається з metadata.name, і це не
+# помилка в лабі. Об'єкт VMInstance з іменем X платформа розгортає чартом
+# `vm-instance`, а ім'я чарта склеюється з іменем релізу: запущений екземпляр
+# називається vm-instance-X. До того ж ціль вказується з префіксом типу, тому що
+# тенантні права видані на екземпляри (virtualmachineinstances, вони ж vmi), а не на
+# virtualmachines, — голе ім'я поверне forbidden. Звідси команда входу в консоль:
+#     virtctl console --namespace=tenant-workshopXX vmi/vm-instance-spravochnik
+# Список запущених екземплярів: kubectl get vmi -n tenant-workshopXX
+# А `kubectl get vminstance spravochnik` показує не екземпляр, а ваше замовлення на нього —
+# той самий об'єкт, який описано нижче.
+#
+# Диск і машина — ДВА РІЗНИХ об'єкти, і це не бюрократія: диск переживає
+# машину. Машину можна видалити і створити заново, підчепивши той самий диск.
+apiVersion: apps.cozystack.io/v1alpha1
+kind: VMDisk
+metadata:
+  name: spravochnik
+  namespace: tenant-workshopXX
+spec:
+  source:
+    image:
+      # Ім'я із загальної колекції образів платформи, не URL.
+      # Список видно в дашборді при створенні диска.
+      name: ubuntu-22.04
+  # Розмір диска. Він не може бути меншим за образ-джерело: ubuntu-22.04 розгортається
+  # у 20Gi, і диск на 10Gi платформа відмовилася б наповнити. Диск потім розширюється,
+  # але не зменшується, тому занизити тут дорожче, ніж завищити.
+  storage: 20Gi
+  # Клас сховища. `replicated` — дані пишуться в кілька копій на різні вузли
+  # платформи: вузол з копією може померти, машина продовжить працювати. За змістом це
+  # дзеркало, тільки зібране по мережі. Той самий клас беруть бази даних у сусідніх лабах.
+  storageClass: replicated
+---
+apiVersion: apps.cozystack.io/v1alpha1
+kind: VMInstance
+metadata:
+  name: spravochnik
+  namespace: tenant-workshopXX
+spec:
+  # 1 процесор, 4 ГБ. Той самий довідник каталогу, з якого беруться
+  # розміри вузлів Kubernetes: машини і вузли тут міряються однаково.
+  instanceType: u1.medium
+  # Профіль гостьової ОС: які драйвери й пристрої підсунути машині.
+  instanceProfile: ubuntu
+  # Always означає «тримати ввімкненою»: вимкнеться сама — увімкнуть знову.
+  # Halted — вимкнена, Manual — як залишили.
+  runStrategy: Always
+  # Які диски підключити до машини. Посилання йде за іменем об'єкта VMDisk вище — того
+  # самого, який переживе цю машину.
+  disks:
+    - name: spravochnik
+  # Зверніть увагу: поля replicas тут НЕМАЄ і не буде.
+  # Віртуальна машина — це один об'єкт. Потрібні дві машини — два об'єкти
+  # з різними іменами. Це принципова відмінність від Deployment,
+  # див. розділ README про те, де ця різниця болить.
+  # Первинне налаштування гостьової ОС. cloud-init — штатний механізм хмарних образів
+  # Linux: при першому запуску машина читає цей текст і застосовує його до себе. За роллю
+  # це кастомізація гостя у vSphere — паролі, файли, служби, — тільки описом, а не
+  # майстром. Усе, що нижче відступу після `|`, їде в гостя дослівно і розбирається
+  # вже там, а не Kubernetes.
+  #
+  # Тут cloud-init робить довідник сервером: кладе HTML-сторінку і заводить службу,
+  # яка віддає її по HTTP на порту 8080. python3 вже є в образі ubuntu — інтернет
+  # для цього не потрібен. Порт 8080 не випадковий: викладач заздалегідь створив у вашому тенанті
+  # Service `spravochnik-http` (80 -> 8080) та Ingress `spravochnik`, і щойно служба
+  # всередині машини підніметься, довідник опублікується на домені тенанта.
+  cloudInit: |
+    #cloud-config
+    # Пароль потрібен, щоб увійти в консоль з дашборда. На робочій машині
+    # так робити не треба — там sshKeys.
+    password: ubuntu
+    chpasswd: { expire: false }
+    ssh_pwauth: true
+    write_files:
+      - path: /opt/directory/index.html
+        content: |
+          <!doctype html><html lang="uk"><head><meta charset="utf-8"><title>Довідник</title></head><body><h1>Довідник співробітників</h1><ul><li>Коваленко І. — 101</li><li>Петренко П. — 102</li></ul></body></html>
+      - path: /etc/systemd/system/directory.service
+        content: |
+          [Unit]
+          Description=Staff directory
+          After=network.target
+          [Service]
+          ExecStart=/usr/bin/python3 -m http.server 8080 --bind 0.0.0.0 --directory /opt/directory
+          Restart=always
+          [Install]
+          WantedBy=multi-user.target
+    runcmd: [ "systemctl daemon-reload", "systemctl enable --now directory" ]

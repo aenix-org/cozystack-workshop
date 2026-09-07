@@ -1,0 +1,169 @@
+---
+# Лаба 11. Вихідники мобільного застосунку «Перепустка» — те, що подається збірці на вхід.
+#
+# Застосовується на вашому навчальному кластері `lab`, а не в тенанті на кластері керування:
+#     export KUBECONFIG=~/lab.kubeconfig
+#     kubectl apply -f propusk-src.yaml
+# Заглушок на кшталт tenant-workshopXX тут немає — підставляти свій номер нікуди не потрібно.
+# Namespace теж не вказано: об'єкт ляже в той, що прописаний у вашому kubeconfig.
+#
+# Застосунок навмисно крихітний: одна активність, один текст на екрані.
+# Сенс лаби не в Android, а в тому, що збірка їде в кластер.
+#
+# ЩО ЦЕ ЗА ФАЙЛИ, якщо мобільних застосунків ви ніколи не збирали.
+# Проєкт Android — не один файл з кодом, а дерево з трьох видів файлів:
+#   *.gradle.kts  опис збірки: звідки брати бібліотеки, чим компілювати, під які
+#                 версії Android збирати. За роллю це makefile, тільки мовою Kotlin;
+#   *.kt          власне код застосунку;
+#   *.xml         ресурси: тексти й опис того, який екран відкривати при натисканні
+#                 на іконку.
+# Складальник Gradle читає це дерево й видає APK — один файл-інсталятор для телефона,
+# за роллю те саме, що .msi для Windows. Ставити Android SDK собі та збирати руками не
+# потрібно: цим займеться Job з android-build.yaml, а тут лежить лише його вхід.
+#
+# Вихідники лежать у ConfigMap, а не в образі, рівно з тієї ж причини, з
+# якої в лабі з першим застосунком у ConfigMap лежала сторінка nginx:
+# щоб змінити їх, нічого не перезбираючи. ConfigMap — об'єкт кластера, всередині
+# якого лежать текстові файли; під час запуску контейнера кластер підкладає їх
+# усередину нього як звичайні файли на диску.
+#
+# Ключі всередині `data` — це імена файлів, а все, що нижче відступу після `|`, —
+# дослівний вміст файлу, а не YAML. Коментар, поставлений усередину такого
+# блоку, став би рядком самого файлу, тому всі пояснення нижче стоять зовні,
+# перед ключем.
+#
+# Плоска карта з шести ключів розгортається в дерево каталогів не тут, а під час
+# монтування: відповідність «ключ -> шлях» задано в android-build.yaml, у блоці
+# volumes.items. Ключ ConfigMap не може містити слеш — звідси пласке ім'я
+# app-build.gradle.kts, яке в проєкті стане app/build.gradle.kts.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: propusk-src
+data:
+  # Верхній файл проєкту: перелічує, звідки Gradle тягне плагіни та бібліотеки і які
+  # модулі входять у проєкт (тут один — app). Усі три репозиторії публічні, в інтернеті:
+  # контейнер збірки стартує порожнім і тягне звідти все, звідси й тривалість збірки.
+  # Це саме місце ви виправите першим, коли ІБ закриє вихід назовні, — сюди пропишеться
+  # внутрішній проксі-репозиторій, рівно як Docker Hub міняли на Harbor.
+  settings.gradle.kts: |
+    pluginManagement {
+      repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+      }
+    }
+    dependencyResolutionManagement {
+      repositories {
+        google()
+        mavenCentral()
+      }
+    }
+    rootProject.name = "propusk"
+    include(":app")
+
+  # Кореневий файл збірки: фіксує версії двох плагінів — складальника Android і компілятора
+  # Kotlin. `apply false` означає «версію оголосити, але в кореневому проєкті не вмикати»:
+  # увімкне їх модуль app. Версії прибиті цвяхами навмисно. Збірка, яка тягне
+  # «останнє», за місяць збирається інакше, ніж сьогодні, і розбиратися в цьому будете ви.
+  build.gradle.kts: |
+    plugins {
+      id("com.android.application") version "8.5.2" apply false
+      id("org.jetbrains.kotlin.android") version "1.9.24" apply false
+    }
+
+  # Опис самого модуля застосунку. Тут три числа, від яких залежить і що завантажить
+  # збірка, і де застосунок узагалі запуститься:
+  #   compileSdk 34   версія Android SDK, якою компілюємо. Її й качає крок встановлення
+  #                   SDK — близько півтора гігабайта, найдовший крок збірки;
+  #   minSdk 24       найстаріший Android, на якому застосунок піде (це Android 7).
+  #                   Піднімете — відітнете старі телефони, опустите — доведеться тягти
+  #                   бібліотеки сумісності;
+  #   jvmTarget 17    Kotlin компілюється в байт-код Java, і це число зобов'язане збігтися
+  #                   з версією JDK в образі збірки (gradle:8.9-jdk17 в android-build.yaml).
+  #                   Розійдуться — збірка впаде на розбіжності версій байт-коду.
+  app-build.gradle.kts: |
+    plugins {
+      id("com.android.application")
+      id("org.jetbrains.kotlin.android")
+    }
+
+    android {
+      namespace = "io.aenix.propusk"
+      compileSdk = 34
+
+      defaultConfig {
+        applicationId = "io.aenix.propusk"
+        minSdk = 24
+        targetSdk = 34
+        versionCode = 1
+        versionName = "1.0"
+      }
+
+      compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+      }
+
+      kotlinOptions {
+        jvmTarget = "17"
+      }
+
+      sourceSets {
+        getByName("main") {
+          java.srcDirs("src/main/kotlin")
+        }
+      }
+    }
+
+  # Паспорт застосунку для телефона: які екрани в ньому є і який з них відкривається
+  # при натисканні на іконку. Рівно за це відповідає блок intent-filter з MAIN і LAUNCHER —
+  # без нього застосунок установиться, але значка в меню не з'явиться.
+  AndroidManifest.xml: |
+    <?xml version="1.0" encoding="utf-8"?>
+    <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+      <application android:label="@string/app_name">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+          <intent-filter>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+          </intent-filter>
+        </activity>
+      </application>
+    </manifest>
+
+  # Єдиний екран застосунку — і весь код, який у проєкті взагалі є.
+  # Узято голий android.app.Activity, а не бібліотеку сумісності: у проєкту нуль зовнішніх
+  # залежностей, і це заощаджує по парі хвилин завантаження на кожній збірці.
+  # R.string.greeting — посилання на текст із strings.xml. Клас R у вихідниках не лежить, його
+  # генерує збірка. Тому помилка «unresolved reference: R» означає невдалий крок
+  # генерації ресурсів, а не одруківку в коді.
+  MainActivity.kt: |
+    package io.aenix.propusk
+
+    import android.app.Activity
+    import android.os.Bundle
+    import android.widget.TextView
+
+    class MainActivity : Activity() {
+      override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        val view = TextView(this)
+        view.textSize = 22f
+        view.setPadding(48, 96, 48, 48)
+        view.text = getString(R.string.greeting)
+        setContentView(view)
+      }
+    }
+
+  # Тексти, винесені з коду: так їх правлять і перекладають, не чіпаючи програміста.
+  # app_name видно під іконкою на телефоні, greeting — на самому екрані.
+  strings.xml: |
+    <?xml version="1.0" encoding="utf-8"?>
+    <resources>
+      <string name="app_name">Перепустка</string>
+      <string name="greeting">Замовити пропуск для гостя</string>
+    </resources>
