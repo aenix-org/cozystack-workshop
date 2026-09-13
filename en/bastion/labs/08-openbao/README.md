@@ -980,24 +980,29 @@ to a line in a schedule.
 
 📍 **Where:** on the bastion, in the lab cluster.
 
-The auditor's second demand — "show me who read the password." Let's turn on the log:
+The auditor's second demand — "show me who read the password." That's what the audit log is for.
 
-```bash
-# audit enable turns on an audit device.
-#   file              the device type: write records as text
-#   file_path=stdout  instead of a file on disk — to the Pod's standard output, from where
-#                     the platform collects the logs
-kubectl exec bao-workbench -- bao audit enable file file_path=stdout
-# audit list lists the enabled devices — a check that the command above went through.
-kubectl exec bao-workbench -- bao audit list
-```
-
-**What you should see** — a table with one enabled device of type `file`.
+> **Version note.** As of OpenBao 2.5 you **cannot** enable auditing over the API with
+> `bao audit enable ... file_path=stdout` — you get back
+> `cannot enable audit device via API; use declarative, config-based audit device management instead`.
+> This is a deliberate hardening after CVE-2025-54997 (a `file` audit device could write to an
+> arbitrary file on the node). Auditing is now configured **declaratively only** — with a stanza in
+> the OpenBao server config, applied on startup and on SIGHUP:
+>
+> ```hcl
+> audit "file" {
+>   options = { file_path = "stdout" }
+> }
+> ```
+>
+> The current workshop OpenBao app does **not** yet expose this config option, so enabling auditing
+> in the lab isn't possible right now — the step is left as explanatory, and the check (`check.sh`)
+> does not require it. Once the platform exposes the audit config, the step becomes runnable again.
 
 <details>
 <summary><b>What goes into the audit log, and how it differs from an ordinary log</b></summary>
 
-From this moment OpenBao writes a record **for every API request**: who asked (which token, which
+When auditing is enabled, OpenBao writes a record **for every API request**: who asked (which token, which
 policy), what exactly, when, from what address, and what was answered. There are two records per
 request — the request itself and the response to it.
 
@@ -1014,8 +1019,8 @@ aren't written. The log can be handed outside without handing over its contents 
 store that serves requests while unable to record them is worse than one that's down. Hence a
 practical corollary — don't point your only audit device at a file on a disk that can fill up.
 
-⚠️ **You won't be allowed to read this log in the lab, and that has to be said plainly.** We directed
-it to the standard output of the OpenBao Pod, and your role can't read the logs of Pods in the
+⚠️ **Even once auditing is enabled, you won't be allowed to read this log in the lab, and that has to be said plainly.** It is directed
+to the standard output of the OpenBao Pod, and your role can't read the logs of Pods in the
 tenant — the tenant hands you management of services, but not access to their internals. In a real
 installation the platform's log collector picks the log up and puts it where the security team looks
 at it, not you via `kubectl`.

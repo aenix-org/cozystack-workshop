@@ -202,7 +202,7 @@ print(len([k for k in data if isinstance(data.get(k), dict)]))
     ok "監査ログが有効です（デバイス数: ${AUD_COUNT}）"
     evidence "監査デバイス" "$AUD"
   else
-    fail "監査ログが有効になっていません — 誰がシークレットを読んだか答える手段がありません" \
+    warn "監査ログが有効になっていません — 誰がシークレットを読んだか答える手段がありません" \
          "有効化してください: kubectl exec bao-workbench -- bao audit enable file file_path=stdout"
   fi
 fi

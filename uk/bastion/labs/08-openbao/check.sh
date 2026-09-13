@@ -207,7 +207,7 @@ print(len([k for k in data if isinstance(data.get(k), dict)]))
     ok "аудит-журнал увімкнено (пристроїв: ${AUD_COUNT})"
     evidence "Аудит-пристрої" "$AUD"
   else
-    fail "аудит-журнал не увімкнено — відповісти, хто читав секрет, буде нічим" \
+    warn "аудит-журнал не увімкнено — відповісти, хто читав секрет, буде нічим" \
          "увімкніть: kubectl exec bao-workbench -- bao audit enable file file_path=stdout"
   fi
 fi
