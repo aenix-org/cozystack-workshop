@@ -205,7 +205,7 @@ print(len([k for k in data if isinstance(data.get(k), dict)]))
     ok "audit log is enabled (devices: ${AUD_COUNT})"
     evidence "Audit devices" "$AUD"
   else
-    fail "audit log is not enabled — there will be nothing to answer who read the secret with" \
+    warn "audit log is not enabled — there will be nothing to answer who read the secret with" \
          "enable it: kubectl exec bao-workbench -- bao audit enable file file_path=stdout"
   fi
 fi

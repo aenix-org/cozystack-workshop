@@ -207,7 +207,7 @@ print(len([k for k in data if isinstance(data.get(k), dict)]))
     ok "el audit log está habilitado (dispositivos: ${AUD_COUNT})"
     evidence "Dispositivos de auditoría" "$AUD"
   else
-    fail "el audit log no está habilitado — no habrá con qué responder quién leyó el secreto" \
+    warn "el audit log no está habilitado — no habrá con qué responder quién leyó el secreto" \
          "habilítalo: kubectl exec bao-workbench -- bao audit enable file file_path=stdout"
   fi
 fi

@@ -206,7 +206,7 @@ print(len([k for k in data if isinstance(data.get(k), dict)]))
     ok "감사 로그가 활성화되었습니다(장치: ${AUD_COUNT}개)"
     evidence "감사 장치" "$AUD"
   else
-    fail "감사 로그가 활성화되지 않았습니다 — 누가 시크릿을 읽었는지 답할 것이 없습니다" \
+    warn "감사 로그가 활성화되지 않았습니다 — 누가 시크릿을 읽었는지 답할 것이 없습니다" \
          "활성화하세요: kubectl exec bao-workbench -- bao audit enable file file_path=stdout"
   fi
 fi

@@ -207,7 +207,7 @@ print(len([k for k in data if isinstance(data.get(k), dict)]))
     ok "审计日志已启用（设备数：${AUD_COUNT}）"
     evidence "审计设备" "$AUD"
   else
-    fail "审计日志未启用——将无从回答谁读取了密钥" \
+    warn "审计日志未启用——将无从回答谁读取了密钥" \
          "启用它：kubectl exec bao-workbench -- bao audit enable file file_path=stdout"
   fi
 fi

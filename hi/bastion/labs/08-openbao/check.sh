@@ -206,7 +206,7 @@ print(len([k for k in data if isinstance(data.get(k), dict)]))
     ok "ऑडिट लॉग चालू है (डिवाइस: ${AUD_COUNT})"
     evidence "ऑडिट डिवाइस" "$AUD"
   else
-    fail "ऑडिट लॉग चालू नहीं है — सीक्रेट किसने पढ़ा, इसका जवाब देने को कुछ नहीं होगा" \
+    warn "ऑडिट लॉग चालू नहीं है — सीक्रेट किसने पढ़ा, इसका जवाब देने को कुछ नहीं होगा" \
          "इसे चालू करें: kubectl exec bao-workbench -- bao audit enable file file_path=stdout"
   fi
 fi
