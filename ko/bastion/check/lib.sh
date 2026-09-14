@@ -240,6 +240,20 @@ PY
 # 사용법:
 #   in_cluster_with_secrets "<image>" "KEY1=val1
 #   KEY2=val2" sh -c '$KEY1 을 읽는 명령'
+# Wait for the one-shot pod to finish and return its stdout via `kubectl logs`.
+# `kubectl run --rm -i` lost output: the container often printed before the attach
+# connected, so stdout was dropped. `kubectl logs` captures it reliably after exit.
+_await_and_log() {
+  local name="$1" i ph
+  for i in $(seq 1 45); do
+    ph="$(kubectl get pod "$name" -o jsonpath='{.status.phase}' 2>/dev/null)"
+    case "$ph" in Succeeded|Failed) break ;; esac
+    sleep 2
+  done
+  kubectl logs "$name" 2>/dev/null
+  kubectl delete pod "$name" --ignore-not-found --wait=false >/dev/null 2>&1
+}
+
 in_cluster_with_secrets() {
   local image="$1" envs="$2"; shift 2
   local name="check-$$-$RANDOM"
@@ -258,15 +272,12 @@ EOF
   # 클러스터에서 파드가 생성되지 않고, 데이터베이스 실습의 검사가 동작하지 않습니다.
   local cmd_json
   cmd_json="$(printf '%s\n' "$@" | python3 -c 'import sys,json;print(json.dumps([l.rstrip("\n") for l in sys.stdin]))')"
-  kubectl run "$name" --rm -i --restart=Never --quiet \
+  kubectl run "$name" --restart=Never --quiet \
     --image="$image" --pod-running-timeout=90s \
     --overrides="{\"spec\":{\"securityContext\":{\"runAsNonRoot\":true,\"runAsUser\":65532,\"seccompProfile\":{\"type\":\"RuntimeDefault\"}},\"containers\":[{\"name\":\"$name\",\"image\":\"$image\",\"stdin\":true,\"securityContext\":{\"allowPrivilegeEscalation\":false,\"capabilities\":{\"drop\":[\"ALL\"]}},\"envFrom\":[{\"secretRef\":{\"name\":\"$sec\"}}],\"command\":$cmd_json}]}}" \
-    2>/dev/null
-  local rc=$?
-
+    >/dev/null 2>&1
+  _await_and_log "$name"
   kubectl delete secret "$sec" --ignore-not-found --wait=false >/dev/null 2>&1
-  kubectl delete pod "$name" --ignore-not-found --wait=false >/dev/null 2>&1
-  return $rc
 }
 
 # `restricted` 프로필을 통과하는 securityContext가 포함된 override를 구성합니다.
@@ -298,17 +309,12 @@ in_cluster_curl() {
   local name="check-$$-$RANDOM"
   # securityContext는 필수입니다: `restricted` 프로필의 클러스터에서 이것이 없는
   # 파드는 생성되지 않으며, 참가자는 실습을 아예 검증할 수 없게 됩니다.
-  kubectl run "$name" --rm -i --restart=Never --quiet \
+  kubectl run "$name" --restart=Never --quiet \
     --image=curlimages/curl:8.11.1 --pod-running-timeout=90s \
     --overrides="$(_restricted_overrides "$name" curlimages/curl:8.11.1 \
       curl -s --max-time 10 $extra "$url")" \
-    2>/dev/null
-  local rc=$?
-  # `--rm`은 클라이언트가 연결되어 있는 동안에만 파드를 삭제합니다: 연결 끊김,
-  # 타임아웃, Ctrl+C는 파드를 매달린 채로 남깁니다. 명시적 삭제 — 스크립트가
-  # 클러스터를 어지럽히지 않도록 하기 위함입니다.
-  kubectl delete pod "$name" --ignore-not-found --wait=false >/dev/null 2>&1
-  return $rc
+    >/dev/null 2>&1
+  _await_and_log "$name"
 }
 
 # 여러 번의 요청 응답을 한 줄에 하나씩 연달아 수집합니다.
@@ -320,12 +326,10 @@ in_cluster_curl() {
 in_cluster_curl_many() {
   local url="$1" times="${2:-8}"
   local name="check-$$-$RANDOM"
-  kubectl run "$name" --rm -i --restart=Never --quiet \
+  kubectl run "$name" --restart=Never --quiet \
     --image=curlimages/curl:8.11.1 --pod-running-timeout=90s \
     --overrides="$(_restricted_overrides "$name" curlimages/curl:8.11.1 \
       sh -c "for i in \$(seq 1 $times); do curl -s --max-time 10 '$url'; echo; done")" \
-    2>/dev/null
-  local rc=$?
-  kubectl delete pod "$name" --ignore-not-found --wait=false >/dev/null 2>&1
-  return $rc
+    >/dev/null 2>&1
+  _await_and_log "$name"
 }

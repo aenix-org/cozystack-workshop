@@ -233,6 +233,20 @@ PY
 # 用法:
 #   in_cluster_with_secrets "<image>" "KEY1=val1
 #   KEY2=val2" sh -c '读取 $KEY1 的命令'
+# Wait for the one-shot pod to finish and return its stdout via `kubectl logs`.
+# `kubectl run --rm -i` lost output: the container often printed before the attach
+# connected, so stdout was dropped. `kubectl logs` captures it reliably after exit.
+_await_and_log() {
+  local name="$1" i ph
+  for i in $(seq 1 45); do
+    ph="$(kubectl get pod "$name" -o jsonpath='{.status.phase}' 2>/dev/null)"
+    case "$ph" in Succeeded|Failed) break ;; esac
+    sleep 2
+  done
+  kubectl logs "$name" 2>/dev/null
+  kubectl delete pod "$name" --ignore-not-found --wait=false >/dev/null 2>&1
+}
+
 in_cluster_with_secrets() {
   local image="$1" envs="$2"; shift 2
   local name="check-$$-$RANDOM"
@@ -251,15 +265,12 @@ EOF
   # 不会被创建，数据库实验的检查也就跑不起来。
   local cmd_json
   cmd_json="$(printf '%s\n' "$@" | python3 -c 'import sys,json;print(json.dumps([l.rstrip("\n") for l in sys.stdin]))')"
-  kubectl run "$name" --rm -i --restart=Never --quiet \
+  kubectl run "$name" --restart=Never --quiet \
     --image="$image" --pod-running-timeout=90s \
     --overrides="{\"spec\":{\"securityContext\":{\"runAsNonRoot\":true,\"runAsUser\":65532,\"seccompProfile\":{\"type\":\"RuntimeDefault\"}},\"containers\":[{\"name\":\"$name\",\"image\":\"$image\",\"stdin\":true,\"securityContext\":{\"allowPrivilegeEscalation\":false,\"capabilities\":{\"drop\":[\"ALL\"]}},\"envFrom\":[{\"secretRef\":{\"name\":\"$sec\"}}],\"command\":$cmd_json}]}}" \
-    2>/dev/null
-  local rc=$?
-
+    >/dev/null 2>&1
+  _await_and_log "$name"
   kubectl delete secret "$sec" --ignore-not-found --wait=false >/dev/null 2>&1
-  kubectl delete pod "$name" --ignore-not-found --wait=false >/dev/null 2>&1
-  return $rc
 }
 
 # 构造一个带 securityContext 的 override，使其能通过 `restricted` 配置。
@@ -289,16 +300,12 @@ in_cluster_curl() {
   local name="check-$$-$RANDOM"
   # securityContext 是必需的：在启用 `restricted` 配置的集群里，没有它的 Pod 不会被
   # 创建，参与者也就根本无法检查这个实验。
-  kubectl run "$name" --rm -i --restart=Never --quiet \
+  kubectl run "$name" --restart=Never --quiet \
     --image=curlimages/curl:8.11.1 --pod-running-timeout=90s \
     --overrides="$(_restricted_overrides "$name" curlimages/curl:8.11.1 \
       curl -s --max-time 10 $extra "$url")" \
-    2>/dev/null
-  local rc=$?
-  # `--rm` 只在客户端处于 attach 状态时删除 Pod：断连、超时或 Ctrl+C 都会让它挂在那里。
-  # 显式删除——是为了让脚本不在集群里留下垃圾。
-  kubectl delete pod "$name" --ignore-not-found --wait=false >/dev/null 2>&1
-  return $rc
+    >/dev/null 2>&1
+  _await_and_log "$name"
 }
 
 # 连续收集来自多个请求的响应，每行一个。
@@ -309,12 +316,10 @@ in_cluster_curl() {
 in_cluster_curl_many() {
   local url="$1" times="${2:-8}"
   local name="check-$$-$RANDOM"
-  kubectl run "$name" --rm -i --restart=Never --quiet \
+  kubectl run "$name" --restart=Never --quiet \
     --image=curlimages/curl:8.11.1 --pod-running-timeout=90s \
     --overrides="$(_restricted_overrides "$name" curlimages/curl:8.11.1 \
       sh -c "for i in \$(seq 1 $times); do curl -s --max-time 10 '$url'; echo; done")" \
-    2>/dev/null
-  local rc=$?
-  kubectl delete pod "$name" --ignore-not-found --wait=false >/dev/null 2>&1
-  return $rc
+    >/dev/null 2>&1
+  _await_and_log "$name"
 }
