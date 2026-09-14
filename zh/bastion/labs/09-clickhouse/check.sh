@@ -76,11 +76,17 @@ fi
 # 任何有 `get pods` 权限的人都能看到，它存在 etcd 里，还会出现在 audit log 中。
 # 实验讲的正是这一点——用一个反其道而行的脚本去检查它，就成了双重标准。
 ch_query() {
+  # The query body is NOT sent via the pod's stdin: kubectl run -i does not reliably
+  # deliver piped stdin to the container (attach/start race), so curl received an empty body.
+  # We base64-encode the query (single line, to survive the line-by-line env parsing) and
+  # decode it inside the container.
+  local CH_Q_B64; CH_Q_B64="$(cat | base64 | tr -d '\n')"
   in_cluster_with_secrets "curlimages/curl:8.11.1" \
     "CH_USER=${CH_USER}
 CH_PASSWORD=${CH_PASSWORD}
-CH_URL=${CH_URL}" \
-    sh -c 'curl -sS --max-time 90 -u "$CH_USER:$CH_PASSWORD" --data-binary @- "$CH_URL?default_format=TSV"'
+CH_URL=${CH_URL}
+CH_Q_B64=${CH_Q_B64}" \
+    sh -c 'echo "$CH_Q_B64" | base64 -d | curl -sS --max-time 90 -u "$CH_USER:$CH_PASSWORD" --data-binary @- "$CH_URL?default_format=TSV"'
 }
 
 # 从 JSON 格式响应的 statistics 块中取出一个数字。
