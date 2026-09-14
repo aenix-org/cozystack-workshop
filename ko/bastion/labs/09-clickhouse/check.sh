@@ -78,11 +78,17 @@ fi
 # 로그에도 노출된다. 랩 자체가 바로 이것을 다룬다 — 반대로 하는 스크립트로 그것을 검증한다면
 # 이중 잣대가 될 것이다.
 ch_query() {
+  # The query body is NOT sent via the pod's stdin: kubectl run -i does not reliably
+  # deliver piped stdin to the container (attach/start race), so curl received an empty body.
+  # We base64-encode the query (single line, to survive the line-by-line env parsing) and
+  # decode it inside the container.
+  local CH_Q_B64; CH_Q_B64="$(cat | base64 | tr -d '\n')"
   in_cluster_with_secrets "curlimages/curl:8.11.1" \
     "CH_USER=${CH_USER}
 CH_PASSWORD=${CH_PASSWORD}
-CH_URL=${CH_URL}" \
-    sh -c 'curl -sS --max-time 90 -u "$CH_USER:$CH_PASSWORD" --data-binary @- "$CH_URL?default_format=TSV"'
+CH_URL=${CH_URL}
+CH_Q_B64=${CH_Q_B64}" \
+    sh -c 'echo "$CH_Q_B64" | base64 -d | curl -sS --max-time 90 -u "$CH_USER:$CH_PASSWORD" --data-binary @- "$CH_URL?default_format=TSV"'
 }
 
 # JSON 형식 응답의 statistics 블록에서 숫자를 뽑아낸다.

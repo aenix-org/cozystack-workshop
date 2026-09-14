@@ -79,11 +79,17 @@ fi
 # Log auf. Genau darum geht es im Lab selbst — es mit einem Skript zu prüfen, das das Gegenteil tut,
 # wäre mit zweierlei Maß gemessen.
 ch_query() {
+  # The query body is NOT sent via the pod's stdin: kubectl run -i does not reliably
+  # deliver piped stdin to the container (attach/start race), so curl received an empty body.
+  # We base64-encode the query (single line, to survive the line-by-line env parsing) and
+  # decode it inside the container.
+  local CH_Q_B64; CH_Q_B64="$(cat | base64 | tr -d '\n')"
   in_cluster_with_secrets "curlimages/curl:8.11.1" \
     "CH_USER=${CH_USER}
 CH_PASSWORD=${CH_PASSWORD}
-CH_URL=${CH_URL}" \
-    sh -c 'curl -sS --max-time 90 -u "$CH_USER:$CH_PASSWORD" --data-binary @- "$CH_URL?default_format=TSV"'
+CH_URL=${CH_URL}
+CH_Q_B64=${CH_Q_B64}" \
+    sh -c 'echo "$CH_Q_B64" | base64 -d | curl -sS --max-time 90 -u "$CH_USER:$CH_PASSWORD" --data-binary @- "$CH_URL?default_format=TSV"'
 }
 
 # Eine Zahl aus dem statistics-Block einer Antwort im JSON-Format herausziehen.
