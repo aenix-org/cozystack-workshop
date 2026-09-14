@@ -65,7 +65,7 @@ data:
     export GRADLE_OPTS="-Xmx3g -Dorg.gradle.daemon=false -Duser.home=$WORK"
 
     CMDLINE_TOOLS_URL="https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"
-    MC_URL="https://dl.min.io/client/mc/release/linux-amd64/mc"
+    MC_URL="https://github.com/pgsty/mc/releases/download/RELEASE.2026-09-13T00-00-00Z/mcli_20260913000000.0.0_linux_amd64.tar.gz"
 
     echo "== 1/5 Android command-line tools をインストール中 =="
     mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
@@ -106,7 +106,9 @@ data:
     # そこへの書き込みは Permission denied で終わる — しかもここ、4 番目のステップで、
     # つまり 30 分ビルドした後で。/work ディレクトリは我々のもので、書き込める。
     mkdir -p "$WORK/bin"
-    curl -fsSL -o "$WORK/bin/mc" "$MC_URL"
+    # dl.min.io больше не отдаёт клиент mc — берём совместимый форк pgsty/mc (mcli из tar.gz).
+    curl -fsSL "$MC_URL" | tar -xz -C "$WORK/bin" mcli
+    mv "$WORK/bin/mcli" "$WORK/bin/mc"
     chmod +x "$WORK/bin/mc"
     # PATH はシェルがコマンドを探すディレクトリのリスト。自分のものを追記して、この先
     # フルパスではなく単に `mc` と書けるようにする。
