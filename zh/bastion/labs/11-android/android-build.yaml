@@ -65,7 +65,7 @@ data:
     export GRADLE_OPTS="-Xmx3g -Dorg.gradle.daemon=false -Duser.home=$WORK"
 
     CMDLINE_TOOLS_URL="https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"
-    MC_URL="https://dl.min.io/client/mc/release/linux-amd64/mc"
+    MC_URL="https://github.com/pgsty/mc/releases/download/RELEASE.2026-09-13T00-00-00Z/mcli_20260913000000.0.0_linux_amd64.tar.gz"
 
     echo "== 1/5 正在安装 Android 命令行工具 =="
     mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
@@ -106,7 +106,9 @@ data:
     # 往那里写会以 Permission denied 收场 —— 而且恰恰是在第四步这里，
     # 也就是构建了半小时之后。/work 目录属于我们，可以往里写。
     mkdir -p "$WORK/bin"
-    curl -fsSL -o "$WORK/bin/mc" "$MC_URL"
+    # dl.min.io больше не отдаёт клиент mc — берём совместимый форк pgsty/mc (mcli из tar.gz).
+    curl -fsSL "$MC_URL" | tar -xz -C "$WORK/bin" mcli
+    mv "$WORK/bin/mcli" "$WORK/bin/mc"
     chmod +x "$WORK/bin/mc"
     # PATH 是 shell 查找命令的目录列表。我们把自己的追加进去，这样后面
     # 就可以只写 `mc` 而不用写完整路径。

@@ -65,7 +65,7 @@ data:
     export GRADLE_OPTS="-Xmx3g -Dorg.gradle.daemon=false -Duser.home=$WORK"
 
     CMDLINE_TOOLS_URL="https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"
-    MC_URL="https://dl.min.io/client/mc/release/linux-amd64/mc"
+    MC_URL="https://github.com/pgsty/mc/releases/download/RELEASE.2026-09-13T00-00-00Z/mcli_20260913000000.0.0_linux_amd64.tar.gz"
 
     echo "== 1/5 Android command-line tools 설치 중 =="
     mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
@@ -106,7 +106,9 @@ data:
     # 거기에 쓰면 Permission denied로 끝납니다 — 그것도 여기 네 번째 단계에서,
     # 즉 30분간의 빌드 후에 말입니다. /work 폴더는 우리 소유이므로 거기에는 쓸 수 있습니다.
     mkdir -p "$WORK/bin"
-    curl -fsSL -o "$WORK/bin/mc" "$MC_URL"
+    # dl.min.io больше не отдаёт клиент mc — берём совместимый форк pgsty/mc (mcli из tar.gz).
+    curl -fsSL "$MC_URL" | tar -xz -C "$WORK/bin" mcli
+    mv "$WORK/bin/mcli" "$WORK/bin/mc"
     chmod +x "$WORK/bin/mc"
     # PATH는 셸이 명령을 찾는 폴더들의 목록입니다. 이후에 전체 경로 대신 그냥 `mc`라고
     # 쓸 수 있도록 우리 것을 추가합니다.
