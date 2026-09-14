@@ -143,9 +143,12 @@ print(json.dumps({"spec": {
 PYEOF
 )"
 
-SUMMARY="$(kubectl run "mongo-check" --rm -i --restart=Never --quiet \
+# Run WITHOUT -i: capture mongosh output via `kubectl logs` after the pod exits
+# (kubectl run --rm -i dropped stdout due to the attach-vs-start race).
+kubectl run "mongo-check" --restart=Never --quiet \
   --pod-running-timeout=90s --overrides="$MONGO_SC" \
-  --image=mongo:8.0 </dev/null 2>/dev/null | tr -d '\r' | grep '^{' | tail -1)"
+  --image=mongo:8.0 >/dev/null 2>&1
+SUMMARY="$(_await_and_log "mongo-check" | tr -d '\r' | grep '^{' | tail -1)"
 
 # Ein Feld aus der JSON-Zeile holen, die mongosh ausgegeben hat. Listen werden mit
 # Komma verbunden, damit man sie dem Teilnehmer unverändert zeigen kann.

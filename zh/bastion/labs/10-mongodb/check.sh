@@ -142,9 +142,12 @@ print(json.dumps({"spec": {
 PYEOF
 )"
 
-SUMMARY="$(kubectl run "mongo-check" --rm -i --restart=Never --quiet \
+# Run WITHOUT -i: capture mongosh output via `kubectl logs` after the pod exits
+# (kubectl run --rm -i dropped stdout due to the attach-vs-start race).
+kubectl run "mongo-check" --restart=Never --quiet \
   --pod-running-timeout=90s --overrides="$MONGO_SC" \
-  --image=mongo:8.0 </dev/null 2>/dev/null | tr -d '\r' | grep '^{' | tail -1)"
+  --image=mongo:8.0 >/dev/null 2>&1
+SUMMARY="$(_await_and_log "mongo-check" | tr -d '\r' | grep '^{' | tail -1)"
 
 # 从 mongosh 打印的 JSON 行中取出一个字段。列表用逗号拼接，
 # 以便原样展示给参与者。
