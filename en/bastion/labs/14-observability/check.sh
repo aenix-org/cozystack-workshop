@@ -44,6 +44,23 @@ else
 fi
 evidence "Collection pods in ${MON_NS}" "$(kubectl get pods -n "$MON_NS" 2>/dev/null)"
 
+# --- delivery: is the agent really sending, or writing into the void? --------
+# A working agent that writes into the void looks exactly like a working one, so we
+# ask the agent itself how many successful (2XX) sends it made. Zero means the tenant
+# has no Monitoring app: vmagent has nowhere to write, there is no storage, and the
+# Grafana steps will not work.
+if [ "$VMAGENT_RUNNING" -ge 1 ]; then
+  VMPOD="$(kubectl get pods -n "$MON_NS" --no-headers 2>/dev/null | awk '$1 ~ /^vmagent/ && $3=="Running"{print $1; exit}')"
+  SENT="$(kubectl exec -n "$MON_NS" "$VMPOD" -c vmagent -- sh -c 'wget -qO- http://127.0.0.1:8429/metrics 2>/dev/null' 2>/dev/null \
+    | awk '/^vmagent_remotewrite_requests_total.*status_code="2XX"/{s+=$NF} END{printf "%d", s+0}')"
+  if [ "${SENT:-0}" -gt 0 ]; then
+    ok "metrics are actually delivered to storage (successful sends: ${SENT})"
+  else
+    fail "the agent is running but delivered zero metrics to storage (0 successful sends)" \
+         "the tenant has no Monitoring app - vmagent has nowhere to write, so there are no historical metrics and no Grafana (steps 2-5). Deploy Monitoring from the catalog (Administration) or ask the instructor"
+  fi
+fi
+
 # --- where exactly the metrics go -------------------------------------------
 # A working agent that writes into the void looks exactly like a working one.
 RW_URL="$(kubectl get vmagent -n "$MON_NS" \
