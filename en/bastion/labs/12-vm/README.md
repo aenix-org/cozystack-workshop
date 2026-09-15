@@ -45,6 +45,9 @@ cd labs/12-vm
 
 📍 **The ingress is created by the instructor, not the participant, and in advance.** Each tenant already contains a `Service spravochnik-http` (it forwards port 80 to 8080 and selects the Pods of your machine) and an `Ingress spravochnik` with the host `spravochnik.workshopXX.workshop.aenix.io`. You don't need to set them up and you don't need to keep their files yourself — all you need is to bring up a virtual machine named `spravochnik`, and the publication will pick it up on its own.
 
+>
+> 🛠 **For the instructor.** These `Service` and `Ingress` objects are provisioned into all tenants in one run from the repo, not clicked per tenant: `instructor/12-vm/provision-spravochnik.sh --context <ctx> --from 1 --to 70` (idempotent, safe to re-run before each cohort). Manifest and guide live in `instructor/12-vm/`.
+
 ## Step 1. Bring up the VM
 
 📍 **Where:** in the browser, in the tenant dashboard.
