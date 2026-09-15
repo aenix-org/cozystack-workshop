@@ -4,7 +4,7 @@
 |---|---|
 | **Time** | 30 minutes |
 | **What it proves** | Metrics collect themselves, continuously and retroactively. You don't need to buy a separate monitoring system |
-| **What you'll need** | The cluster from lab 0, the app from lab 1, lab 3 completed (load and HPA), access to the tenant dashboard |
+| **What you'll need** | The cluster from lab 0, the app from lab 1, lab 3 completed (load and HPA), access to the tenant dashboard; the `Monitoring` app in the tenant (without it metrics have nowhere to go and steps 2–5 don't work) |
 
 ## Why this matters
 
@@ -220,7 +220,7 @@ A second place is the output of `check.sh` from this same lab: the line "Grafana
 The script pulls the address out of that same ingress, so there's no need to type it by hand.
 
 ⚠️ **If there's no `Monitoring` app in your tenant** — then you have no Grafana of your own either, and
-the metrics go to the parent tenant's monitoring. The reliable path is to deploy `Monitoring` from the
+`vmagent` has no reachable storage (its remote-write target does not resolve, `NXDOMAIN`), so metrics are not stored and steps 2–5 do not work. The reliable path is to deploy `Monitoring` from the
 catalog (the `Administration` section): the address will appear on the `Ingress` tab of your own
 app, and all the queries below will work. `check.sh` will also find someone else's monitoring and
 name the namespace it runs in, but you'll only be able to open it if you have access to that namespace.
