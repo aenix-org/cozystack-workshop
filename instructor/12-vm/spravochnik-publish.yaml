@@ -1,0 +1,42 @@
+# Instructor-side publishing for Lab 12 (VM). Participants deploy a VMInstance named
+# `spravochnik`; these two objects publish it on the tenant domain. They live in EACH
+# participant tenant and are intentionally NOT created by the participant (the lab tells
+# them not to touch these). Provision them for every tenant with provision-spravochnik.sh.
+#
+# Replace __NS__ (tenant namespace) and __N__ (tenant number) before applying, or let the
+# script do it. The Service selector matches the pods KubeVirt labels for a VMInstance named
+# `spravochnik` (app.kubernetes.io/instance=vm-instance-spravochnik), so it stays empty until
+# the participant's VM comes up — exactly the 503->page transition the lab teaches.
+apiVersion: v1
+kind: Service
+metadata:
+  name: spravochnik-http
+  namespace: __NS__
+spec:
+  selector:
+    app.kubernetes.io/instance: vm-instance-spravochnik
+    app.kubernetes.io/name: vm-instance
+  ports:
+    - name: http
+      port: 80
+      protocol: TCP
+      targetPort: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: spravochnik
+  namespace: __NS__
+spec:
+  ingressClassName: tenant-root
+  rules:
+    - host: spravochnik.workshop__N__.workshop.aenix.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: spravochnik-http
+                port:
+                  number: 80
