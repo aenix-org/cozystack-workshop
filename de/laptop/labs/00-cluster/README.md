@@ -6,6 +6,8 @@
 | **Was es beweist** | Ein Cluster ist ein Posten im Katalog, kein Projekt über ein ganzes Quartal |
 | **Was Sie brauchen** | Zugang zum Tenant-Dashboard; `kubectl`, `kubelogin` und `git` auf Ihrem Laptop |
 
+> **Von Ihrem eigenen Bastion oder Laptop.** Auf der von der Lehrkraft bereitgestellten VM ist bereits alles installiert — diesen Block können Sie überspringen. Wenn Sie die Labs von Ihrer eigenen Maschine aus durchführen, installieren Sie vorab: `kubectl`, `helm` (v3+), `virtctl` (für die VM-Labs, z. B. 12), `git`, `python3`, `curl` — und holen Sie sich Ihren Tenant-`kubeconfig` (Dashboard → Zugang herunterladen). Ohne `helm` besteht Lab 13 nicht; ohne `virtctl` öffnet sich in Lab 12 die Konsole nicht.
+
 ## Warum das wichtig ist
 
 Später werden Sie Anwendungen bereitstellen, sie kaputt machen, sie reparieren und sie skalieren. Für all das brauchen Sie einen Ort, an dem Sie der uneingeschränkte Eigentümer sind und an dem ein Fehler nichts kostet.

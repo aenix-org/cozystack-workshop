@@ -45,6 +45,8 @@ cd labs/12-vm
 
 📍 **ingress を作るのは参加者ではなく講師であり、しかも事前に作ります。** 各テナントにはすでに `Service spravochnik-http`（ポート 80 を 8080 に転送し、あなたのマシンの Pod を選択します）と、ホスト `spravochnik.workshopXX.workshop.aenix.io` を持つ `Ingress spravochnik` が入っています。これらを設定する必要はなく、そのファイルを自分で持っておく必要もありません。必要なのは `spravochnik` という名前の仮想マシンを立ち上げることだけで、公開のほうが勝手にそれを拾ってくれます。
 
+🛠 **講師の方へ。** これらの `Service` と `Ingress` は、テナントごとにマウスで一つずつ作るのではなく、リポジトリからの一度の実行で全テナントに対してプロビジョニングされます：`instructor/12-vm/provision-spravochnik.sh --context <ctx> --from 1 --to 70`（冪等で、各回の前に繰り返し実行しても安全です）。マニフェストと手引きは `instructor/12-vm/` にあります。
+
 ## ステップ 1. 仮想マシンを立ち上げる
 
 📍 **どこで:** ブラウザで、テナントのダッシュボードで。

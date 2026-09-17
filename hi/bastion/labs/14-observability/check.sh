@@ -44,6 +44,19 @@ else
 fi
 evidence "${MON_NS} में संग्रह पॉड" "$(kubectl get pods -n "$MON_NS" 2>/dev/null)"
 
+# --- डिलीवरी: एजेंट सच में भेज रहा है, या शून्य में लिख रहा है? --------
+if [ "$VMAGENT_RUNNING" -ge 1 ]; then
+  VMPOD="$(kubectl get pods -n "$MON_NS" --no-headers 2>/dev/null | awk '$1 ~ /^vmagent/ && $3=="Running"{print $1; exit}')"
+  SENT="$(kubectl exec -n "$MON_NS" "$VMPOD" -c vmagent -- sh -c 'wget -qO- http://127.0.0.1:8429/metrics 2>/dev/null' 2>/dev/null \
+    | awk '/^vmagent_remotewrite_requests_total.*status_code="2XX"/{s+=$NF} END{printf "%d", s+0}')"
+  if [ "${SENT:-0}" -gt 0 ]; then
+    ok "मेट्रिक्स वाक़ई भंडारण तक पहुँच रही हैं (सफल प्रेषण: ${SENT})"
+  else
+    fail "एजेंट चल रहा है, पर भंडारण तक एक भी मेट्रिक नहीं पहुँचाई (सफल प्रेषण 0)" \
+         "टेनेंट में कोई Monitoring ऐप नहीं है — vmagent के पास लिखने की कोई जगह नहीं, इसलिए न ऐतिहासिक मेट्रिक्स होंगी और न Grafana (स्टेप 2-5)। कैटलॉग (Administration) से Monitoring डिप्लॉय करें या प्रशिक्षक से पूछें"
+  fi
+fi
+
 # --- मेट्रिक्स आख़िर जाती कहाँ हैं ------------------------------------------
 # एक चालू एजेंट जो शून्य में लिखता है, बिल्कुल एक कार्यशील एजेंट जैसा ही दिखता है।
 RW_URL="$(kubectl get vmagent -n "$MON_NS" \

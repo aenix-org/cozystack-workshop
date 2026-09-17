@@ -45,6 +45,8 @@ cd labs/12-vm
 
 📍 **ingress 由讲师创建，而非参与者，并且是提前创建的。** 每个租户里都已经有一个 `Service spravochnik-http`（它把 80 端口转发到 8080，并选中你机器的 Pod），以及一个 host 为 `spravochnik.workshopXX.workshop.aenix.io` 的 `Ingress spravochnik`。你不需要去搭建它们，也不需要自己保管它们的文件——你要做的只是立起一台名为 `spravochnik` 的虚拟机，发布会自行把它接住。
 
+> 🛠 **讲师须知。** 这些 `Service` 和 `Ingress` 是从仓库里一次性给所有租户批量创建的，而不是逐个租户用鼠标点出来的：`instructor/12-vm/provision-spravochnik.sh --context <ctx> --from 1 --to 70`（幂等，可在每一批学员开始前安全地重复运行）。清单和说明都在 `instructor/12-vm/` 里。
+
 ## 步骤 1. 立起虚拟机
 
 📍 **在哪里：** 在浏览器里，在租户控制台（dashboard）中。

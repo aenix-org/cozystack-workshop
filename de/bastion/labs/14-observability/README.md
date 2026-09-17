@@ -4,7 +4,7 @@
 |---|---|
 | **Zeit** | 30 Minuten |
 | **Was es zeigt** | Metriken sammeln sich selbst, kontinuierlich und rückwirkend. Ein separates Monitoring-System muss man nicht kaufen |
-| **Was Sie brauchen** | Den Cluster aus Lab 0, die App aus Lab 1, abgeschlossenes Lab 3 (Last und HPA), Zugang zum Dashboard des Tenants |
+| **Was Sie brauchen** | Den Cluster aus Lab 0, die App aus Lab 1, abgeschlossenes Lab 3 (Last und HPA), Zugang zum Dashboard des Tenants; die App `Monitoring` im Tenant (ohne sie haben die Metriken keinen Speicherort und die Schritte 2–5 funktionieren nicht) |
 
 ## Warum das wichtig ist
 
@@ -222,7 +222,7 @@ Ein zweiter Ort ist die Ausgabe von `check.sh` aus genau diesem Lab: die Zeile �
 Das Skript zieht die Adresse aus demselben Ingress, sodass Sie sie nicht von Hand eintippen müssen.
 
 ⚠️ **Wenn es in Ihrem Tenant keine App `Monitoring` gibt** — dann haben Sie auch keine eigene Grafana, und
-die Metriken gehen in das Monitoring des übergeordneten Tenants. Der zuverlässige Weg ist, `Monitoring`
+`vmagent` hat keinen erreichbaren Speicher (das Remote-Write-Ziel wird nicht aufgelöst, `NXDOMAIN`), daher werden keine Metriken gespeichert und die Schritte 2–5 funktionieren nicht. Der zuverlässige Weg ist, `Monitoring`
 aus dem Katalog zu deployen (Abschnitt `Administration`): die Adresse erscheint dann auf dem Tab `Ingress` Ihrer
 eigenen App, und alle Abfragen unten funktionieren. `check.sh` findet auch fremdes Monitoring und
 nennt den namespace, in dem es läuft, aber öffnen können Sie es nur, wenn Sie Zugang zu diesem namespace haben.

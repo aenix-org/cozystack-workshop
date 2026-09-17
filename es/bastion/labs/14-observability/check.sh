@@ -44,6 +44,23 @@ else
 fi
 evidence "Pods de recolección en ${MON_NS}" "$(kubectl get pods -n "$MON_NS" 2>/dev/null)"
 
+# --- entrega: ¿el agente realmente envía, o escribe al vacío? ----------------
+# Un agente en ejecución que escribe al vacío se ve exactamente igual que uno que
+# funciona, así que le preguntamos al propio agente cuántos envíos exitosos (2XX) hizo.
+# Cero significa que el tenant no tiene la app Monitoring: vmagent no tiene dónde escribir,
+# no hay almacenamiento, y los pasos con Grafana no funcionarán.
+if [ "$VMAGENT_RUNNING" -ge 1 ]; then
+  VMPOD="$(kubectl get pods -n "$MON_NS" --no-headers 2>/dev/null | awk '$1 ~ /^vmagent/ && $3=="Running"{print $1; exit}')"
+  SENT="$(kubectl exec -n "$MON_NS" "$VMPOD" -c vmagent -- sh -c 'wget -qO- http://127.0.0.1:8429/metrics 2>/dev/null' 2>/dev/null \
+    | awk '/^vmagent_remotewrite_requests_total.*status_code="2XX"/{s+=$NF} END{printf "%d", s+0}')"
+  if [ "${SENT:-0}" -gt 0 ]; then
+    ok "las métricas realmente se entregan al almacenamiento (envíos exitosos: ${SENT})"
+  else
+    fail "el agente está en ejecución pero no entregó ni una sola métrica al almacenamiento (0 envíos exitosos)" \
+         "el tenant no tiene la app Monitoring — vmagent no tiene dónde escribir, así que no hay métricas históricas ni Grafana (pasos 2-5). Despliega Monitoring desde el catálogo (Administration) o pregúntale al ponente"
+  fi
+fi
+
 # --- a dónde van exactamente las métricas -----------------------------------
 # Un agente en ejecución que escribe al vacío se ve exactamente igual que uno que funciona.
 RW_URL="$(kubectl get vmagent -n "$MON_NS" \

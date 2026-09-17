@@ -4,7 +4,7 @@
 |---|---|
 | **时长** | 30 分钟 |
 | **能证明什么** | 指标会自己持续、且可回溯地采集。你不需要另外购买一套监控系统 |
-| **需要准备什么** | 实验 0 的集群、实验 1 的应用、已完成的实验 3（压测与 HPA）、租户控制台（dashboard）的访问权限 |
+| **需要准备什么** | 实验 0 的集群、实验 1 的应用、已完成的实验 3（压测与 HPA）、租户控制台（dashboard）的访问权限；租户里的 `Monitoring` 应用（没有它，指标无处可存，步骤 2–5 无法工作） |
 
 ## 为什么这很重要
 
@@ -183,7 +183,7 @@ https://grafana.<你的租户主机>
 
 第二个地方是本实验中 `check.sh` 的输出：那一行「Grafana for your metrics」。脚本会从同一个 ingress 里把地址抽出来，所以不用手敲。
 
-⚠️ **如果你的租户里没有 `Monitoring` 应用**——那你也就没有自己的 Grafana，指标会流进父租户的监控里。可靠的做法是从目录（catalog）里部署一个 `Monitoring`（`Administration` 分区）：地址就会出现在你自己那个应用的 `Ingress` 选项卡上，下面所有查询都能用了。`check.sh` 同样会找到别人的监控，并说出它跑在哪个 namespace 里，但只有当你有那个 namespace 的访问权限时才打得开。
+⚠️ **如果你的租户里没有 `Monitoring` 应用**——那你也就没有自己的 Grafana，`vmagent` 也没有可达的存储（它的 remote-write 目标无法解析，`NXDOMAIN`），因此指标不会被存下来，步骤 2–5 也无法工作。可靠的做法是从目录（catalog）里部署一个 `Monitoring`（`Administration` 分区）：地址就会出现在你自己那个应用的 `Ingress` 选项卡上，下面所有查询都能用了。`check.sh` 同样会找到别人的监控，并说出它跑在哪个 namespace 里，但只有当你有那个 namespace 的访问权限时才打得开。
 
 **用什么登录。**登录名是 `admin`。密码在 `grafana-admin-password` 这个 Secret 里：控制台（dashboard）→ `Monitoring` 应用 → `Secrets` 选项卡 → `password` 这个键 → `Reveal`。
 

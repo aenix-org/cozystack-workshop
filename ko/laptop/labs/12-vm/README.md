@@ -45,6 +45,9 @@ cd labs/12-vm
 
 📍 **ingress는 참가자가 아니라 강사가, 그것도 미리 만들어 둡니다.** 각 테넌트에는 이미 `Service spravochnik-http`(포트 80을 8080으로 전달하고 여러분 머신의 Pod를 선택합니다)와 호스트가 `spravochnik.workshopXX.workshop.aenix.io`인 `Ingress spravochnik`가 들어 있습니다. 여러분이 이것들을 직접 설정할 필요도 없고 그 파일을 직접 보관할 필요도 없습니다. 필요한 것은 오직 `spravochnik`라는 이름의 가상 머신을 띄우는 것뿐이며, 게시는 알아서 이를 잡아냅니다.
 
+>
+> 🛠 **강사에게.** 이 `Service`와 `Ingress`는 테넌트마다 마우스로 하나씩 만드는 것이 아니라, 리포지토리에서 한 번의 실행으로 모든 테넌트에 프로비저닝됩니다: `instructor/12-vm/provision-spravochnik.sh --context <ctx> --from 1 --to 70`(멱등적이며, 각 코호트 전에 반복 실행해도 안전합니다). 매니페스트와 안내는 `instructor/12-vm/`에 있습니다.
+
 ## 1단계. VM 띄우기
 
 📍 **위치:** 브라우저에서, 테넌트 대시보드에서.

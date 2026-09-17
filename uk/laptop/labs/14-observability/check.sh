@@ -44,6 +44,19 @@ else
 fi
 evidence "Pod збору в ${MON_NS}" "$(kubectl get pods -n "$MON_NS" 2>/dev/null)"
 
+# --- доставка: агент справді надсилає, чи пише в нікуди? --------
+if [ "$VMAGENT_RUNNING" -ge 1 ]; then
+  VMPOD="$(kubectl get pods -n "$MON_NS" --no-headers 2>/dev/null | awk '$1 ~ /^vmagent/ && $3=="Running"{print $1; exit}')"
+  SENT="$(kubectl exec -n "$MON_NS" "$VMPOD" -c vmagent -- sh -c 'wget -qO- http://127.0.0.1:8429/metrics 2>/dev/null' 2>/dev/null \
+    | awk '/^vmagent_remotewrite_requests_total.*status_code="2XX"/{s+=$NF} END{printf "%d", s+0}')"
+  if [ "${SENT:-0}" -gt 0 ]; then
+    ok "метрики реально доставляються у сховище (успішних надсилань: ${SENT})"
+  else
+    fail "агент запущений, але не доставив у сховище жодної метрики (успішних надсилань 0)" \
+         "у тенанта немає застосунку Monitoring — vmagent-у нема куди писати, тому історичних метрик і Grafana (кроки 2-5) не буде. Розгорніть Monitoring з каталогу (розділ Administration) або спитайте викладача"
+  fi
+fi
+
 # --- куди саме їдуть метрики -------------------------------------------
 # Працюючий агент, який пише в нікуди, виглядає точно так само, як робочий.
 RW_URL="$(kubectl get vmagent -n "$MON_NS" \

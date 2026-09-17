@@ -44,6 +44,19 @@ else
 fi
 evidence "${MON_NS} 中的采集 pod" "$(kubectl get pods -n "$MON_NS" 2>/dev/null)"
 
+# --- 投递：代理是真的在发送，还是在写入虚无？ --------
+if [ "$VMAGENT_RUNNING" -ge 1 ]; then
+  VMPOD="$(kubectl get pods -n "$MON_NS" --no-headers 2>/dev/null | awk '$1 ~ /^vmagent/ && $3=="Running"{print $1; exit}')"
+  SENT="$(kubectl exec -n "$MON_NS" "$VMPOD" -c vmagent -- sh -c 'wget -qO- http://127.0.0.1:8429/metrics 2>/dev/null' 2>/dev/null \
+    | awk '/^vmagent_remotewrite_requests_total.*status_code="2XX"/{s+=$NF} END{printf "%d", s+0}')"
+  if [ "${SENT:-0}" -gt 0 ]; then
+    ok "指标确实被送达到存储（成功发送次数：${SENT}）"
+  else
+    fail "代理在运行，但没有向存储送达任何一条指标（成功发送次数为 0）" \
+         "租户里没有 Monitoring 应用——vmagent 无处可写，因此不会有历史指标，也不会有 Grafana（步骤 2-5）。从目录（Administration 分区）里部署 Monitoring，或者询问讲师"
+  fi
+fi
+
 # --- 指标究竟发往何处 -------------------------------------------------------
 # 一个把数据写入虚无的运行中代理，看起来和正常工作的一模一样。
 RW_URL="$(kubectl get vmagent -n "$MON_NS" \
