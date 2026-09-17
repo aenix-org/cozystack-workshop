@@ -44,6 +44,19 @@ else
 fi
 evidence "${MON_NS} の収集ポッド" "$(kubectl get pods -n "$MON_NS" 2>/dev/null)"
 
+# --- 配信: エージェントは本当に送信しているのか、それともどこでもない場所へ書き込んでいるのか --------
+if [ "$VMAGENT_RUNNING" -ge 1 ]; then
+  VMPOD="$(kubectl get pods -n "$MON_NS" --no-headers 2>/dev/null | awk '$1 ~ /^vmagent/ && $3=="Running"{print $1; exit}')"
+  SENT="$(kubectl exec -n "$MON_NS" "$VMPOD" -c vmagent -- sh -c 'wget -qO- http://127.0.0.1:8429/metrics 2>/dev/null' 2>/dev/null \
+    | awk '/^vmagent_remotewrite_requests_total.*status_code="2XX"/{s+=$NF} END{printf "%d", s+0}')"
+  if [ "${SENT:-0}" -gt 0 ]; then
+    ok "メトリクスは実際にストレージへ届いています (成功した送信: ${SENT})"
+  else
+    fail "エージェントは稼働していますが、ストレージへメトリクスを 1 つも届けていません (成功した送信は 0)" \
+         "テナントに Monitoring アプリがありません — vmagent は書き込む先がなく、そのため履歴メトリクスも Grafana (ステップ 2-5) もありません。カタログ (Administration) から Monitoring をデプロイするか、講師に尋ねてください"
+  fi
+fi
+
 # --- メトリクスは正確にどこへ送られるか -------------------------------------
 # 虚空へ書き込んでいる稼働中エージェントは、正常なものとまったく同じに見える。
 RW_URL="$(kubectl get vmagent -n "$MON_NS" \

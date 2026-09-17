@@ -44,6 +44,23 @@ else
 fi
 evidence "Erfassungs-Pods in ${MON_NS}" "$(kubectl get pods -n "$MON_NS" 2>/dev/null)"
 
+# --- Zustellung: sendet der Agent wirklich, oder schreibt er ins Leere? -----
+# Ein laufender Agent, der ins Leere schreibt, sieht genauso aus wie ein funktionierender,
+# deshalb fragen wir den Agenten selbst, wie viele erfolgreiche Sendungen (2XX) er gemacht hat.
+# Null bedeutet, dass der Tenant keine Monitoring-App hat: vmagent hat nichts, wohin er schreiben
+# kann, es gibt keinen Speicher, und die Grafana-Schritte funktionieren nicht.
+if [ "$VMAGENT_RUNNING" -ge 1 ]; then
+  VMPOD="$(kubectl get pods -n "$MON_NS" --no-headers 2>/dev/null | awk '$1 ~ /^vmagent/ && $3=="Running"{print $1; exit}')"
+  SENT="$(kubectl exec -n "$MON_NS" "$VMPOD" -c vmagent -- sh -c 'wget -qO- http://127.0.0.1:8429/metrics 2>/dev/null' 2>/dev/null \
+    | awk '/^vmagent_remotewrite_requests_total.*status_code="2XX"/{s+=$NF} END{printf "%d", s+0}')"
+  if [ "${SENT:-0}" -gt 0 ]; then
+    ok "Metriken werden tatsächlich in den Speicher zugestellt (erfolgreiche Sendungen: ${SENT})"
+  else
+    fail "der Agent läuft, hat aber keine einzige Metrik in den Speicher zugestellt (0 erfolgreiche Sendungen)" \
+         "der Tenant hat keine Monitoring-App — vmagent hat nichts, wohin er schreiben kann, daher gibt es keine historischen Metriken und kein Grafana (Schritte 2-5). Deployen Sie Monitoring aus dem Katalog (Abschnitt Administration) oder fragen Sie die Lehrkraft"
+  fi
+fi
+
 # --- wohin genau die Metriken gehen -----------------------------------------
 # Ein laufender Agent, der ins Leere schreibt, sieht genauso aus wie ein funktionierender.
 RW_URL="$(kubectl get vmagent -n "$MON_NS" \

@@ -4,7 +4,7 @@
 |---|---|
 | **Tiempo** | 30 minutos |
 | **Qué demuestra** | Las métricas se recolectan solas, de forma continua y retroactiva. No necesitas comprar un sistema de monitorización aparte |
-| **Qué necesitas** | El clúster del lab 0, la app del lab 1, el lab 3 completado (carga y HPA), acceso al panel del tenant |
+| **Qué necesitas** | El clúster del lab 0, la app del lab 1, el lab 3 completado (carga y HPA), acceso al panel del tenant; la app `Monitoring` en el tenant (sin ella las métricas no tienen dónde almacenarse y los pasos 2–5 no funcionan) |
 
 ## Por qué esto importa
 
@@ -220,7 +220,7 @@ Un segundo lugar es la salida de `check.sh` de este mismo lab: la línea "Grafan
 El script saca la dirección de ese mismo ingress, así que no hace falta teclearla a mano.
 
 ⚠️ **Si no hay ninguna app `Monitoring` en tu tenant** — entonces tampoco tienes Grafana propia, y
-las métricas van a la monitorización del tenant padre. El camino fiable es desplegar `Monitoring` desde el
+`vmagent` no tiene un almacenamiento accesible (su destino de remote-write no se resuelve, `NXDOMAIN`), así que las métricas no se almacenan y los pasos 2–5 no funcionan. El camino fiable es desplegar `Monitoring` desde el
 catálogo (la sección `Administration`): la dirección aparecerá en la pestaña `Ingress` de tu propia
 app, y todas las consultas de abajo funcionarán. `check.sh` también encontrará la monitorización de otro y
 nombrará el namespace en el que corre, pero solo podrás abrirla si tienes acceso a ese namespace.

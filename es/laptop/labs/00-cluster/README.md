@@ -6,6 +6,8 @@
 | **Qué demuestra** | Un clúster es una línea de un catálogo, no un proyecto de un trimestre |
 | **Qué necesitarás** | Acceso al panel del tenant; `kubectl`, `kubelogin` y `git` en tu laptop |
 
+> **Desde tu propio bastion o laptop.** En la VM que entrega el instructor ya está todo instalado — puedes saltarte esto. Si haces los labs desde tu propia máquina, instala de antemano: `kubectl`, `helm` (v3+), `virtctl` (para los labs con VM, p. ej. 12), `git`, `python3`, `curl`, y obtén tu `kubeconfig` de tenant (panel → descargar acceso). Sin `helm` el lab 13 no pasará; sin `virtctl` la consola del lab 12 no se abrirá.
+
 ## Por qué esto importa
 
 Más adelante vas a desplegar aplicaciones, romperlas, arreglarlas y escalarlas. Para todo eso necesitas un lugar donde seas el dueño pleno y donde un error no cueste nada.

@@ -44,6 +44,19 @@ else
 fi
 evidence "${MON_NS} 의 수집 파드" "$(kubectl get pods -n "$MON_NS" 2>/dev/null)"
 
+# --- 전달: 에이전트가 정말로 보내고 있는가, 아니면 허공에 쓰고 있는가? --------
+if [ "$VMAGENT_RUNNING" -ge 1 ]; then
+  VMPOD="$(kubectl get pods -n "$MON_NS" --no-headers 2>/dev/null | awk '$1 ~ /^vmagent/ && $3=="Running"{print $1; exit}')"
+  SENT="$(kubectl exec -n "$MON_NS" "$VMPOD" -c vmagent -- sh -c 'wget -qO- http://127.0.0.1:8429/metrics 2>/dev/null' 2>/dev/null \
+    | awk '/^vmagent_remotewrite_requests_total.*status_code="2XX"/{s+=$NF} END{printf "%d", s+0}')"
+  if [ "${SENT:-0}" -gt 0 ]; then
+    ok "메트릭이 실제로 저장소로 전달되고 있습니다 (성공한 전송: ${SENT})"
+  else
+    fail "에이전트는 동작 중이지만 저장소로 전달된 메트릭이 하나도 없습니다 (성공한 전송 0)" \
+         "테넌트에 Monitoring 앱이 없습니다 — vmagent가 쓸 곳이 없어 과거 메트릭도 Grafana(2-5단계)도 없습니다. 카탈로그(Administration 섹션)에서 Monitoring을 배포하거나 강사에게 문의하세요"
+  fi
+fi
+
 # --- 메트릭이 정확히 어디로 가는지 -------------------------------------------
 # 허공에 쓰는 동작 중인 에이전트는 정상 동작하는 것과 똑같아 보인다.
 RW_URL="$(kubectl get vmagent -n "$MON_NS" \
