@@ -6,6 +6,8 @@
 | **What it proves** | A cluster is an item in a catalog, not a quarter-long project |
 | **What you'll need** | Access to the tenant dashboard; `kubectl`, `kubelogin` and `git` on your laptop |
 
+> **From your own bastion or laptop.** On the instructor-provided VM everything is already installed — you can skip this. If you run the labs from your own machine, install up front: `kubectl`, `helm` (v3+), `virtctl` (for the VM labs, e.g. 12), `git`, `python3`, `curl`, and get your tenant `kubeconfig` (dashboard → download access). Without `helm` lab 13 will not pass; without `virtctl` the console in lab 12 will not open.
+
 ## Why this matters
 
 Later on you'll be deploying applications, breaking them, fixing them and scaling them. For all of that you need a place where you are the full owner and where a mistake costs nothing.
