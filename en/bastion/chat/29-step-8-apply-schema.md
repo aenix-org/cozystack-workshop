@@ -55,7 +55,7 @@ psql --version
 **Grab the schema file** — the machine already has network:
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/bastion/scripts/orders-schema.sql
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/bastion/scripts/orders-schema.sql
 ```
 
 **Apply it.** Let's break the command down part by part, so you're not typing blind:

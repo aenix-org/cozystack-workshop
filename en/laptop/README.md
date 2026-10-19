@@ -130,7 +130,7 @@ grep -rn tenant-workshopXX manifests scripts || echo "all clean, you can continu
 ```
 
 One spot the command leaves untouched on purpose: in `manifests/03-app-vm.yaml` the line
-`url: "ВСТАВЬТЕ_PRESIGNED_URL"` — you'll get that link after the second phase.
+`url: "PASTE_PRESIGNED_URL"` — you'll get that link after the second phase.
 
 In detail: [chat/10](chat/10-clone-and-set-number.md) ·
 file map [chat/11](chat/11-file-map.md)
@@ -197,7 +197,7 @@ virtctl console --namespace=tenant-workshopXX vm-instance-convert
 ```
 
 Inside: `nano convert.sh`, paste in the text of `scripts/convert.sh`, put your own
-`bucketName`, `accessKey` and `secretKey` in place of `ВСТАВЬТЕ_...`, and run
+`bucketName`, `accessKey` and `secretKey` in place of `PASTE_...`, and run
 `bash convert.sh`.
 
 **You should see:** at the end of the output, after the word `Share:` — a signed link to the image.
@@ -223,7 +223,7 @@ kubectl delete vmdisk convert-tools --namespace tenant-workshopXX
 ```
 
 Put the link you got into `manifests/03-app-vm.yaml` in place of
-`url: "ВСТАВЬТЕ_PRESIGNED_URL"`, then:
+`url: "PASTE_PRESIGNED_URL"`, then:
 
 ```bash
 kubectl apply -f manifests/03-app-vm.yaml
@@ -338,7 +338,7 @@ If `command not found` — the client landed outside `PATH`: look at
 We fetch the schema and apply it:
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/laptop/scripts/orders-schema.sql
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/laptop/scripts/orders-schema.sql
 
 PGPASSWORD='Orders2019!' psql \
   -h postgres-db-rw.tenant-workshopXX.svc.cozy.local -U orders -d orders \

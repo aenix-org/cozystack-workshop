@@ -9,7 +9,7 @@ file itself — no need to copy anything through the clipboard.
 
 Pull the script from GitHub straight onto the machine:
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/bastion/scripts/convert.sh
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/bastion/scripts/convert.sh
 ```
 
 Open it:
@@ -33,7 +33,7 @@ and the same for everyone.
 To save in nano: `Ctrl+O`, then `Enter`, then `Ctrl+X` to exit. Check that no placeholders
 are left:
 ```bash
-grep ВСТАВЬТЕ convert.sh || echo "all filled in, ready to run"
+grep PASTE_ convert.sh || echo "all filled in, ready to run"
 ```
 
 Run it — always through `sudo`, the script needs root privileges. And run it **in `screen`**:
@@ -61,7 +61,7 @@ At the end the script will print a **presigned link** to your image — look in 
 starting with the word `Share:`, the link comes right after it.
 
 **What to do with it:** copy it into that same notepad. In the next step you'll go back to the bastion, open `manifests/03-app-vm.yaml` and paste it into the `url` field — where
-the `ВСТАВЬТЕ_PRESIGNED_URL` placeholder currently sits. The very one I warned you about
+the `PASTE_PRESIGNED_URL` placeholder currently sits. The very one I warned you about
 when we were filling in the numbers.
 
 This is a temporary signed link: the storage isn't exposed to the outside, and you made the link

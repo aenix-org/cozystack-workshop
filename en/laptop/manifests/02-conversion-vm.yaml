@@ -32,4 +32,4 @@ spec:
     package_update: true
     packages: [ libguestfs-tools, virt-v2v, qemu-utils ]
     runcmd:
-      - [ bash, -c, "wget -q -O /usr/local/bin/mc https://dl.min.io/client/mc/release/linux-amd64/mc && chmod +x /usr/local/bin/mc" ]
+      - [ bash, -c, "curl -fsSL https://github.com/pgsty/mc/releases/download/RELEASE.2026-09-13T00-00-00Z/mcli_20260913000000.0.0_linux_amd64.tar.gz | tar -xz -C /usr/local/bin mcli && mv /usr/local/bin/mcli /usr/local/bin/mc && chmod +x /usr/local/bin/mc" ]

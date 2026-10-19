@@ -74,7 +74,7 @@ else
   if [ -z "$GR_URL" ]; then
     fail "no GitRepository named ${GITREPO} found in flux-system" \
          "apply flux/gitrepository.yaml with your repository address filled in"
-  elif printf '%s' "$GR_URL" | grep -q 'ЗАМЕНИТЕ-МЕНЯ'; then
+  elif printf '%s' "$GR_URL" | grep -q 'REPLACE-ME'; then
     fail "the GitRepository still has a placeholder address" \
          "open flux/gitrepository.yaml and enter your own GitHub repository address"
   elif [ "$GR_READY" = "True" ]; then

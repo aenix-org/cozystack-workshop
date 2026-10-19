@@ -30,4 +30,4 @@ cd ~/workshop
 `nano manifests/03-app-vm.yaml` (save: `Ctrl+O`, `Enter`, exit: `Ctrl+X`).
 
 The only placeholder deliberately left in is in `manifests/03-app-vm.yaml`, the line
-`url: "ВСТАВЬТЕ_PRESIGNED_URL"`. You'll get that URL once you convert the image. For now, just know it's waiting for you there.
+`url: "PASTE_PRESIGNED_URL"`. You'll get that URL once you convert the image. For now, just know it's waiting for you there.

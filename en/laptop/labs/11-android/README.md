@@ -216,13 +216,13 @@ export KUBECONFIG=~/lab.kubeconfig
 # generic means "an arbitrary set of name-value pairs," not a ready-made type
 # for an image-registry password or a TLS certificate.
 #   bucket-creds        the secret's name. The Job will reference it by this name
-#   --from-literal=name='value'   one pair. In place of ВСТАВЬТЕ_..., substitute
+#   --from-literal=name='value'   one pair. In place of PASTE_..., substitute
 #                       the values from the bucket's card in the dashboard
 kubectl create secret generic bucket-creds \
-  --from-literal=endpoint='ВСТАВЬТЕ_endpoint' \
-  --from-literal=bucketName='ВСТАВЬТЕ_bucketName' \
-  --from-literal=accessKey='ВСТАВЬТЕ_accessKey' \
-  --from-literal=secretKey='ВСТАВЬТЕ_secretKey'
+  --from-literal=endpoint='PASTE_endpoint' \
+  --from-literal=bucketName='PASTE_bucketName' \
+  --from-literal=accessKey='PASTE_accessKey' \
+  --from-literal=secretKey='PASTE_secretKey'
 ```
 
 **What you should see:**

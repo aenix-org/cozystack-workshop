@@ -10,7 +10,7 @@ metadata:
 spec:
   source:
     http:
-      url: "ВСТАВЬТЕ_PRESIGNED_URL"  # from convert.sh (the Share: line)
+      url: "PASTE_PRESIGNED_URL"  # from convert.sh (the Share: line)
   storage: 10Gi
   storageClass: replicated
 ---

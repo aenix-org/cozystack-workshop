@@ -106,7 +106,7 @@ data:
     # writing there would end in Permission denied — and right here, at the fourth step,
     # i.e. after half an hour of building. The /work directory belongs to us, we can write to it.
     mkdir -p "$WORK/bin"
-    # dl.min.io больше не отдаёт клиент mc — берём совместимый форк pgsty/mc (mcli из tar.gz).
+    # dl.min.io no longer serves the mc client — use the compatible fork pgsty/mc (mcli from tar.gz).
     curl -fsSL "$MC_URL" | tar -xz -C "$WORK/bin" mcli
     mv "$WORK/bin/mcli" "$WORK/bin/mc"
     chmod +x "$WORK/bin/mc"

@@ -5,7 +5,7 @@
 #   kubectl --kubeconfig="$HOME/.kube/workshop" apply -f mongodb.yaml
 #
 # BEFORE APPLYING: replace tenant-workshopXX with your namespace,
-# and ЗдесьВашПароль with a password you come up with.
+# and YourPasswordHere with a password you come up with.
 apiVersion: apps.cozystack.io/v1alpha1
 kind: MongoDB
 metadata:
@@ -39,7 +39,7 @@ spec:
   # that is why authSource=admin is mandatory in the connection string.
   users:
     passapp:
-      password: ЗдесьВашПароль
+      password: YourPasswordHere
   # The passes database and permissions in it: the passapp user is granted the admin role of this database,
   # meaning it can read, write, build indexes and change collection settings.
   # This does not grant rights to other databases.

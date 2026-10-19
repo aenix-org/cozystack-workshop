@@ -5,7 +5,7 @@
 #   kubectl --kubeconfig="$HOME/.kube/workshop" apply -f clickhouse.yaml
 #
 # BEFORE APPLYING: replace tenant-workshopXX with your namespace,
-# and ЗдесьВашПароль with a password you come up with.
+# and YourPasswordHere with a password you come up with.
 apiVersion: apps.cozystack.io/v1alpha1
 kind: ClickHouse
 metadata:
@@ -35,7 +35,7 @@ spec:
   # After creation it is visible in the dashboard, in the secret clickhouse-analytics-credentials.
   users:
     analyst:
-      password: ЗдесьВашПароль
+      password: YourPasswordHere
   # Backups to object storage. The data here is generated,
   # there is nothing to restore — disabled on the training stand.
   backup:
