@@ -237,10 +237,15 @@ After that the machine needs a **reboot**: CentOS 7 applies network settings at 
 **5.2.** The script replaces the hard-wired addresses `192.168.10.30` and `192.168.10.40` in
 `/etc/orders/application.properties` with service names and restarts the application.
 
-**5.3.** We install the `psql` client and apply the schema — the commands are below, in the
-final check.
+**5.3.** We install the `psql` client and apply the schema. The commands live in the next
+section, because they go in a fixed order with the firewall:
 
-In detail: [chat/25](chat/25-step-6-fix-networking.md) ·
+➡️ **Go to [The final check](#the-final-check-three-steps-in-order)** and do
+**Step 1** (shut down firewalld), then **Step 2. The database schema** — that is where `psql`
+is installed and `orders-schema.sql` is applied. In the chat this is step 8:
+[chat/28](chat/28-step-8-why-it-still-fails.md) · [chat/29](chat/29-step-8-apply-schema.md).
+
+In detail for 5.1 and 5.2: [chat/25](chat/25-step-6-fix-networking.md) ·
 [chat/26](chat/26-first-check-fails.md) ·
 [chat/27](chat/27-step-7-switch-app.md)
 
