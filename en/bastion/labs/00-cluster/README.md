@@ -112,11 +112,11 @@ Fill in:
 | Name | `lab` | short — you'll have to type it in commands |
 | Version | leave the one offered | it's the latest stable |
 | Control plane replicas | **1** | the default is two; one is enough for a lab testbed |
-| Node group: name | `md0` | this name ends up in the node name — you'll see it later in the output of `kubectl get nodes` |
-| Node group: min replicas | **1** | we start with one node |
-| Node group: max replicas | **3** | the ceiling the group may grow to by itself; the default is 10, and the scaling lab is built on that ceiling |
-| Node group: instance type | `u1.medium` | 1 processor, 4 GB |
-| Node group: disk | `20Gi` | |
+| Node groups → **Add** → **Key name** | `md0` | the form calls the group's name “Key name”. It ends up in the node name — you'll see it later in the output of `kubectl get nodes`. The fields below appear only after you add the group |
+| Node group: `minReplicas` | **1** | we start with one node. The form offers 0 — with 0 the cluster has no workers at all |
+| Node group: `maxReplicas` | **3** | the ceiling the group may grow to by itself; the default is 10, and the scaling lab is built on that ceiling |
+| Node group: `instanceType` | `u1.medium` | 1 processor, 4 GB |
+| Node group: `diskSize` | `20Gi` | |
 | Storage class | `replicated` | the data lands in three copies on different nodes |
 | Addons → **Monitoring agents** | **enable** | otherwise metrics won't accumulate, and in the charts lab there'll be nothing to look at |
 
