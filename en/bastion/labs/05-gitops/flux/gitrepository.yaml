@@ -6,7 +6,7 @@
 #     kubectl apply -f flux/
 #
 # WARNING: REPLACE url with the address of YOUR repository before applying: the
-# ЗАМЕНИТЕ-МЕНЯ string is a placeholder; with it Flux will go to a non-existent address and halt
+# REPLACE-ME string is a placeholder; with it Flux will go to a non-existent address and halt
 # with an error. Check the branch too: GitHub creates new repositories with a main branch.
 #
 # In every object: apiVersion is the schema version of the description, kind is what we create,
@@ -29,7 +29,7 @@ spec:
   # The repository address. It's public, so there's neither a login nor a key here —
   # this is a simplification of the training stand. In production the repository is private, and next to it appears
   # a reference to a secret with a deploy key (the secretRef field).
-  url: https://github.com/ЗАМЕНИТЕ-МЕНЯ/passes-gitops
+  url: https://github.com/REPLACE-ME/passes-gitops
   # Which branch to treat as the source of truth. What is merged into main goes to the cluster;
   # what lies in other branches does not. This is where review comes from: a change
   # first lives in its own branch, where it can be reviewed, and only the merge into main

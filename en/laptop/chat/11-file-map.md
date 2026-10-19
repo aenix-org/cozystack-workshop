@@ -27,7 +27,7 @@ On your laptop you don't need them at all.
 The **converter machine** has a network, so it downloads the file itself. The repository is
 public, no keys needed:
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/laptop/scripts/convert.sh
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/laptop/scripts/convert.sh
 ```
 
 **Your app-VM has no network at all to begin with** — that broken state is exactly what we fix

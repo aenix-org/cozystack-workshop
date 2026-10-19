@@ -34,9 +34,9 @@ The fourth one, `endpoint`, you don't need to write down — it's the same for e
 **Where they go.** In step 3 you'll open the file `convert.sh` on the converter machine, and in it a block "PASTE YOUR VALUES" of three lines:
 
 ```
-BUCKET="ВСТАВЬТЕ_bucketName"
-ACCESS_KEY="ВСТАВЬТЕ_accessKey"
-SECRET_KEY="ВСТАВЬТЕ_secretKey"
+BUCKET="PASTE_bucketName"
+ACCESS_KEY="PASTE_accessKey"
+SECRET_KEY="PASTE_secretKey"
 ```
 
 Those are the exact three values you'll paste there, each inside its own quotes. They won't be needed anywhere else: the script itself will upload the finished image to your bucket and itself create a link to it.

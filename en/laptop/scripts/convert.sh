@@ -11,9 +11,9 @@ set -euo pipefail
 # =========================================================================
 S3_ENDPOINT="https://s3.workshop.aenix.io"   # endpoint field from Secrets, but WITH THE https:// PREFIX
                                              # (shown without the scheme in the dashboard, add https:// yourself)
-BUCKET="ВСТАВЬТЕ_bucketName"                 # bucketName of your bucket
-ACCESS_KEY="ВСТАВЬТЕ_accessKey"              # accessKey of your bucket
-SECRET_KEY="ВСТАВЬТЕ_secretKey"              # secretKey of your bucket
+BUCKET="PASTE_bucketName"                 # bucketName of your bucket
+ACCESS_KEY="PASTE_accessKey"              # accessKey of your bucket
+SECRET_KEY="PASTE_secretKey"              # secretKey of your bucket
 OVA_URL="https://s3.workshop.aenix.io/bucket-a9209f83-4ac1-463e-8477-d8365bef787b/app-1.ova"  # ready-made demo OVA for the workshop (already uploaded; you can replace it with your own)
 # =========================================================================
 

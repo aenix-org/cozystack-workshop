@@ -28,7 +28,7 @@ On the bastion itself you don't run them — you only apply the manifests with `
 The **converter machine** has a network, so it downloads the file itself. The repository is
 public, no keys needed:
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/bastion/scripts/convert.sh
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/bastion/scripts/convert.sh
 ```
 
 **Your app-VM has no network at all to begin with** — that broken state is exactly what we fix
@@ -41,5 +41,5 @@ out in full and with comments: handy to reread later, when you repeat this on yo
 ⚠️ **The tenant number in the manifests is already filled in** — while the bastion was being
 prepared, the `tenant-workshopXX` placeholders were replaced with your number. You don't need
 to enter anything by hand. The only things you fill in yourself are `bucketName`, `accessKey`
-and `secretKey` in `convert.sh` (it's downloaded into the converter fresh, with `ВСТАВЬТЕ_...`
+and `secretKey` in `convert.sh` (it's downloaded into the converter fresh, with `PASTE_...`
 placeholders), and the presigned link in `manifests/03-app-vm.yaml` at step four.

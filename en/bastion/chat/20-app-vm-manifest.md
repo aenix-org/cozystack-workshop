@@ -7,7 +7,7 @@ kind: VMDisk
 spec:
   source:
     http:
-      url: "ВСТАВЬТЕ_PRESIGNED_URL"
+      url: "PASTE_PRESIGNED_URL"
   storage: 10Gi
 ```
 

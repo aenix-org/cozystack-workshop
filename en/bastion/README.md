@@ -74,7 +74,7 @@ grep -rl tenant-workshop manifests | head -1 | xargs grep -m1 namespace   # you 
 ```
 
 One spot is left as a placeholder on purpose: in `manifests/03-app-vm.yaml` the line
-`url: "ВСТАВЬТЕ_PRESIGNED_URL"` — you'll get that link after the second phase and fill it in yourself.
+`url: "PASTE_PRESIGNED_URL"` — you'll get that link after the second phase and fill it in yourself.
 
 In detail: [chat/10](chat/10-clone-and-set-number.md) ·
 file map [chat/11](chat/11-file-map.md)
@@ -141,7 +141,7 @@ virtctl console --namespace=tenant-workshopXX vm-instance-convert
 ```
 
 Inside: `nano convert.sh`, paste in the text of `scripts/convert.sh`, and put your own
-`bucketName`, `accessKey` and `secretKey` in place of `ВСТАВЬТЕ_...`.
+`bucketName`, `accessKey` and `secretKey` in place of `PASTE_...`.
 
 ⚠️ **Run the conversion inside `screen`** — it takes about five minutes, and if your SSH session
 to the bastion drops, an ordinary run will be cut off halfway. `screen` keeps the process alive,
@@ -176,7 +176,7 @@ kubectl delete vmdisk convert-tools --namespace tenant-workshopXX
 ```
 
 Put the link you got into `manifests/03-app-vm.yaml` in place of
-`url: "ВСТАВЬТЕ_PRESIGNED_URL"`, then:
+`url: "PASTE_PRESIGNED_URL"`, then:
 
 ```bash
 kubectl apply -f manifests/03-app-vm.yaml
@@ -292,7 +292,7 @@ If `command not found` — the client landed outside `PATH`: look at
 We fetch the schema and apply it (this app-VM does reach the internet, so the file will download):
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/bastion/scripts/orders-schema.sql
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/bastion/scripts/orders-schema.sql
 
 PGPASSWORD='Orders2019!' psql \
   -h postgres-db-rw.tenant-workshopXX.svc.cozy.local -U orders -d orders \
