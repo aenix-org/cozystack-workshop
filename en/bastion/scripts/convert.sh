@@ -14,7 +14,7 @@ S3_ENDPOINT="https://s3.workshop.aenix.io"   # endpoint field from Secrets, but 
 BUCKET="PASTE_bucketName"                 # bucketName of your bucket
 ACCESS_KEY="PASTE_accessKey"              # accessKey of your bucket
 SECRET_KEY="PASTE_secretKey"              # secretKey of your bucket
-OVA_URL="https://s3.workshop.aenix.io/bucket-a9209f83-4ac1-463e-8477-d8365bef787b/app-1.ova"  # ready-made workshop demo-OVA (already uploaded; can be replaced with your own)
+OVA_URL="https://s3.workshop.aenix.io/bucket-a9209f83-4ac1-463e-8477-d8365bef787b/app-1.ova"  # shared source image — do NOT put your own bucket here
 # =========================================================================
 
 echo "== 1. nested-virt? (if /dev/kvm is missing -> TCG, slower, but works) =="

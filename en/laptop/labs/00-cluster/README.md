@@ -121,7 +121,7 @@ Fill in:
 | Node group: `maxReplicas` | **3** | the ceiling the group may grow to by itself; the default is 10, and the scaling lab is built on that ceiling |
 | Node group: `instanceType` | `u1.medium` | 1 processor, 4 GB |
 | Node group: `diskSize` | `20Gi` | |
-| Storage class | `replicated` | the data lands in three copies on different nodes |
+| Storage class | `replicated` | the data lands in three copies on different nodes. **Only `replicated`:** worker disks must be shareable for live migration, and with `local` the cluster never gets any nodes |
 | Addons → **Monitoring agents** | **enable** | otherwise metrics won't accumulate, and in the charts lab there'll be nothing to look at |
 
 Click create.
@@ -251,6 +251,8 @@ macOS and Linux:
 # KUBECONFIG is the variable from which kubectl learns which access file to take.
 # export makes it visible to all commands run further in this terminal window.
 export KUBECONFIG=~/lab.kubeconfig
+# Without this line kubectl talks to your tenant, not to your cluster,
+# and `get nodes` answers "Forbidden": the shared platform nodes are not yours to see.
 # nodes are the cluster's nodes, the very virtual machines your applications will run on.
 # The answer also proves the access file works.
 kubectl get nodes
