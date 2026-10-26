@@ -36,16 +36,16 @@ are left:
 grep PASTE_ convert.sh || echo "all filled in, ready to run"
 ```
 
-Run it — always through `sudo`, the script needs root privileges. And run it **in `screen`**:
-the conversion takes about five minutes, and right now you're on a chain of two connections (your laptop → SSH
-to the bastion → the converter machine's console). If any link in the chain drops, an ordinary run
-will break off halfway. `screen` keeps the process alive even when the connection drops:
+Run it — always through `sudo`, the script needs root privileges:
 
 ```bash
-screen -S convert          # start a separate session
-sudo bash convert.sh       # run it inside that session
-#  connection dropped? log back in to this same machine, then:  screen -r convert
+sudo bash convert.sh
 ```
+
+The conversion takes about five minutes. You are on a chain of two connections (your laptop →
+SSH to the bastion → the converter machine's console), but if a link drops, the script does
+not stop: it runs inside the converter machine, not in your SSH session. Reconnect with
+`virtctl console` and you will find it right where it was.
 
 What happens inside: the script downloads the source image, runs `virt-v2v`,
 compresses the result and uploads it to your bucket.

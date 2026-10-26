@@ -143,15 +143,14 @@ virtctl console --namespace=tenant-workshopXX vm-instance-convert
 내부에서: `nano convert.sh`로 `scripts/convert.sh`의 내용을 붙여 넣고, `ВСТАВЬТЕ_...` 자리에
 자신의 `bucketName`, `accessKey`, `secretKey`를 넣습니다.
 
-⚠️ **변환은 `screen` 안에서 실행하세요** — 약 5분 걸리는데, bastion으로의 SSH 세션이 끊기면
-평범하게 실행한 작업은 중간에 잘려 나갑니다. `screen`은 연결이 사라져도 프로세스를 계속 살려
-둡니다:
+변환을 실행하세요 — 약 5분 걸립니다:
 
 ```bash
-screen -S convert          # 별도 세션을 엽니다
-sudo bash convert.sh       # 그 세션 안에서 실행합니다
-#  연결이 끊겼나요? bastion에 다시 ssh로 접속한 뒤:  screen -r convert
+sudo bash convert.sh
 ```
+
+중간에 연결이 끊겨도 잃는 것은 없습니다. 스크립트는 SSH 세션이 아니라 변환기 머신 안에서
+실행됩니다. `virtctl console`로 다시 접속하면 하던 자리에서 그대로 진행 중입니다.
 
 **이렇게 보여야 합니다:** 출력의 끝, `Share:`라는 단어 뒤에 — 이미지로 향하는 서명된 링크가 있습니다.
 다음 단계에서 필요합니다.
@@ -369,7 +368,6 @@ Enter를 누르세요. 같은 것을 마우스로도 할 수 있습니다: dashb
   디스크가 `Terminating`에 걸립니다. `ubuntu-20.04`에는 25Gi면 충분합니다.
 * 새 app-VM에서는 먼저 `netfix`, 그다음 `connect` — 그렇지 않으면 애플리케이션이 매니지드
   서비스를 보지 못합니다.
-* 긴 변환은 `screen` 안에서 실행하세요 — 그렇지 않으면 SSH가 끊길 때 중간에 잘려 나갑니다.
 
 나머지 함정들은 — [chat/31](chat/31-troubleshooting.md).
 

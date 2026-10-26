@@ -31,13 +31,13 @@ SECRET_KEY="your-secretKey"
 grep ВСТАВЬТЕ convert.sh || echo "全部填好了，可以运行了"
 ```
 
-运行它——一定要通过 `sudo`，脚本需要 root 权限。而且要**在 `screen` 里**运行：转换大约要五分钟，而你现在是挂在一条由两段连接组成的链路上（你的笔记本 → SSH 到 bastion → 转换机的控制台）。这条链路里任何一环断掉，普通的运行就会在中途中断。`screen` 能让进程一直活着，即使连接断了：
+运行它——一定要通过 `sudo`，脚本需要 root 权限：
 
 ```bash
-screen -S convert          # 开一个独立的会话
-sudo bash convert.sh       # 在它里面运行
-#  连接断了？重新登录到这同一台机器，然后：  screen -r convert
+sudo bash convert.sh
 ```
+
+转换大约要五分钟。你现在挂在一条由两段连接组成的链路上（你的笔记本 → SSH 到 bastion → 转换机的控制台），但哪一环断了，脚本都不会停：它运行在转换机里面，而不是在你的 SSH 会话里。用 `virtctl console` 重新连上，就能看到它还在原来的地方继续跑。
 
 内部发生的事：脚本会下载源镜像，运行 `virt-v2v`，压缩结果，再把它上传到你的 bucket。
 

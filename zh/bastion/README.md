@@ -111,13 +111,13 @@ virtctl console --namespace=tenant-workshopXX vm-instance-convert
 
 进去后：`nano convert.sh`，把 `scripts/convert.sh` 的内容粘进去，再把你自己的 `bucketName`、`accessKey` 和 `secretKey` 填到 `ВСТАВЬТЕ_...` 的位置。
 
-⚠️ **在 `screen` 里跑转换**——它大约要五分钟，如果你到 bastion 的 SSH 会话断了，普通方式跑的话会在半路被切断。`screen` 能把进程保住，哪怕连接掉了也在：
+运行转换——大约要五分钟：
 
 ```bash
-screen -S convert          # 开一个独立会话
-sudo bash convert.sh       # 在这个会话里跑它
-#  连接断了？重新 ssh 到 bastion，然后：  screen -r convert
+sudo bash convert.sh
 ```
+
+如果连接在中途断了，什么都不会丢：脚本运行在转换机里面，而不是在你的 SSH 会话里。用 `virtctl console` 重新连上，就能看到它还在原来的地方继续跑。
 
 **你应该看到：** 在输出的末尾，`Share:` 这个词后面——一个指向镜像的签名链接。下一阶段你会用到它。
 
@@ -302,7 +302,6 @@ virtctl ssh ubuntu@vmi/vm-instance-app-1 --namespace=tenant-workshopXX
 * conversion-VM 只用 `ubuntu-20.04`。在 24.04 上内核会 panic；在 22.04 上 `virt-v2v` 解析不了老的 CentOS 7 RPM 数据库。
 * 用于目录镜像的 VMDisk 必须比镜像本身大，否则克隆过不去，磁盘会卡在 `Terminating`。对 `ubuntu-20.04` 来说，25Gi 就够了。
 * 在一台全新的 app-VM 上，先 `netfix`，再 `connect`——否则应用看不到那些托管服务。
-* 长时间的转换要在 `screen` 里跑——否则 SSH 一断就会把它切在半路。
 
 其余的坑——[chat/31](chat/31-troubleshooting.md)。
 

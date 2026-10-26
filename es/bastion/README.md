@@ -144,15 +144,15 @@ virtctl console --namespace=tenant-workshopXX vm-instance-convert
 Dentro: `nano convert.sh`, pega el texto de `scripts/convert.sh`, y pon tus propios
 `bucketName`, `accessKey` y `secretKey` en lugar de `ВСТАВЬТЕ_...`.
 
-⚠️ **Ejecuta la conversión dentro de `screen`** — tarda unos cinco minutos, y si tu sesión SSH al
-bastion se cae, una ejecución normal quedaría cortada a la mitad. `screen` mantiene el proceso vivo,
-incluso cuando la conexión se pierde:
+Ejecuta la conversión — tarda unos cinco minutos:
 
 ```bash
-screen -S convert          # abre una sesión aparte
-sudo bash convert.sh       # ejecútalo dentro de esa sesión
-#  ¿se cayó la conexión? vuelve a entrar por ssh al bastion, luego:  screen -r convert
+sudo bash convert.sh
 ```
+
+Si la conexión se cae a la mitad, no se pierde nada: el script se ejecuta dentro de la
+máquina conversora, no en tu sesión SSH. Vuelve a conectarte con `virtctl console` y lo
+encontrarás donde lo dejaste.
 
 **Deberías ver:** al final de la salida, después de la palabra `Share:` — un enlace firmado a la imagen.
 Lo necesitarás en la siguiente fase.
@@ -372,7 +372,6 @@ página de la máquina en el panel.
   el clon no pasará y el disco quedará colgado en `Terminating`. Para `ubuntu-20.04`, 25Gi es suficiente.
 * En una app-VM recién creada, primero `netfix`, luego `connect` — de lo contrario la aplicación no
   verá los servicios gestionados.
-* Ejecuta la conversión larga dentro de `screen` — de lo contrario una caída de SSH la cortará a la mitad.
 
 El resto de los escollos — [chat/31](chat/31-troubleshooting.md).
 

@@ -144,14 +144,13 @@ virtctl console --namespace=tenant-workshopXX vm-instance-convert
 中で: `nano convert.sh` を実行し、`scripts/convert.sh` の内容を貼り付け、`ВСТАВЬТЕ_...` の代わりに
 自分の `bucketName`、`accessKey`、`secretKey` を書き込みます。
 
-⚠️ **変換は `screen` の中で実行してください** — 5分ほどかかり、bastion への SSH セッションが切れると、
-普通の実行は途中で打ち切られます。`screen` は接続がなくなってもプロセスを保ち続けます:
+変換を実行します。5分ほどかかります:
 
 ```bash
-screen -S convert          # 別のセッションに入る
-sudo bash convert.sh       # そのセッションの中で実行する
-#  接続が切れた? もう一度 bastion に ssh して、次を実行:  screen -r convert
+sudo bash convert.sh
 ```
+
+途中で接続が切れても何も失われません。スクリプトは SSH セッションではなく、変換用マシンの中で動いています。`virtctl console` でつなぎ直せば、そのままの状態で続いています。
 
 **表示されるはず:** 出力の最後、`Share:` という単語の後に、イメージへの署名付きリンク。次のフェーズで
 必要になります。
@@ -371,7 +370,6 @@ virtctl ssh ubuntu@vmi/vm-instance-app-1 --namespace=tenant-workshopXX
   通らず、ディスクは `Terminating` のまま止まります。`ubuntu-20.04` なら 25Gi で足ります。
 * 新しい app-VM では、まず `netfix`、次に `connect` の順で — さもないとアプリケーションはマネージド
   サービスを認識しません。
-* 長い変換は `screen` の中で実行してください — さもないと SSH の切断が途中で打ち切ります。
 
 残りの落とし穴は — [chat/31](chat/31-troubleshooting.md)。
 

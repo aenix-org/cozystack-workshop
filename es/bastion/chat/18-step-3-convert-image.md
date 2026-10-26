@@ -36,16 +36,16 @@ queden marcadores:
 grep ВСТАВЬТЕ convert.sh || echo "all filled in, ready to run"
 ```
 
-Ejecútalo — siempre a través de `sudo`, el script necesita privilegios de root. Y ejecútalo **dentro de `screen`**:
-la conversión tarda unos cinco minutos, y ahora mismo estás sobre una cadena de dos conexiones (tu portátil → SSH
-al bastion → la consola de la máquina conversora). Si cualquier eslabón de la cadena se cae, una ejecución
-normal se cortaría a la mitad. `screen` mantiene vivo el proceso incluso cuando la conexión se cae:
+Ejecútalo — siempre a través de `sudo`, el script necesita privilegios de root:
 
 ```bash
-screen -S convert          # entrar en una sesión aparte
-sudo bash convert.sh       # ejecutarlo dentro de ella
-#  ¿se cayó la conexión? vuelve a entrar a esta misma máquina, luego:  screen -r convert
+sudo bash convert.sh
 ```
+
+La conversión tarda unos cinco minutos. Ahora mismo estás sobre una cadena de dos conexiones
+(tu portátil → SSH al bastion → la consola de la máquina conversora), pero si un eslabón se
+cae, el script no se detiene: se ejecuta dentro de la máquina conversora, no en tu sesión SSH.
+Vuelve a conectarte con `virtctl console` y lo encontrarás justo donde lo dejaste.
 
 Lo que ocurre por dentro: el script descarga la imagen de origen, ejecuta `virt-v2v`,
 comprime el resultado y lo sube a tu bucket.

@@ -142,15 +142,15 @@ virtctl console --namespace=tenant-workshopXX vm-instance-convert
 Im Inneren: `nano convert.sh`, fügen Sie den Text von `scripts/convert.sh` ein und setzen Sie Ihre
 eigenen `bucketName`, `accessKey` und `secretKey` anstelle von `ВСТАВЬТЕ_...` ein.
 
-⚠️ **Führen Sie die Konvertierung innerhalb von `screen` aus** — sie dauert etwa fünf Minuten, und
-wenn Ihre SSH-Sitzung zum Bastion abbricht, wird ein gewöhnlicher Lauf auf halbem Weg abgeschnitten.
-`screen` hält den Prozess am Leben, selbst wenn die Verbindung weg ist:
+Führen Sie die Konvertierung aus — sie dauert etwa fünf Minuten:
 
 ```bash
-screen -S convert          # eine separate Sitzung öffnen
-sudo bash convert.sh       # innerhalb dieser Sitzung ausführen
-#  Verbindung abgebrochen? Per SSH zurück auf den Bastion, dann:  screen -r convert
+sudo bash convert.sh
 ```
+
+Bricht die Verbindung mittendrin ab, geht nichts verloren: Das Skript läuft im
+Konvertierungsrechner, nicht in Ihrer SSH-Sitzung. Verbinden Sie sich mit `virtctl console`
+erneut, und Sie finden es dort, wo Sie es verlassen haben.
 
 **Sie sollten sehen:** am Ende der Ausgabe, nach dem Wort `Share:` — einen signierten Link zum Image.
 Sie brauchen ihn in der nächsten Phase.
@@ -368,8 +368,6 @@ der Seite der Maschine im Dashboard.
   durch und die Festplatte bleibt in `Terminating` hängen. Für `ubuntu-20.04` reichen 25Gi.
 * Auf einer frischen App-VM zuerst `netfix`, dann `connect` — sonst sieht die Anwendung die Managed
   Services nicht.
-* Führen Sie die lange Konvertierung innerhalb von `screen` aus — sonst schneidet ein SSH-Abbruch sie
-  auf halbem Weg ab.
 
 Die übrigen Fallstricke — [chat/31](chat/31-troubleshooting.md).
 

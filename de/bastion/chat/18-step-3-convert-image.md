@@ -36,16 +36,17 @@ Platzhalter übrig sind:
 grep ВСТАВЬТЕ convert.sh || echo "alles ausgefüllt, bereit zum Ausführen"
 ```
 
-Führen Sie es aus — immer über `sudo`, das Skript braucht root-Rechte. Und führen Sie es **in `screen`** aus:
-die Konvertierung dauert etwa fünf Minuten, und Sie hängen gerade an einer Kette aus zwei Verbindungen (Ihr Laptop → SSH
-zum Bastion → Konsole des Konvertierungsrechners). Fällt irgendein Glied der Kette aus, bricht ein gewöhnlicher
-Lauf auf halbem Weg ab. `screen` hält den Prozess am Leben, selbst wenn die Verbindung wegfällt:
+Führen Sie es aus — immer über `sudo`, das Skript braucht root-Rechte:
 
 ```bash
-screen -S convert          # eine separate Sitzung starten
-sudo bash convert.sh       # innerhalb dieser Sitzung ausführen
-#  Verbindung abgebrochen? Melden Sie sich erneut an genau diesem Rechner an, dann:  screen -r convert
+sudo bash convert.sh
 ```
+
+Die Konvertierung dauert etwa fünf Minuten. Sie hängen gerade an einer Kette aus zwei
+Verbindungen (Ihr Laptop → SSH zum Bastion → Konsole des Konvertierungsrechners), doch fällt
+ein Glied aus, läuft das Skript weiter: Es läuft im Konvertierungsrechner, nicht in Ihrer
+SSH-Sitzung. Verbinden Sie sich mit `virtctl console` erneut, und Sie finden es dort, wo Sie
+es verlassen haben.
 
 Was dabei intern passiert: Das Skript lädt das Quell-Image herunter, führt `virt-v2v` aus,
 komprimiert das Ergebnis und lädt es in Ihren Bucket hoch.

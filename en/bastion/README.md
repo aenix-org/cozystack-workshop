@@ -143,15 +143,15 @@ virtctl console --namespace=tenant-workshopXX vm-instance-convert
 Inside: `nano convert.sh`, paste in the text of `scripts/convert.sh`, and put your own
 `bucketName`, `accessKey` and `secretKey` in place of `PASTE_...`.
 
-⚠️ **Run the conversion inside `screen`** — it takes about five minutes, and if your SSH session
-to the bastion drops, an ordinary run will be cut off halfway. `screen` keeps the process alive,
-even when the connection is gone:
+Run the conversion — it takes about five minutes:
 
 ```bash
-screen -S convert          # open a separate session
-sudo bash convert.sh       # run it inside that session
-#  connection dropped? ssh back into the bastion, then:  screen -r convert
+sudo bash convert.sh
 ```
+
+If your connection drops halfway, nothing is lost: the script runs inside the converter
+machine, not in your SSH session. Reconnect with `virtctl console` and you will find it
+where it was.
 
 **You should see:** at the end of the output, after the word `Share:` — a signed link to the image.
 You'll need it in the next phase.
@@ -376,7 +376,6 @@ machine's page in the dashboard.
   won't go through and the disk will hang in `Terminating`. For `ubuntu-20.04`, 25Gi is enough.
 * On a fresh app-VM, `netfix` first, then `connect` — otherwise the application won't see the
   managed services.
-* Run the long conversion inside `screen` — otherwise an SSH drop will cut it off halfway.
 
 The rest of the pitfalls — [chat/31](chat/31-troubleshooting.md).
 
