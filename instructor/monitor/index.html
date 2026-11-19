@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Participant Monitor</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.css">
+<script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@xterm/addon-search@0.15.0/lib/addon-search.js"></script>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --line: #2a2f3a; --text: #d7dae0; --muted: #8a909c;
+    --ok: #3fb950; --warn: #d29922; --err: #f85149; --stuck: #ff7b72; --accent: #58a6ff;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  body { display: grid; grid-template-rows: auto 1fr; overflow: hidden; }
+  header { display: flex; gap: 14px; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--line);
+    background: var(--panel); flex-wrap: wrap; }
+  header h1 { font-size: 14px; margin: 0; font-weight: 600; }
+  #summary { color: var(--muted); }
+  #summary.bad { color: var(--err); }
+  header label { color: var(--muted); display: flex; gap: 6px; align-items: center; cursor: pointer; }
+  header input[type=text] { background: var(--bg); color: var(--text); border: 1px solid var(--line);
+    border-radius: 4px; padding: 3px 6px; width: 260px; }
+  #conn { margin-left: auto; font-size: 12px; }
+  #conn.on { color: var(--ok); } #conn.off { color: var(--err); }
+  main { display: grid; grid-template-columns: 1fr 320px; min-height: 0; }
+  #grid { display: grid; gap: 6px; padding: 6px; min-height: 0; overflow: auto;
+    grid-auto-rows: minmax(180px, 1fr); }
+  .tile { display: flex; flex-direction: column; min-height: 0; background: #000; border: 2px solid var(--line);
+    border-radius: 6px; overflow: hidden; }
+  .tile.warn { border-color: var(--warn); }
+  .tile.error { border-color: var(--err); }
+  .tile.stuck { border-color: var(--stuck); animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 3px rgba(255,123,114,.45); } }
+  .tile.expanded { position: fixed; inset: 46px 330px 8px 8px; z-index: 10; }
+  .bar { display: flex; gap: 8px; align-items: center; padding: 3px 8px; background: var(--panel);
+    font-size: 12px; cursor: pointer; white-space: nowrap; }
+  .bar .name { font-weight: 600; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+  .dot.online { background: var(--ok); }
+  .bar .cmd { color: var(--muted); overflow: hidden; text-overflow: ellipsis; flex: 1; font-family: ui-monospace, Menlo, monospace; }
+  .badge { background: var(--err); color: #fff; border-radius: 9px; padding: 0 6px; font-size: 11px; }
+  .badge:empty { display: none; }
+  .ack { display: none; background: none; border: 1px solid var(--muted); color: var(--text); border-radius: 4px;
+    font-size: 11px; padding: 0 6px; cursor: pointer; }
+  .tile.error .ack, .tile.stuck .ack { display: inline-block; }
+  .search { display: none; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 4px;
+    font-size: 12px; padding: 1px 6px; width: 200px; }
+  .tile.expanded .search { display: inline-block; }
+  .term { flex: 1; min-height: 0; padding: 2px 0 0 4px; }
+  aside { border-left: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; background: var(--panel); }
+  aside h2 { font-size: 12px; margin: 0; padding: 8px 10px; color: var(--muted); font-weight: 600;
+    border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; }
+  #feed { overflow: auto; flex: 1; }
+  .ev { padding: 6px 10px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .ev:hover { background: #1f2430; }
+  .ev .h { display: flex; gap: 6px; font-size: 11px; color: var(--muted); }
+  .ev .k { font-weight: 600; }
+  .ev.error .k { color: var(--err); } .ev.warn .k { color: var(--warn); } .ev.stuck .k { color: var(--stuck); }
+  .ev .m { font-family: ui-monospace, Menlo, monospace; font-size: 11.5px; word-break: break-word; margin-top: 2px; white-space: pre-wrap; }
+  .ev.old { opacity: .55; }
+  #empty { color: var(--muted); padding: 40px; text-align: center; grid-column: 1 / -1; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } aside { display: none; }
+    .tile.expanded { inset: 46px 8px 8px 8px; } }
+</style>
+</head>
+<body>
+<header>
+  <h1 data-i18n="title"></h1>
+  <span id="summary"></span>
+  <label data-i18n-title="filterHint"><span data-i18n="participants"></span> <input id="filter" type="text" placeholder="online01, online02 …"></label>
+  <label><input id="notify" type="checkbox"> <span data-i18n="notifications"></span></label>
+  <label><input id="notifyErrors" type="checkbox"> <span data-i18n="everyError"></span></label>
+  <label><input id="sound" type="checkbox"> <span data-i18n="sound"></span></label>
+  <span id="conn" class="off" data-i18n="offline"></span>
+</header>
+<main>
+  <section id="grid"><div id="empty" data-i18n="waiting"></div></section>
+  <aside><h2><span data-i18n="events"></span><span id="feedCount"></span></h2><div id="feed"></div></aside>
+</main>
+<script>
+"use strict";
+const I18N = {
+  en: {
+    title: "Participant Monitor", participants: "Participants", filterHint: "Comma-separated; empty means everyone",
+    notifications: "notifications", everyError: "on every error too", sound: "sound",
+    online: "connected", offline: "disconnected", reconnecting: "disconnected, reconnecting…",
+    waiting: "Waiting for participants…", events: "Events", search: "search, Enter for next", ack: "got it",
+    loggedIn: "logged in", loggedOut: "not logged in", outputAgo: (d) => `output ${d} ago`,
+    sec: "s", min: "min",
+    summary: (on, n, bad, stuck) => `logged in ${on} of ${n} · problems: ${bad}` + (stuck ? ` · stuck: ${stuck}` : ""),
+    kind: { fail: "command failed", pattern: "error in output", stuck: "stuck", hung: "hanging", idle: "idle" },
+    msg: {
+      pattern: (l) => l,
+      ok_with_error: (l, c) => `command succeeded, but its output says: ${l}\n${c}`,
+      exit: (rc, c, l) => `exit ${rc}: ${c}` + (l ? `\n${l}` : ""),
+      stuck_repeat: (n, c) => `the same command failed ${n} times: ${c}`,
+      stuck_many: (n) => `${n} errors in a row without a single successful command`,
+      hung: (m, c) => `command running ${m} min with no output: ${c}`,
+      idle: (m) => `no activity for ${m} min`,
+    },
+  },
+  ru: {
+    title: "Монитор участников", participants: "Участники", filterHint: "Список через запятую, пусто — все",
+    notifications: "уведомления", everyError: "и о каждой ошибке", sound: "звук",
+    online: "на связи", offline: "нет связи", reconnecting: "нет связи, переподключаюсь…",
+    waiting: "Ждём участников…", events: "События", search: "поиск, Enter — дальше", ack: "принял",
+    loggedIn: "в сети", loggedOut: "не в сети", outputAgo: (d) => `вывод ${d} назад`,
+    sec: "с", min: "мин",
+    summary: (on, n, bad, stuck) => `в сети ${on} из ${n} · проблемы: ${bad}` + (stuck ? ` · буксуют: ${stuck}` : ""),
+    kind: { fail: "команда упала", pattern: "ошибка в выводе", stuck: "буксует", hung: "завис", idle: "молчит" },
+    msg: {
+      pattern: (l) => l,
+      ok_with_error: (l, c) => `команда прошла, но в выводе: ${l}\n${c}`,
+      exit: (rc, c, l) => `код ${rc}: ${c}` + (l ? `\n${l}` : ""),
+      stuck_repeat: (n, c) => `${n} раза падает одна и та же команда: ${c}`,
+      stuck_many: (n) => `${n} ошибок подряд, ни одной успешной команды`,
+      hung: (m, c) => `команда висит ${m} мин без вывода: ${c}`,
+      idle: (m) => `нет активности ${m} мин`,
+    },
+  },
+};
+const LANG = (new URLSearchParams(location.search).get("lang") || navigator.language || "en").slice(0, 2) === "ru" ? "ru" : "en";
+const T = I18N[LANG];
+document.documentElement.lang = LANG;
+document.title = T.title;
+document.querySelectorAll("[data-i18n]").forEach((el) => { el.textContent = T[el.dataset.i18n]; });
+document.querySelectorAll("[data-i18n-title]").forEach((el) => { el.title = T[el.dataset.i18nTitle]; });
+const KIND = T.kind;
+function message(a) { const f = a.key && T.msg[a.key]; return f ? f(...(a.args || [])) : a.msg; }
+const tiles = new Map();          // user -> tile
+let users = [];
+let ready = false;
+const $ = (s) => document.querySelector(s);
+
+function store(key, val) { try { if (val === undefined) return localStorage.getItem(key); localStorage.setItem(key, val); } catch (e) { return null; } }
+
+const filterInput = $("#filter");
+const urlUsers = new URLSearchParams(location.search).get("u");
+filterInput.value = urlUsers || store("ws.filter") || "";
+for (const id of ["notify", "notifyErrors", "sound"]) {
+  const el = $("#" + id);
+  el.checked = store("ws." + id) === "1";
+  el.addEventListener("change", () => {
+    store("ws." + id, el.checked ? "1" : "0");
+    if (id === "notify" && el.checked && "Notification" in window && Notification.permission !== "granted") Notification.requestPermission();
+  });
+}
+filterInput.addEventListener("change", () => { store("ws.filter", filterInput.value); layout(); });
+
+function wanted() {
+  const list = filterInput.value.split(/[\s,]+/).filter(Boolean);
+  return list.length ? users.filter((u) => list.includes(u)) : users;
+}
+
+function fmtTime(ms) { return new Date(ms).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", second: "2-digit" }); }
+function fmtDur(ms) { const s = Math.max(0, Math.floor(ms / 1000)); return s < 60 ? `${s} ${T.sec}` : `${Math.floor(s / 60)} ${T.min}`; }
+
+function makeTile(user) {
+  const el = document.createElement("div");
+  el.className = "tile";
+  el.innerHTML = `<div class="bar"><span class="dot"></span><span class="name"></span><span class="cmd"></span>
+    <input class="search" type="text"><span class="badge"></span><button class="ack"></button></div>
+    <div class="term"></div>`;
+  el.querySelector(".name").textContent = user;
+  el.querySelector(".search").placeholder = T.search;
+  el.querySelector(".ack").textContent = T.ack;
+  const term = new Terminal({
+    fontSize: 11.5, fontFamily: "ui-monospace, Menlo, monospace", scrollback: 50000, disableStdin: true,
+    cursorBlink: false, cursorStyle: "underline", allowProposedApi: true, overviewRulerWidth: 10,
+    theme: { background: "#000000", foreground: "#d7dae0", cursor: "#000000" },
+  });
+  const fit = new FitAddon.FitAddon();
+  const search = new SearchAddon.SearchAddon();
+  term.loadAddon(fit); term.loadAddon(search);
+  const t = { user, el, term, fit, search, state: {}, markers: new Map(), marks: new Map() };
+  el.querySelector(".bar").addEventListener("click", (e) => {
+    if (e.target.closest(".ack, .search")) return;
+    toggleExpand(t);
+  });
+  el.querySelector(".ack").addEventListener("click", () => fetch("/ack?u=" + encodeURIComponent(user), { method: "POST" }));
+  const sbox = el.querySelector(".search");
+  sbox.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") (e.shiftKey ? search.findPrevious : search.findNext).call(search, sbox.value,
+      { decorations: { matchBackground: "#6e5a00", activeMatchBackground: "#d29922", matchOverviewRuler: "#d29922", activeMatchColorOverviewRuler: "#ffcc00" } });
+    if (e.key === "Escape") toggleExpand(t, false);
+  });
+  new ResizeObserver(() => { if (el.isConnected && el.offsetWidth) try { fit.fit(); } catch (e) {} }).observe(el);
+  tiles.set(user, t);
+  return t;
+}
+
+function tileFor(user) { return tiles.get(user) || makeTile(user); }
+
+function layout() {
+  const grid = $("#grid");
+  const list = wanted();
+  $("#empty").style.display = list.length ? "none" : "";
+  const n = list.length || 1;
+  const cols = n <= 1 ? 1 : n <= 2 ? 2 : n <= 4 ? 2 : n <= 6 ? 3 : n <= 9 ? 3 : n <= 12 ? 4 : 5;
+  grid.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
+  for (const [u, t] of tiles) if (!list.includes(u) && t.el.isConnected) t.el.remove();
+  for (const u of list) {
+    const t = tileFor(u);
+    if (!t.opened) { grid.appendChild(t.el); t.term.open(t.el.querySelector(".term")); t.opened = true; }
+    else grid.appendChild(t.el);
+  }
+  requestAnimationFrame(() => { for (const u of list) try { tiles.get(u).fit.fit(); } catch (e) {} });
+  summary();
+}
+
+let expanded = null;
+function toggleExpand(t, on) {
+  const want = on === undefined ? expanded !== t : on;
+  if (expanded && expanded !== t) expanded.el.classList.remove("expanded");
+  t.el.classList.toggle("expanded", want);
+  expanded = want ? t : null;
+  requestAnimationFrame(() => { try { t.fit.fit(); } catch (e) {} if (want) t.el.querySelector(".search").focus(); });
+}
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && expanded) toggleExpand(expanded, false); });
+
+function b64bytes(s) { const bin = atob(s); const a = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i); return a; }
+
+function applyState(user, s) {
+  const t = tileFor(user);
+  t.state = s;
+  t.el.classList.remove("ok", "warn", "error", "stuck");
+  t.el.classList.add(s.level);
+  t.el.querySelector(".dot").classList.toggle("online", !!s.online);
+  t.el.querySelector(".dot").title = s.online ? T.loggedIn : T.loggedOut;
+  t.el.querySelector(".badge").textContent = s.errors ? String(s.errors) : "";
+  renderCmd(t);
+  summary();
+}
+
+function renderCmd(t) {
+  const s = t.state, c = t.el.querySelector(".cmd");
+  if (s.running) c.textContent = "▶ " + s.running.cmd + " · " + fmtDur(Date.now() - s.running.since);
+  else c.textContent = s.lastOut ? T.outputAgo(fmtDur(Date.now() - s.lastOut)) : "";
+}
+setInterval(() => { for (const t of tiles.values()) if (t.state) renderCmd(t); }, 5000);
+
+function summary() {
+  const list = wanted();
+  const bad = list.filter((u) => ["error", "stuck"].includes(tiles.get(u)?.state.level)).length;
+  const stuck = list.filter((u) => tiles.get(u)?.state.level === "stuck").length;
+  const online = list.filter((u) => tiles.get(u)?.state.online).length;
+  const el = $("#summary");
+  el.textContent = T.summary(online, list.length, bad, stuck);
+  el.classList.toggle("bad", bad > 0);
+}
+
+// Server "mark" messages arrive right after the output they point at, so the line is known then;
+// the alert that uses the mark may come later (when the command's exit code is known).
+function addMark(t, m) {
+  if (!t.opened) return;
+  t.term.write("", () => { const mk = t.term.registerMarker(-(m.back || 0)); if (mk) t.marks.set(m.id, mk); });
+}
+
+function decorate(t, a) {
+  if (!a.mark || !t.opened) return;
+  t.term.write("", () => {
+    const mk = t.marks.get(a.mark);
+    if (!mk || mk.isDisposed) return;
+    const color = a.sev === "warn" ? "#d29922" : "#f85149";
+    t.term.registerDecoration({ marker: mk, width: t.term.cols, backgroundColor: a.sev === "warn" ? "#3a2e05" : "#4a1414",
+      overviewRulerOptions: { color, position: "full" } });
+    t.markers.set(a.id, mk);
+  });
+}
+
+const feed = $("#feed");
+let feedCount = 0;
+function addFeed(a, user) {
+  const el = document.createElement("div");
+  el.className = "ev " + a.sev + (a.replay ? " old" : "");
+  el.innerHTML = `<div class="h"><span>${fmtTime(a.ts)}</span><span class="u"></span><span class="k">${KIND[a.kind] || a.kind}</span></div><div class="m"></div>`;
+  el.querySelector(".u").textContent = user;
+  el.querySelector(".m").textContent = message(a);
+  el.addEventListener("click", () => {
+    const t = tiles.get(user);
+    if (!t) return;
+    if (!t.el.isConnected) { filterInput.value = ""; layout(); }
+    toggleExpand(t, true);
+    const m = t.markers.get(a.id);
+    requestAnimationFrame(() => { if (m && m.line >= 0) t.term.scrollToLine(Math.max(0, m.line - 5)); });
+  });
+  feed.prepend(el);
+  while (feed.childElementCount > 500) feed.lastChild.remove();
+  $("#feedCount").textContent = ++feedCount;
+}
+
+let audio;
+function beep() {
+  try {
+    audio = audio || new AudioContext();
+    const o = audio.createOscillator(), g = audio.createGain();
+    o.frequency.value = 880; g.gain.value = 0.08; o.connect(g); g.connect(audio.destination);
+    o.start(); o.stop(audio.currentTime + 0.18);
+  } catch (e) {}
+}
+
+function notify(a, user) {
+  if (a.replay) return;
+  const important = a.sev === "stuck" || ($("#notifyErrors").checked && a.sev === "error");
+  if (!important) return;
+  if ($("#sound").checked) beep();
+  if ($("#notify").checked && "Notification" in window && Notification.permission === "granted") {
+    const n = new Notification(`${user}: ${KIND[a.kind] || a.kind}`, { body: message(a), tag: user + a.kind });
+    n.onclick = () => { window.focus(); const t = tiles.get(user); if (t) toggleExpand(t, true); };
+  }
+}
+
+function handle(m) {
+  switch (m.t) {
+    case "users":
+      users = m.list; layout(); break;
+    case "out": {
+      const t = tileFor(m.u);
+      if (!t.opened) { t.pending = t.pending || []; t.pending.push(b64bytes(m.d)); break; }
+      t.term.write(b64bytes(m.d)); break;
+    }
+    case "alert": {
+      const t = tileFor(m.u);
+      decorate(t, m); addFeed(m, m.u); notify(m, m.u); break;
+    }
+    case "mark": addMark(tileFor(m.u), m); break;
+    case "state": applyState(m.u, m.s); break;
+    case "ready": ready = true; break;
+  }
+}
+
+let es;
+function connect() {
+  for (const t of tiles.values()) { t.term.reset(); t.markers.clear(); t.marks.clear(); t.pending = null; }
+  feed.textContent = ""; feedCount = 0;
+  es = new EventSource("/stream");
+  es.onopen = () => { $("#conn").textContent = T.online; $("#conn").className = "on"; };
+  es.onmessage = (e) => handle(JSON.parse(e.data));
+  es.onerror = () => {
+    $("#conn").textContent = T.reconnecting; $("#conn").className = "off";
+    es.close(); setTimeout(connect, 3000);
+  };
+}
+// Users outside the filter still get their output buffered so switching the filter loses nothing.
+const origLayout = layout;
+layout = function () {
+  origLayout();
+  for (const t of tiles.values()) if (t.opened && t.pending) { for (const d of t.pending) t.term.write(d); t.pending = null; }
+};
+connect();
+</script>
+</body>
+</html>

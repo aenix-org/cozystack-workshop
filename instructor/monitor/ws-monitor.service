@@ -1,0 +1,12 @@
+[Unit]
+Description=Workshop participant monitor (instructor view)
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 /opt/ws-monitor/ws-monitor.py
+Restart=always
+RestartSec=2
+Nice=5
+
+[Install]
+WantedBy=multi-user.target
