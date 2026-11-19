@@ -124,7 +124,7 @@ const I18N = {
     },
   },
 };
-const LANG = (new URLSearchParams(location.search).get("lang") || navigator.language || "en").slice(0, 2) === "ru" ? "ru" : "en";
+const LANG = new URLSearchParams(location.search).get("lang") === "ru" ? "ru" : "en";
 const T = I18N[LANG];
 document.documentElement.lang = LANG;
 document.title = T.title;

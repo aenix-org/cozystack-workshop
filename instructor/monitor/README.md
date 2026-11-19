@@ -33,8 +33,7 @@ to the highlighted line. Browser notifications and a short sound can be turned o
 in the header; by default they fire only when somebody is stuck, a second
 checkbox adds every error.
 
-The interface is in English, or in Russian when the browser prefers Russian
-(`?lang=en` / `?lang=ru` force one). Add `?u=online01,online02` to the address to
+The interface is in English; `?lang=ru` switches it to Russian. Add `?u=online01,online02` to the address to
 show only those participants; the same list can be typed into the header field.
 
 ## How problems are detected
