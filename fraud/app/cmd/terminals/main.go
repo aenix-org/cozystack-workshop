@@ -202,7 +202,7 @@ func main() {
 		ctx, stop = context.WithTimeout(ctx, d)
 		defer stop()
 	}
-	s := &simulator{url: url, mode: mode, client: &http.Client{Timeout: 2 * time.Second}, slots: make(chan struct{}, 64), retries: platform.Int("RETRIES", 15)}
+	s := &simulator{url: url, mode: mode, client: &http.Client{Timeout: 2 * time.Second}, slots: make(chan struct{}, platform.Int("INFLIGHT", 256)), retries: platform.Int("RETRIES", 15)}
 	s.rate.Store(int64(min(1000000, max(0, platform.Int("RATE", 20)))))
 	go func() {
 		prev := s.stats.Snapshot()
