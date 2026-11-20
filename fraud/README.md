@@ -234,15 +234,16 @@ kubectl --context fraud -n fraud scale deploy/scorer --replicas=6
 kubectl --context fraud -n fraud get pods -l app=scorer -o wide
 ```
 
-**You should see:** the new scorers start, and within two or three minutes the lag stops growing and stays low, and stand-in falls back to a few percent. If some pods stay `Pending`, your cluster is out of room: the cluster autoscaler adds a second node, which takes a few minutes (`kubectl --context fraud get nodes -w`).
+**You should see:** the new scorers start, and within two or three minutes the lag stops growing and stays low, and stand-in falls back to a few percent.
 
-Now try twelve:
+Now try twelve, and look at what each scorer is doing:
 
 ```bash
 kubectl --context fraud -n fraud scale deploy/scorer --replicas=12
+kubectl --context fraud -n fraud logs -l app=scorer --tail=1 --prefix
 ```
 
-Throughput stops growing at eight. `auth.requests` has eight partitions, and in a Kafka consumer group one partition is read by one consumer at a time. Scaling out a streaming system is decided when the topic is created, not when the pods are added.
+**You should see:** after a minute, eight scorers reporting a few hundred payments every five seconds and four reporting `scored 0`. `auth.requests` has eight partitions, and in a Kafka consumer group one partition is read by one consumer at a time; the four extra scorers have no partition to read. How far a streaming system scales is decided when the topic is created, not when the pods are added.
 
 Back to a normal day:
 

@@ -21,7 +21,7 @@ spec:
           env: [{name: WORK_MS, value: "1"}]
           envFrom: [{configMapRef: {name: endpoints}}]
           resources:
-            requests: {cpu: 100m, memory: 64Mi}
+            requests: {cpu: 50m, memory: 32Mi}
             limits: {cpu: "1", memory: 256Mi}
 ---
 # The case writer: stores every answer the switch gave into PostgreSQL,
