@@ -61,7 +61,7 @@ func Score(req model.AuthRequest, f Features, threshold float64) model.Decision 
 	if f.Count60 >= 12 {
 		add("VELOCITY", fmt.Sprintf("%d payments in 60 seconds (%d in 10 minutes)", f.Count60, f.Count10), w.Velocity)
 	}
-	if f.BINCards60 >= 8 {
+	if f.BINCards60 >= 8 && req.AmountCents <= 200 {
 		add("BIN_ATTACK", fmt.Sprintf("%d distinct cards on BIN %s paid $2 or less in 60 seconds", f.BINCards60, req.BIN), w.BINAttack)
 	}
 	if f.HomeCountry != "" && req.Country != f.HomeCountry {

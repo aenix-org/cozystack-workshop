@@ -1,0 +1,60 @@
+# Lab 1. Three services from the Cozystack catalog, in your tenant.
+# Apply with the platform context:  kubectl --context platform apply -f manifests/01-data-services.yaml
+#
+# Kafka: the bus every authorization travels on.
+#   auth.requests  - the switch asks "approve or decline?"
+#   auth.decisions - the scorer answers
+#   auth.journal   - the switch records every answer it gave, for the case database
+apiVersion: apps.cozystack.io/v1alpha1
+kind: Kafka
+metadata:
+  name: kafka
+  namespace: tenant-dallasXX
+spec:
+  kafka:
+    replicas: 1
+    size: 5Gi
+    storageClass: replicated
+    resourcesPreset: c1.small
+  zookeeper:
+    replicas: 1
+    size: 2Gi
+    storageClass: replicated
+    resourcesPreset: c1.small
+  topics:
+    - {name: auth.requests,  partitions: 8, replicas: 1, config: {}}
+    - {name: auth.decisions, partitions: 8, replicas: 1, config: {}}
+    - {name: auth.journal,   partitions: 8, replicas: 1, config: {}}
+---
+# Redis: short-term memory of every card - how often it paid in the last minute,
+# where it was seen last, how many tiny "probe" payments it made.
+apiVersion: apps.cozystack.io/v1alpha1
+kind: Redis
+metadata:
+  name: features
+  namespace: tenant-dallasXX
+spec:
+  replicas: 1
+  size: 1Gi
+  storageClass: replicated
+  authEnabled: false
+---
+# PostgreSQL: the case database - every transaction and every alert.
+# Two replicas: a primary and a hot standby, so the database survives losing a node (Lab 6).
+apiVersion: apps.cozystack.io/v1alpha1
+kind: Postgres
+metadata:
+  name: cases
+  namespace: tenant-dallasXX
+spec:
+  replicas: 2
+  size: 2Gi
+  storageClass: replicated
+  resourcesPreset: t1.micro
+  users:
+    fraud:
+      password: Fraud2026
+  databases:
+    fraud:
+      roles:
+        admin: [fraud]

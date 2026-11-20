@@ -176,7 +176,7 @@ func main() {
 	ctx, cancel := platform.Context()
 	defer cancel()
 	host, _ := os.Hostname()
-	s := &switchService{host: host, limit: int64(platform.Int("STATIC_LIMIT_CENTS", 500000)), timeout: time.Duration(platform.Int("DECISION_TIMEOUT_MS", 150)) * time.Millisecond, waiters: map[string]chan model.Decision{}}
+	s := &switchService{host: host, limit: int64(platform.Int("STATIC_LIMIT_CENTS", 500000)), timeout: time.Duration(platform.Int("DECISION_TIMEOUT_MS", 400)) * time.Millisecond, waiters: map[string]chan model.Decision{}}
 	var journalCancel context.CancelFunc
 	var done chan struct{}
 	var jw *kafka.Writer
