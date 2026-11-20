@@ -1,0 +1,66 @@
+# Applied by the host before the session, into each participant's cluster:
+# the namespace, the service addresses, and the card terminals that already send
+# payments to the switch, which approves every one of them.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: fraud
+---
+# Where everything lives. The services are in your tenant on the platform,
+# the cluster reaches them by their platform DNS names.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: endpoints
+  namespace: fraud
+data:
+  KAFKA_BOOTSTRAP: kafka-kafka-kafka-bootstrap.tenant-dallasXX.svc.cozy.local:9092
+  REDIS_ADDR: rfrm-redis-features.tenant-dallasXX.svc.cozy.local:6379
+  PG_URL: postgres://fraud:Fraud2026@postgres-cases-rw.tenant-dallasXX.svc.cozy.local:5432/fraud?sslmode=prefer
+  SWITCH_URL: http://switch.tenant-dallasXX.svc.cozy.local:8080
+  TERMINALS_URL: http://terminals.fraud.svc:9090
+  # The language model from Lab 3. Until it is deployed, alerts simply wait for an explanation.
+  EXPLAINER_URL: http://explainer.fraud.svc:8080
+---
+# How many card payments per second the terminals send. Lab 5 raises it.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: traffic
+  namespace: fraud
+data:
+  rate: "20"
+---
+# Card terminals in shops across the US: a steady stream of ordinary payments to the switch.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: terminals
+  namespace: fraud
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: terminals}}
+  template:
+    metadata: {labels: {app: terminals}}
+    spec:
+      dnsConfig: {searches: [cozy.local]}
+      containers:
+        - name: terminals
+          image: ghcr.io/aenix-org/fraud-workshop:latest
+          command: [terminals]
+          envFrom: [{configMapRef: {name: endpoints}}]
+          env: [{name: RATE_FILE, value: /etc/traffic/rate}]
+          volumeMounts: [{name: traffic, mountPath: /etc/traffic}]
+          resources:
+            requests: {cpu: 100m, memory: 64Mi}
+            limits: {cpu: 1, memory: 256Mi}
+      volumes: [{name: traffic, configMap: {name: traffic}}]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: terminals
+  namespace: fraud
+spec:
+  selector: {app: terminals}
+  ports: [{name: stats, port: 9090}]

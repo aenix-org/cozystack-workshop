@@ -1,0 +1,23 @@
+# Lab 4. A fraud ring goes after your cardholders: card testing with tiny payments,
+# the same card in two countries minutes apart, and a run on a whole range of card numbers.
+# Apply with:  kubectl --context fraud apply -f manifests/04-attack.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: attack
+  namespace: fraud
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: Never
+      dnsConfig: {searches: [cozy.local]}
+      containers:
+        - name: attack
+          image: ghcr.io/aenix-org/fraud-workshop:latest
+          command: [terminals]
+          envFrom: [{configMapRef: {name: endpoints}}]
+          env:
+            - {name: MODE, value: attack}
+            - {name: SCENARIO, value: all}

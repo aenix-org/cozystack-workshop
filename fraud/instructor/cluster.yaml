@@ -1,0 +1,17 @@
+# The participant's own Kubernetes cluster, created by the host before the session
+# (it takes about ten minutes). One worker is enough for the labs; the autoscaler may
+# add a second one under Black Friday load.
+apiVersion: apps.cozystack.io/v1alpha1
+kind: Kubernetes
+metadata:
+  name: fraud
+  namespace: tenant-dallasXX
+spec:
+  storageClass: replicated
+  nodeGroups:
+    md0:
+      minReplicas: 1
+      maxReplicas: 2
+      instanceType: u1.2xmedium
+      diskSize: 20Gi
+      roles: []

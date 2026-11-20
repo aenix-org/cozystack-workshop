@@ -1,0 +1,26 @@
+# Publishes the participant's fraud dashboard at https://fraud.dallasXX.workshop.aenix.io.
+# The Service on the platform selects the worker VMs of the participant's cluster and
+# sends traffic to NodePort 30080, where the dashboard Service listens inside the cluster.
+apiVersion: v1
+kind: Service
+metadata: {name: fraud-dashboard, namespace: tenant-dallasXX}
+spec:
+  selector:
+    cluster.x-k8s.io/cluster-name: kubernetes-fraud
+    cluster.x-k8s.io/role: worker
+  ports: [{name: http, port: 80, targetPort: 30080}]
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: fraud-dashboard
+  namespace: tenant-dallasXX
+  annotations:
+    acme.cert-manager.io/http01-ingress-ingressclassname: tenant-root
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: tenant-root
+  rules:
+  - host: fraud.dallasXX.workshop.aenix.io
+    http: {paths: [{path: /, pathType: Prefix, backend: {service: {name: fraud-dashboard, port: {number: 80}}}}]}
+  tls: [{hosts: [fraud.dallasXX.workshop.aenix.io], secretName: fraud-dashboard-tls}]

@@ -31,6 +31,15 @@ from English (a cleaner pivot for machine translation) and reviewed by native
 speakers. See [`STYLE.md`](STYLE.md) for the translation rules and
 [`GLOSSARY.md`](GLOSSARY.md) for the canonical terminology.
 
+## Fraud detection workshop
+
+[`fraud/`](fraud/) holds a separate, two-hour workshop: a real-time card fraud
+detection system built on Cozystack around a legacy authorization switch on a VM,
+with Kafka, Redis and PostgreSQL from the catalog, a scoring service in the
+participant's own Kubernetes cluster, and a small language model that explains
+every blocked payment. It runs through the bastion, in English. Its host notes
+are in [`fraud/instructor/`](fraud/instructor/).
+
 ## What is inside each language
 
 Every language directory is a complete, self-contained copy of the workshop with

@@ -1,0 +1,80 @@
+# Lab 2. The fraud detection services, in your own Kubernetes cluster.
+# Apply with the cluster context:  kubectl --context fraud apply -f manifests/02-scoring.yaml
+# The scorer: reads every authorization request from Kafka, looks the card up
+# in Redis and answers approve or decline. The weights are in internal/scoring/rules.go.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scorer
+  namespace: fraud
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: scorer}}
+  template:
+    metadata: {labels: {app: scorer}}
+    spec:
+      dnsConfig: {searches: [cozy.local]}
+      containers:
+        - name: scorer
+          image: ghcr.io/aenix-org/fraud-workshop:latest
+          command: [scorer]
+          envFrom: [{configMapRef: {name: endpoints}}]
+          resources:
+            requests: {cpu: 100m, memory: 64Mi}
+            limits: {cpu: 500m, memory: 256Mi}
+---
+# The case writer: stores every answer the switch gave into PostgreSQL,
+# and every decline as an alert.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cases
+  namespace: fraud
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: cases}}
+  template:
+    metadata: {labels: {app: cases}}
+    spec:
+      dnsConfig: {searches: [cozy.local]}
+      containers:
+        - name: cases
+          image: ghcr.io/aenix-org/fraud-workshop:latest
+          command: [cases]
+          envFrom: [{configMapRef: {name: endpoints}}]
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {cpu: 500m, memory: 256Mi}
+---
+# The fraud team's screen.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dashboard
+  namespace: fraud
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: dashboard}}
+  template:
+    metadata: {labels: {app: dashboard}}
+    spec:
+      dnsConfig: {searches: [cozy.local]}
+      containers:
+        - name: dashboard
+          image: ghcr.io/aenix-org/fraud-workshop:latest
+          command: [dashboard]
+          envFrom: [{configMapRef: {name: endpoints}}]
+          resources:
+            requests: {cpu: 25m, memory: 32Mi}
+            limits: {cpu: 500m, memory: 256Mi}
+---
+# NodePort 30080: the platform routes https://fraud.dallasXX.workshop.aenix.io here.
+apiVersion: v1
+kind: Service
+metadata:
+  name: dashboard
+  namespace: fraud
+spec:
+  type: NodePort
+  selector: {app: dashboard}
+  ports: [{name: http, port: 8080, nodePort: 30080}]
