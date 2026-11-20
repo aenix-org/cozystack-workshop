@@ -29,6 +29,8 @@ type simulator struct {
 	mode, url string
 	client    *http.Client
 	slots     chan struct{}
+	retries   int
+	retried   atomic.Uint64
 	wg        sync.WaitGroup
 }
 
@@ -45,26 +47,21 @@ func (s *simulator) send(ctx context.Context, req model.AuthRequest) bool {
 		defer func() { <-s.slots }()
 		start := time.Now()
 		b, _ := json.Marshal(req)
-		r, err := http.NewRequestWithContext(ctx, "POST", s.url+"/authorize", bytes.NewReader(b))
-		decision := ""
-		if err == nil {
-			r.Header.Set("Content-Type", "application/json")
-			var resp *http.Response
-			resp, err = s.client.Do(r)
-			if err == nil {
-				defer resp.Body.Close()
-				if resp.StatusCode != 200 {
-					err = errors.New(resp.Status)
-				} else {
-					var answer struct {
-						Decision string `json:"decision"`
-					}
-					err = json.NewDecoder(resp.Body).Decode(&answer)
-					decision = answer.Decision
-					if err == nil && decision != "APPROVE" && decision != "DECLINE" {
-						err = errors.New("invalid switch decision")
-					}
+		// A real terminal repeats an unanswered authorization with the same
+		// transaction id, so a short network gap does not lose the payment.
+		var decision string
+		var err error
+		for attempt := 0; attempt <= s.retries; attempt++ {
+			if attempt > 0 {
+				s.retried.Add(1)
+				select {
+				case <-time.After(time.Second):
+				case <-ctx.Done():
 				}
+			}
+			decision, err = s.authorize(ctx, b)
+			if err == nil || ctx.Err() != nil {
+				break
 			}
 		}
 		timeout := false
@@ -81,6 +78,31 @@ func (s *simulator) send(ctx context.Context, req model.AuthRequest) bool {
 	}()
 	return true
 }
+func (s *simulator) authorize(ctx context.Context, body []byte) (string, error) {
+	r, err := http.NewRequestWithContext(ctx, "POST", s.url+"/authorize", bytes.NewReader(body))
+	if err != nil {
+		return "", err
+	}
+	r.Header.Set("Content-Type", "application/json")
+	resp, err := s.client.Do(r)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return "", errors.New(resp.Status)
+	}
+	var answer struct {
+		Decision string `json:"decision"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&answer); err != nil {
+		return "", err
+	}
+	if answer.Decision != "APPROVE" && answer.Decision != "DECLINE" {
+		return "", errors.New("invalid switch decision")
+	}
+	return answer.Decision, nil
+}
 func (s *simulator) snapshot() any {
 	v := s.stats.Snapshot()
 	return struct {
@@ -89,11 +111,12 @@ func (s *simulator) snapshot() any {
 		Declined uint64  `json:"declined"`
 		Errors   uint64  `json:"errors"`
 		Timeouts uint64  `json:"timeouts"`
+		Retried  uint64  `json:"retried"`
 		P50      float64 `json:"p50_ms"`
 		P99      float64 `json:"p99_ms"`
 		Rate     int64   `json:"rate"`
 		Mode     string  `json:"mode"`
-	}{s.sent.Load(), v.Approved, v.Declined, v.Errors, v.Timeouts, v.P50, v.P99, s.rate.Load(), s.mode}
+	}{s.sent.Load(), v.Approved, v.Declined, v.Errors, v.Timeouts, s.retried.Load(), v.P50, v.P99, s.rate.Load(), s.mode}
 }
 
 // The ticker caps both normal and scheduled attack traffic at the current rate.
@@ -179,7 +202,7 @@ func main() {
 		ctx, stop = context.WithTimeout(ctx, d)
 		defer stop()
 	}
-	s := &simulator{url: url, mode: mode, client: &http.Client{Timeout: 2 * time.Second}, slots: make(chan struct{}, 64)}
+	s := &simulator{url: url, mode: mode, client: &http.Client{Timeout: 2 * time.Second}, slots: make(chan struct{}, 64), retries: platform.Int("RETRIES", 15)}
 	s.rate.Store(int64(min(1000000, max(0, platform.Int("RATE", 20)))))
 	go func() {
 		prev := s.stats.Snapshot()
