@@ -47,21 +47,25 @@ bastion:
 * The **monitor** in [`../../instructor/monitor`](../../instructor/monitor) records
   every participant's bastion terminal for the host.
 
-## Step 7: the live migration demo
+## Step 7: keep the migration guard running
 
-Run it from a host account on the bastion (for example `dallas00`, prepared like a
-participant), with its dashboard on the projector:
+On the workshop cluster, kube-ovn v1.15 skips preparing the VM port for a live
+migration while the target node is still unknown, so the port then flaps between the
+two nodes and the migration hangs or the VM loses its network. Start
+[`migration-guard.sh`](migration-guard.sh) before the session and leave it running
+until the end:
 
 ```bash
-kubectl --context platform get vmi vm-instance-switch -o wide
-kubectl --context platform create -f demo-migration.yaml
-kubectl --context platform get vmim -w
+KCTX=admin@workshop ./migration-guard.sh
 ```
 
-Edit the target node in [`demo-migration.yaml`](demo-migration.yaml) first: it must
-be a different node from the one in `get vmi`, with at least 2 GiB of free memory.
-On the workshop cluster, kube-ovn v1.15 skips the migration port setup while the
-target node is still unknown, so the VM port flaps between the two nodes and a
-migration may hang in `Scheduling` or leave the VM without network for about ten
-seconds. The terminals repeat unanswered authorizations, so no payment fails, and
-the dashboard shows how many were repeated.
+It marks the port of every migrating VM in `tenant-dallas*` as bound to both nodes
+as soon as the target pod is placed, which is what kube-ovn should have done; kube-ovn
+resets the options when the migration ends. With it, a migration takes about fifteen
+seconds and the terminals repeat a few dozen authorizations, none of them fail.
+
+Before the session, also apply [`prepull.yaml`](prepull.yaml) in each participant
+cluster: the llama.cpp image takes several minutes to download on first use.
+
+After a dry run, [`reset-participant.sh`](reset-participant.sh) returns an
+environment to its starting state.

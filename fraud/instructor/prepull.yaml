@@ -1,0 +1,18 @@
+# Pulls the llama.cpp image onto the participant's worker before the session, so
+# Step 3 does not wait several minutes for the download. Apply with the `fraud` context.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: prepull-explainer
+  namespace: fraud
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: pull
+          image: ghcr.io/ggml-org/llama.cpp:server
+          command: [/bin/sh, -c, "true"]
+          resources: {requests: {cpu: 10m, memory: 16Mi}}
