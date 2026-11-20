@@ -93,7 +93,7 @@ func explain(ctx context.Context, pool *pgxpool.Pool, url string) {
 	for ctx.Err() == nil {
 		found, err := explainOne(ctx, pool, url, client)
 		if err != nil && ctx.Err() == nil && time.Since(lastLog) > 30*time.Second {
-			log.Printf("explainer unavailable, alerts wait for an explanation: %v", err)
+			log.Printf("explanations paused, alerts wait: %v", err)
 			lastLog = time.Now()
 		}
 		if err != nil || !found {

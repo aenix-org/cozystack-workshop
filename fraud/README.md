@@ -251,8 +251,9 @@ kubectl --context fraud -n fraud logs job/attack -f
 **You should see:** in the attack log, most payments `declined`. The first few probes
 of each stolen card are approved: one tiny payment looks like any other, and the
 pattern becomes clear after a handful. On the dashboard, declines rising and blocked transactions appearing with
-their reason codes. A few seconds later each of them gets a plain-English
-explanation from the model.
+their reason codes. Within a minute or two each of them gets a plain-English
+explanation from the model. It is a very small model on one CPU: the explanations
+arrive one by one, and now and then one reads clumsily.
 
 Read the rules that caught the attack:
 [`app/internal/scoring/rules.go`](app/internal/scoring/rules.go). A card-testing run
@@ -283,7 +284,7 @@ kubectl --context fraud -n fraud get pods -l app=scorer -o wide
 ```
 
 **You should see:** the new scorers start, and within two or three minutes the lag
-drains and stand-in falls back to a few percent. If some pods stay `Pending`, your cluster is out of room: the cluster
+stops growing and stays low, and stand-in falls back to a few percent. If some pods stay `Pending`, your cluster is out of room: the cluster
 autoscaler adds a second node, which takes a few minutes
 (`kubectl --context fraud get nodes -w`).
 
@@ -335,7 +336,8 @@ kubectl --context fraud -n fraud logs deploy/cases --tail=20
 
 you will see `database unavailable, holding … messages, retrying`, then the backlog
 written. The dashboard's reconciliation line compares what the switch journaled
-with what the database stored: `missing: 0`. Not one case was lost.
+with what the database stored; once the backlog is written, it shows `missing: 0`.
+Not one case was lost.
 
 ## Step 7. The switch moves to another server mid-flow
 
@@ -351,8 +353,8 @@ virtctl migrate vm-instance-switch
 kubectl --context platform get vmim -w
 ```
 
-**You should see:** the migration go through `Scheduling`, `Running` and
-`Succeeded` within half a minute; after that, `get vmi` shows another node. The
+**You should see:** the migration go through `Pending`, `Scheduling`,
+`TargetReady` and `Succeeded` within half a minute; after that, `get vmi` shows another node. The
 memory of the running VM is copied to the new server while it works, and the disk
 does not have to move: it is on replicated storage that both servers can reach.
 
