@@ -119,8 +119,23 @@ journalctl -u auth-switch -f
 runs in legacy mode: it declines only payments above $5,000. Stolen cards that
 buy a $40 dinner get through.
 
-Stop the log with `Ctrl-C`. Stay in the console: you will be back here in Step 2.
-To leave the console, press `Ctrl-]`.
+Stop the log with `Ctrl-C` and leave the console with `Ctrl-]`.
+
+Now prove that fraud gets through. A fraud ring hits your cardholders: card testing
+with tiny payments, a card used in two countries minutes apart, and a run on a whole
+range of card numbers:
+
+```bash
+kubectl --context fraud apply -f manifests/04-attack.yaml
+kubectl --context fraud -n fraud logs job/attack -f
+```
+
+**You should see:** first the attack describing itself (`attack: card testing on
+card …4750: 36 probes of $0.50–$3.00`, `attack: impossible travel …`,
+`attack: BIN attack on 411111 …`), then every five seconds a line such as
+`sent 30, approved 30, declined 0`. Every fraudulent payment is approved: none of
+them is above $5,000. Stop with `Ctrl-C`. In Step 4 you run the same attack, with
+the same cards, against the system you are about to build.
 
 ## Step 1. Kafka, Redis and PostgreSQL from the catalog
 
