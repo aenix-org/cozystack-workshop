@@ -46,3 +46,22 @@ bastion:
   search list.
 * The **monitor** in [`../../instructor/monitor`](../../instructor/monitor) records
   every participant's bastion terminal for the host.
+
+## Lab 7: the live migration demo
+
+Run it from a host account on the bastion (for example `dallas00`, prepared like a
+participant), with its dashboard on the projector:
+
+```bash
+kubectl --context platform get vmi vm-instance-switch -o wide
+kubectl --context platform create -f demo-migration.yaml
+kubectl --context platform get vmim -w
+```
+
+Edit the target node in [`demo-migration.yaml`](demo-migration.yaml) first: it must
+be a different node from the one in `get vmi`, with at least 2 GiB of free memory.
+On the workshop cluster, kube-ovn v1.15 skips the migration port setup while the
+target node is still unknown, so the VM port flaps between the two nodes and a
+migration may hang in `Scheduling` or leave the VM without network for about ten
+seconds. The terminals repeat unanswered authorizations, so no payment fails, and
+the dashboard shows how many were repeated.
