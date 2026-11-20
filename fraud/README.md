@@ -223,7 +223,7 @@ kubectl --context fraud -n fraud rollout status deploy/explainer --timeout=5m
 ```
 
 **You should see:** `successfully rolled out` within a minute or two: the pod
-downloads a 400 MB model and loads it.
+downloads a 400 MB model and loads it. If the command gives up waiting, run it again.
 
 `cases` was already configured with the explainer's address and has been waiting
 for it. Nothing is blocked yet, so there is nothing to explain. Step 4 changes that.
@@ -259,7 +259,8 @@ is stopped by about the sixth probe, a BIN attack by about the eighth card.
 📍 On the bastion, with your dashboard open.
 
 Traffic goes up twenty times. The terminals read their rate from a ConfigMap, so
-you can change it without a restart:
+you can change it without a restart (Kubernetes delivers the new value to the pod
+within a minute):
 
 ```bash
 kubectl --context fraud -n fraud patch configmap traffic -p '{"data":{"rate":"400"}}'
@@ -277,8 +278,8 @@ kubectl --context fraud -n fraud scale deploy/scorer --replicas=6
 kubectl --context fraud -n fraud get pods -l app=scorer -o wide
 ```
 
-**You should see:** the new scorers start, the lag drains, and stand-in goes back
-to zero. If some pods stay `Pending`, your cluster is out of room: the cluster
+**You should see:** the new scorers start, and within two or three minutes the lag
+drains and stand-in falls back to a few percent. If some pods stay `Pending`, your cluster is out of room: the cluster
 autoscaler adds a second node, which takes a few minutes
 (`kubectl --context fraud get nodes -w`).
 
@@ -334,9 +335,9 @@ with what the database stored: `missing: 0`. Not one case was lost.
 
 ## Step 7. The switch moves to another server mid-flow
 
-📍 The host shows this one on the screen, on the host's own environment.
+📍 On the bastion, with your dashboard open.
 
-The server under the switch needs maintenance. In a bank that usually means a
+The server under your switch needs maintenance. In a bank that usually means a
 change window at 3 a.m. Here the VM moves to another server while it keeps
 answering terminals:
 
@@ -346,19 +347,19 @@ virtctl migrate vm-instance-switch
 kubectl --context platform get vmim -w
 ```
 
-The migration goes through `Scheduling`, `Running` and `Succeeded`; after that,
-`get vmi` shows another node. The memory of the running VM is copied to the new
-server while it works, and the disk does not have to move: it is on replicated
-storage that both servers can reach.
+**You should see:** the migration go through `Scheduling`, `Running` and
+`Succeeded` within half a minute; after that, `get vmi` shows another node. The
+memory of the running VM is copied to the new server while it works, and the disk
+does not have to move: it is on replicated storage that both servers can reach.
 
-Watch the **terminal errors** on the dashboard. On this cluster the VM's network
-needs a few seconds to settle on the new server, so some authorizations go
-unanswered for a moment. The terminals do what real terminals do: they repeat an
-unanswered authorization with the same transaction id. The dashboard counts those
-as **repeated by the terminal**, and terminal errors stay at zero.
+On the dashboard, **terminal errors stay at zero**. For a second or two the VM's
+network settles on the new server, and a few authorizations go unanswered; the
+terminals do what real terminals do and repeat them with the same transaction id.
+The dashboard counts those as **repeated by the terminal**.
 
-Why the host and not everyone: ten migrations at once on this workshop cluster
-trip over a known issue in its network layer, and the demo is the same for all.
+```bash
+kubectl --context fraud -n fraud logs deploy/terminals --tail=20
+```
 
 ## What's next
 
