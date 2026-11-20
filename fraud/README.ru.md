@@ -102,7 +102,7 @@ kubectl --context fraud -n fraud get pods
 ```
 
 **Должно получиться:** ВМ `switch` и кластер `fraud`, оба в состоянии ready; в
-вашем кластере одна нода; запущен один под `terminals`.
+вашем кластере одна нода; запущен один под `terminals` (завершённый под `prepull-explainer` — это подготовка ведущего к шагу 3).
 
 Теперь зайдите на свитч. Это обычная ВМ с Ubuntu, пользователь `ubuntu`, пароль `ubuntu`:
 
@@ -136,8 +136,11 @@ kubectl --context platform apply -f manifests/01-data-services.yaml
 kubectl --context platform get kafka,redis,postgres -w
 ```
 
-**Должно получиться:** за три–пять минут все три переходят в `READY True`.
-Остановите наблюдение через `Ctrl-C`.
+**Должно получиться:** `features` (Redis) и `cases` (PostgreSQL) переходят в
+`READY True` за минуту-две, а `kafka` — за три–десять минут: когда заказывает весь
+зал разом, платформа ставит их по очереди. Остановите наблюдение через `Ctrl-C`.
+К шагу 2 можно переходить, как только готовы Redis и PostgreSQL: сервисы сами
+дождутся Kafka.
 
 Пока они запускаются, посмотрите на заказанное в дашборде Cozystack
 (https://dashboard.workshop.aenix.io, ваш тенант `tenant-dallasNN`): там те же три
