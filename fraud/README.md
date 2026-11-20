@@ -67,7 +67,7 @@ One username (`dallasNN`) and one password, the same everywhere:
 
 * **the bastion**: `ssh dallasNN@<bastion-address>`
 * **the Cozystack dashboard**: https://dashboard.workshop.aenix.io
-* **your fraud dashboard**, once Lab 2 is done: `https://fraud.dallasNN.workshop.aenix.io`
+* **your fraud dashboard**, once Step 2 is done: `https://fraud.dallasNN.workshop.aenix.io`
 
 Everywhere below, `dallasNN` stands for your own username. On the bastion, the
 files are already filled in with your number; there is nothing to replace.
@@ -78,7 +78,7 @@ The host has already prepared, in your tenant `tenant-dallasNN`:
 * your own **Kubernetes cluster** `fraud`;
 * the **card terminals** in that cluster, sending about 20 payments a second.
 
-## Lab 0. Log in and look at the switch
+## Step 0. Log in and look at the switch
 
 ```bash
 ssh dallasNN@<bastion-address>
@@ -118,10 +118,10 @@ journalctl -u auth-switch -f
 runs in legacy mode: it declines only payments above $5,000. Stolen cards that
 buy a $40 dinner get through.
 
-Stop the log with `Ctrl-C`. Stay in the console: you will be back here in Lab 2.
+Stop the log with `Ctrl-C`. Stay in the console: you will be back here in Step 2.
 To leave the console, press `Ctrl-]`.
 
-## Lab 1. Kafka, Redis and PostgreSQL from the catalog
+## Step 1. Kafka, Redis and PostgreSQL from the catalog
 
 📍 On the bastion, outside the VM console.
 
@@ -151,12 +151,12 @@ What each one is for:
 * **Redis** is the short-term memory of every card: how many payments in the last
   minute, the last place it was seen, how many tiny "probe" payments it made.
 * **PostgreSQL** is the case database. Two replicas, a primary and a hot standby:
-  Lab 6 takes the primary away.
+  Step 6 takes the primary away.
 
 ⚠️ If `apply` fails with `SchemaError … unknown model in reference`, it is the
 client-side check that fails, not the cluster. Add `--validate=false`.
 
-## Lab 2. The scorer, and connecting the switch
+## Step 2. The scorer, and connecting the switch
 
 📍 On the bastion.
 
@@ -207,7 +207,7 @@ Leave the console (`Ctrl-]`) and open your dashboard:
 **You should see:** about 20 authorizations a second, almost no declines, the
 decision latency, and Kafka lag close to zero.
 
-## Lab 3. A language model explains every blocked payment
+## Step 3. A language model explains every blocked payment
 
 📍 On the bastion.
 
@@ -226,9 +226,9 @@ kubectl --context fraud -n fraud rollout status deploy/explainer --timeout=5m
 downloads a 400 MB model and loads it.
 
 `cases` was already configured with the explainer's address and has been waiting
-for it. Nothing is blocked yet, so there is nothing to explain. Lab 4 changes that.
+for it. Nothing is blocked yet, so there is nothing to explain. Step 4 changes that.
 
-## Lab 4. Fraud attack
+## Step 4. Fraud attack
 
 📍 On the bastion, with your dashboard open.
 
@@ -253,7 +253,7 @@ Read the rules that caught the attack:
 [`app/internal/scoring/rules.go`](app/internal/scoring/rules.go). A card-testing run
 is stopped by about the sixth probe, a BIN attack by about the eighth card.
 
-## Lab 5. Black Friday
+## Step 5. Black Friday
 
 📍 On the bastion, with your dashboard open.
 
@@ -298,7 +298,7 @@ kubectl --context fraud -n fraud patch configmap traffic -p '{"data":{"rate":"20
 kubectl --context fraud -n fraud scale deploy/scorer --replicas=2
 ```
 
-## Lab 6. The primary database node goes down
+## Step 6. The primary database node goes down
 
 📍 On the bastion, with your dashboard open.
 
@@ -331,7 +331,7 @@ you will see `database unavailable, holding … messages, retrying`, then the ba
 written. The dashboard's reconciliation line compares what the switch journaled
 with what the database stored: `missing: 0`. Not one case was lost.
 
-## Lab 7. The switch moves to another server mid-flow
+## Step 7. The switch moves to another server mid-flow
 
 📍 The host shows this one on the screen, on the host's own environment.
 
@@ -378,7 +378,7 @@ a live server move.
 | Symptom | Cause and fix |
 |---|---|
 | `virtctl console` shows nothing | Press Enter. The login prompt is printed only once. |
-| The switch log shows `stand-in 100%` after Lab 2 | Kafka is not ready yet, or the address in `/etc/auth-switch/env` has a typo. `kubectl --context platform get kafka` must show `READY True`. |
+| The switch log shows `stand-in 100%` after Step 2 | Kafka is not ready yet, or the address in `/etc/auth-switch/env` has a typo. `kubectl --context platform get kafka` must show `READY True`. |
 | Dashboard returns 502 or 503 | The dashboard pod is not running yet: `kubectl --context fraud -n fraud get pods`. |
-| No explanations after Lab 4 | The explainer is still loading the model: `kubectl --context fraud -n fraud logs deploy/explainer`. |
+| No explanations after Step 4 | The explainer is still loading the model: `kubectl --context fraud -n fraud logs deploy/explainer`. |
 | `forbidden` on a command | Check the context: catalog services, VMs and PostgreSQL pods live in `platform`; the fraud services live in `fraud`. |

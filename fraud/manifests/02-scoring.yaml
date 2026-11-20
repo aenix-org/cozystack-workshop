@@ -1,4 +1,4 @@
-# Lab 2. The fraud detection services, in your own Kubernetes cluster.
+# Step 2. The fraud detection services, in your own Kubernetes cluster.
 # Apply with the cluster context:  kubectl --context fraud apply -f manifests/02-scoring.yaml
 # The scorer: reads every authorization request from Kafka, looks the card up
 # in Redis and answers approve or decline. The weights are in internal/scoring/rules.go.
