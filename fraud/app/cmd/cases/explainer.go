@@ -19,6 +19,10 @@ import (
 
 const systemPrompt = "You write one short sentence for a bank support agent explaining why a card payment was blocked. Restate only the facts you are given, in plain English. Do not add any number, limit, place or rule that is not in the facts. Do not give advice."
 
+// One worked example keeps a small model to the shape of the answer.
+const exampleQuestion = "Card …4242; amount $1.20; merchant QuickBuy Online; city online; country US. Facts: 7 payments below $5 in 10 minutes; 7 distinct merchants in 10 minutes"
+const exampleAnswer = "The card made seven payments under $5 at seven different shops within ten minutes, which is how stolen cards are tested before a large purchase."
+
 func explainOne(ctx context.Context, pool *pgxpool.Pool, url string, client *http.Client) (bool, error) {
 	ctx, cancel := context.WithTimeout(ctx, 35*time.Second)
 	defer cancel()
@@ -46,7 +50,7 @@ func explainOne(ctx context.Context, pool *pgxpool.Pool, url string, client *htt
 		facts = append(facts, r.Fact)
 	}
 	user := fmt.Sprintf("Card …%s; amount $%.2f; merchant %s; city %s; country %s. Facts: %s", last4, float64(amount)/100, merchant, city, country, strings.Join(facts, "; "))
-	b, _ := json.Marshal(map[string]any{"model": "local", "temperature": 0, "max_tokens": 60, "messages": []map[string]string{{"role": "system", "content": systemPrompt}, {"role": "user", "content": user}}})
+	b, _ := json.Marshal(map[string]any{"model": "local", "temperature": 0, "max_tokens": 60, "messages": []map[string]string{{"role": "system", "content": systemPrompt}, {"role": "user", "content": exampleQuestion}, {"role": "assistant", "content": exampleAnswer}, {"role": "user", "content": user}}})
 	req, err := http.NewRequestWithContext(ctx, "POST", strings.TrimRight(url, "/")+"/v1/chat/completions", bytes.NewReader(b))
 	if err != nil {
 		return false, err

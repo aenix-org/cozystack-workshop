@@ -96,6 +96,28 @@ func (s *switchService) authorize(w http.ResponseWriter, r *http.Request) {
 		Reasons   []model.Reason `json:"reasons"`
 	}{req.TxnID, decision, source, ms, reasons})
 }
+func (s *switchService) readDecisions(ctx context.Context) {
+	reading := map[int]bool{}
+	for {
+		for _, p := range decisionPartitions(ctx) {
+			if reading[p] {
+				continue
+			}
+			reading[p] = true
+			r := kafka.NewReader(kafka.ReaderConfig{Brokers: platform.Brokers(), Topic: "auth.decisions", Partition: p, MinBytes: 1, MaxBytes: 10e6, MaxWait: 10 * time.Millisecond})
+			if err := r.SetOffset(kafka.LastOffset); err != nil {
+				log.Printf("decision reader for partition %d: %v", p, err)
+			}
+			go func() {
+				defer r.Close()
+				s.consume(ctx, r)
+			}()
+		}
+		if !platform.Sleep(ctx, 10*time.Second) {
+			return
+		}
+	}
+}
 func decisionPartitions(ctx context.Context) []int {
 	for {
 		for _, b := range platform.Brokers() {
@@ -216,14 +238,9 @@ func main() {
 		// Read every partition of auth.decisions directly, from the newest offset.
 		// A consumer group would pause all reads on every rebalance, and each pause
 		// sends payments into stand-in.
-		for _, p := range decisionPartitions(ctx) {
-			r := kafka.NewReader(kafka.ReaderConfig{Brokers: platform.Brokers(), Topic: "auth.decisions", Partition: p, MinBytes: 1, MaxBytes: 10e6, MaxWait: 10 * time.Millisecond})
-			if err := r.SetOffset(kafka.LastOffset); err != nil {
-				log.Printf("decision reader for partition %d: %v", p, err)
-			}
-			defer r.Close()
-			go s.consume(ctx, r)
-		}
+		// The topic may still be growing to its final partition count when the
+		// switch starts, so new partitions are picked up every ten seconds.
+		go s.readDecisions(ctx)
 		log.Print("switch started in SCORING mode")
 	} else {
 		log.Print("switch started in LEGACY mode")
