@@ -333,9 +333,9 @@ with what the database stored: `missing: 0`. Not one case was lost.
 
 ## Lab 7. The switch moves to another server mid-flow
 
-📍 On the bastion, with your dashboard open.
+📍 The host shows this one on the screen, on the host's own environment.
 
-The server under your switch needs maintenance. In a bank that usually means a
+The server under the switch needs maintenance. In a bank that usually means a
 change window at 3 a.m. Here the VM moves to another server while it keeps
 answering terminals:
 
@@ -345,15 +345,19 @@ virtctl migrate vm-instance-switch
 kubectl --context platform get vmim -w
 ```
 
-**You should see:** the migration go through `Scheduling`, `Running` and
-`Succeeded`; after that, `get vmi` shows another node. On the dashboard, **terminal
-errors stay at zero**: no authorization failed while the VM moved. The memory of
-the running VM was copied to the new server, and the disk did not have to move: it
-is on replicated storage that both servers can reach.
+The migration goes through `Scheduling`, `Running` and `Succeeded`; after that,
+`get vmi` shows another node. The memory of the running VM is copied to the new
+server while it works, and the disk does not have to move: it is on replicated
+storage that both servers can reach.
 
-```bash
-kubectl --context fraud -n fraud logs deploy/terminals --tail=20
-```
+Watch the **terminal errors** on the dashboard. On this cluster the VM's network
+needs a few seconds to settle on the new server, so some authorizations go
+unanswered for a moment. The terminals do what real terminals do: they repeat an
+unanswered authorization with the same transaction id. The dashboard counts those
+as **repeated by the terminal**, and terminal errors stay at zero.
+
+Why the host and not everyone: ten migrations at once on this workshop cluster
+trip over a known issue in its network layer, and the demo is the same for all.
 
 ## What's next
 
