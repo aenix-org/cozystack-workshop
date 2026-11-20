@@ -1,0 +1,10 @@
+# Lab 7 demo: live-migrate the switch to a chosen node. Pick a node pair that is
+# known to work on your cluster (on the workshop cluster on 2026-11-20: ws3 <-> ws4).
+apiVersion: kubevirt.io/v1
+kind: VirtualMachineInstanceMigration
+metadata:
+  generateName: switch-move-
+spec:
+  vmiName: vm-instance-switch
+  addedNodeSelector:
+    kubernetes.io/hostname: ws3
