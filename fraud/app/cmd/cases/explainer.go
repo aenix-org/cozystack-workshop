@@ -30,7 +30,7 @@ func explainOne(ctx context.Context, pool *pgxpool.Pool, url string, client *htt
 	var id, last4, merchant, city, country string
 	var amount int64
 	var raw []byte
-	err = tx.QueryRow(ctx, `SELECT txn_id::text,last4,amount_cents,merchant_name,city,country,reasons FROM alerts WHERE explanation IS NULL ORDER BY ts FOR UPDATE SKIP LOCKED LIMIT 1`).Scan(&id, &last4, &amount, &merchant, &city, &country, &raw)
+	err = tx.QueryRow(ctx, `SELECT txn_id::text,last4,amount_cents,merchant_name,city,country,reasons FROM alerts WHERE explanation IS NULL ORDER BY ts DESC FOR UPDATE SKIP LOCKED LIMIT 1`).Scan(&id, &last4, &amount, &merchant, &city, &country, &raw)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return false, nil
 	}
@@ -85,10 +85,12 @@ func explainOne(ctx context.Context, pool *pgxpool.Pool, url string, client *htt
 }
 func explain(ctx context.Context, pool *pgxpool.Pool, url string) {
 	client := &http.Client{Timeout: 30 * time.Second}
+	var lastLog time.Time
 	for ctx.Err() == nil {
 		found, err := explainOne(ctx, pool, url, client)
-		if err != nil && ctx.Err() == nil {
-			log.Printf("explanation unavailable, retrying later: %v", err)
+		if err != nil && ctx.Err() == nil && time.Since(lastLog) > 30*time.Second {
+			log.Printf("explainer unavailable, alerts wait for an explanation: %v", err)
+			lastLog = time.Now()
 		}
 		if err != nil || !found {
 			if !platform.Sleep(ctx, 2*time.Second) {
