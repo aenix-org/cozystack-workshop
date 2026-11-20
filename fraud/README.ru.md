@@ -125,7 +125,7 @@ kubectl --context fraud -n fraud logs job/attack -f
 ```bash
 cat manifests/01-data-services.yaml
 kubectl --context tenant apply -f manifests/01-data-services.yaml
-kubectl --context tenant get kafka,redis,postgres -w
+watch -n 5 kubectl --context tenant get kafka,redis,postgres
 ```
 
 **Должно получиться:** `features` (Redis) и `cases` (PostgreSQL) переходят в `READY True` за минуту-две, а `kafka` — за три–десять минут: когда заказывает весь зал разом, платформа ставит их по очереди. Остановите наблюдение через `Ctrl-C`. К шагу 2 можно переходить, как только готовы Redis и PostgreSQL: сервисы сами дождутся Kafka.

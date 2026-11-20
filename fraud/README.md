@@ -125,7 +125,7 @@ The three services come from the Cozystack catalog, in the same way you would or
 ```bash
 cat manifests/01-data-services.yaml
 kubectl --context tenant apply -f manifests/01-data-services.yaml
-kubectl --context tenant get kafka,redis,postgres -w
+watch -n 5 kubectl --context tenant get kafka,redis,postgres
 ```
 
 **You should see:** `features` (Redis) and `cases` (PostgreSQL) move to `READY True` within a minute or two, and `kafka` within three to ten minutes: when the whole room orders at once, the platform installs them one after another. Stop watching with `Ctrl-C`. You can go on to Step 2 as soon as Redis and PostgreSQL are ready; the services wait for Kafka by themselves.
