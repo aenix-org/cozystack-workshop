@@ -354,7 +354,7 @@ kubectl --context platform get vmim -w
 ```
 
 **You should see:** the migration go through `Pending`, `Scheduling`,
-`TargetReady` and `Succeeded` within half a minute; after that, `get vmi` shows another node. The
+`TargetReady` and `Succeeded` within a minute; after that, `get vmi` shows another node. The
 memory of the running VM is copied to the new server while it works, and the disk
 does not have to move: it is on replicated storage that both servers can reach.
 

@@ -23,6 +23,21 @@ const systemPrompt = "You write one short sentence for a bank support agent expl
 const exampleQuestion = "Card …4242; amount $1.20; merchant QuickBuy Online; city online; country US. Facts: 7 payments below $5 in 10 minutes; 7 distinct merchants in 10 minutes"
 const exampleAnswer = "The card made seven payments under $5 at seven different shops within ten minutes, which is how stolen cards are tested before a large purchase."
 
+// usable keeps the complete sentences of an answer, or returns "" when the answer
+// contradicts the decision.
+func usable(text string) string {
+	lower := strings.ToLower(text)
+	for _, bad := range []string{"legitimate", "not a fraud", "not fraud", "not fraudulent", "was approved", "no fraud"} {
+		if strings.Contains(lower, bad) {
+			return ""
+		}
+	}
+	if i := strings.LastIndexAny(text, ".!"); i > 20 {
+		return text[:i+1]
+	}
+	return ""
+}
+
 func explainOne(ctx context.Context, pool *pgxpool.Pool, url string, client *http.Client) (bool, error) {
 	ctx, cancel := context.WithTimeout(ctx, 35*time.Second)
 	defer cancel()
@@ -77,7 +92,12 @@ func explainOne(ctx context.Context, pool *pgxpool.Pool, url string, client *htt
 	if len(answer.Choices) == 0 || strings.TrimSpace(answer.Choices[0].Message.Content) == "" {
 		return false, errors.New("empty explanation")
 	}
-	explanation := strings.Join(strings.Fields(answer.Choices[0].Message.Content), " ")
+	explanation := usable(strings.Join(strings.Fields(answer.Choices[0].Message.Content), " "))
+	if explanation == "" {
+		// A very small model sometimes contradicts the decision or stops mid-word;
+		// the support agent then gets the facts themselves.
+		explanation = "Blocked because: " + strings.Join(facts, "; ") + "."
+	}
 	if _, err = tx.Exec(ctx, `UPDATE alerts SET explanation=$2,explained_at=now() WHERE txn_id=$1`, id, explanation); err != nil {
 		return false, err
 	}
