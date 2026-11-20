@@ -100,7 +100,8 @@ kubectl --context fraud -n fraud get pods
 ```
 
 **You should see:** the VM `switch` and the cluster `fraud`, both ready; one node
-in your cluster; one `terminals` pod running.
+in your cluster; one `terminals` pod running (a `prepull-explainer` pod that has
+already completed is the host's preparation for Step 3).
 
 Now log in to the switch. It is a plain Ubuntu VM, user `ubuntu`, password `ubuntu`:
 
@@ -134,8 +135,11 @@ kubectl --context platform apply -f manifests/01-data-services.yaml
 kubectl --context platform get kafka,redis,postgres -w
 ```
 
-**You should see:** all three move to `READY True` within three to five minutes.
-Stop watching with `Ctrl-C`.
+**You should see:** `features` (Redis) and `cases` (PostgreSQL) move to
+`READY True` within a minute or two, and `kafka` within three to ten minutes: when
+the whole room orders at once, the platform installs them one after another. Stop
+watching with `Ctrl-C`. You can go on to Step 2 as soon as Redis and PostgreSQL are
+ready; the services wait for Kafka by themselves.
 
 While they start, look at what you ordered in the Cozystack dashboard
 (https://dashboard.workshop.aenix.io, your tenant `tenant-dallasNN`): the same three
