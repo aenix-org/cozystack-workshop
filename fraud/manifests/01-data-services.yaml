@@ -1,5 +1,5 @@
 # Step 1. Three services from the Cozystack catalog, in your tenant.
-# Apply with the platform context:  kubectl --context platform apply -f manifests/01-data-services.yaml
+# Apply with the platform context:  kubectl --context tenant apply -f manifests/01-data-services.yaml
 #
 # Kafka: the bus every authorization travels on.
 #   auth.requests  - the switch asks "approve or decline?"
