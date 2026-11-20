@@ -114,7 +114,7 @@ Press Enter if the screen stays empty. Inside the VM:
 journalctl -u auth-switch -f
 ```
 
-**You should see**, every five seconds: `100 authorizations, 0 declined`. The switch
+**You should see**, every five seconds: `100 authorizations, 0 declined, stand-in 0.0%`. The switch
 runs in legacy mode: it declines only payments above $5,000. Stolen cards that
 buy a $40 dinner get through.
 
@@ -244,8 +244,9 @@ kubectl --context fraud apply -f manifests/04-attack.yaml
 kubectl --context fraud -n fraud logs job/attack -f
 ```
 
-**You should see:** in the attack log, `declined` growing and `approved` staying at
-zero; on the dashboard, declines rising and blocked transactions appearing with
+**You should see:** in the attack log, most payments `declined`. The first few probes
+of each stolen card are approved: one tiny payment looks like any other, and the
+pattern becomes clear after a handful. On the dashboard, declines rising and blocked transactions appearing with
 their reason codes. A few seconds later each of them gets a plain-English
 explanation from the model.
 

@@ -30,7 +30,9 @@ spec:
             - --ctx-size
             - "2048"
             - --threads
-            - "2"
+            - "1"
+            - --parallel
+            - "1"
           env: [{name: LLAMA_CACHE, value: /models}]
           ports: [{containerPort: 8080}]
           readinessProbe:
@@ -39,7 +41,7 @@ spec:
           volumeMounts: [{name: models, mountPath: /models}]
           resources:
             requests: {cpu: 200m, memory: 768Mi}
-            limits: {cpu: "2", memory: 1536Mi}
+            limits: {cpu: "1", memory: 1536Mi}
       volumes: [{name: models, emptyDir: {}}]
 ---
 apiVersion: v1

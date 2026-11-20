@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -96,6 +95,29 @@ func (s *switchService) authorize(w http.ResponseWriter, r *http.Request) {
 		LatencyMS float64        `json:"latency_ms"`
 		Reasons   []model.Reason `json:"reasons"`
 	}{req.TxnID, decision, source, ms, reasons})
+}
+func decisionPartitions(ctx context.Context) []int {
+	for {
+		for _, b := range platform.Brokers() {
+			conn, err := kafka.DialContext(ctx, "tcp", b)
+			if err != nil {
+				continue
+			}
+			parts, err := conn.ReadPartitions("auth.decisions")
+			conn.Close()
+			if err == nil && len(parts) > 0 {
+				ids := make([]int, 0, len(parts))
+				for _, p := range parts {
+					ids = append(ids, p.ID)
+				}
+				return ids
+			}
+		}
+		log.Print("waiting for Kafka topic auth.decisions")
+		if !platform.Sleep(ctx, 2*time.Second) {
+			return nil
+		}
+	}
 }
 func (s *switchService) consume(ctx context.Context, r *kafka.Reader) {
 	for {
@@ -191,9 +213,17 @@ func main() {
 		journalCancel = jcancel
 		done = make(chan struct{})
 		go s.journalLoop(jctx, jw, done)
-		r := kafka.NewReader(kafka.ReaderConfig{Brokers: platform.Brokers(), Topic: "auth.decisions", GroupID: fmt.Sprintf("switch-%s-%d", host, os.Getpid()), StartOffset: kafka.LastOffset, MinBytes: 1, MaxBytes: 10e6, MaxWait: 10 * time.Millisecond, CommitInterval: time.Second})
-		defer r.Close()
-		go s.consume(ctx, r)
+		// Read every partition of auth.decisions directly, from the newest offset.
+		// A consumer group would pause all reads on every rebalance, and each pause
+		// sends payments into stand-in.
+		for _, p := range decisionPartitions(ctx) {
+			r := kafka.NewReader(kafka.ReaderConfig{Brokers: platform.Brokers(), Topic: "auth.decisions", Partition: p, MinBytes: 1, MaxBytes: 10e6, MaxWait: 10 * time.Millisecond})
+			if err := r.SetOffset(kafka.LastOffset); err != nil {
+				log.Printf("decision reader for partition %d: %v", p, err)
+			}
+			defer r.Close()
+			go s.consume(ctx, r)
+		}
 		log.Print("switch started in SCORING mode")
 	} else {
 		log.Print("switch started in LEGACY mode")

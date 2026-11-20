@@ -21,7 +21,7 @@ spec:
           envFrom: [{configMapRef: {name: endpoints}}]
           resources:
             requests: {cpu: 100m, memory: 64Mi}
-            limits: {cpu: 500m, memory: 256Mi}
+            limits: {cpu: "1", memory: 256Mi}
 ---
 # The case writer: stores every answer the switch gave into PostgreSQL,
 # and every decline as an alert.
