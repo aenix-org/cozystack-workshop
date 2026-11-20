@@ -5,7 +5,7 @@ Replace the `dallas` prefix with the city of your session.
 
 | File | Where it goes | What it creates |
 |---|---|---|
-| `access.yaml` | platform, tenant namespace | service account and tenant roles for the bastion, plus the right to live-migrate VMs (Lab 7) |
+| `access.yaml` | platform, tenant namespace | service account and tenant roles for the bastion, plus the right to live-migrate VMs (Step 7) |
 | `cluster.yaml` | platform | the participant's Kubernetes cluster `fraud` (one `u1.2xmedium` worker, autoscaler up to two) |
 | `switch-vm.yaml` | platform | the switch VM on `replicated` storage, and the Service `switch` the cluster reaches it by |
 | `dashboard-ingress.yaml` | platform | `https://fraud.dallasNN.workshop.aenix.io`, routed to NodePort 30080 of the cluster's workers |
@@ -47,7 +47,7 @@ bastion:
 * The **monitor** in [`../../instructor/monitor`](../../instructor/monitor) records
   every participant's bastion terminal for the host.
 
-## Lab 7: the live migration demo
+## Step 7: the live migration demo
 
 Run it from a host account on the bastion (for example `dallas00`, prepared like a
 participant), with its dashboard on the projector:

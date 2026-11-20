@@ -1,4 +1,4 @@
-# Lab 4. A fraud ring goes after your cardholders: card testing with tiny payments,
+# Step 4. A fraud ring goes after your cardholders: card testing with tiny payments,
 # the same card in two countries minutes apart, and a run on a whole range of card numbers.
 # Apply with:  kubectl --context fraud apply -f manifests/04-attack.yaml
 apiVersion: batch/v1

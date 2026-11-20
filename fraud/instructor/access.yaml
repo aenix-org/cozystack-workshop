@@ -1,5 +1,5 @@
 # Command-line access for the participant on the bastion: a service account with the
-# usual tenant roles, plus the right to live-migrate VMs, which Lab 7 needs.
+# usual tenant roles, plus the right to live-migrate VMs, which Step 7 needs.
 apiVersion: v1
 kind: ServiceAccount
 metadata: {name: dallasXX, namespace: tenant-dallasXX}

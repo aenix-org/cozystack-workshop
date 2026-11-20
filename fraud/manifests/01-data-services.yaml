@@ -1,4 +1,4 @@
-# Lab 1. Three services from the Cozystack catalog, in your tenant.
+# Step 1. Three services from the Cozystack catalog, in your tenant.
 # Apply with the platform context:  kubectl --context platform apply -f manifests/01-data-services.yaml
 #
 # Kafka: the bus every authorization travels on.
@@ -40,7 +40,7 @@ spec:
   authEnabled: false
 ---
 # PostgreSQL: the case database - every transaction and every alert.
-# Two replicas: a primary and a hot standby, so the database survives losing a node (Lab 6).
+# Two replicas: a primary and a hot standby, so the database survives losing a node (Step 6).
 apiVersion: apps.cozystack.io/v1alpha1
 kind: Postgres
 metadata:

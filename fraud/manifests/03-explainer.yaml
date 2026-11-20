@@ -1,4 +1,4 @@
-# Lab 3. A small language model inside your cluster explains every blocked payment.
+# Step 3. A small language model inside your cluster explains every blocked payment.
 # Qwen2.5 0.5B Instruct (Apache 2.0), served by llama.cpp on the CPU. No GPU, and no
 # card data leaves your cluster: the model weights come in, nothing goes out.
 # Apply with:  kubectl --context fraud apply -f manifests/03-explainer.yaml

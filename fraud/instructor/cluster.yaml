@@ -1,5 +1,5 @@
 # The participant's own Kubernetes cluster, created by the host before the session
-# (it takes about ten minutes). One worker is enough for the labs; the autoscaler may
+# (it takes about ten minutes). One worker is enough for the workshop; the autoscaler may
 # add a second one under Black Friday load.
 apiVersion: apps.cozystack.io/v1alpha1
 kind: Kubernetes

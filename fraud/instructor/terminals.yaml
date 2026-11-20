@@ -19,10 +19,10 @@ data:
   PG_URL: postgres://fraud:Fraud2026@postgres-cases-rw.tenant-dallasXX.svc.cozy.local:5432/fraud?sslmode=prefer
   SWITCH_URL: http://switch.tenant-dallasXX.svc.cozy.local:8080
   TERMINALS_URL: http://terminals.fraud.svc:9090
-  # The language model from Lab 3. Until it is deployed, alerts simply wait for an explanation.
+  # The language model from Step 3. Until it is deployed, alerts simply wait for an explanation.
   EXPLAINER_URL: http://explainer.fraud.svc:8080
 ---
-# How many card payments per second the terminals send. Lab 5 raises it.
+# How many card payments per second the terminals send. Step 5 raises it.
 apiVersion: v1
 kind: ConfigMap
 metadata:
