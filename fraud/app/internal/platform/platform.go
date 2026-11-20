@@ -69,7 +69,7 @@ func Writer(topic string) *kafka.Writer {
 	return &kafka.Writer{Addr: kafka.TCP(Brokers()...), Topic: topic, Balancer: &kafka.Hash{}, BatchTimeout: 2 * time.Millisecond, RequiredAcks: kafka.RequireOne, AllowAutoTopicCreation: false, WriteTimeout: 2 * time.Second, ReadTimeout: 2 * time.Second, MaxAttempts: 1}
 }
 func Reader(topic, group string) *kafka.Reader {
-	return kafka.NewReader(kafka.ReaderConfig{Brokers: Brokers(), Topic: topic, GroupID: group, MinBytes: 1, MaxBytes: 10e6, MaxWait: 10 * time.Millisecond, CommitInterval: time.Second})
+	return kafka.NewReader(kafka.ReaderConfig{Brokers: Brokers(), Topic: topic, GroupID: group, WatchPartitionChanges: true, PartitionWatchInterval: 5 * time.Second, MinBytes: 1, MaxBytes: 10e6, MaxWait: 10 * time.Millisecond, CommitInterval: time.Second})
 }
 func Message(key string, v any) kafka.Message {
 	b, _ := json.Marshal(v)
