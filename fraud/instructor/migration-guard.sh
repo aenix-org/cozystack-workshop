@@ -22,8 +22,15 @@ while true; do
     src=$(k -n "$ns" get vmi "$vmi" -o jsonpath='{.status.nodeName}')
     [ -n "$src" ] && [ "$src" != "$dst" ] || continue
     lsp="$vmi.$ns"
-    if k -n cozy-kubeovn exec deploy/ovn-central -c ovn-central -- \
-        ovn-nbctl lsp-set-options "$lsp" "requested-chassis=$src,$dst" activation-strategy=rarp; then
+    # Only the OVN northbound leader accepts writes, so try every ovn-central pod.
+    ok=""
+    for pod in $(k -n cozy-kubeovn get pods -l app=ovn-central -o name); do
+      if k -n cozy-kubeovn exec "$pod" -c ovn-central -- \
+          ovn-nbctl lsp-set-options "$lsp" "requested-chassis=$src,$dst" activation-strategy=rarp 2>/dev/null; then
+        ok=1; break
+      fi
+    done
+    if [ -n "$ok" ]; then
       done_uids="$done_uids$uid "
       echo "$(date +%T) $ns/$name: port $lsp prepared for $src -> $dst"
     fi
