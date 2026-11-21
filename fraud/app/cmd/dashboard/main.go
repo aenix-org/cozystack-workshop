@@ -47,9 +47,12 @@ type panel struct {
 	Error string `json:"error,omitempty"`
 }
 type dashboard struct {
-	pool      *pgxpool.Pool
-	client    *http.Client
-	terminals string
+	pool           *pgxpool.Pool
+	client         *http.Client
+	terminals      string
+	metricsMu      sync.Mutex
+	metricsText    string
+	metricsExpires time.Time
 }
 
 func (d *dashboard) database(ctx context.Context) panel {
@@ -115,12 +118,12 @@ func (d *dashboard) terminalStats(ctx context.Context) panel {
 	}
 	return panel{Data: stats}
 }
-func (d *dashboard) stats(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), 2500*time.Millisecond)
+func (d *dashboard) collectStats(ctx context.Context, includeAlerts bool) map[string]panel {
+	ctx, cancel := context.WithTimeout(ctx, 2500*time.Millisecond)
 	defer cancel()
 	var db, alerts, scorer, cases, terminals panel
 	var wg sync.WaitGroup
-	tasks := []func(){func() { db = d.database(ctx) }, func() { alerts = d.alerts(ctx) }, func() {
+	tasks := []func(){func() { db = d.database(ctx) }, func() {
 		lag, _, err := platform.KafkaLag(ctx, "scorer", "auth.requests")
 		if err != nil {
 			scorer = panel{Error: "Kafka unavailable"}
@@ -135,13 +138,20 @@ func (d *dashboard) stats(w http.ResponseWriter, r *http.Request) {
 			cases = panel{Data: map[string]int64{"lag": lag, "journal_entries": end}}
 		}
 	}, func() { terminals = d.terminalStats(ctx) }}
+	if includeAlerts {
+		tasks = append(tasks, func() { alerts = d.alerts(ctx) })
+	}
 	for _, task := range tasks {
 		wg.Add(1)
 		go func(f func()) { defer wg.Done(); f() }(task)
 	}
 	wg.Wait()
+	return map[string]panel{"database": db, "alerts": alerts, "scorer": scorer, "cases": cases, "terminals": terminals}
+}
+func (d *dashboard) stats(w http.ResponseWriter, r *http.Request) {
+	s := d.collectStats(r.Context(), true)
 	w.Header().Set("Cache-Control", "no-store")
-	platform.JSON(w, map[string]panel{"database": db, "alerts": alerts, "scorer": scorer, "cases": cases, "terminals": terminals})
+	platform.JSON(w, s)
 }
 func main() {
 	ctx, cancel := platform.Context()
@@ -163,6 +173,7 @@ func main() {
 	mux := http.NewServeMux()
 	platform.Health(mux)
 	mux.HandleFunc("GET /api/stats", d.stats)
+	mux.HandleFunc("GET /metrics", d.metrics)
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
 			http.NotFound(w, r)

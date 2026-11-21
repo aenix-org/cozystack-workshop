@@ -46,3 +46,22 @@ kind: RoleBinding
 metadata: {name: dallasXX-live-migration, namespace: tenant-dallasXX}
 roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: workshop-live-migration}
 subjects: [{kind: ServiceAccount, name: dallasXX, namespace: tenant-dallasXX}]
+---
+# Alert rules as code: the tenant roles of Cozystack 1.6 do not let a tenant user create
+# alerting rules, although the monitoring docs describe putting them in the tenant namespace.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: workshop-alert-rules, namespace: tenant-dallasXX}
+rules:
+  - apiGroups: [operator.victoriametrics.com]
+    resources: [vmrules]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [monitoring.coreos.com]
+    resources: [prometheusrules]
+    verbs: [get, list, watch, create, update, patch, delete]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: dallasXX-alert-rules, namespace: tenant-dallasXX}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: workshop-alert-rules}
+subjects: [{kind: ServiceAccount, name: dallasXX, namespace: tenant-dallasXX}]
