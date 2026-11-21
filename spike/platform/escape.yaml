@@ -1,0 +1,4 @@
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: escape-test, namespace: tenant-root}
+data: {a: b}
