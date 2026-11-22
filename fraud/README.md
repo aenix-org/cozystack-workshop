@@ -52,7 +52,7 @@ The route totals 190 minutes, about three hours.
 
 ## What the host gave you
 
-You have one username (`austinNN`) and one password, the same for the bastion and GitLab. Your credentials file also contains the monitoring credentials, including Grafana user `admin` and its password.
+You have one username (`austinNN`) and one password, the same for the bastion and GitLab. Your credentials file, `~/credentials.txt` on the bastion, also contains the monitoring credentials, including Grafana user `admin` and its password.
 
 | Where | Address |
 |---|---|
@@ -363,7 +363,7 @@ Read the rules that caught the attack: [`app/internal/scoring/rules.go`](app/int
 
 ### 3.1 Find the managed-service dashboards
 
-Log in to `https://grafana.austinNN.workshop.aenix.io` with user `admin` and the password from your credentials file. Find folder `kafka` → **Strimzi Kafka**, then folder `db` → **CloudNativePG** and **Redis**. Find which pod is the PostgreSQL primary and how much memory Kafka uses.
+Log in to `https://grafana.austinNN.workshop.aenix.io` with user `admin` and the password from `~/credentials.txt` on the bastion. Find folder `kafka` → **Strimzi Kafka**, then folder `db` → **CloudNativePG** and **Redis**. Find which pod is the PostgreSQL primary and how much memory Kafka uses.
 
 ### 3.2 Send your cluster's logs and metrics to tenant monitoring
 
@@ -851,5 +851,5 @@ Found something wrong in the Cozystack documentation today? Open an issue or a P
 | Flux is not applying your change | `kubectl --context tenant get kustomization platform` shows the error. |
 | YAML error in your file | `kubectl --context tenant get kustomization platform` shows the error; fix the file, commit, and push. |
 | ClickHouse reports `Memory limit exceeded` | Use preset `t1.medium`. |
-| Grafana login fails | Use the Grafana credentials from your credentials file. |
+| Grafana login fails | Use user `admin` and the Grafana password from `~/credentials.txt` on the bastion; it is not your bastion password. |
 | `incident` says an incident is already active | Finish it, or use `incident hint`. |

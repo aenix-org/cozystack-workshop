@@ -66,7 +66,7 @@ metadata: {name: dallasXX-alert-rules, namespace: tenant-dallasXX}
 roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: workshop-alert-rules}
 subjects: [{kind: ServiceAccount, name: dallasXX, namespace: tenant-dallasXX}]
 ---
-# Read-only view of what Cozystack builds from an application (README step 1.5).
+# What Cozystack builds from an application (README step 1.5), plus exec into database pods (Part 5).
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -82,6 +82,10 @@ rules:
   - apiGroups: [kafka.strimzi.io]
     resources: [kafkas, kafkatopics]
     verbs: [get, list, watch]
+  # clickhouse-client and psql inside the database pods (README Part 5).
+  - apiGroups: [""]
+    resources: [pods/exec]
+    verbs: [create]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
