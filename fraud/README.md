@@ -247,7 +247,7 @@ Commit both files with the message `Order Kafka and the case database`, push, th
 watch -n 5 kubectl --context tenant get kafka,redis,postgres
 ```
 
-**You should see:** `features` (Redis) and `cases` (PostgreSQL) move to `READY True` within one or two minutes, and `kafka` within three to ten minutes. When the whole room orders at once, the platform installs services one after another. Stop watching with `Ctrl-C`. You can go on to Part 2 as soon as Redis and PostgreSQL are ready; the services wait for Kafka by themselves.
+**You should see:** `features` (Redis) and `cases` (PostgreSQL) move to `READY True` within one or two minutes, and `kafka` within ten to twenty minutes; carry on with 1.5 and 1.6 while it starts. When the whole room orders at once, the platform installs services one after another. Stop watching with `Ctrl-C`. You can go on to Part 2 as soon as Redis and PostgreSQL are ready; the services wait for Kafka by themselves.
 
 ### 1.5 Under the hood (5 min of this part)
 
