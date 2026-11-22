@@ -119,19 +119,20 @@ func (d *dashboard) terminalStats(ctx context.Context) panel {
 	return panel{Data: stats}
 }
 func (d *dashboard) collectStats(ctx context.Context, includeAlerts bool) map[string]panel {
+	kafkaCtx := ctx
 	ctx, cancel := context.WithTimeout(ctx, 2500*time.Millisecond)
 	defer cancel()
 	var db, alerts, scorer, cases, terminals panel
 	var wg sync.WaitGroup
 	tasks := []func(){func() { db = d.database(ctx) }, func() {
-		lag, _, err := platform.KafkaLag(ctx, "scorer", "auth.requests")
+		lag, _, err := platform.KafkaLag(kafkaCtx, "scorer", "auth.requests")
 		if err != nil {
 			scorer = panel{Error: "Kafka unavailable"}
 		} else {
 			scorer = panel{Data: map[string]int64{"lag": lag}}
 		}
 	}, func() {
-		lag, end, err := platform.KafkaLag(ctx, "cases", "auth.journal")
+		lag, end, err := platform.KafkaLag(kafkaCtx, "cases", "auth.journal")
 		if err != nil {
 			cases = panel{Error: "Kafka unavailable"}
 		} else {
