@@ -303,7 +303,7 @@ virtctl console vm-instance-switch
 
 **You should see:** the switch VM console. Log in with `ubuntu` / `ubuntu`.
 
-Inside the VM, point the switch at Kafka and restart it:
+Inside the VM, point the switch at Kafka and restart it. Make sure Kafka is ready first: from the bastion, `kubectl --context tenant get kafka` must show `READY True`; if it is still starting, wait here and check again (ten to twenty-five minutes after Part 1):
 
 ```bash
 sudo sed -i 's#^KAFKA_BOOTSTRAP=.*#KAFKA_BOOTSTRAP=kafka-kafka-kafka-bootstrap:9092#' /etc/auth-switch/env
@@ -422,7 +422,7 @@ spec:
 
 ### 3.4 Alert as code
 
-Use the [alerting documentation](https://cozystack.io/docs/v1.6/operations/services/monitoring/alerting/) to write `~/fraud-infra/platform/alerts.yaml`: a `VMRule` named `fraud-alerts` with two alerts. `FraudDecidedBlind` uses `fraud_stand_in_ratio > 0.2`, duration `1m`, severity `critical`. `FraudScorerFallingBehind` uses `fraud_scorer_lag_messages > 1000`, duration `1m`, severity `warning`. The page uses `PrometheusRule`; `VMRule` works the same way. Check the object after committing and pushing with the command below.
+Use the [alerting documentation](https://cozystack.io/docs/v1.6/operations/services/monitoring/alerting/) to write `~/fraud-infra/platform/alerts.yaml`: a `VMRule` named `fraud-alerts` with two alerts. `FraudDecidedBlind` uses `fraud_stand_in_ratio > 0.2`, duration `1m`, severity `critical`. `FraudScorerFallingBehind` uses `fraud_scorer_lag_messages > 1000`, duration `30s`, severity `warning`. The page uses `PrometheusRule`; `VMRule` works the same way. Check the object after committing and pushing with the command below.
 
 <details><summary>Solution</summary>
 
@@ -442,7 +442,7 @@ spec:
             severity: critical
         - alert: FraudScorerFallingBehind
           expr: fraud_scorer_lag_messages > 1000
-          for: 1m
+          for: 30s
           labels:
             severity: warning
 ```
@@ -705,7 +705,7 @@ Meanwhile, on the fraud dashboard, the database panel shows `database unavailabl
 kubectl --context fraud -n fraud logs deploy/cases --tail=20
 ```
 
-**You should see:** `database unavailable, holding … messages, retrying`, then the backlog written. The dashboard's reconciliation line compares what the switch journaled with what the database stored; once the backlog is written, it shows `missing: 0`. Not one case was lost.
+**You should see:** `database unavailable, holding … messages, retrying`, then the backlog written. The dashboard's reconciliation line compares what the switch journaled with what the database stored; once the backlog is written — within a minute or two — it shows `missing: 0`. Not one case was lost.
 
 ### 6.3 The switch moves to another server mid-flow
 
