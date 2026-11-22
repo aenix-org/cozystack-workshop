@@ -304,7 +304,7 @@ virtctl console vm-instance-switch
 
 **Вы должны увидеть:** консоль ВМ свитча. Войдите с `ubuntu` / `ubuntu`.
 
-Внутри ВМ направьте свитч на Kafka и перезапустите его:
+Внутри ВМ направьте свитч на Kafka и перезапустите его. Сначала убедитесь, что Kafka готова: с бастиона выполните `kubectl --context tenant get kafka` — должно быть `READY True`; если она ещё стартует, подождите здесь и проверьте снова (десять-двадцать пять минут после части 1):
 
 ```bash
 sudo sed -i 's#^KAFKA_BOOTSTRAP=.*#KAFKA_BOOTSTRAP=kafka-kafka-kafka-bootstrap:9092#' /etc/auth-switch/env
@@ -423,7 +423,7 @@ spec:
 
 ### 3.4 Алерты как код
 
-Воспользуйтесь [документацией по алертингу](https://cozystack.io/docs/v1.6/operations/services/monitoring/alerting/), чтобы написать `~/fraud-infra/platform/alerts.yaml`: `VMRule` с именем `fraud-alerts` и двумя алертами. `FraudDecidedBlind` — `fraud_stand_in_ratio > 0.2`, длительность `1m`, severity `critical`. `FraudScorerFallingBehind` — `fraud_scorer_lag_messages > 1000`, длительность `1m`, severity `warning`. На странице используется `PrometheusRule`; `VMRule` работает так же. После коммита и пуша проверьте объект командой ниже.
+Воспользуйтесь [документацией по алертингу](https://cozystack.io/docs/v1.6/operations/services/monitoring/alerting/), чтобы написать `~/fraud-infra/platform/alerts.yaml`: `VMRule` с именем `fraud-alerts` и двумя алертами. `FraudDecidedBlind` — `fraud_stand_in_ratio > 0.2`, длительность `1m`, severity `critical`. `FraudScorerFallingBehind` — `fraud_scorer_lag_messages > 1000`, длительность `30s`, severity `warning`. На странице используется `PrometheusRule`; `VMRule` работает так же. После коммита и пуша проверьте объект командой ниже.
 
 <details><summary>Решение</summary>
 
@@ -443,7 +443,7 @@ spec:
             severity: critical
         - alert: FraudScorerFallingBehind
           expr: fraud_scorer_lag_messages > 1000
-          for: 1m
+          for: 30s
           labels:
             severity: warning
 ```
@@ -706,7 +706,7 @@ kubectl --context tenant get pods -l cnpg.io/cluster=postgres-cases -L role -w
 kubectl --context fraud -n fraud logs deploy/cases --tail=20
 ```
 
-**Вы должны увидеть:** `database unavailable, holding … messages, retrying`, а затем запись накопившегося хвоста. Строка сверки на дашборде сравнивает то, что свитч записал в журнал, с тем, что сохранилось в базе; когда хвост записан, она показывает `missing: 0`. Ни один кейс не пропал.
+**Вы должны увидеть:** `database unavailable, holding … messages, retrying`, а затем запись накопившегося хвоста. Строка сверки на дашборде сравнивает то, что свитч записал в журнал, с тем, что сохранилось в базе; когда хвост записан — в течение минуты-двух — она показывает `missing: 0`. Ни один кейс не пропал.
 
 ### 6.3 Свитч переезжает на другой сервер посреди потока
 
