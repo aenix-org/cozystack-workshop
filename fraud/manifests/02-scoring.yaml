@@ -18,11 +18,11 @@ spec:
         - name: scorer
           image: ghcr.io/aenix-org/fraud-workshop:latest
           command: [scorer]
-          env: [{name: WORK_MS, value: "4"}]
+          env: [{name: WORK_MS, value: "1"}]
           envFrom: [{configMapRef: {name: endpoints}}]
           resources:
-            requests: {cpu: 50m, memory: 32Mi}
-            limits: {cpu: 500m, memory: 256Mi}
+            requests: {cpu: 100m, memory: 64Mi}
+            limits: {cpu: "1", memory: 256Mi}
 ---
 # The case writer: stores every answer the switch gave into PostgreSQL,
 # and every decline as an alert.
@@ -65,7 +65,6 @@ spec:
           image: ghcr.io/aenix-org/fraud-workshop:latest
           command: [dashboard]
           envFrom: [{configMapRef: {name: endpoints}}]
-          ports: [{name: http, containerPort: 8080}]
           resources:
             requests: {cpu: 25m, memory: 32Mi}
             limits: {cpu: 500m, memory: 256Mi}
