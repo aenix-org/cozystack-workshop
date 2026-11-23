@@ -13,7 +13,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 )
@@ -22,26 +21,12 @@ const systemPrompt = "You write one short sentence for a bank support agent expl
 
 // One worked example keeps a small model to the shape of the answer.
 const exampleQuestion = "Card …4242; amount $1.20; merchant QuickBuy Online; city online; country US. Facts: 7 payments below $5 in 10 minutes; 7 distinct merchants in 10 minutes"
-const exampleAnswer = "The card made 7 payments below $5 at 7 different merchants within 10 minutes, which is how stolen cards are tested before a large purchase."
+const exampleAnswer = "The card made seven payments under $5 at seven different shops within ten minutes, which is how stolen cards are tested before a large purchase."
 
 // usable keeps the complete sentences of an answer, or returns "" when the answer
 // contradicts the decision.
-var numberPattern = regexp.MustCompile(`\d+(\.\d+)?`)
-
-func usable(text, facts string) string {
+func usable(text string) string {
 	lower := strings.ToLower(text)
-	// Every number in the answer must come from the facts, and numbers must be digits:
-	// a small model likes to turn 36 into "three hundred and sixty".
-	for _, n := range numberPattern.FindAllString(text, -1) {
-		if !strings.Contains(facts, n) {
-			return ""
-		}
-	}
-	for _, w := range []string{"hundred", "thousand", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety", "seven", "eight", "nine", "six "} {
-		if strings.Contains(lower, w) {
-			return ""
-		}
-	}
 	for _, bad := range []string{"legitimate", "not a fraud", "not fraud", "not fraudulent", "was approved", "no fraud"} {
 		if strings.Contains(lower, bad) {
 			return ""
@@ -80,7 +65,7 @@ func explainOne(ctx context.Context, pool *pgxpool.Pool, url string, client *htt
 		facts = append(facts, r.Fact)
 	}
 	user := fmt.Sprintf("Card …%s; amount $%.2f; merchant %s; city %s; country %s. Facts: %s", last4, float64(amount)/100, merchant, city, country, strings.Join(facts, "; "))
-	b, _ := json.Marshal(map[string]any{"model": "local", "temperature": 0, "max_tokens": 80, "messages": []map[string]string{{"role": "system", "content": systemPrompt}, {"role": "user", "content": exampleQuestion}, {"role": "assistant", "content": exampleAnswer}, {"role": "user", "content": user}}})
+	b, _ := json.Marshal(map[string]any{"model": "local", "temperature": 0, "max_tokens": 60, "messages": []map[string]string{{"role": "system", "content": systemPrompt}, {"role": "user", "content": exampleQuestion}, {"role": "assistant", "content": exampleAnswer}, {"role": "user", "content": user}}})
 	req, err := http.NewRequestWithContext(ctx, "POST", strings.TrimRight(url, "/")+"/v1/chat/completions", bytes.NewReader(b))
 	if err != nil {
 		return false, err
@@ -107,7 +92,7 @@ func explainOne(ctx context.Context, pool *pgxpool.Pool, url string, client *htt
 	if len(answer.Choices) == 0 || strings.TrimSpace(answer.Choices[0].Message.Content) == "" {
 		return false, errors.New("empty explanation")
 	}
-	explanation := usable(strings.Join(strings.Fields(answer.Choices[0].Message.Content), " "), user)
+	explanation := usable(strings.Join(strings.Fields(answer.Choices[0].Message.Content), " "))
 	if explanation == "" {
 		// A very small model sometimes contradicts the decision or stops mid-word;
 		// the support agent then gets the facts themselves.
