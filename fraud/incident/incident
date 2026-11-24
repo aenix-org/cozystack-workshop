@@ -1,0 +1,502 @@
+#!/usr/bin/env python3
+"""Blind workshop fault injection. Python standard library only."""
+
+import argparse
+import base64
+import datetime
+from decimal import Decimal, InvalidOperation
+import fcntl
+import getpass
+import json
+import os
+from pathlib import Path
+import random
+import re
+import secrets
+import subprocess
+import sys
+import tempfile
+import traceback
+
+
+FAULTS = {
+    'redis-unreachable': {
+        'deployment': 'scorer',
+        'apply': ('set', 'env', 'deploy/scorer', 'REDIS_ADDR=redis-features-cache:6379'),
+        'description': 'Override scorer REDIS_ADDR with redis-features-cache:6379; Redis unavailable, holding transaction.',
+        'hints': (
+            'Dashboard: stand-in share jumps to 100%; the Scoring queue grows.',
+            'Inspect logs of deploy/scorer in the fraud cluster: which Redis address does it try?',
+            'Compare env in kubectl --context fraud -n fraud get deploy scorer -o yaml '
+            'with ConfigMap endpoints; inspect kubectl --context fraud -n fraud rollout history deploy/scorer.',
+        ),
+    },
+    'db-password': {
+        'file': 'postgres.yaml', 'path': ('spec', 'users', 'fraud', 'password'),
+        'commit': 'Rotate database credentials',
+        'description': 'Changed the fraud user password in platform/postgres.yaml.',
+        'hints': (
+            "Dashboard: inspect the Case management queue and Journal reconciliation 'missing'.",
+            'Inspect logs of deploy/cases in the fraud cluster.',
+            'In ~/fraud-infra, run git log -p -- platform/postgres.yaml.',
+        ),
+    },
+    'switch-halted': {
+        'file': 'switch-vm.yaml', 'path': ('spec', 'runStrategy'),
+        'value': 'Halted', 'commit': 'Pause switch VM for maintenance window',
+        'description': 'Set spec.runStrategy to Halted in platform/switch-vm.yaml.',
+        'hints': (
+            'Dashboard: inspect Terminal errors.',
+            'Run kubectl --context tenant get vminstances,vmi.',
+            'In ~/fraud-infra, run git log -p -- platform/switch-vm.yaml.',
+        ),
+    },
+    'scorer-throttled': {
+        'deployment': 'scorer',
+        'apply': ('set', 'resources', 'deploy/scorer', '--limits=cpu=30m', '--requests=cpu=30m'),
+        'description': 'Set scorer CPU requests and limits to 30m.',
+        'hints': (
+            'Dashboard: inspect the Scoring queue and stand-in share.',
+            'Grafana: inspect CPU throttling of scorer pods in your cluster.',
+            'Run kubectl --context fraud -n fraud describe deploy scorer and inspect limits.',
+        ),
+    },
+    'cases-stopped': {
+        'deployment': 'cases', 'apply': ('scale', 'deploy/cases', '--replicas=0'),
+        'description': 'Scaled deploy/cases to zero replicas.',
+        'hints': (
+            'Dashboard: inspect the Case management queue.',
+            'Grafana/kubectl: how many cases pods are running?',
+            'Run kubectl --context fraud -n fraud get deploy cases.',
+        ),
+    },
+    'explainer-oom': {
+        'deployment': 'explainer',
+        'apply': ('set', 'resources', 'deploy/explainer', '--limits=memory=200Mi', '--requests=memory=200Mi'),
+        'description': 'Set explainer memory limits to 200Mi.',
+        'hints': (
+            'Inspect Latest alerts: are explanations missing?',
+            'Inspect pod restarts / OOMKilled in Grafana or kubectl get pods.',
+            'Run kubectl --context fraud -n fraud describe deploy explainer and inspect the memory limit.',
+        ),
+    },
+}
+
+START_MESSAGE = (
+    'Incident started. The fraud team reports that something is wrong. Find the cause and fix it.\n'
+    "Tip: follow the six-step search in the README. Run 'incident hint' if you are stuck."
+)
+LOG_DIR = Path('/var/log/ws-incidents')
+
+
+class IncidentError(Exception):
+    pass
+
+
+def run(args, cwd=None):
+    """Never inherit command output: it could disclose the incident or credentials."""
+    try:
+        result = subprocess.run(args, cwd=cwd, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE, text=True, timeout=120)
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise IncidentError('Command failed.') from exc
+    if result.returncode:
+        raise IncidentError('Command failed.') from subprocess.CalledProcessError(
+            result.returncode, args, output=result.stdout, stderr=result.stderr)
+    return result.stdout
+
+
+def kube(context, *args):
+    command = ['kubectl', '--context', context]
+    if context == 'fraud':
+        command += ['-n', 'fraud']
+    return run(command + list(args))
+
+
+def get(context, resource, name=None, missing_ok=False):
+    args = ['get', resource]
+    if name:
+        args.append(name)
+    try:
+        value = json.loads(kube(context, *args, '-o', 'json'))
+        if not isinstance(value, dict):
+            raise ValueError()
+        return value
+    except IncidentError as exc:
+        cause = exc.__cause__
+        if (missing_ok and isinstance(cause, subprocess.CalledProcessError)
+                and '(NotFound)' in (cause.stderr or '')):
+            return {}
+        raise
+    except ValueError as exc:
+        raise IncidentError('Invalid command response.') from exc
+
+
+def scalar(raw):
+    """Read a simple YAML string, respecting quoted # characters and comments."""
+    raw = raw.strip()
+    if raw.startswith('"'):
+        try:
+            value, end = json.JSONDecoder().raw_decode(raw)
+        except ValueError as exc:
+            raise IncidentError('Unsupported YAML scalar.') from exc
+        tail = raw[end:].strip()
+        if not isinstance(value, str) or (tail and not tail.startswith('#')):
+            raise IncidentError('Unsupported YAML scalar.')
+        return value
+    if raw.startswith("'"):
+        match = re.fullmatch(r"'((?:[^']|'')*)'\s*(?:#.*)?", raw)
+        if not match:
+            raise IncidentError('Unsupported YAML scalar.')
+        return match[1].replace("''", "'")
+    value = re.split(r'\s+#', raw, maxsplit=1)[0].rstrip()
+    if not value or value[0] in '#|>&*!{[' or ': ' in value:
+        raise IncidentError('Unsupported YAML scalar.')
+    return value
+
+
+def fields(source, path=None):
+    """Index block fields, keeping document boundaries and inline values intact.
+
+    With a path, select the first document containing it, or its parent for
+    insertion. Without a path, expose the first occurrence of each field.
+    """
+    result, stack = {}, []
+    documents = [result]
+    scalar_indent = None
+    for index, line in enumerate(source.splitlines(keepends=True)):
+        if not line.strip() or line.lstrip().startswith('#'):
+            continue
+        if line.rstrip('\r\n') in ('---', '...'):
+            result, stack = {}, []
+            documents.append(result)
+            scalar_indent = None
+            continue
+        if '\t' in line[:len(line) - len(line.lstrip())]:
+            raise IncidentError('Unsupported YAML structure.')
+        match = re.match(r'^( *)([A-Za-z_][\w.-]*):(?:[ \t]+(.*)|\s*)$', line.rstrip('\r\n'))
+        indent = len(line) - len(line.lstrip(' '))
+        if scalar_indent is not None:
+            if indent > scalar_indent:
+                continue
+            scalar_indent = None
+        while stack and stack[-1][0] >= indent:
+            stack.pop()
+        if not match:
+            # Sequences and other structures may exist away from the edited mapping.
+            stack.append((indent, None))
+            continue
+        key_path = tuple(key for _, key in stack) + (match[2],)
+        if key_path in result:
+            raise IncidentError('Ambiguous YAML mapping.')
+        result[key_path] = (index, indent, match[3] or '')
+        stack.append((indent, match[2]))
+        if re.match(r'^[|>][0-9+-]*(?:\s|$)', match[3] or ''):
+            scalar_indent = indent
+    if path is not None:
+        for document in documents:
+            if path in document:
+                return document
+        for document in documents:
+            if path[:-1] in document:
+                return document
+        return {}
+    return {key: entry for document in reversed(documents)
+            for key, entry in document.items()}
+
+
+def field_value(source, path):
+    entries = fields(source, path)
+    require_parents(entries, path)
+    entry = entries.get(path)
+    if entry is None:
+        raise IncidentError('Required YAML field missing.')
+    return scalar(entry[2])
+
+
+def require_parents(entries, path):
+    for depth in range(1, len(path)):
+        parent = entries.get(path[:depth])
+        if parent is None or (parent[2].strip() and not parent[2].lstrip().startswith('#')):
+            raise IncidentError('Required YAML mapping missing.')
+
+
+def edit_field(source, path, value, add=False):
+    entries = fields(source, path)
+    require_parents(entries, path)
+    lines = source.splitlines(keepends=True)
+    if path in entries:
+        index, indent, raw = entries[path]
+        scalar(raw)  # Refuse block scalars, aliases, and mappings.
+        lines[index] = ' ' * indent + path[-1] + ': ' + value + '\n'
+    elif add:
+        parent = entries.get(path[:-1])
+        if parent is None or (parent[2].strip() and not parent[2].lstrip().startswith('#')):
+            raise IncidentError('Required YAML mapping missing.')
+        index, indent, _ = parent
+        children = [entry[1] for key, entry in entries.items()
+                    if len(key) == len(path) and key[:-1] == path[:-1]]
+        child_indent = min(children) if children else indent + 2
+        if not lines[index].endswith('\n'):
+            lines[index] += '\n'
+        lines.insert(index + 1, ' ' * child_indent + path[-1] + ': ' + value + '\n')
+    else:
+        raise IncidentError('Required YAML field missing.')
+    return ''.join(lines)
+
+
+def quantity(value):
+    match = re.fullmatch(r'([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)([a-zA-Z]*)', str(value))
+    factors = {'': 1, 'n': Decimal('1e-9'), 'u': Decimal('1e-6'),
+               'm': Decimal('0.001'), 'k': 1000, 'K': 1000}
+    for index, suffix in enumerate(('M', 'G', 'T', 'P', 'E'), 2):
+        factors[suffix] = 1000 ** index
+    for index, suffix in enumerate(('Ki', 'Mi', 'Gi', 'Ti', 'Pi', 'Ei'), 1):
+        factors[suffix] = 1024 ** index
+    if not match or match[2] not in factors:
+        return Decimal(-1)
+    try:
+        return Decimal(match[1]) * factors[match[2]]
+    except InvalidOperation:
+        return Decimal(-1)
+
+
+def limits_at_least(deployment, resource, minimum):
+    containers = deployment.get('spec', {}).get('template', {}).get('spec', {}).get('containers', [])
+    return bool(containers) and all(
+        quantity(c.get('resources', {}).get('limits', {}).get(resource, '')) >= minimum
+        for c in containers)
+
+
+def matches_selector(labels, selector):
+    if not selector or not (selector.get('matchLabels') or selector.get('matchExpressions')):
+        return False
+    if any(labels.get(k) != v for k, v in selector.get('matchLabels', {}).items()):
+        return False
+    for expr in selector.get('matchExpressions', []):
+        key, op, values = expr['key'], expr['operator'], expr.get('values', [])
+        if op == 'In' and (key not in labels or labels[key] not in values):
+            return False
+        if op == 'NotIn' and labels.get(key) in values:
+            return False
+        if op == 'Exists' and key not in labels:
+            return False
+        if op == 'DoesNotExist' and key in labels:
+            return False
+        if op not in ('In', 'NotIn', 'Exists', 'DoesNotExist'):
+            return False
+    return True
+
+
+class Incident:
+    def __init__(self, home=None, log_dir=None):
+        self.home = Path(home) if home is not None else Path.home()
+        self.repo = self.home / 'fraud-infra'
+        self.directory = self.home / '.incident'
+        self.state_file = self.directory / 'state'
+        self.log_dir = LOG_DIR if log_dir is None else Path(log_dir)
+        self.state = {'active': None, 'used': [], 'done': []}
+
+    def load(self):
+        if not self.state_file.exists():
+            return
+        try:
+            state = json.loads(base64.b64decode(self.state_file.read_bytes(), validate=True))
+            if not isinstance(state, dict) or not all(k in state for k in ('active', 'used', 'done')):
+                raise ValueError()
+            for key in ('used', 'done'):
+                if not isinstance(state[key], list) or any(f not in FAULTS for f in state[key]):
+                    raise ValueError()
+            active = state['active']
+            if active is not None:
+                if (not isinstance(active, dict) or active.get('id') not in FAULTS
+                        or type(active.get('hints')) is not int or not 0 <= active['hints'] <= 3):
+                    raise ValueError()
+                if active['id'] == 'db-password' and not isinstance(active.get('original'), str):
+                    raise ValueError()
+            self.state = state
+        except (ValueError, TypeError, KeyError) as exc:
+            raise IncidentError('Cannot read incident state.') from exc
+
+    def save(self):
+        payload = base64.b64encode(json.dumps(self.state).encode())
+        fd, name = tempfile.mkstemp(dir=self.directory)
+        try:
+            with os.fdopen(fd, 'wb') as stream:
+                stream.write(payload)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(name, self.state_file)
+        finally:
+            if os.path.exists(name):
+                os.unlink(name)
+
+    def log(self, event, fault):
+        try:
+            user = getpass.getuser()
+            if '/' in user or '\n' in user:
+                return
+            timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
+            with (self.log_dir / (user + '.log')).open('a') as stream:
+                stream.write(f'{timestamp} {user} {event} {fault}\n')
+        except OSError:
+            pass
+
+    def eligible(self, fault):
+        spec = FAULTS[fault]
+        try:
+            if 'file' in spec:
+                source = (self.repo / 'platform' / spec['file']).read_text()
+                edit_field(source, spec['path'], spec.get('value', 'probe'), spec.get('add', False))
+            else:
+                get('fraud', 'deployment', spec['deployment'])
+            return True
+        except (OSError, IncidentError):
+            return False
+
+    def apply(self, fault):
+        spec = FAULTS[fault]
+        active = {'id': fault, 'hints': 0}
+        if 'file' in spec:
+            run(['git', 'pull', '--rebase'], cwd=self.repo)
+            relative = 'platform/' + spec['file']
+            path = self.repo / relative
+            source = path.read_text()
+            value = spec.get('value')
+            if fault == 'db-password':
+                active['original'] = field_value(source, spec['path'])
+                value = json.dumps(secrets.token_urlsafe(24))
+            updated = edit_field(source, spec['path'], value, spec.get('add', False))
+            path.write_text(updated)
+            run(['git', 'add', '--', relative], cwd=self.repo)
+            run(['git', 'commit', '-m', spec['commit'], '--', relative], cwd=self.repo)
+            run(['git', 'push'], cwd=self.repo)
+            if fault == 'db-password':
+                # Let credentials reconcile, then discard existing authenticated connections.
+                subprocess.Popen(
+                    ['nohup', 'sh', '-c', 'sleep 90 && exec kubectl --context fraud -n fraud delete pod -l app=cases --wait=false'],
+                    stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL, start_new_session=True,
+                )
+        else:
+            kube('fraud', *spec['apply'])
+        return active
+
+    def fixed(self, active):
+        fault = active['id']
+        spec = FAULTS[fault]
+        if 'file' in spec:
+            source = (self.repo / 'platform' / spec['file']).read_text()
+            value = field_value(source, spec['path'])
+            if fault == 'db-password':
+                return value == active['original']
+            return value == 'Always' and get('tenant', 'vmi', 'vm-instance-switch', missing_ok=True).get('status', {}).get('phase') == 'Running'
+        deployment = get('fraud', 'deployment', spec['deployment'], missing_ok=True)
+        if fault == 'redis-unreachable':
+            containers = deployment.get('spec', {}).get('template', {}).get('spec', {}).get('containers', [])
+            if not containers:
+                return False
+            overrides = [env for container in containers for env in container.get('env', [])
+                         if env.get('name') == 'REDIS_ADDR']
+            if not overrides:
+                return True
+            address = get('fraud', 'configmap', 'endpoints', missing_ok=True).get('data', {}).get('REDIS_ADDR')
+            return address is not None and all(env.get('value') == address for env in overrides)
+        if fault == 'scorer-throttled':
+            return limits_at_least(deployment, 'cpu', Decimal('0.5'))
+        if fault == 'cases-stopped':
+            return (deployment.get('spec', {}).get('replicas', 0) >= 1
+                    and deployment.get('status', {}).get('availableReplicas', 0) >= 1)
+        if not limits_at_least(deployment, 'memory', 1024 ** 3):
+            return False
+        selector = deployment.get('spec', {}).get('selector', {})
+        return any(
+            not pod.get('metadata', {}).get('deletionTimestamp')
+            and matches_selector(pod.get('metadata', {}).get('labels', {}), selector)
+            and any(c.get('type') == 'Ready' and c.get('status') == 'True'
+                    for c in pod.get('status', {}).get('conditions', []))
+            for pod in get('fraud', 'pods', missing_ok=True).get('items', []))
+
+    def execute(self, command):
+        active = self.state['active']
+        if command == 'status':
+            print(f"incident active, {active['hints']} hints used" if active else 'no active incident')
+        elif command == 'list-done':
+            for fault in self.state['done']:
+                print(fault)
+        elif command == 'start':
+            if active:
+                print('An incident is already active.')
+                return 1
+            candidates = [f for f in FAULTS if f not in self.state['used'] and self.eligible(f)]
+            if not candidates:
+                print('No unused incidents with available prerequisites.')
+                return 1
+            fault = random.choice(candidates)
+            self.state['active'] = self.apply(fault)
+            self.state['used'].append(fault)
+            self.save()
+            self.log('start', fault)
+            print(START_MESSAGE)
+        elif not active:
+            print('no active incident')
+            return 1
+        elif command == 'hint':
+            if active['hints'] >= 3:
+                print("All three hints have been shown. Run 'incident reveal' for details.")
+                return 0
+            hint = FAULTS[active['id']]['hints'][active['hints']]
+            active['hints'] += 1
+            self.save()
+            self.log('hint', active['id'])
+            print(hint)
+        elif command == 'reveal':
+            if active['hints'] < 3:
+                print('Use all three hints before revealing the incident.')
+                return 1
+            self.log('reveal', active['id'])
+            print(active['id'] + ': ' + FAULTS[active['id']]['description'])
+        elif command == 'check':
+            if not self.fixed(active):
+                print('Not fixed yet.')
+                return 1
+            if active['id'] not in self.state['done']:
+                self.state['done'].append(active['id'])
+            self.state['active'] = None
+            self.save()
+            self.log('fixed', active['id'])
+            print('Fixed. Well done.')
+        return 0
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description='Start and investigate a blind workshop incident.')
+    parser.add_argument('command', nargs='?', default='start',
+                        choices=('start', 'hint', 'reveal', 'status', 'check', 'list-done'),
+                        help='default: start; reveal requires three hints')
+    args = parser.parse_args(argv)
+    app = Incident()
+    try:
+        app.directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+        with (app.directory / 'lock').open('a') as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            app.load()
+            return app.execute(args.command)
+    except (IncidentError, OSError, ValueError, TypeError, KeyError) as exc:
+        if os.environ.get('INCIDENT_DEBUG') == '1':
+            traceback.print_exc()
+            cause = exc
+            while cause is not None:
+                stderr = getattr(cause, 'stderr', None)
+                if stderr:
+                    if isinstance(stderr, bytes):
+                        stderr = stderr.decode(errors='replace')
+                    print(stderr, file=sys.stderr, end='' if stderr.endswith('\n') else '\n')
+                cause = cause.__cause__
+        else:
+            print('Error: operation failed. Please try again.', file=sys.stderr)
+        return 1
+
+
+if __name__ == '__main__':
+    sys.exit(main())

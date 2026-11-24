@@ -1,0 +1,55 @@
+# The legacy card authorization switch: a VM with its disk on replicated storage.
+apiVersion: apps.cozystack.io/v1alpha1
+kind: VMDisk
+metadata: {name: switch-os}
+spec:
+  source: {image: {name: ubuntu-24.04}}
+  storage: 20Gi
+  storageClass: replicated
+---
+apiVersion: apps.cozystack.io/v1alpha1
+kind: VMInstance
+metadata: {name: switch}
+spec:
+  instanceType: u1.small
+  instanceProfile: ubuntu
+  runStrategy: Always
+  disks: [{name: switch-os}]
+  cloudInitSeed: "fraud-v1"
+  cloudInit: |
+    #cloud-config
+    hostname: switch
+    password: ubuntu
+    chpasswd: {expire: false}
+    ssh_pwauth: true
+    write_files:
+      - path: /etc/auth-switch/env
+        content: |
+          # Card authorization switch settings. Restart after a change:
+          #   sudo systemctl restart auth-switch
+          LISTEN=:8080
+          # Static rule used in legacy mode and in stand-in: decline above $5,000.
+          STATIC_LIMIT_CENTS=500000
+          # How long to wait for the fraud scorer before deciding alone (stand-in).
+          DECISION_TIMEOUT_MS=400
+          # Empty = legacy mode, no fraud scoring at all.
+          KAFKA_BOOTSTRAP=
+      - path: /etc/systemd/system/auth-switch.service
+        content: |
+          [Unit]
+          Description=Card authorization switch
+          After=network-online.target
+          Wants=network-online.target
+          [Service]
+          EnvironmentFile=/etc/auth-switch/env
+          ExecStart=/usr/local/bin/auth-switch
+          Restart=always
+          RestartSec=1
+          DynamicUser=yes
+          [Install]
+          WantedBy=multi-user.target
+    runcmd:
+      - [sh, -c, "for i in 1 2 3 4 5 6 7 8 9 10; do curl -fsSL -o /usr/local/bin/auth-switch https://github.com/aenix-org/cozystack-workshop/releases/download/fraud-latest/auth-switch-linux-amd64 && break; sleep 5; done"]
+      - [chmod, "0755", /usr/local/bin/auth-switch]
+      - [systemctl, daemon-reload]
+      - [systemctl, enable, --now, auth-switch]
