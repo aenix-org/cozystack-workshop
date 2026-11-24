@@ -1,6 +1,6 @@
 # Workshop: real-time card fraud detection on your own cloud
 
-In about three hours you build a working real-time fraud detection system for card payments, then run it the way a bank runs production: through unknown incidents, a traffic spike, the loss of a database node, and a server move in the middle of the payment flow.
+In about two hours you build a working real-time fraud detection system for card payments, then run it the way a bank runs production: through a traffic spike, the loss of a database node, and a server move in the middle of the payment flow.
 
 Everything runs on [Cozystack](https://cozystack.io), an open-source CNCF platform that turns ordinary servers into a private cloud. You work through a shared VM, the bastion, so all you need is a laptop with a terminal and a browser.
 
@@ -44,29 +44,25 @@ The source code of every piece is in [`app/`](app/). The scoring rules and their
 | 0 | Look around | 15 |
 | 1 | Order the data services: GUI, YAML from the docs, and Git | 30 |
 | 2 | Fraud scoring | 25 |
-| 3 | Observability | 35 |
-| 4 | Something is broken: blind incidents | 25 |
-| 5 | Grow the system with the catalog | 30 |
-| 6 | Production day | 30 |
+| 3 | Grow the system with the catalog | 30 |
+| 4 | Production day | 30 |
 
-The route totals 190 minutes, about three hours.
+The route totals 130 minutes, a little over two hours.
 
 ## What the host gave you
 
-You have one username (`austinNN`) and one password, the same for the bastion and GitLab. Your credentials file, `~/credentials.txt` on the bastion, also contains the monitoring credentials, including Grafana user `admin` and its password.
+You have one username (`austinNN`) and one password, the same for the bastion and GitLab. Your credentials file is `~/credentials.txt` on the bastion.
 
 | Where | Address |
 |---|---|
 | Bastion | `ssh austinNN@<bastion-address>` |
 | Cozystack dashboard | https://dashboard.workshop.aenix.io |
 | GitLab | https://gitlab.workshop.aenix.io |
-| Grafana | `https://grafana.austinNN.workshop.aenix.io` |
-| Alerta | `https://alerta.austinNN.workshop.aenix.io` |
 | Fraud dashboard, after Part 2 | `https://fraud.austinNN.workshop.aenix.io` |
 
 Everywhere below, `austinNN` stands for your own username. On the bastion, everything is already filled in with your number.
 
-The host has prepared your tenant `tenant-austinNN` with the legacy switch VM, your Kubernetes cluster `fraud`, and tenant monitoring with Grafana and Alerta. In namespace `fraud` of your cluster, card terminals send 20 payments a second to the switch. Your materials are in `~/workshop`: this README, `manifests/`, and `app/`.
+The host has prepared your tenant `tenant-austinNN` with the legacy switch VM and your Kubernetes cluster `fraud`. In namespace `fraud` of your cluster, card terminals send 20 payments a second to the switch. Your materials are in `~/workshop`: this README, `manifests/`, and `app/`.
 
 Your GitLab repository `austinNN/fraud-infra` is already cloned at `~/fraud-infra`. It contains `platform/kubernetes.yaml` for your cluster and `platform/switch-vm.yaml` for the switch. Flux runs in the platform on your tenant's behalf: it applies `platform/` from `main` within about a minute of a push, using your tenant rights. Every Cozystack application you order ends up in this repository. In the GUI exercises you create the application in the dashboard first, then add its declaration to Git.
 
@@ -211,7 +207,7 @@ spec:
 
 </details>
 
-`auth.requests` carries the switch's questions, `auth.decisions` the scorer's answers, and `auth.journal` every answer the switch gave, whoever made the decision. Eight partitions let eight scorers share the work; Part 6 will show why that number matters.
+`auth.requests` carries the switch's questions, `auth.decisions` the scorer's answers, and `auth.journal` every answer the switch gave, whoever made the decision. Eight partitions let eight scorers share the work; Part 4 will show why that number matters.
 
 ### 1.3 PostgreSQL: a primary and a hot standby
 
@@ -284,7 +280,7 @@ Reconciliation compares what exists with what Git declares and puts the missing 
 
 📍 On the bastion.
 
-Deploy the fraud detection services into your own cluster. The scorer in `manifests/02-scoring.yaml` is deliberately small, with a CPU limit of `500m`, so that in Part 6 you can watch it run out of capacity:
+Deploy the fraud detection services into your own cluster. The scorer in `manifests/02-scoring.yaml` is deliberately small, with a CPU limit of `500m`, so that in Part 4 you can watch it run out of capacity:
 
 ```bash
 cd ~/workshop
@@ -366,175 +362,11 @@ kubectl --context fraud -n fraud logs job/attack -f
 
 Read the rules that caught the attack: [`app/internal/scoring/rules.go`](app/internal/scoring/rules.go). A card-testing run is stopped by about the sixth probe, a BIN attack by about the eighth card.
 
-## Part 3. Observability (35 min)
-
-📍 In Grafana and on the bastion.
-
-### 3.1 Find the managed-service dashboards
-
-Log in to `https://grafana.austinNN.workshop.aenix.io` with user `admin` and the password from `~/credentials.txt` on the bastion. Find folder `kafka` → **Strimzi Kafka**, then folder `db` → **CloudNativePG** and **Redis**. Find which pod is the PostgreSQL primary and how much memory Kafka uses.
-
-### 3.2 Send your cluster's logs and metrics to tenant monitoring
-
-Follow [Monitoring Logs](https://cozystack.io/docs/v1.6/operations/services/monitoring/logs/), under “Enable the monitoringAgents addon on the tenant Kubernetes cluster.” Edit `~/fraud-infra/platform/kubernetes.yaml` and set `addons.monitoringAgents.enabled: true`, keeping the rest of your cluster declaration. After pushing, give the agents two or three minutes to start, then check Grafana Explore: in data source `vlogs-generic`, query `kubernetes_container_name:scorer`; in `vm-shortterm`, query `kube_pod_info{namespace="fraud"}`.
-
-<details><summary>Solution</summary>
-
-Merge this setting into the existing `spec` in `platform/kubernetes.yaml`, keeping its other fields and addons:
-
-```yaml
-spec:
-  addons:
-    monitoringAgents:
-      enabled: true
-```
-
-</details>
-
-Commit with the message `Send my cluster metrics and logs to the tenant monitoring` and push.
-
-**You should see:** scorer log lines such as `5s: scored 100, declined 0` in `vlogs-generic`, and the `fraud` namespace's pod metrics in `vm-shortterm`.
-
-### 3.3 Teach monitoring your application's metrics
-
-The dashboard serves a metrics endpoint:
-
-```bash
-curl -s https://fraud.austinNN.workshop.aenix.io/metrics | head
-```
-
-**You should see:** application metrics from the fraud dashboard.
-
-Use the [VMPodScrape documentation](https://docs.victoriametrics.com/operator/resources/vmpodscrape/) to write a `VMPodScrape` named `fraud-dashboard` in namespace `fraud` of your own cluster. Select `app: dashboard`, use endpoint port `http` (the dashboard's named port), path `/metrics`, and interval `15s`. This object lives in your own cluster, not in the tenant, so Flux does not apply it: save it in `~/workshop`, for example as `podscrape.yaml`, and apply it with `kubectl --context fraud apply -f podscrape.yaml`. Check Grafana Explore, data source `vm-shortterm`, with the query `fraud_stand_in_ratio`.
-
-<details><summary>Solution</summary>
-
-```yaml
-apiVersion: operator.victoriametrics.com/v1beta1
-kind: VMPodScrape
-metadata:
-  name: fraud-dashboard
-  namespace: fraud
-spec:
-  selector:
-    matchLabels:
-      app: dashboard
-  podMetricsEndpoints:
-    - port: http
-      path: /metrics
-      interval: 15s
-```
-
-</details>
-
-**You should see:** the `fraud_stand_in_ratio` series in Explore. Open the ready **Fraud detection** dashboard that the host imported.
-
-### 3.4 Alert as code
-
-Use the [alerting documentation](https://cozystack.io/docs/v1.6/operations/services/monitoring/alerting/) to write `~/fraud-infra/platform/alerts.yaml`: a `VMRule` named `fraud-alerts` with two alerts. `FraudDecidedBlind` uses `fraud_stand_in_ratio > 0.2`, duration `1m`, severity `critical`. `FraudScorerFallingBehind` uses `fraud_scorer_lag_messages > 1000`, duration `30s`, severity `warning`. The documentation shows a `PrometheusRule`; write the same kind of rules as a `VMRule`.
-
-<details><summary>Solution</summary>
-
-```yaml
-apiVersion: operator.victoriametrics.com/v1beta1
-kind: VMRule
-metadata:
-  name: fraud-alerts
-spec:
-  groups:
-    - name: fraud-alerts
-      rules:
-        - alert: FraudDecidedBlind
-          expr: fraud_stand_in_ratio > 0.2
-          for: 1m
-          labels:
-            severity: critical
-        - alert: FraudScorerFallingBehind
-          expr: fraud_scorer_lag_messages > 1000
-          for: 30s
-          labels:
-            severity: warning
-```
-
-</details>
-
-Commit `platform/alerts.yaml` and push, then check:
-
-```bash
-kubectl --context tenant get vmrule fraud-alerts
-```
-
-**You should see:** the `fraud-alerts` rule in your tenant. In Part 6 these alerts will fire in Alerta at `https://alerta.austinNN.workshop.aenix.io`.
-
-## Part 4. Something is broken (25 min)
-
-📍 On the bastion, with the fraud dashboard and Grafana open.
-
-### 4.1 Use a six-step search
-
-1. What does the business see? Look at stand-in share, latency, **Scoring queue**, **Case management queue**, **Journal reconciliation** `missing`, **Terminal errors**, and explanations on the fraud dashboard.
-2. Which component does that point to? Use the symptom table below.
-3. Check that component's saturation and errors in Grafana: CPU, throttling, memory, and restarts, plus the Redis or PostgreSQL dashboard where relevant.
-4. Read its logs in Grafana Explore → `vlogs-generic`, or use `kubectl --context fraud -n fraud logs deploy/<name>`.
-5. Find what changed recently: the history of your repository (in GitLab or with `git log`) and the cluster events, using the commands below.
-6. Fix it by reverting the change or putting the setting back, then return to step 1 to confirm the business has recovered. Put infrastructure corrections through Git.
-
-| Symptom | Component to investigate |
-|---|---|
-| Stand-in up and Scoring queue up | scorer or Redis |
-| Case management queue or Journal reconciliation `missing` up | cases or PostgreSQL |
-| Terminal errors | switch VM |
-| Blocks without explanations | explainer |
-
-To inspect recent changes:
-
-```bash
-cd ~/fraud-infra && git pull && git log -p -3
-kubectl --context fraud -n fraud get events --sort-by=.lastTimestamp
-```
-
-**You should see:** the last three commits with their changes, followed by cluster events ordered by their last timestamp. Compare them with when the symptom began.
-
-### 4.2 Diagnose an unknown incident
-
-Start a problem in your environment:
-
-```bash
-incident
-```
-
-**You should see:** an incident start in your environment. Use the six-step search to discover what is wrong.
-
-If you get stuck:
-
-```bash
-incident hint
-```
-
-**You should see:** a hint for the active incident. There are three hints; ask for another when you need it.
-
-Check your progress:
-
-```bash
-incident status
-incident check
-```
-
-**You should see:** the incident's status and whether you have fixed it. Confirm recovery on the fraud dashboard too.
-
-After using all three hints, you can reveal the incident:
-
-```bash
-incident reveal
-```
-
-**You should see:** the explanation of the active incident. Finish it, then start another. Do two or three incidents.
-
-## Part 5. Grow the system with the catalog (30 min)
+## Part 3. Grow the system with the catalog (30 min)
 
 📍 On the bastion, in your infrastructure repository, and in the Cozystack dashboard.
 
-### 5.1 ClickHouse for the fraud analysts
+### 3.1 ClickHouse for the fraud analysts
 
 Use the [ClickHouse documentation](https://cozystack.io/docs/v1.6/applications/clickhouse/) to write `~/fraud-infra/platform/clickhouse.yaml`, named `analytics`: a single ClickHouse node (one replica, one shard) on replicated storage, 5Gi, preset `t1.medium`, and a user `fraud` with password `Fraud2026`. A single node does not need ClickHouse Keeper: find how to switch it off. Do not take `t1.small`: ClickHouse runs out of memory reading the payment journal.
 
@@ -562,7 +394,7 @@ spec:
 
 Commit the file, push, and wait for `analytics` to be ready in the dashboard.
 
-### 5.2 Read the journal straight from Kafka
+### 3.2 Read the journal straight from Kafka
 
 Open the ClickHouse client:
 
@@ -585,9 +417,9 @@ ORDER BY count(*) DESC
 LIMIT 10;
 ```
 
-**You should see:** up to ten merchants with their decline counts, ordered from most to least. The other queries show declines grouped by minute and reason, and stand-in counts and shares per minute; the values depend on the traffic and incidents you ran.
+**You should see:** up to ten merchants with their decline counts, ordered from most to least. The other queries show declines grouped by minute and reason, and stand-in counts and shares per minute; the values depend on the traffic and attacks you ran.
 
-### 5.3 A bucket for reports
+### 3.3 A bucket for reports
 
 In the Cozystack dashboard, open catalog → Bucket, name it `reports`, and add a user `analytics`. Put the same declaration in `~/fraud-infra/platform/bucket.yaml`. Hint: `spec.users.analytics: {}`.
 
@@ -620,11 +452,11 @@ LIMIT 10;
 
 **You should see:** `daily-report.csv` in the bucket UI at `https://bucket-reports.austinNN.workshop.aenix.io`. Open the UI and find the file.
 
-## Part 6. Production day (30 min)
+## Part 4. Production day (30 min)
 
-📍 On the bastion, with the fraud dashboard, Grafana, and Alerta open.
+📍 On the bastion, with the fraud dashboard open.
 
-### 6.1 Black Friday with an autoscaler
+### 4.1 Black Friday with an autoscaler
 
 Write a `HorizontalPodAutoscaler` named `scorer` in namespace `fraud`, targeting the `scorer` Deployment. Use a minimum of 1 replica, a maximum of 8, and the CPU metric with target type `AverageValue` and value `250m`. Eight is the maximum useful number because `auth.requests` has eight partitions.
 
@@ -660,7 +492,7 @@ Like the `VMPodScrape`, the HPA belongs to your own cluster: save it in `~/works
 kubectl --context fraud -n fraud patch configmap traffic -p '{"data":{"rate":"200"}}'
 ```
 
-**You should see:** within one or two minutes, stand-in rising to 100%, the Scoring queue growing, and `FraudDecidedBlind` and `FraudScorerFallingBehind` firing in Alerta. Stand-in means the switch decided alone with its static rule: in a real bank that is the moment fraud gets through, because nobody checked.
+**You should see:** within one or two minutes, stand-in rising to 100%, and the Scoring queue growing. Stand-in means the switch decided alone with its static rule: in a real bank that is the moment fraud gets through, because nobody checked.
 
 Watch the autoscaler:
 
@@ -693,9 +525,9 @@ kubectl --context fraud -n fraud patch configmap traffic -p '{"data":{"rate":"20
 
 **You should see:** traffic returning to about 20 payments a second, with the HPA scaling down by itself after about five minutes.
 
-### 6.2 The primary database node goes down
+### 4.2 The primary database node goes down
 
-Find the primary of your PostgreSQL cluster, and open the Grafana **CloudNativePG** dashboard:
+Find the primary of your PostgreSQL cluster:
 
 ```bash
 kubectl --context tenant get pods -l cnpg.io/cluster=postgres-cases -L role
@@ -710,7 +542,7 @@ kubectl --context tenant delete pod <the primary pod> --grace-period=5
 kubectl --context tenant get pods -l cnpg.io/cluster=postgres-cases -L role -w
 ```
 
-**You should see:** within seconds, the other pod becomes `primary`; the deleted one comes back as the new replica. Follow the change in Grafana too. Stop watching with `Ctrl-C`.
+**You should see:** within seconds, the other pod becomes `primary`; the deleted one comes back as the new replica. Stop watching with `Ctrl-C`.
 
 Meanwhile, on the fraud dashboard, the database panel shows `database unavailable` for a few seconds, and the Case management queue grows. Payments are not affected: the switch never talks to the database. Its journal waits in Kafka. Read the `cases` log:
 
@@ -720,7 +552,7 @@ kubectl --context fraud -n fraud logs deploy/cases --tail=20
 
 **You should see:** `database unavailable, holding … messages, retrying`, then the backlog written. The dashboard's reconciliation line compares what the switch journaled with what the database stored; once the backlog is written — within a minute or two — it shows `missing: 0`. Not one case was lost.
 
-### 6.3 The switch moves to another server mid-flow
+### 4.3 The switch moves to another server mid-flow
 
 The server under your switch needs maintenance. In a bank that usually means a change window at 3 a.m. Here the VM moves to another server while it keeps answering terminals:
 
@@ -767,5 +599,3 @@ Found something wrong in the Cozystack documentation today? Open an issue or a P
 | Git push rejected | Run `git pull --rebase`, then push again. |
 | Flux is not applying your change, or your YAML has an error | `kubectl --context tenant get kustomization platform` shows the error; fix the file, commit, and push. |
 | ClickHouse reports `Memory limit exceeded` | Use preset `t1.medium`. |
-| Grafana login fails | Use user `admin` and the Grafana password from `~/credentials.txt` on the bastion; it is not your bastion password. |
-| `incident` says an incident is already active | Finish it, or use `incident hint`. |
