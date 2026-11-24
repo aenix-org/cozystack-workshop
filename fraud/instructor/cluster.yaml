@@ -8,6 +8,9 @@ metadata:
   namespace: tenant-dallasXX
 spec:
   storageClass: replicated
+  # One API server is plenty for a one-node workshop cluster and saves memory on the platform.
+  controlPlane:
+    replicas: 1
   nodeGroups:
     md0:
       minReplicas: 1
