@@ -1,0 +1,17 @@
+# Applied by the host into each participant cluster (context fraud).
+# Works around Cozystack 1.6.1: the monitoring-agents addon writes metrics to
+# vminsert-*.cozy-monitoring.svc inside the participant cluster, where nothing
+# listens. These names point at the tenant's VictoriaMetrics instead.
+apiVersion: v1
+kind: Service
+metadata: {name: vminsert-shortterm, namespace: cozy-monitoring}
+spec:
+  type: ExternalName
+  externalName: vminsert-shortterm.tenant-dallasXX.svc.cozy.local
+---
+apiVersion: v1
+kind: Service
+metadata: {name: vminsert-longterm, namespace: cozy-monitoring}
+spec:
+  type: ExternalName
+  externalName: vminsert-shortterm.tenant-dallasXX.svc.cozy.local
