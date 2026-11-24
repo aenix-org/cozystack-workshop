@@ -66,9 +66,9 @@
 
 Во всём тексте ниже `austinNN` — это ваш собственный логин. На бастионе всё уже заполнено вашим номером.
 
-Ведущий подготовил ваш тенант `tenant-austinNN`: ВМ с легендарным свитчем, ваш собственный кластер Kubernetes `fraud` и мониторинг тенанта с Grafana и Alerta. В неймспейсе `fraud` вашего кластера карточные терминалы отправляют свитчу 20 платежей в секунду. Ваши материалы лежат в `~/workshop`: этот README, `manifests/` и `app/`.
+Ведущий подготовил ваш тенант `tenant-austinNN`: ВМ со старым свитчем, ваш собственный кластер Kubernetes `fraud` и мониторинг тенанта с Grafana и Alerta. В неймспейсе `fraud` вашего кластера карточные терминалы отправляют свитчу 20 платежей в секунду. Ваши материалы лежат в `~/workshop`: этот README, `manifests/` и `app/`.
 
-Ваш репозиторий GitLab `austinNN/fraud-infra` уже склонирован в `~/fraud-infra`. В нём — `platform/kubernetes.yaml` с декларацией вашего кластера и `platform/switch-vm.yaml` со свитчем. Flux работает на платформе от имени вашего тенанта: он применяет `platform/` из ветки `main` в течение минуты после пуша, с правами вашего тенанта. Ваш репозиторий — способ декларировать приложения Cozystack; в упражнениях с GUI вы сначала создаёте приложение в дашборде, а затем переносите его декларацию под Git.
+Ваш репозиторий GitLab `austinNN/fraud-infra` уже склонирован в `~/fraud-infra`. В нём — `platform/kubernetes.yaml` с декларацией вашего кластера и `platform/switch-vm.yaml` со свитчем. Flux работает на платформе от имени вашего тенанта: он применяет `platform/` из ветки `main` в течение минуты после пуша, с правами вашего тенанта. Каждое приложение Cozystack, которое вы закажете, в итоге окажется в этом репозитории. В упражнениях с GUI вы сначала создаёте приложение в дашборде, а затем добавляете его декларацию в Git.
 
 ## Часть 0. Осматриваемся (15 мин)
 
@@ -99,7 +99,7 @@ kubectl --context fraud get nodes
 kubectl --context fraud -n fraud get pods
 ```
 
-**Вы должны увидеть:** свитч-ВМ и кластер `fraud` в состоянии Ready, квоту вашего тенанта, каталог приложений, одну ноду кластера и работающий под `terminals`. Завершённый под `prepull-explainer` — подготовка ведущего к языковой модели.
+**Вы должны увидеть:** свитч-ВМ и кластер `fraud` в состоянии Ready, квоту вашего тенанта, каталог приложений, одну ноду кластера и работающий под `terminals`. Под `prepull-explainer` в статусе `Completed` — так и должно быть: ведущий заранее скачал им языковую модель.
 
 Квота — это бюджет вашего тенанта: `hard` — лимит, `used` — сколько вы уже потратили. Список определений приложений показывает, что можно заказать. Откройте дашборд Cozystack, выберите свой тенант и найдите там же ВМ, кластер, бюджет и каталог.
 
@@ -161,7 +161,7 @@ kubectl --context tenant get redis features -o yaml
 
 **Вы должны увидеть:** Redis `features` с настройками, которые вы выбрали в дашборде.
 
-Напишите `~/fraud-infra/platform/redis.yaml` с той же декларацией. Подсказки: kind `Redis`, `metadata.name: features` и поля спецификации `replicas: 1`, `size: 1Gi`, `storageClass: replicated`, `authEnabled: false`. В качестве образца используйте объект, который вы только что посмотрели; оставьте декларацию без сгенерированного статуса. Перед коммитом сверьте эти значения.
+Напишите `~/fraud-infra/platform/redis.yaml` с той же декларацией. Подсказки: kind `Redis`, `metadata.name: features` и поля спецификации `replicas: 1`, `size: 1Gi`, `storageClass: replicated`, `authEnabled: false`. Из объекта, который вы только что посмотрели, возьмите только `apiVersion`, `kind`, `metadata.name` и эти поля `spec`; `status` и сгенерированные метаданные не переносите.
 
 <details><summary>Решение</summary>
 
@@ -183,7 +183,7 @@ spec:
 
 ### 1.2 Kafka: пишем манифест по документации
 
-Воспользуйтесь [документацией Kafka](https://cozystack.io/docs/v1.6/applications/kafka/), чтобы написать `~/fraud-infra/platform/kafka.yaml` с именем `kafka`: один брокер и один ZooKeeper, оба на реплицированном хранилище (5Gi и 2Gi), пресет `c1.small` и три топика — `auth.requests`, `auth.decisions`, `auth.journal` — по 8 партиций и 1 реплике каждый. Сверьте настройки брокера, ZooKeeper и всех трёх топиков с заданием; готовность проверите в 1.4.
+Воспользуйтесь [документацией Kafka](https://cozystack.io/docs/v1.6/applications/kafka/), чтобы написать `~/fraud-infra/platform/kafka.yaml` с именем `kafka`: один брокер и один ZooKeeper, оба на реплицированном хранилище (5Gi и 2Gi), пресет `c1.small` и три топика — `auth.requests`, `auth.decisions`, `auth.journal` — по 8 партиций и 1 реплике каждый.
 
 <details><summary>Решение</summary>
 
@@ -215,7 +215,7 @@ spec:
 
 ### 1.3 PostgreSQL: primary и горячая реплика
 
-Воспользуйтесь [документацией PostgreSQL](https://cozystack.io/docs/v1.6/applications/postgres/), чтобы написать `~/fraud-infra/platform/postgres.yaml` с именем `cases`: primary и горячая реплика, по 2Gi на реплицированном хранилище, пресет `t1.micro`, пользователь `fraud` с паролем `Fraud2026` и база `fraud` в его владении. Подсказка: две реплики включают primary. Сверьте декларацию пользователя и базы; готовность проверите в 1.4.
+Воспользуйтесь [документацией PostgreSQL](https://cozystack.io/docs/v1.6/applications/postgres/), чтобы написать `~/fraud-infra/platform/postgres.yaml` с именем `cases`: primary и горячая реплика, по 2Gi на реплицированном хранилище, пресет `t1.micro`, пользователь `fraud` с паролем `Fraud2026` и база `fraud` в его владении. Подсказка: `replicas: 2` — это primary и одна реплика.
 
 <details><summary>Решение</summary>
 
@@ -248,7 +248,7 @@ spec:
 watch -n 5 kubectl --context tenant get kafka,redis,postgres
 ```
 
-**Вы должны увидеть:** `features` (Redis) и `cases` (PostgreSQL) перейдут в `READY True` за минуту-две, `kafka` — за десять-двадцать минут; пока Kafka стартует, продолжайте с 1.5 и 1.6. Когда вся комната заказывает одновременно, платформа ставит сервисы по очереди. Остановите наблюдение по `Ctrl-C`. К части 2 можно переходить, как только готовы Redis и PostgreSQL; остальные сервисы подождут Kafka сами.
+**Вы должны увидеть:** `features` (Redis) и `cases` (PostgreSQL) перейдут в `READY True` за минуту-две, `kafka` — за десять-двадцать минут; пока Kafka стартует, продолжайте с 1.5 и 1.6. Когда вся комната заказывает одновременно, платформа ставит сервисы по очереди. Остановите наблюдение по `Ctrl-C`. К части 2 можно переходить, как только готовы Redis и PostgreSQL: сервисы антифрода, которые вы там развернёте, подождут Kafka сами.
 
 ### 1.5 Под капотом (5 минут из этой части)
 
@@ -263,7 +263,7 @@ kubectl --context tenant get svc | grep postgres-cases
 
 **Вы должны увидеть:** Helm-релизы, кластер CloudNativePG за `cases`, его поды primary и реплики, а также сервисы PostgreSQL с суффиксами `rw`, `ro` и `r`.
 
-Эти сервисы поддерживают операторы: Strimzi управляет Kafka, CloudNativePG — PostgreSQL, оператор Redis — Redis. Cozystack превращает ваши декларации приложений в Helm-релизы и ресурсы операторов, а операторы содержат поды и сервисы под ними.
+Эти сервисы поддерживают операторы: Strimzi управляет Kafka, CloudNativePG — PostgreSQL, оператор Redis — Redis. Cozystack превращает ваши декларации приложений в Helm-релизы и ресурсы операторов, а операторы обслуживают поды и сервисы под ними.
 
 ### 1.6 Дрейф: смотрим, как платформа возвращает удалённый объект
 
@@ -284,7 +284,7 @@ kubectl --context tenant get redis -w
 
 📍 На бастионе.
 
-Разверните сервисы антифрода в своём кластере. Подготовленный `manifests/02-scoring.yaml` запускает scorer с `WORK_MS=4`, CPU request `50m` и CPU limit `500m`; в дашборде объявлен именованный порт `http` на `8080`:
+Разверните сервисы антифрода в своём кластере. Scorer в `manifests/02-scoring.yaml` нарочно маленький, с лимитом CPU `500m`, чтобы в части 6 вы увидели, как ему перестаёт хватать мощности:
 
 ```bash
 cd ~/workshop
@@ -296,7 +296,15 @@ kubectl --context fraud -n fraud get pods -w
 
 Сервисы находят Kafka, Redis и PostgreSQL по их платформенным именам, например `kafka-kafka-kafka-bootstrap.tenant-austinNN.svc.cozy.local`. Ваш кластер — тенант платформы, и сервисы платформы находятся в той же сети.
 
-Scorer работает, но пока никто его ни о чём не спрашивает: свитч по-прежнему решает сам. Вернитесь к свитчу:
+Scorer работает, но пока никто его ни о чём не спрашивает: свитч по-прежнему решает сам. Прежде чем подключать свитч, проверьте, что Kafka готова:
+
+```bash
+kubectl --context tenant get kafka
+```
+
+**Вы должны увидеть:** `kafka` с `READY True`. Если она ещё стартует, подождите и повторите команду: Kafka поднимается десять-двадцать минут после пуша в 1.4.
+
+Вернитесь к свитчу:
 
 ```bash
 virtctl console vm-instance-switch
@@ -304,7 +312,7 @@ virtctl console vm-instance-switch
 
 **Вы должны увидеть:** консоль ВМ свитча. Войдите с `ubuntu` / `ubuntu`.
 
-Внутри ВМ направьте свитч на Kafka и перезапустите его. Сначала убедитесь, что Kafka готова: с бастиона выполните `kubectl --context tenant get kafka` — должно быть `READY True`; если она ещё стартует, подождите здесь и проверьте снова (десять-двадцать пять минут после части 1):
+Внутри ВМ направьте свитч на Kafka и перезапустите его:
 
 ```bash
 sudo sed -i 's#^KAFKA_BOOTSTRAP=.*#KAFKA_BOOTSTRAP=kafka-kafka-kafka-bootstrap:9092#' /etc/auth-switch/env
@@ -317,7 +325,7 @@ journalctl -u auth-switch -f
 
 Короткого имени `kafka-kafka-kafka-bootstrap` достаточно: домен вашего тенанта уже прописан в поисковых доменах DNS ВМ.
 
-Теперь каждый платёж совершает рейс через Kafka к scorer'у в вашем кластере и обратно, а терминал по-прежнему получает ответ примерно за десять миллисекунд. Если scorer не отвечает в течение 400 мс, свитч возвращается к своему старому статическому правилу, поэтому медленный scorer никогда не остановит платёж. В банках это называется **обработкой в режиме стенд-ин** (stand-in processing).
+Теперь каждый платёж проходит путь через Kafka к scorer'у в вашем кластере и обратно, а терминал по-прежнему получает ответ примерно за десять миллисекунд. Если scorer не отвечает в течение 400 мс, свитч возвращается к своему старому статическому правилу, поэтому медленный scorer никогда не остановит платёж. В банках это называется **обработкой в режиме стенд-ин** (stand-in processing).
 
 Выйдите из консоли (`Ctrl-]`) и откройте свой дашборд: `https://fraud.austinNN.workshop.aenix.io`
 
@@ -327,7 +335,7 @@ journalctl -u auth-switch -f
 
 📍 На бастионе.
 
-Отказ нуждается в причине, которую сотрудник поддержки может зачитать клиенту. Её пишет небольшая языковая модель. Она работает внутри вашего кластера на CPU: Qwen2.5 0.5B Instruct, обслуживается llama.cpp. Веса модели попадают в ваш кластер; данные карт из него не выходят, и никакой внешний ИИ-сервис не участвует.
+Для каждого отказа нужна причина, которую сотрудник поддержки может зачитать клиенту. Её пишет небольшая языковая модель. Она работает внутри вашего кластера на CPU: Qwen2.5 0.5B Instruct, обслуживается llama.cpp. Веса модели попадают в ваш кластер; данные карт из него не выходят, и никакой внешний ИИ-сервис не участвует.
 
 ```bash
 cat manifests/03-explainer.yaml
@@ -356,7 +364,7 @@ kubectl --context fraud -n fraud logs job/attack -f
 
 **Вы должны увидеть:** в логе атаки большинство платежей `declined`. Первые несколько проб каждой украденной карты одобрены: один крошечный платёж выглядит как любой другой, и картина проясняется только после нескольких попыток. На дашборде растут отказы и появляются заблокированные транзакции с кодами причин. В течение минуты-двух каждая из них получает простое объяснение от модели. Это очень маленькая модель на одном CPU: объяснения приходят по одному, и время от времени одно из них звучит коряво.
 
-Прочитайте правила, которые остановили атаку: [`app/internal/scoring/rules.go`](app/internal/scoring/rules.go). Пробег кард-тестинга останавливается примерно на шестом пробе, BIN-атака — примерно на восьмой карте.
+Прочитайте правила, которые остановили атаку: [`app/internal/scoring/rules.go`](app/internal/scoring/rules.go). Кард-тестинг останавливается примерно на шестой пробе, BIN-атака — примерно на восьмой карте.
 
 ## Часть 3. Наблюдаемость (35 мин)
 
@@ -368,11 +376,11 @@ kubectl --context fraud -n fraud logs job/attack -f
 
 ### 3.2 Отправляем логи и метрики своего кластера в мониторинг тенанта
 
-Следуйте [документации «Monitoring Logs»](https://cozystack.io/docs/v1.6/operations/services/monitoring/logs/), раздел «Enable the monitoringAgents addon on the tenant Kubernetes cluster». Отредактируйте `~/fraud-infra/platform/kubernetes.yaml`, включив `addons.monitoringAgents.enabled: true`. Сохраните остальную часть декларации вашего кластера. После пуша проверьте Grafana Explore: в источнике данных `vlogs-generic` выполните запрос `kubernetes_container_name:scorer`, в `vm-shortterm` — `kube_pod_info{namespace="fraud"}`.
+Следуйте [документации «Monitoring Logs»](https://cozystack.io/docs/v1.6/operations/services/monitoring/logs/), раздел «Enable the monitoringAgents addon on the tenant Kubernetes cluster». Отредактируйте `~/fraud-infra/platform/kubernetes.yaml`: задайте `addons.monitoringAgents.enabled: true`, остальную декларацию кластера не трогайте. После пуша дайте агентам две-три минуты на запуск и проверьте Grafana Explore: в источнике данных `vlogs-generic` выполните запрос `kubernetes_container_name:scorer`, в `vm-shortterm` — `kube_pod_info{namespace="fraud"}`.
 
 <details><summary>Решение</summary>
 
-Влейте эту настройку в существующий `spec` файла `platform/kubernetes.yaml`, сохранив его остальные поля и аддоны:
+Добавьте эту настройку в существующий `spec` файла `platform/kubernetes.yaml`, сохранив его остальные поля и аддоны:
 
 ```yaml
 spec:
@@ -397,7 +405,7 @@ curl -s https://fraud.austinNN.workshop.aenix.io/metrics | head
 
 **Вы должны увидеть:** метрики приложения из антифрод-дашборда.
 
-Воспользуйтесь [документацией VMPodScrape](https://docs.victoriametrics.com/operator/resources/vmpodscrape/), чтобы написать `VMPodScrape` с именем `fraud-dashboard` в неймспейсе `fraud` вашего кластера. Выберите `app: dashboard`, используйте порт endpoint'а `http`, путь `/metrics` и интервал `15s`. Примените свой файл командой `kubectl --context fraud apply -f <ваш-файл.yaml>`. Проверьте в Grafana Explore, источник данных `vm-shortterm`, запрос `fraud_stand_in_ratio`.
+Воспользуйтесь [документацией VMPodScrape](https://docs.victoriametrics.com/operator/resources/vmpodscrape/), чтобы написать `VMPodScrape` с именем `fraud-dashboard` в неймспейсе `fraud` вашего кластера. Выберите `app: dashboard`, используйте порт `http` (именованный порт дашборда), путь `/metrics` и интервал `15s`. Этот объект живёт в вашем собственном кластере, а не в тенанте, поэтому Flux его не применяет: сохраните его в `~/workshop`, например как `podscrape.yaml`, и примените командой `kubectl --context fraud apply -f podscrape.yaml`. Проверьте в Grafana Explore, источник данных `vm-shortterm`, запрос `fraud_stand_in_ratio`.
 
 <details><summary>Решение</summary>
 
@@ -419,11 +427,11 @@ spec:
 
 </details>
 
-**Вы должны увидеть:** ряд `fraud_stand_in_ratio` в Explore. Откройте готовый дашборд **Fraud detection**, который импортировал ведущий.
+**Вы должны увидеть:** временной ряд `fraud_stand_in_ratio` в Explore. Откройте готовый дашборд **Fraud detection**, который импортировал ведущий.
 
 ### 3.4 Алерты как код
 
-Воспользуйтесь [документацией по алертингу](https://cozystack.io/docs/v1.6/operations/services/monitoring/alerting/), чтобы написать `~/fraud-infra/platform/alerts.yaml`: `VMRule` с именем `fraud-alerts` и двумя алертами. `FraudDecidedBlind` — `fraud_stand_in_ratio > 0.2`, длительность `1m`, severity `critical`. `FraudScorerFallingBehind` — `fraud_scorer_lag_messages > 1000`, длительность `30s`, severity `warning`. На странице используется `PrometheusRule`; `VMRule` работает так же. После коммита и пуша проверьте объект командой ниже.
+Воспользуйтесь [документацией по алертингу](https://cozystack.io/docs/v1.6/operations/services/monitoring/alerting/), чтобы написать `~/fraud-infra/platform/alerts.yaml`: `VMRule` с именем `fraud-alerts` и двумя алертами. `FraudDecidedBlind` — `fraud_stand_in_ratio > 0.2`, длительность `1m`, severity `critical`. `FraudScorerFallingBehind` — `fraud_scorer_lag_messages > 1000`, длительность `30s`, severity `warning`. В документации показан `PrometheusRule`; те же правила напишите в виде `VMRule`.
 
 <details><summary>Решение</summary>
 
@@ -468,7 +476,7 @@ kubectl --context tenant get vmrule fraud-alerts
 2. На какой компонент это указывает? Используйте таблицу симптомов ниже.
 3. Проверьте насыщение и ошибки этого компонента в Grafana: CPU, throttling, память и рестарты, а где уместно — дашборд Redis или PostgreSQL.
 4. Прочитайте его логи в Grafana Explore → `vlogs-generic` или командой `kubectl --context fraud -n fraud logs deploy/<имя>`.
-5. Найдите, что недавно менялось: историю в GitLab, историю репозитория и события кластера ниже.
+5. Найдите, что недавно менялось: история репозитория (в GitLab или через `git log`) и события кластера — команды ниже.
 6. Почините, откатив изменение или вернув настройку, затем вернитесь к шагу 1 и убедитесь, что бизнес восстановился. Исправления инфраструктуры пропускайте через Git.
 
 | Симптом | Компонент для расследования |
@@ -528,7 +536,7 @@ incident reveal
 
 ### 5.1 ClickHouse для антифрод-аналитиков
 
-Воспользуйтесь [документацией ClickHouse](https://cozystack.io/docs/v1.6/applications/clickhouse/), чтобы написать `~/fraud-infra/platform/clickhouse.yaml` с именем `analytics`: один узел ClickHouse (одна реплика, один шард) на реплицированном хранилище, 5Gi, пресет `t1.medium` и пользователь `fraud` с паролем `Fraud2026`. Одиночному узлу ClickHouse Keeper не нужен: найдите, как его выключить. Сверьте эти значения перед коммитом, затем проверьте готовность в дашборде. `t1.small` слишком мал, чтобы читать платёжный журнал.
+Воспользуйтесь [документацией ClickHouse](https://cozystack.io/docs/v1.6/applications/clickhouse/), чтобы написать `~/fraud-infra/platform/clickhouse.yaml` с именем `analytics`: один узел ClickHouse (одна реплика, один шард) на реплицированном хранилище, 5Gi, пресет `t1.medium` и пользователь `fraud` с паролем `Fraud2026`. Одиночному узлу ClickHouse Keeper не нужен: найдите, как его выключить. Не берите `t1.small`: ClickHouse не хватит памяти, чтобы читать платёжный журнал.
 
 <details><summary>Решение</summary>
 
@@ -564,7 +572,7 @@ kubectl --context tenant exec -it chi-clickhouse-analytics-clickhouse-0-0-0 -c c
 
 **Вы должны увидеть:** SQL-приглашение ClickHouse, подключённого как `fraud`.
 
-Откройте [`manifests/05-analytics.sql`](manifests/05-analytics.sql) из `~/workshop` и вставьте его SQL в клиент. Он создаёт `journal_stream` — таблицу с Kafka-движком, использующую `JSONAsString`, `kafka_max_block_size = 1000` и `kafka_poll_max_batch_size = 1000`; `payments` — таблицу MergeTree; и `payments_stream_mv` — materialized view, который превращает записи журнала в сохранённые строки. ClickHouse читает `auth.journal` напрямую, без отдельного приложения.
+Откройте [`manifests/05-analytics.sql`](manifests/05-analytics.sql) из `~/workshop` и вставьте его SQL в клиент. Он создаёт три объекта: `journal_stream` — таблицу, которая читает Kafka-топик `auth.journal`; `payments` — таблицу MergeTree, где хранятся строки; и `payments_stream_mv` — materialized view, который перекладывает каждую запись журнала из первой таблицы во вторую. ClickHouse читает Kafka напрямую, без промежуточного приложения.
 
 Выполните три примера запросов из файла: отказы по причинам в минуту, топ-10 мерчантов по отказам и стенд-ин в минуту. Например:
 
@@ -581,7 +589,7 @@ LIMIT 10;
 
 ### 5.3 Бакет для отчётов
 
-В дашборде Cozystack откройте каталог → Bucket, назовите его `reports` и добавьте пользователя `analytics`. Положите ту же декларацию в `~/fraud-infra/platform/bucket.yaml`. Подсказка: `spec.users.analytics: {}`. Сверьте имя и пользователя с созданным объектом.
+В дашборде Cozystack откройте каталог → Bucket, назовите его `reports` и добавьте пользователя `analytics`. Положите ту же декларацию в `~/fraud-infra/platform/bucket.yaml`. Подсказка: `spec.users.analytics: {}`.
 
 <details><summary>Решение</summary>
 
@@ -597,7 +605,7 @@ spec:
 
 </details>
 
-Закоммитьте и запушьте. В дашборде откройте Bucket → reports → Secrets → `bucket-reports-analytics-credentials`. Прочитайте `accessKey`, `secretKey`, `bucketName` и `endpoint`. В секрете endpoint указан без `https://` — добавьте его. В клиенте ClickHouse замените заглушки этими значениями и выгрузите отчёт:
+Закоммитьте и запушьте. В дашборде откройте Bucket → reports → Secrets → `bucket-reports-analytics-credentials`. Вам нужны `accessKey`, `secretKey` и `bucketName`; endpoint `s3.workshop.aenix.io` уже есть в запросе. В клиенте ClickHouse замените заглушки этими значениями и выгрузите отчёт:
 
 ```sql
 INSERT INTO FUNCTION s3('https://s3.workshop.aenix.io/<bucketName>/daily-report.csv', '<accessKey>', '<secretKey>', 'CSVWithNames')
@@ -618,7 +626,7 @@ LIMIT 10;
 
 ### 6.1 Чёрная пятница с автомасштабировщиком
 
-Напишите `HorizontalPodAutoscaler` с именем `scorer` в неймспейсе `fraud`, нацеленный на Deployment `scorer`. Используйте минимум 1 реплику, максимум 8 и метрику CPU с типом цели `AverageValue` и значением `250m`. Проверьте его масштабирование командой наблюдения ниже. Восемь — максимально полезное число, потому что у `auth.requests` восемь партиций.
+Напишите `HorizontalPodAutoscaler` с именем `scorer` в неймспейсе `fraud`, нацеленный на Deployment `scorer`. Используйте минимум 1 реплику, максимум 8 и метрику CPU с типом цели `AverageValue` и значением `250m`. Восемь — максимально полезное число, потому что у `auth.requests` восемь партиций.
 
 <details><summary>Решение</summary>
 
@@ -646,7 +654,7 @@ spec:
 
 </details>
 
-Примените свой файл HPA командой `kubectl --context fraud apply -f <ваш-файл.yaml>`. Терминалы читают свою интенсивность из ConfigMap, поэтому трафик можно поднять без рестарта; Kubernetes доставит новое значение в под в течение минуты:
+Как и `VMPodScrape`, HPA относится к вашему собственному кластеру: сохраните его в `~/workshop` как `hpa.yaml` и примените командой `kubectl --context fraud apply -f hpa.yaml`. Терминалы читают свою интенсивность из ConfigMap, поэтому трафик можно поднять без рестарта; Kubernetes доставит новое значение в под в течение минуты:
 
 ```bash
 kubectl --context fraud -n fraud patch configmap traffic -p '{"data":{"rate":"200"}}'
@@ -664,14 +672,18 @@ kubectl --context fraud -n fraud get hpa scorer -w
 
 Представьте супермаркет с восемью кассовыми лентами: добавление кассиров не создаёт новых лент. Партиции — это ленты, а скореры — кассиры. У `auth.requests` восемь партиций, и в consumer-группе Kafka одну партицию в каждый момент времени читает один консьюмер. Насколько масштабируется потоковая система, решается в момент создания топика, а не когда добавляются поды.
 
-Необязательно: эксперимент из v1 с двенадцатью репликами иллюстрирует этот потолок. Пока HPA управляет репликами, ручное масштабирование временно и может быть исправлено раньше, чем вы увидите все двенадцать подов:
+Необязательно: убедитесь в этом потолке сами. Закрепите автомасштабировщик на двенадцати скорерах, подождите минуту и прочитайте последнюю строку лога каждого:
 
 ```bash
-kubectl --context fraud -n fraud scale deploy/scorer --replicas=12
+kubectl --context fraud -n fraud patch hpa scorer -p '{"spec":{"minReplicas":12,"maxReplicas":12}}'
 kubectl --context fraud -n fraud logs -l app=scorer --tail=1 --prefix
 ```
 
-**Вы должны увидеть:** если двенадцать скореров остаются достаточно долго, чтобы поделить работу, восемь сообщают о платежах, а четыре — `scored 0`. У лишних скореров нет партиций для чтения; HPA вернёт deployment в свой максимум восемь.
+**Вы должны увидеть:** восемь скореров сообщают о платежах, а четыре — `scored 0`: лишним скорерам не досталось партиций. Верните автомасштабировщик:
+
+```bash
+kubectl --context fraud -n fraud patch hpa scorer -p '{"spec":{"minReplicas":1,"maxReplicas":8}}'
+```
 
 Возвращаемся к обычному дню:
 
@@ -728,7 +740,7 @@ kubectl --context tenant get vmi vm-instance-switch -o wide
 
 **Вы должны увидеть:** ВМ на другой ноде. Память работающей ВМ копируется на новый сервер, пока она работает, а диск переезжать не должен: он на реплицированном хранилище, доступном обоим серверам.
 
-На дашборде **Terminal errors остаются на нуле**. Секунду-две сеть ВМ обживается на новом сервере, и несколько авторизаций остаются без ответа; терминалы делают то, что делают настоящие терминалы, — повторяют их с тем же id транзакции. Дашборд считает их как **repeated by the terminal**.
+На дашборде **Terminal errors остаются на нуле**. Секунду-две сеть ВМ перестраивается на новом сервере, и несколько авторизаций остаются без ответа; терминалы делают то, что делают настоящие терминалы, — повторяют их с тем же id транзакции. Дашборд показывает их в строке **repeated by the terminal**.
 
 ```bash
 kubectl --context fraud -n fraud logs deploy/terminals --tail=20
@@ -753,8 +765,7 @@ kubectl --context fraud -n fraud logs deploy/terminals --tail=20
 | `forbidden` на команду | Проверьте контекст: сервисы каталога, ВМ и поды PostgreSQL живут в `tenant`; сервисы антифрода — в `fraud`. |
 | `apply` падает с `SchemaError … unknown model in reference` | Отказала клиентская проверка, не кластер. Добавьте `--validate=false`. |
 | Git push отклонён | Выполните `git pull --rebase`, затем запушьте снова. |
-| Flux не применяет изменение | `kubectl --context tenant get kustomization platform` покажет ошибку. |
-| Ошибка YAML в файле | `kubectl --context tenant get kustomization platform` покажет ошибку; исправьте файл, закоммитьте и запушьте. |
+| Flux не применяет изменение или в YAML ошибка | `kubectl --context tenant get kustomization platform` покажет ошибку; исправьте файл, закоммитьте и запушьте. |
 | ClickHouse сообщает `Memory limit exceeded` | Используйте пресет `t1.medium`. |
 | Не получается войти в Grafana | Используйте пользователя `admin` и пароль Grafana из `~/credentials.txt` на бастионе; это не ваш пароль от бастиона. |
 | `incident` говорит, что инцидент уже активен | Завершите его или воспользуйтесь `incident hint`. |

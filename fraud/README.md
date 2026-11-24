@@ -4,8 +4,9 @@ In about three hours you build a working real-time fraud detection system for ca
 
 Everything runs on [Cozystack](https://cozystack.io), an open-source CNCF platform that turns ordinary servers into a private cloud. You work through a shared VM, the bastion, so all you need is a laptop with a terminal and a browser.
 
-## The story
+[Русская версия](README.ru.md)
 
+## The story
 
 Every time a card is used, the shop's terminal asks the card issuer one question: approve or decline? The program that receives these requests is the **card authorization switch**. In most banks it is old, it runs on a virtual machine, and nobody wants to touch it. Ours is no different: it sits on a VM in your tenant and approves everything that is below $5,000. A fraud ring would love it.
 
@@ -67,7 +68,7 @@ Everywhere below, `austinNN` stands for your own username. On the bastion, every
 
 The host has prepared your tenant `tenant-austinNN` with the legacy switch VM, your Kubernetes cluster `fraud`, and tenant monitoring with Grafana and Alerta. In namespace `fraud` of your cluster, card terminals send 20 payments a second to the switch. Your materials are in `~/workshop`: this README, `manifests/`, and `app/`.
 
-Your GitLab repository `austinNN/fraud-infra` is already cloned at `~/fraud-infra`. It contains `platform/kubernetes.yaml` for your cluster and `platform/switch-vm.yaml` for the switch. Flux runs in the platform on your tenant's behalf: it applies `platform/` from `main` within about a minute of a push, using your tenant rights. Your repository is the route for declaring Cozystack applications; in the GUI exercises you first create an application in the dashboard, then put its declaration under Git.
+Your GitLab repository `austinNN/fraud-infra` is already cloned at `~/fraud-infra`. It contains `platform/kubernetes.yaml` for your cluster and `platform/switch-vm.yaml` for the switch. Flux runs in the platform on your tenant's behalf: it applies `platform/` from `main` within about a minute of a push, using your tenant rights. Every Cozystack application you order ends up in this repository. In the GUI exercises you create the application in the dashboard first, then add its declaration to Git.
 
 ## Part 0. Look around (15 min)
 
@@ -98,7 +99,7 @@ kubectl --context fraud get nodes
 kubectl --context fraud -n fraud get pods
 ```
 
-**You should see:** the switch VM and cluster `fraud` ready, your tenant quota, the application catalog, one cluster node, and the running `terminals` pod. A completed `prepull-explainer` pod is the host's preparation for the language model.
+**You should see:** the switch VM and cluster `fraud` ready, your tenant quota, the application catalog, one cluster node, and the running `terminals` pod. A `prepull-explainer` pod in `Completed` is expected: the host used it to download the language model in advance.
 
 The quota is your tenant's budget: `hard` is the limit and `used` is what you have consumed. The application definitions list what you can order. Open the Cozystack dashboard, select your tenant, and find the same VM, Kubernetes cluster, budget, and catalog.
 
@@ -160,7 +161,7 @@ kubectl --context tenant get redis features -o yaml
 
 **You should see:** Redis `features` with the settings you chose in the dashboard.
 
-Write `~/fraud-infra/platform/redis.yaml` with the same declaration. Hints: kind `Redis`, `metadata.name: features`, and spec fields `replicas: 1`, `size: 1Gi`, `storageClass: replicated`, `authEnabled: false`. Use the object you just inspected as your reference; keep the declaration, without generated status. Check that these values match before committing.
+Write `~/fraud-infra/platform/redis.yaml` with the same declaration. Hints: kind `Redis`, `metadata.name: features`, and spec fields `replicas: 1`, `size: 1Gi`, `storageClass: replicated`, `authEnabled: false`. Take only `apiVersion`, `kind`, `metadata.name`, and these `spec` fields from the object you just inspected; leave out `status` and the generated metadata.
 
 <details><summary>Solution</summary>
 
@@ -182,7 +183,7 @@ Commit with the message `Order Redis for card history` and push. From now on Git
 
 ### 1.2 Kafka: write the declaration from the docs
 
-Use the [Kafka documentation](https://cozystack.io/docs/v1.6/applications/kafka/) to write `~/fraud-infra/platform/kafka.yaml`, named `kafka`: one broker and one ZooKeeper, both on replicated storage (5Gi and 2Gi), preset `c1.small`, and three topics `auth.requests`, `auth.decisions`, `auth.journal` with 8 partitions and 1 replica each. Check the broker, ZooKeeper, and all three topic settings against this task; you will check readiness in 1.4.
+Use the [Kafka documentation](https://cozystack.io/docs/v1.6/applications/kafka/) to write `~/fraud-infra/platform/kafka.yaml`, named `kafka`: one broker and one ZooKeeper, both on replicated storage (5Gi and 2Gi), preset `c1.small`, and three topics `auth.requests`, `auth.decisions`, `auth.journal` with 8 partitions and 1 replica each.
 
 <details><summary>Solution</summary>
 
@@ -214,7 +215,7 @@ spec:
 
 ### 1.3 PostgreSQL: a primary and a hot standby
 
-Use the [PostgreSQL documentation](https://cozystack.io/docs/v1.6/applications/postgres/) to write `~/fraud-infra/platform/postgres.yaml`, named `cases`: a primary and a hot standby, 2Gi each on replicated storage, preset `t1.micro`, a user `fraud` with password `Fraud2026`, and a database `fraud` owned by that user. Hint: two replicas include the primary. Check the user and database declaration; you will check readiness in 1.4.
+Use the [PostgreSQL documentation](https://cozystack.io/docs/v1.6/applications/postgres/) to write `~/fraud-infra/platform/postgres.yaml`, named `cases`: a primary and a hot standby, 2Gi each on replicated storage, preset `t1.micro`, a user `fraud` with password `Fraud2026`, and a database `fraud` owned by that user. Hint: `replicas: 2` means the primary plus one standby.
 
 <details><summary>Solution</summary>
 
@@ -247,7 +248,7 @@ Commit both files with the message `Order Kafka and the case database`, push, th
 watch -n 5 kubectl --context tenant get kafka,redis,postgres
 ```
 
-**You should see:** `features` (Redis) and `cases` (PostgreSQL) move to `READY True` within one or two minutes, and `kafka` within ten to twenty minutes; carry on with 1.5 and 1.6 while it starts. When the whole room orders at once, the platform installs services one after another. Stop watching with `Ctrl-C`. You can go on to Part 2 as soon as Redis and PostgreSQL are ready; the services wait for Kafka by themselves.
+**You should see:** `features` (Redis) and `cases` (PostgreSQL) move to `READY True` within one or two minutes, and `kafka` within ten to twenty minutes; carry on with 1.5 and 1.6 while it starts. When the whole room orders at once, the platform installs services one after another. Stop watching with `Ctrl-C`. You can go on to Part 2 as soon as Redis and PostgreSQL are ready: the fraud services you deploy there wait for Kafka by themselves.
 
 ### 1.5 Under the hood (5 min of this part)
 
@@ -283,7 +284,7 @@ Reconciliation compares what exists with what Git declares and puts the missing 
 
 📍 On the bastion.
 
-Deploy the fraud detection services into your own cluster. The prepared `manifests/02-scoring.yaml` runs the scorer with `WORK_MS=4`, a CPU request of `50m`, and a CPU limit of `500m`; the dashboard declares the named port `http` on `8080`:
+Deploy the fraud detection services into your own cluster. The scorer in `manifests/02-scoring.yaml` is deliberately small, with a CPU limit of `500m`, so that in Part 6 you can watch it run out of capacity:
 
 ```bash
 cd ~/workshop
@@ -295,7 +296,15 @@ kubectl --context fraud -n fraud get pods -w
 
 The services reach Kafka, Redis and PostgreSQL by their platform names, such as `kafka-kafka-kafka-bootstrap.tenant-austinNN.svc.cozy.local`. Your cluster is a tenant of the platform, and the platform's services are on the same network.
 
-The scorer is running, but nobody asks it anything yet: the switch still decides alone. Go back to the switch:
+The scorer is running, but nobody asks it anything yet: the switch still decides alone. Before you connect the switch, check that Kafka is ready:
+
+```bash
+kubectl --context tenant get kafka
+```
+
+**You should see:** `kafka` with `READY True`. If it is still starting, wait and run the command again: Kafka takes ten to twenty minutes after the push in 1.4.
+
+Go back to the switch:
 
 ```bash
 virtctl console vm-instance-switch
@@ -303,7 +312,7 @@ virtctl console vm-instance-switch
 
 **You should see:** the switch VM console. Log in with `ubuntu` / `ubuntu`.
 
-Inside the VM, point the switch at Kafka and restart it. Make sure Kafka is ready first: from the bastion, `kubectl --context tenant get kafka` must show `READY True`; if it is still starting, wait here and check again (ten to twenty-five minutes after Part 1):
+Inside the VM, point the switch at Kafka and restart it:
 
 ```bash
 sudo sed -i 's#^KAFKA_BOOTSTRAP=.*#KAFKA_BOOTSTRAP=kafka-kafka-kafka-bootstrap:9092#' /etc/auth-switch/env
@@ -367,7 +376,7 @@ Log in to `https://grafana.austinNN.workshop.aenix.io` with user `admin` and the
 
 ### 3.2 Send your cluster's logs and metrics to tenant monitoring
 
-Follow [Monitoring Logs](https://cozystack.io/docs/v1.6/operations/services/monitoring/logs/), under “Enable the monitoringAgents addon on the tenant Kubernetes cluster.” Edit `~/fraud-infra/platform/kubernetes.yaml` to enable `addons.monitoringAgents.enabled: true`. Preserve the rest of your cluster declaration. After pushing, check Grafana Explore: in data source `vlogs-generic`, query `kubernetes_container_name:scorer`; in `vm-shortterm`, query `kube_pod_info{namespace="fraud"}`.
+Follow [Monitoring Logs](https://cozystack.io/docs/v1.6/operations/services/monitoring/logs/), under “Enable the monitoringAgents addon on the tenant Kubernetes cluster.” Edit `~/fraud-infra/platform/kubernetes.yaml` and set `addons.monitoringAgents.enabled: true`, keeping the rest of your cluster declaration. After pushing, give the agents two or three minutes to start, then check Grafana Explore: in data source `vlogs-generic`, query `kubernetes_container_name:scorer`; in `vm-shortterm`, query `kube_pod_info{namespace="fraud"}`.
 
 <details><summary>Solution</summary>
 
@@ -396,7 +405,7 @@ curl -s https://fraud.austinNN.workshop.aenix.io/metrics | head
 
 **You should see:** application metrics from the fraud dashboard.
 
-Use the [VMPodScrape documentation](https://docs.victoriametrics.com/operator/resources/vmpodscrape/) to write a `VMPodScrape` named `fraud-dashboard` in namespace `fraud` of your own cluster. Select `app: dashboard`, use endpoint port `http`, path `/metrics`, and interval `15s`. Apply your file with `kubectl --context fraud apply -f <your-file.yaml>`. Check Grafana Explore, data source `vm-shortterm`, with the query `fraud_stand_in_ratio`.
+Use the [VMPodScrape documentation](https://docs.victoriametrics.com/operator/resources/vmpodscrape/) to write a `VMPodScrape` named `fraud-dashboard` in namespace `fraud` of your own cluster. Select `app: dashboard`, use endpoint port `http` (the dashboard's named port), path `/metrics`, and interval `15s`. This object lives in your own cluster, not in the tenant, so Flux does not apply it: save it in `~/workshop`, for example as `podscrape.yaml`, and apply it with `kubectl --context fraud apply -f podscrape.yaml`. Check Grafana Explore, data source `vm-shortterm`, with the query `fraud_stand_in_ratio`.
 
 <details><summary>Solution</summary>
 
@@ -422,7 +431,7 @@ spec:
 
 ### 3.4 Alert as code
 
-Use the [alerting documentation](https://cozystack.io/docs/v1.6/operations/services/monitoring/alerting/) to write `~/fraud-infra/platform/alerts.yaml`: a `VMRule` named `fraud-alerts` with two alerts. `FraudDecidedBlind` uses `fraud_stand_in_ratio > 0.2`, duration `1m`, severity `critical`. `FraudScorerFallingBehind` uses `fraud_scorer_lag_messages > 1000`, duration `30s`, severity `warning`. The page uses `PrometheusRule`; `VMRule` works the same way. Check the object after committing and pushing with the command below.
+Use the [alerting documentation](https://cozystack.io/docs/v1.6/operations/services/monitoring/alerting/) to write `~/fraud-infra/platform/alerts.yaml`: a `VMRule` named `fraud-alerts` with two alerts. `FraudDecidedBlind` uses `fraud_stand_in_ratio > 0.2`, duration `1m`, severity `critical`. `FraudScorerFallingBehind` uses `fraud_scorer_lag_messages > 1000`, duration `30s`, severity `warning`. The documentation shows a `PrometheusRule`; write the same kind of rules as a `VMRule`.
 
 <details><summary>Solution</summary>
 
@@ -467,7 +476,7 @@ kubectl --context tenant get vmrule fraud-alerts
 2. Which component does that point to? Use the symptom table below.
 3. Check that component's saturation and errors in Grafana: CPU, throttling, memory, and restarts, plus the Redis or PostgreSQL dashboard where relevant.
 4. Read its logs in Grafana Explore → `vlogs-generic`, or use `kubectl --context fraud -n fraud logs deploy/<name>`.
-5. Find what changed recently: use the GitLab history, the repository history, and cluster events below.
+5. Find what changed recently: the history of your repository (in GitLab or with `git log`) and the cluster events, using the commands below.
 6. Fix it by reverting the change or putting the setting back, then return to step 1 to confirm the business has recovered. Put infrastructure corrections through Git.
 
 | Symptom | Component to investigate |
@@ -527,7 +536,7 @@ incident reveal
 
 ### 5.1 ClickHouse for the fraud analysts
 
-Use the [ClickHouse documentation](https://cozystack.io/docs/v1.6/applications/clickhouse/) to write `~/fraud-infra/platform/clickhouse.yaml`, named `analytics`: a single ClickHouse node (one replica, one shard) on replicated storage, 5Gi, preset `t1.medium`, and a user `fraud` with password `Fraud2026`. A single node does not need ClickHouse Keeper: find how to switch it off. Check these values before committing, then check readiness in the dashboard. `t1.small` is too small to read the payment journal.
+Use the [ClickHouse documentation](https://cozystack.io/docs/v1.6/applications/clickhouse/) to write `~/fraud-infra/platform/clickhouse.yaml`, named `analytics`: a single ClickHouse node (one replica, one shard) on replicated storage, 5Gi, preset `t1.medium`, and a user `fraud` with password `Fraud2026`. A single node does not need ClickHouse Keeper: find how to switch it off. Do not take `t1.small`: ClickHouse runs out of memory reading the payment journal.
 
 <details><summary>Solution</summary>
 
@@ -563,7 +572,7 @@ kubectl --context tenant exec -it chi-clickhouse-analytics-clickhouse-0-0-0 -c c
 
 **You should see:** the ClickHouse SQL prompt, connected as `fraud`.
 
-Open [`manifests/05-analytics.sql`](manifests/05-analytics.sql) from `~/workshop` and paste its SQL into the client. It creates `journal_stream`, a Kafka engine table using `JSONAsString`, `kafka_max_block_size = 1000`, and `kafka_poll_max_batch_size = 1000`; `payments`, a MergeTree table; and `payments_stream_mv`, the materialized view that turns journal entries into stored rows. ClickHouse reads `auth.journal` directly, without another application.
+Open [`manifests/05-analytics.sql`](manifests/05-analytics.sql) from `~/workshop` and paste its SQL into the client. It creates three objects: `journal_stream`, a table that reads the Kafka topic `auth.journal`; `payments`, a MergeTree table that stores the rows; and `payments_stream_mv`, a materialized view that moves every journal entry from the first table into the second. ClickHouse reads Kafka directly, without another application in between.
 
 Run the file's three example queries: declines by reason per minute, the top 10 merchants by declines, and stand-in per minute. For example:
 
@@ -580,7 +589,7 @@ LIMIT 10;
 
 ### 5.3 A bucket for reports
 
-In the Cozystack dashboard, open catalog → Bucket, name it `reports`, and add a user `analytics`. Put the same declaration in `~/fraud-infra/platform/bucket.yaml`. Hint: `spec.users.analytics: {}`. Check that the name and user match the object you created.
+In the Cozystack dashboard, open catalog → Bucket, name it `reports`, and add a user `analytics`. Put the same declaration in `~/fraud-infra/platform/bucket.yaml`. Hint: `spec.users.analytics: {}`.
 
 <details><summary>Solution</summary>
 
@@ -596,7 +605,7 @@ spec:
 
 </details>
 
-Commit and push. In the dashboard, open Bucket → reports → Secrets → `bucket-reports-analytics-credentials`. Read `accessKey`, `secretKey`, `bucketName`, and `endpoint`. The endpoint in the secret has no `https://`; add it. In the ClickHouse client, replace the placeholders with those values and export a report:
+Commit and push. In the dashboard, open Bucket → reports → Secrets → `bucket-reports-analytics-credentials`. You need `accessKey`, `secretKey`, and `bucketName`; the endpoint, `s3.workshop.aenix.io`, is already in the query. In the ClickHouse client, replace the placeholders with those values and export a report:
 
 ```sql
 INSERT INTO FUNCTION s3('https://s3.workshop.aenix.io/<bucketName>/daily-report.csv', '<accessKey>', '<secretKey>', 'CSVWithNames')
@@ -617,7 +626,7 @@ LIMIT 10;
 
 ### 6.1 Black Friday with an autoscaler
 
-Write a `HorizontalPodAutoscaler` named `scorer` in namespace `fraud`, targeting the `scorer` Deployment. Use a minimum of 1 replica, a maximum of 8, and the CPU metric with target type `AverageValue` and value `250m`. Check its scaling with the watch command below. Eight is the maximum useful number because `auth.requests` has eight partitions.
+Write a `HorizontalPodAutoscaler` named `scorer` in namespace `fraud`, targeting the `scorer` Deployment. Use a minimum of 1 replica, a maximum of 8, and the CPU metric with target type `AverageValue` and value `250m`. Eight is the maximum useful number because `auth.requests` has eight partitions.
 
 <details><summary>Solution</summary>
 
@@ -645,7 +654,7 @@ spec:
 
 </details>
 
-Apply your HPA file with `kubectl --context fraud apply -f <your-file.yaml>`. The terminals read their rate from a ConfigMap, so you can raise traffic without a restart; Kubernetes delivers the new value to the pod within a minute:
+Like the `VMPodScrape`, the HPA belongs to your own cluster: save it in `~/workshop` as `hpa.yaml` and apply it with `kubectl --context fraud apply -f hpa.yaml`. The terminals read their rate from a ConfigMap, so you can raise traffic without a restart; Kubernetes delivers the new value to the pod within a minute:
 
 ```bash
 kubectl --context fraud -n fraud patch configmap traffic -p '{"data":{"rate":"200"}}'
@@ -663,14 +672,18 @@ kubectl --context fraud -n fraud get hpa scorer -w
 
 Think of a supermarket with eight checkout lanes: adding cashiers does not create more lanes. The partitions are the lanes and the scorers are the cashiers. `auth.requests` has eight partitions, and in a Kafka consumer group one partition is read by one consumer at a time. How far a streaming system scales is decided when the topic is created, not when the pods are added.
 
-Optional: the v1 twelve-replica experiment illustrates that ceiling. With the HPA controlling replicas, a manual scale is temporary and it may be corrected before you observe all twelve pods:
+Optional: see the ceiling for yourself. Pin the autoscaler to twelve scorers, wait a minute, and read the last line of each scorer's log:
 
 ```bash
-kubectl --context fraud -n fraud scale deploy/scorer --replicas=12
+kubectl --context fraud -n fraud patch hpa scorer -p '{"spec":{"minReplicas":12,"maxReplicas":12}}'
 kubectl --context fraud -n fraud logs -l app=scorer --tail=1 --prefix
 ```
 
-**You should see:** if twelve scorers remain long enough to share the work, eight report payments and four report `scored 0`. The extra scorers have no partition to read; the HPA will bring the deployment back within its maximum of eight.
+**You should see:** eight scorers report payments and four report `scored 0`: the extra scorers have no partition to read. Put the autoscaler back:
+
+```bash
+kubectl --context fraud -n fraud patch hpa scorer -p '{"spec":{"minReplicas":1,"maxReplicas":8}}'
+```
 
 Back to a normal day:
 
@@ -752,8 +765,7 @@ Found something wrong in the Cozystack documentation today? Open an issue or a P
 | `forbidden` on a command | Check the context: catalog services, VMs, and PostgreSQL pods live in `tenant`; the fraud services live in `fraud`. |
 | `apply` fails with `SchemaError … unknown model in reference` | The client-side check failed, not the cluster. Add `--validate=false`. |
 | Git push rejected | Run `git pull --rebase`, then push again. |
-| Flux is not applying your change | `kubectl --context tenant get kustomization platform` shows the error. |
-| YAML error in your file | `kubectl --context tenant get kustomization platform` shows the error; fix the file, commit, and push. |
+| Flux is not applying your change, or your YAML has an error | `kubectl --context tenant get kustomization platform` shows the error; fix the file, commit, and push. |
 | ClickHouse reports `Memory limit exceeded` | Use preset `t1.medium`. |
 | Grafana login fails | Use user `admin` and the Grafana password from `~/credentials.txt` on the bastion; it is not your bastion password. |
 | `incident` says an incident is already active | Finish it, or use `incident hint`. |
