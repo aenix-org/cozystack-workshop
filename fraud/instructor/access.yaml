@@ -46,3 +46,57 @@ kind: RoleBinding
 metadata: {name: dallasXX-live-migration, namespace: tenant-dallasXX}
 roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: workshop-live-migration}
 subjects: [{kind: ServiceAccount, name: dallasXX, namespace: tenant-dallasXX}]
+---
+# Alert rules as code: the tenant roles of Cozystack 1.6 do not let a tenant user create
+# alerting rules, although the monitoring docs describe putting them in the tenant namespace.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: workshop-alert-rules, namespace: tenant-dallasXX}
+rules:
+  - apiGroups: [operator.victoriametrics.com]
+    resources: [vmrules]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [monitoring.coreos.com]
+    resources: [prometheusrules]
+    verbs: [get, list, watch, create, update, patch, delete]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: dallasXX-alert-rules, namespace: tenant-dallasXX}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: workshop-alert-rules}
+subjects: [{kind: ServiceAccount, name: dallasXX, namespace: tenant-dallasXX}]
+---
+# What Cozystack builds from an application (README step 1.5), plus exec into database pods (Part 5).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: workshop-under-the-hood
+  namespace: tenant-dallasXX
+rules:
+  - apiGroups: [helm.toolkit.fluxcd.io]
+    resources: [helmreleases]
+    verbs: [get, list, watch]
+  - apiGroups: [postgresql.cnpg.io]
+    resources: [clusters, backups]
+    verbs: [get, list, watch]
+  - apiGroups: [kafka.strimzi.io]
+    resources: [kafkas, kafkatopics]
+    verbs: [get, list, watch]
+  # clickhouse-client and psql inside the database pods (README Part 5).
+  - apiGroups: [""]
+    resources: [pods/exec]
+    verbs: [create]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dallasXX-under-the-hood
+  namespace: tenant-dallasXX
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: workshop-under-the-hood
+subjects:
+  - kind: ServiceAccount
+    name: dallasXX
+    namespace: tenant-dallasXX
