@@ -188,7 +188,7 @@ git push
 
 ### 1.2 Kafka: пишем манифест по документации
 
-Воспользуйтесь [документацией Kafka](https://cozystack.io/docs/v1.6/applications/kafka/), чтобы написать `~/fraud-infra/platform/kafka.yaml` с именем `kafka`: один брокер и один ZooKeeper, оба на реплицированном хранилище (5Gi и 2Gi), пресет `c1.small` и три топика — `auth.requests`, `auth.decisions`, `auth.journal` — по 8 партиций и 1 реплике каждый.
+Воспользуйтесь [документацией Kafka](https://cozystack.io/docs/v1.7/applications/kafka/), чтобы написать `~/fraud-infra/platform/kafka.yaml` с именем `kafka`: один брокер на реплицированном хранилище, 5Gi, пресет `c1.small` (Kafka работает в режиме KRaft, без ZooKeeper) и три топика — `auth.requests`, `auth.decisions`, `auth.journal` — по 8 партиций и 1 реплике каждый.
 
 <details><summary>Решение</summary>
 
@@ -203,11 +203,6 @@ spec:
     size: 5Gi
     storageClass: replicated
     resourcesPreset: c1.small
-  zookeeper:
-    replicas: 1
-    size: 2Gi
-    storageClass: replicated
-    resourcesPreset: c1.small
   topics:
     - {name: auth.requests, partitions: 8, replicas: 1, config: {}}
     - {name: auth.decisions, partitions: 8, replicas: 1, config: {}}
@@ -220,7 +215,7 @@ spec:
 
 ### 1.3 PostgreSQL: primary и горячая реплика
 
-Воспользуйтесь [документацией PostgreSQL](https://cozystack.io/docs/v1.6/applications/postgres/), чтобы написать `~/fraud-infra/platform/postgres.yaml` с именем `cases`: primary и горячая реплика, по 2Gi на реплицированном хранилище, пресет `t1.micro`, пользователь `fraud` с паролем `Fraud2026` и база `fraud` в его владении. Подсказка: `replicas: 2` — это primary и одна реплика.
+Воспользуйтесь [документацией PostgreSQL](https://cozystack.io/docs/v1.7/applications/postgres/), чтобы написать `~/fraud-infra/platform/postgres.yaml` с именем `cases`: primary и горячая реплика, по 2Gi на реплицированном хранилище, пресет `t1.micro`, пользователь `fraud` и база `fraud` в его владении. Подсказка: `replicas: 2` — это primary и одна реплика. Пароль задавать не нужно: Cozystack сам генерирует его и кладёт в секрет `postgres-cases-credentials`, а в шаге 2.1 вы передадите его сервисам.
 
 <details><summary>Решение</summary>
 
@@ -235,8 +230,7 @@ spec:
   storageClass: replicated
   resourcesPreset: t1.micro
   users:
-    fraud:
-      password: Fraud2026
+    fraud: {}
   databases:
     fraud:
       roles:
@@ -298,10 +292,19 @@ kubectl --context tenant get redis -w
 
 📍 На бастионе.
 
-Разверните сервисы антифрода в своём кластере. Scorer в `manifests/02-scoring.yaml` нарочно маленький, с лимитом CPU `500m`, чтобы в части 4 вы увидели, как ему перестаёт хватать мощности:
+Сначала передайте сервисам пароль базы. Cozystack сам генерирует пароли PostgreSQL и хранит их в секрете на платформе; команда копирует пароль пользователя `fraud` в ваш кластер, откуда его читают `cases` и `dashboard`:
 
 ```bash
 cd ~/workshop
+kubectl --context fraud -n fraud create secret generic cases-db \
+  --from-literal=password="$(kubectl --context tenant get secret postgres-cases-credentials -o jsonpath='{.data.fraud}' | base64 -d)"
+```
+
+**Вы должны увидеть:** `secret/cases-db created`.
+
+Теперь разверните сервисы антифрода в своём кластере. Scorer в `manifests/02-scoring.yaml` нарочно маленький, с лимитом CPU `500m`, чтобы в части 4 вы увидели, как ему перестаёт хватать мощности:
+
+```bash
 kubectl --context fraud apply -f manifests/02-scoring.yaml
 kubectl --context fraud -n fraud get pods -w
 ```
@@ -390,7 +393,7 @@ kubectl --context fraud -n fraud logs job/attack -f
 
 ### 3.1 ClickHouse для антифрод-аналитиков
 
-Воспользуйтесь [документацией ClickHouse](https://cozystack.io/docs/v1.6/applications/clickhouse/), чтобы написать `~/fraud-infra/platform/clickhouse.yaml` с именем `analytics`: один узел ClickHouse (одна реплика, один шард) на реплицированном хранилище, 5Gi, пресет `t1.medium` и пользователь `fraud` с паролем `Fraud2026`. Одиночному узлу ClickHouse Keeper не нужен: найдите, как его выключить. Не берите `t1.small`: ClickHouse не хватит памяти, чтобы читать платёжный журнал.
+Воспользуйтесь [документацией ClickHouse](https://cozystack.io/docs/v1.7/applications/clickhouse/), чтобы написать `~/fraud-infra/platform/clickhouse.yaml` с именем `analytics`: один узел ClickHouse (одна реплика, один шард) на реплицированном хранилище, 5Gi, пресет `t1.medium` и пользователь `fraud` с паролем `Fraud2026`. Одиночному узлу ClickHouse Keeper не нужен: найдите, как его выключить. Не берите `t1.small`: ClickHouse не хватит памяти, чтобы читать платёжный журнал.
 
 <details><summary>Решение</summary>
 

@@ -16,7 +16,7 @@ metadata:
 data:
   KAFKA_BOOTSTRAP: kafka-kafka-kafka-bootstrap.tenant-dallasXX.svc.cozy.local:9092
   REDIS_ADDR: rfrm-redis-features.tenant-dallasXX.svc.cozy.local:6379
-  PG_URL: postgres://fraud:Fraud2026@postgres-cases-rw.tenant-dallasXX.svc.cozy.local:5432/fraud?sslmode=prefer
+  PG_URL: postgres://fraud@postgres-cases-rw.tenant-dallasXX.svc.cozy.local:5432/fraud?sslmode=prefer
   SWITCH_URL: http://switch.tenant-dallasXX.svc.cozy.local:8080
   TERMINALS_URL: http://terminals.fraud.svc:9090
   # The language model from Step 3. Until it is deployed, alerts simply wait for an explanation.

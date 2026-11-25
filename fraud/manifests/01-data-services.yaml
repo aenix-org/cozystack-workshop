@@ -16,11 +16,6 @@ spec:
     size: 5Gi
     storageClass: replicated
     resourcesPreset: c1.small
-  zookeeper:
-    replicas: 1
-    size: 2Gi
-    storageClass: replicated
-    resourcesPreset: c1.small
   topics:
     - {name: auth.requests,  partitions: 8, replicas: 1, config: {}}
     - {name: auth.decisions, partitions: 8, replicas: 1, config: {}}
@@ -52,8 +47,7 @@ spec:
   storageClass: replicated
   resourcesPreset: t1.micro
   users:
-    fraud:
-      password: Fraud2026
+    fraud: {}
   databases:
     fraud:
       roles:

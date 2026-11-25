@@ -100,3 +100,21 @@ subjects:
   - kind: ServiceAccount
     name: dallasXX
     namespace: tenant-dallasXX
+---
+# Read the generated PostgreSQL password. Cozystack 1.7 generates database passwords and
+# stores them in the <release>-credentials Secret; step 2.1 copies the `fraud` user's
+# password into the participant's cluster. Only this one Secret is readable.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: workshop-db-credentials, namespace: tenant-dallasXX}
+rules:
+  - apiGroups: [""]
+    resources: [secrets]
+    resourceNames: [postgres-cases-credentials]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: dallasXX-db-credentials, namespace: tenant-dallasXX}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: workshop-db-credentials}
+subjects: [{kind: ServiceAccount, name: dallasXX, namespace: tenant-dallasXX}]
