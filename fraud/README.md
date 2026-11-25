@@ -384,6 +384,10 @@ Read the rules that caught the attack: [`app/internal/scoring/rules.go`](app/int
 
 📍 On the bastion, in your infrastructure repository, and in the Cozystack dashboard.
 
+Fraud detection works, and now the fraud analysts come to you. They want to run any query they like over every payment the switch has answered: which merchants get the most declines, how declines change minute by minute, when the switch had to decide alone. Neither the scorer nor the case database is built for that, and heavy reports must not slow down the payment flow.
+
+So you add an analytics database next to the system without touching it. ClickHouse reads the switch's journal straight from Kafka, as one more independent reader beside `cases` and the dashboard, and keeps every payment ready for fast queries. The reports then go to an S3 bucket the analysts can open in the browser. Both come from the same catalog and the same Git repository as everything else: the path from the payment journal to a finished report is three catalog services and one SQL file, with no code of your own in between.
+
 ### 3.1 ClickHouse for the fraud analysts
 
 Use the [ClickHouse documentation](https://cozystack.io/docs/v1.6/applications/clickhouse/) to write `~/fraud-infra/platform/clickhouse.yaml`, named `analytics`: a single ClickHouse node (one replica, one shard) on replicated storage, 5Gi, preset `t1.medium`, and a user `fraud` with password `Fraud2026`. A single node does not need ClickHouse Keeper: find how to switch it off. Do not take `t1.small`: ClickHouse runs out of memory reading the payment journal.
