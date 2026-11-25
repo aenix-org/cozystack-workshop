@@ -1,6 +1,7 @@
 # The participant's own Kubernetes cluster, created by the host before the session
-# (it takes about ten minutes). One worker is enough for the workshop; the autoscaler may
-# add a second one under Black Friday load.
+# (it takes about ten minutes). Since Cozystack 1.7 worker pools are a separate
+# KubernetesNodes application that points at the cluster: one worker is enough for the
+# workshop, and the autoscaler may add a second one under Black Friday load.
 apiVersion: apps.cozystack.io/v1alpha1
 kind: Kubernetes
 metadata:
@@ -11,10 +12,17 @@ spec:
   # One API server is plenty for a one-node workshop cluster and saves memory on the platform.
   controlPlane:
     replicas: 1
-  nodeGroups:
-    md0:
-      minReplicas: 1
-      maxReplicas: 2
-      instanceType: u1.2xmedium
-      diskSize: 20Gi
-      roles: []
+---
+apiVersion: apps.cozystack.io/v1alpha1
+kind: KubernetesNodes
+metadata:
+  name: fraud-md0
+  namespace: tenant-dallasXX
+spec:
+  cluster: fraud
+  minReplicas: 1
+  maxReplicas: 2
+  instanceType: u1.2xmedium
+  diskSize: 20Gi
+  storageClass: replicated
+  roles: []

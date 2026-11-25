@@ -188,7 +188,7 @@ From now on Git is the source of truth: the object you created in the dashboard 
 
 ### 1.2 Kafka: write the declaration from the docs
 
-Use the [Kafka documentation](https://cozystack.io/docs/v1.6/applications/kafka/) to write `~/fraud-infra/platform/kafka.yaml`, named `kafka`: one broker and one ZooKeeper, both on replicated storage (5Gi and 2Gi), preset `c1.small`, and three topics `auth.requests`, `auth.decisions`, `auth.journal` with 8 partitions and 1 replica each.
+Use the [Kafka documentation](https://cozystack.io/docs/v1.7/applications/kafka/) to write `~/fraud-infra/platform/kafka.yaml`, named `kafka`: one broker on replicated storage, 5Gi, preset `c1.small` (Kafka runs in KRaft mode, without ZooKeeper), and three topics `auth.requests`, `auth.decisions`, `auth.journal` with 8 partitions and 1 replica each.
 
 <details><summary>Solution</summary>
 
@@ -203,11 +203,6 @@ spec:
     size: 5Gi
     storageClass: replicated
     resourcesPreset: c1.small
-  zookeeper:
-    replicas: 1
-    size: 2Gi
-    storageClass: replicated
-    resourcesPreset: c1.small
   topics:
     - {name: auth.requests, partitions: 8, replicas: 1, config: {}}
     - {name: auth.decisions, partitions: 8, replicas: 1, config: {}}
@@ -220,7 +215,7 @@ spec:
 
 ### 1.3 PostgreSQL: a primary and a hot standby
 
-Use the [PostgreSQL documentation](https://cozystack.io/docs/v1.6/applications/postgres/) to write `~/fraud-infra/platform/postgres.yaml`, named `cases`: a primary and a hot standby, 2Gi each on replicated storage, preset `t1.micro`, a user `fraud` with password `Fraud2026`, and a database `fraud` owned by that user. Hint: `replicas: 2` means the primary plus one standby.
+Use the [PostgreSQL documentation](https://cozystack.io/docs/v1.7/applications/postgres/) to write `~/fraud-infra/platform/postgres.yaml`, named `cases`: a primary and a hot standby, 2Gi each on replicated storage, preset `t1.micro`, a user `fraud`, and a database `fraud` owned by that user. Hint: `replicas: 2` means the primary plus one standby. You do not set the password: Cozystack generates it and stores it in the Secret `postgres-cases-credentials`, and step 2.1 hands it to the services.
 
 <details><summary>Solution</summary>
 
@@ -235,8 +230,7 @@ spec:
   storageClass: replicated
   resourcesPreset: t1.micro
   users:
-    fraud:
-      password: Fraud2026
+    fraud: {}
   databases:
     fraud:
       roles:
@@ -298,10 +292,19 @@ Reconciliation compares what exists with what Git declares and puts the missing 
 
 📍 On the bastion.
 
-Deploy the fraud detection services into your own cluster. The scorer in `manifests/02-scoring.yaml` is deliberately small, with a CPU limit of `500m`, so that in Part 4 you can watch it run out of capacity:
+Give the services the database password first. Cozystack generates PostgreSQL passwords and keeps them in a Secret on the platform; this copies the `fraud` user's password into your cluster, where `cases` and `dashboard` read it:
 
 ```bash
 cd ~/workshop
+kubectl --context fraud -n fraud create secret generic cases-db \
+  --from-literal=password="$(kubectl --context tenant get secret postgres-cases-credentials -o jsonpath='{.data.fraud}' | base64 -d)"
+```
+
+**You should see:** `secret/cases-db created`.
+
+Now deploy the fraud detection services into your own cluster. The scorer in `manifests/02-scoring.yaml` is deliberately small, with a CPU limit of `500m`, so that in Part 4 you can watch it run out of capacity:
+
+```bash
 kubectl --context fraud apply -f manifests/02-scoring.yaml
 kubectl --context fraud -n fraud get pods -w
 ```
@@ -390,7 +393,7 @@ So you add an analytics database next to the system without touching it. ClickHo
 
 ### 3.1 ClickHouse for the fraud analysts
 
-Use the [ClickHouse documentation](https://cozystack.io/docs/v1.6/applications/clickhouse/) to write `~/fraud-infra/platform/clickhouse.yaml`, named `analytics`: a single ClickHouse node (one replica, one shard) on replicated storage, 5Gi, preset `t1.medium`, and a user `fraud` with password `Fraud2026`. A single node does not need ClickHouse Keeper: find how to switch it off. Do not take `t1.small`: ClickHouse runs out of memory reading the payment journal.
+Use the [ClickHouse documentation](https://cozystack.io/docs/v1.7/applications/clickhouse/) to write `~/fraud-infra/platform/clickhouse.yaml`, named `analytics`: a single ClickHouse node (one replica, one shard) on replicated storage, 5Gi, preset `t1.medium`, and a user `fraud` with password `Fraud2026`. A single node does not need ClickHouse Keeper: find how to switch it off. Do not take `t1.small`: ClickHouse runs out of memory reading the payment journal.
 
 <details><summary>Solution</summary>
 
