@@ -427,17 +427,26 @@ git push
 
 ### 3.2 Читаем журнал напрямую из Kafka
 
-Откройте клиент ClickHouse:
+Сначала загрузите [`manifests/05-analytics.sql`](manifests/05-analytics.sql) в ClickHouse. Команда передаёт файл из `~/workshop` клиенту ClickHouse, который работает внутри пода базы:
+
+```bash
+cd ~/workshop
+kubectl --context tenant exec -i chi-clickhouse-analytics-clickhouse-0-0-0 -c clickhouse -- clickhouse-client --user fraud --password Fraud2026 --multiquery < manifests/05-analytics.sql
+```
+
+**Вы должны увидеть:** никаких ошибок, а в конце — вывод трёх примеров запросов из файла; сразу после загрузки они могут быть пустыми.
+
+Файл создаёт три объекта: `journal_stream` — таблицу, которая читает Kafka-топик `auth.journal`; `payments` — таблицу MergeTree, где хранятся строки; и `payments_stream_mv` — materialized view, который перекладывает каждую запись журнала из первой таблицы во вторую. ClickHouse читает Kafka напрямую, без промежуточного приложения.
+
+Теперь откройте тот же клиент в интерактивном режиме, чтобы задавать свои вопросы:
 
 ```bash
 kubectl --context tenant exec -it chi-clickhouse-analytics-clickhouse-0-0-0 -c clickhouse -- clickhouse-client --user fraud --password Fraud2026
 ```
 
-**Вы должны увидеть:** SQL-приглашение ClickHouse, подключённого как `fraud`.
+**Вы должны увидеть:** SQL-приглашение ClickHouse, подключённого как `fraud`. Выход — `exit`.
 
-Откройте [`manifests/05-analytics.sql`](manifests/05-analytics.sql) из `~/workshop` и вставьте его SQL в клиент. Он создаёт три объекта: `journal_stream` — таблицу, которая читает Kafka-топик `auth.journal`; `payments` — таблицу MergeTree, где хранятся строки; и `payments_stream_mv` — materialized view, который перекладывает каждую запись журнала из первой таблицы во вторую. ClickHouse читает Kafka напрямую, без промежуточного приложения.
-
-Выполните три примера запросов из файла: отказы по причинам в минуту, топ-10 мерчантов по отказам и стенд-ин в минуту. Например:
+Дайте ClickHouse минуту догнать журнал, затем выполните три примера запросов из файла: отказы по причинам в минуту, топ-10 мерчантов по отказам и стенд-ин в минуту. Например:
 
 ```sql
 SELECT merchant, count(*)

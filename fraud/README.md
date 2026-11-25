@@ -427,17 +427,26 @@ Wait for `analytics` to be ready in the dashboard.
 
 ### 3.2 Read the journal straight from Kafka
 
-Open the ClickHouse client:
+First load [`manifests/05-analytics.sql`](manifests/05-analytics.sql) into ClickHouse. The command sends the file from `~/workshop` to the ClickHouse client that runs inside the database pod:
+
+```bash
+cd ~/workshop
+kubectl --context tenant exec -i chi-clickhouse-analytics-clickhouse-0-0-0 -c clickhouse -- clickhouse-client --user fraud --password Fraud2026 --multiquery < manifests/05-analytics.sql
+```
+
+**You should see:** no errors, and at the end the output of the file's three example queries; right after loading they may still be empty.
+
+The file creates three objects: `journal_stream`, a table that reads the Kafka topic `auth.journal`; `payments`, a MergeTree table that stores the rows; and `payments_stream_mv`, a materialized view that moves every journal entry from the first table into the second. ClickHouse reads Kafka directly, without another application in between.
+
+Now open the same client interactively to ask your own questions:
 
 ```bash
 kubectl --context tenant exec -it chi-clickhouse-analytics-clickhouse-0-0-0 -c clickhouse -- clickhouse-client --user fraud --password Fraud2026
 ```
 
-**You should see:** the ClickHouse SQL prompt, connected as `fraud`.
+**You should see:** the ClickHouse SQL prompt, connected as `fraud`. Leave it with `exit`.
 
-Open [`manifests/05-analytics.sql`](manifests/05-analytics.sql) from `~/workshop` and paste its SQL into the client. It creates three objects: `journal_stream`, a table that reads the Kafka topic `auth.journal`; `payments`, a MergeTree table that stores the rows; and `payments_stream_mv`, a materialized view that moves every journal entry from the first table into the second. ClickHouse reads Kafka directly, without another application in between.
-
-Run the file's three example queries: declines by reason per minute, the top 10 merchants by declines, and stand-in per minute. For example:
+Give ClickHouse a minute to catch up with the journal, then run the three example queries from the file: declines by reason per minute, the top 10 merchants by declines, and stand-in per minute. For example:
 
 ```sql
 SELECT merchant, count(*)
