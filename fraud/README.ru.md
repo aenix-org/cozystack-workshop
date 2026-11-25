@@ -175,7 +175,16 @@ spec:
 
 </details>
 
-Закоммитьте с сообщением `Order Redis for card history` и запушьте. С этого момента Git — источник истины: объект, созданный в дашборде, управляется из репозитория.
+Закоммитьте и запушьте:
+
+```bash
+cd ~/fraud-infra
+git add platform/redis.yaml
+git commit -m "Order Redis for card history"
+git push
+```
+
+С этого момента Git — источник истины: объект, созданный в дашборде, управляется из репозитория.
 
 ### 1.2 Kafka: пишем манифест по документации
 
@@ -238,7 +247,16 @@ spec:
 
 ### 1.4 Коммитим, пушим и наблюдаем
 
-Закоммитьте оба файла с сообщением `Order Kafka and the case database`, запушьте, затем наблюдайте за приложениями:
+Закоммитьте оба файла и запушьте:
+
+```bash
+cd ~/fraud-infra
+git add platform/kafka.yaml platform/postgres.yaml
+git commit -m "Order Kafka and the case database"
+git push
+```
+
+Затем наблюдайте за приложениями:
 
 ```bash
 watch -n 5 kubectl --context tenant get kafka,redis,postgres
@@ -392,7 +410,16 @@ spec:
 
 </details>
 
-Закоммитьте файл, запушьте и дождитесь готовности `analytics` в дашборде.
+Закоммитьте и запушьте:
+
+```bash
+cd ~/fraud-infra
+git add platform/clickhouse.yaml
+git commit -m "Order ClickHouse for the analysts"
+git push
+```
+
+Дождитесь готовности `analytics` в дашборде.
 
 ### 3.2 Читаем журнал напрямую из Kafka
 
@@ -437,7 +464,16 @@ spec:
 
 </details>
 
-Закоммитьте и запушьте. В дашборде откройте Bucket → reports → Secrets → `bucket-reports-analytics-credentials`. Вам нужны `accessKey`, `secretKey` и `bucketName`; endpoint `s3.workshop.aenix.io` уже есть в запросе. В клиенте ClickHouse замените заглушки этими значениями и выгрузите отчёт:
+Закоммитьте и запушьте:
+
+```bash
+cd ~/fraud-infra
+git add platform/bucket.yaml
+git commit -m "Order a bucket for reports"
+git push
+```
+
+В дашборде откройте Bucket → reports → Secrets → `bucket-reports-analytics-credentials`. Вам нужны `accessKey`, `secretKey` и `bucketName`; endpoint `s3.workshop.aenix.io` уже есть в запросе. В клиенте ClickHouse замените заглушки этими значениями и выгрузите отчёт:
 
 ```sql
 INSERT INTO FUNCTION s3('https://s3.workshop.aenix.io/<bucketName>/daily-report.csv', '<accessKey>', '<secretKey>', 'CSVWithNames')
