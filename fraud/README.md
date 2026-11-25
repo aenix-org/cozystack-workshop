@@ -109,7 +109,7 @@ cd ~/fraud-infra && ls platform && cat platform/kubernetes.yaml
 
 **You should see:** `kubernetes.yaml` and `switch-vm.yaml`, then the declaration of your `fraud` cluster.
 
-Open `austinNN/fraud-infra` in GitLab and log in with your bastion username and password. The platform applies the files in `platform/` from `main`. For each Git task below, save the requested files in this clone, commit them, and push to `main`; give the platform about a minute to reconcile.
+Open your repository in GitLab, `https://gitlab.workshop.aenix.io/austinNN/fraud-infra`, and log in with your bastion username and password. The platform applies the files in `platform/` from `main`. For each Git task below, save the requested files in this clone, commit them, and push to `main`; give the platform about a minute to reconcile.
 
 ### 0.3 Watch the bare switch, then attack it
 
