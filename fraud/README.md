@@ -175,7 +175,16 @@ spec:
 
 </details>
 
-Commit with the message `Order Redis for card history` and push. From now on Git is the source of truth: the object you created in the dashboard is managed from the repository.
+Commit and push:
+
+```bash
+cd ~/fraud-infra
+git add platform/redis.yaml
+git commit -m "Order Redis for card history"
+git push
+```
+
+From now on Git is the source of truth: the object you created in the dashboard is managed from the repository.
 
 ### 1.2 Kafka: write the declaration from the docs
 
@@ -238,7 +247,16 @@ spec:
 
 ### 1.4 Commit, push, and watch
 
-Commit both files with the message `Order Kafka and the case database`, push, then watch the applications:
+Commit both files and push:
+
+```bash
+cd ~/fraud-infra
+git add platform/kafka.yaml platform/postgres.yaml
+git commit -m "Order Kafka and the case database"
+git push
+```
+
+Then watch the applications:
 
 ```bash
 watch -n 5 kubectl --context tenant get kafka,redis,postgres
@@ -392,7 +410,16 @@ spec:
 
 </details>
 
-Commit the file, push, and wait for `analytics` to be ready in the dashboard.
+Commit and push:
+
+```bash
+cd ~/fraud-infra
+git add platform/clickhouse.yaml
+git commit -m "Order ClickHouse for the analysts"
+git push
+```
+
+Wait for `analytics` to be ready in the dashboard.
 
 ### 3.2 Read the journal straight from Kafka
 
@@ -437,7 +464,16 @@ spec:
 
 </details>
 
-Commit and push. In the dashboard, open Bucket → reports → Secrets → `bucket-reports-analytics-credentials`. You need `accessKey`, `secretKey`, and `bucketName`; the endpoint, `s3.workshop.aenix.io`, is already in the query. In the ClickHouse client, replace the placeholders with those values and export a report:
+Commit and push:
+
+```bash
+cd ~/fraud-infra
+git add platform/bucket.yaml
+git commit -m "Order a bucket for reports"
+git push
+```
+
+In the dashboard, open Bucket → reports → Secrets → `bucket-reports-analytics-credentials`. You need `accessKey`, `secretKey`, and `bucketName`; the endpoint, `s3.workshop.aenix.io`, is already in the query. In the ClickHouse client, replace the placeholders with those values and export a report:
 
 ```sql
 INSERT INTO FUNCTION s3('https://s3.workshop.aenix.io/<bucketName>/daily-report.csv', '<accessKey>', '<secretKey>', 'CSVWithNames')
