@@ -461,7 +461,9 @@ LIMIT 10;
 
 ### 3.3 Бакет для отчётов
 
-В дашборде Cozystack откройте каталог → Bucket, назовите его `reports` и добавьте пользователя `analytics`. Положите ту же декларацию в `~/fraud-infra/platform/bucket.yaml`. Подсказка: `spec.users.analytics: {}`.
+Бакет заказываем сразу через Git, как Kafka и ClickHouse: напишите `~/fraud-infra/platform/bucket.yaml` — `Bucket` с именем `reports` и одним пользователем `analytics`. Подсказка: `spec.users.analytics: {}`.
+
+Пользователь бакета — это не человек, а отдельная пара S3-ключей доступа к этому бакету. Cozystack сам создаёт ключи и кладёт их в секрет, названный по бакету и пользователю. ClickHouse будет писать отчёты этими ключами, поэтому аналитическая выгрузка получает доступ только к этому бакету и больше ни к чему.
 
 <details><summary>Решение</summary>
 
@@ -486,7 +488,7 @@ git commit -m "Order a bucket for reports"
 git push
 ```
 
-В дашборде откройте Bucket → reports → Secrets → `bucket-reports-analytics-credentials`. Вам нужны `accessKey`, `secretKey` и `bucketName`; endpoint `s3.workshop.aenix.io` уже есть в запросе. В клиенте ClickHouse замените заглушки этими значениями и выгрузите отчёт:
+Когда `reports` будет готов, прочитайте его ключи в дашборде Cozystack: откройте Bucket → reports → Secrets → `bucket-reports-analytics-credentials`. Вам нужны `accessKey`, `secretKey` и `bucketName`; endpoint `s3.workshop.aenix.io` уже есть в запросе. В клиенте ClickHouse замените заглушки этими значениями и выгрузите отчёт:
 
 ```sql
 INSERT INTO FUNCTION s3('https://s3.workshop.aenix.io/<bucketName>/daily-report.csv', '<accessKey>', '<secretKey>', 'CSVWithNames')
