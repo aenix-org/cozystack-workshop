@@ -118,3 +118,21 @@ kind: RoleBinding
 metadata: {name: dallasXX-db-credentials, namespace: tenant-dallasXX}
 roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: workshop-db-credentials}
 subjects: [{kind: ServiceAccount, name: dallasXX, namespace: tenant-dallasXX}]
+---
+# Worker pools. Cozystack 1.7 moved worker pools into the KubernetesNodes application, but
+# the tenant admin role (cozy:tenant:admin, 1.7.1) does not list `kubernetesnodeses` among
+# the resources it may write, so a tenant can create a cluster and not its workers.
+# The participant's Flux applies platform/kubernetes.yaml with this service account.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: workshop-kubernetes-nodes, namespace: tenant-dallasXX}
+rules:
+  - apiGroups: [apps.cozystack.io]
+    resources: [kubernetesnodeses]
+    verbs: [get, list, watch, create, update, patch, delete]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: dallasXX-kubernetes-nodes, namespace: tenant-dallasXX}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: workshop-kubernetes-nodes}
+subjects: [{kind: ServiceAccount, name: dallasXX, namespace: tenant-dallasXX}]
