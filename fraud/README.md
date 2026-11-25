@@ -461,7 +461,9 @@ LIMIT 10;
 
 ### 3.3 A bucket for reports
 
-In the Cozystack dashboard, open catalog → Bucket, name it `reports`, and add a user `analytics`. Put the same declaration in `~/fraud-infra/platform/bucket.yaml`. Hint: `spec.users.analytics: {}`.
+The bucket goes straight into Git, like Kafka and ClickHouse: write `~/fraud-infra/platform/bucket.yaml` for a `Bucket` named `reports` with one user, `analytics`. Hint: `spec.users.analytics: {}`.
+
+A bucket user is not a person: it is a separate pair of S3 access keys for this bucket. Cozystack creates the keys and stores them in a secret named after the bucket and the user. ClickHouse will write reports with these keys, so the analytics job gets access to this one bucket and nothing else.
 
 <details><summary>Solution</summary>
 
@@ -486,7 +488,7 @@ git commit -m "Order a bucket for reports"
 git push
 ```
 
-In the dashboard, open Bucket → reports → Secrets → `bucket-reports-analytics-credentials`. You need `accessKey`, `secretKey`, and `bucketName`; the endpoint, `s3.workshop.aenix.io`, is already in the query. In the ClickHouse client, replace the placeholders with those values and export a report:
+When `reports` is ready, read its keys in the Cozystack dashboard: open Bucket → reports → Secrets → `bucket-reports-analytics-credentials`. You need `accessKey`, `secretKey`, and `bucketName`; the endpoint, `s3.workshop.aenix.io`, is already in the query. In the ClickHouse client, replace the placeholders with those values and export a report:
 
 ```sql
 INSERT INTO FUNCTION s3('https://s3.workshop.aenix.io/<bucketName>/daily-report.csv', '<accessKey>', '<secretKey>', 'CSVWithNames')
