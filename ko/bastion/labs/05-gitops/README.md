@@ -47,7 +47,7 @@
 
 ## 실습 폴더에 무엇이 들어 있나
 
-파일은 이미 전부 여러분 것입니다 — 저장소와 함께 가져왔으니까요. 새로 만들거나 다시 입력할 것은 없습니다: 아래에서 `kubectl apply -f 이름.yaml`이라고 적힌 곳이면, 그 파일은 여기서 가져옵니다.
+파일은 이미 전부 여러분 것입니다 — 저장소와 함께 가져왔으니까요. 새로 만들거나 다시 입력할 것은 없습니다: 아래에서 `kubectl apply -f name.yaml`이라고 적힌 곳이면, 그 파일은 여기서 가져옵니다.
 
 ```bash
 # From here on, all commands run from this folder: the paths in `kubectl apply -f` are relative to it.
@@ -262,7 +262,7 @@ kubectl apply -f https://github.com/fluxcd/flux2/releases/latest/download/instal
 
 Flux는 설치됐지만, 아직 어디로 가야 할지 모릅니다. 두 개의 객체로 알려줍니다.
 
-이 실습 폴더의 `flux/gitrepository.yaml`을 열고, `교체하세요` 자리표시자 대신 **본인** 저장소의 주소를 넣으세요:
+이 실습 폴더의 `flux/gitrepository.yaml`을 열고, `REPLACE-ME` 자리표시자 대신 **본인** 저장소의 주소를 넣으세요:
 
 ```yaml
   url: https://github.com/REPLACE-ME/passes-gitops

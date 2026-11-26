@@ -133,7 +133,7 @@ las credenciales del registro, y dentro de él tres claves que necesitas:
 
 | Clave | Qué contiene |
 |---|---|
-| `url` | la dirección de tu registro, de la forma `https://harbor-....<dominio del entorno de pruebas>` |
+| `url` | la dirección de tu registro, de la forma `https://harbor-....<testbed domain>` |
 | `admin-password` | la contraseña del administrador |
 | `redis-password` | la contraseña interna de Harbor, que no necesitas |
 

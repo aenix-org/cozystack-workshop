@@ -27,7 +27,7 @@ virtctl port-forward --namespace=tenant-workshopXX vmi/vm-instance-app-1 8080:80
 
 ⚠️ **Тут `vmi/` обов'язковий, а в `virtctl console` — навпаки, заважає.** Це не
 одрук і не наша примха: у двох команд різний синтаксис цілі. `port-forward` вимагає
-`тип/ім'я` і без префікса відповідає `target must contain type and name separated by '/'`.
+`type/name` і без префікса відповідає `target must contain type and name separated by '/'`.
 `console` очікує просто ім'я і з префіксом відповідає `forbidden`, бо приймає
 слово `vmi` за ім'я машини.
 

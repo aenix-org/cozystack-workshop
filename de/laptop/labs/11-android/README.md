@@ -263,7 +263,7 @@ zusammen mit der Beschreibung der Aufgabe ankommt.
 Der Quellcode liegt aus demselben Grund dort: Der Build braucht Dateien, und für sechs
 Textdateien eine Netzwerkfestplatte einzurichten hat keinen Sinn.
 
-Die App tut eine Sache: Sie zeigt die Zeile «Gästeausweis anfordern» an. Das genügt, denn
+Die App tut eine Sache: Sie zeigt die Zeile «Request a guest pass» an. Das genügt, denn
 im Lab geht es nicht um Android, sondern darum, wo es gebaut wird.
 
 **Ein APK** ist das, was am Ende herauskommt. Es ist ein Archiv, das die kompilierte
@@ -672,9 +672,9 @@ Orientierungspunkte:
 
 | Log-Markierung | Ungefähr wann |
 |---|---|
-| `== 1/5 installiere Android command-line tools ==` | sofort |
-| `== 2/5 akzeptiere Lizenzen und lade das SDK herunter (der längste Schritt) ==` | +1–2 Minuten, und hängt am längsten |
-| `== 3/5 baue das APK ==` | +5–15 Minuten ab dem Start |
+| `== 1/5 installing Android command-line tools ==` | sofort |
+| `== 2/5 accepting licenses and downloading the SDK (the longest step) ==` | +1–2 Minuten, und hängt am längsten |
+| `== 3/5 building the APK ==` | +5–15 Minuten ab dem Start |
 | `BUILD SUCCESSFUL in ...` | +10–25 Minuten ab dem Start |
 | `APK-UPLOADED bucket-.../propusk/propusk-...apk` | direkt danach |
 

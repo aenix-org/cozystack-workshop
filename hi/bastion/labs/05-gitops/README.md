@@ -47,7 +47,7 @@
 
 ## लैब फ़ोल्डर में क्या है
 
-सारी फ़ाइलें पहले से ही आपकी हैं — आपने उन्हें रिपॉज़िटरी के साथ ले लिया था। कुछ भी नए सिरे से बनाने या टाइप करने की ज़रूरत नहीं: नीचे जहाँ भी `kubectl apply -f नाम.yaml` लिखा है, फ़ाइल यहीं से आती है।
+सारी फ़ाइलें पहले से ही आपकी हैं — आपने उन्हें रिपॉज़िटरी के साथ ले लिया था। कुछ भी नए सिरे से बनाने या टाइप करने की ज़रूरत नहीं: नीचे जहाँ भी `kubectl apply -f name.yaml` लिखा है, फ़ाइल यहीं से आती है।
 
 ```bash
 # From here on, all commands run from this folder: the paths in `kubectl apply -f` are relative to it.
@@ -262,7 +262,7 @@ kubectl apply -f https://github.com/fluxcd/flux2/releases/latest/download/instal
 
 Flux इंस्टॉल हो गया, लेकिन उसे अभी नहीं पता कि कहाँ जाना है। हम उसे यह दो ऑब्जेक्ट से बताएँगे।
 
-इस लैब के फ़ोल्डर से `flux/gitrepository.yaml` खोलें और `मुझे-बदलें` प्लेसहोल्डर की जगह **अपनी** रिपॉज़िटरी का पता डालें:
+इस लैब के फ़ोल्डर से `flux/gitrepository.yaml` खोलें और `REPLACE-ME` प्लेसहोल्डर की जगह **अपनी** रिपॉज़िटरी का पता डालें:
 
 ```yaml
   url: https://github.com/REPLACE-ME/passes-gitops

@@ -262,7 +262,7 @@ kubectl apply -f https://github.com/fluxcd/flux2/releases/latest/download/instal
 
 Flux встановлений, але він поки не знає, куди ходити. Скажемо йому це двома об'єктами.
 
-Відкрийте `flux/gitrepository.yaml` з папки цієї лаби й підставте адресу **свого** репозиторію замість заглушки `ЗАМІНІТЬ-МЕНЕ`:
+Відкрийте `flux/gitrepository.yaml` з папки цієї лаби й підставте адресу **свого** репозиторію замість заглушки `REPLACE-ME`:
 
 ```yaml
   url: https://github.com/REPLACE-ME/passes-gitops

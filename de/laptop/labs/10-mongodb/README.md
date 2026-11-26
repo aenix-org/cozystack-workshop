@@ -380,7 +380,7 @@ cd labs/10-mongodb
 mo < passes.js
 ```
 
-**Was Sie sehen sollten** — `Dokumente in der Sammlung: 4`.
+**Was Sie sehen sollten** — `documents in collection: 4`.
 
 <details>
 <summary><b>Durchgehen, was wir eingelegt haben</b></summary>
@@ -501,7 +501,7 @@ db.passes.find({ "car.plate": "AB-1174-CD" })
 Dokuments und kann hineinreichen, statt das verschachtelte Objekt als einen Brocken Text zu speichern.
 
 Der Unterschied ist praktisch. Läge `car` in einer relationalen Tabelle als `TEXT`-Spalte mit JSON darin,
-würde die Suche nach dem Kennzeichen `LIKE '%M-AB 1234%'` bedeuten — ein Full Scan ohne Index, mit
+würde die Suche nach dem Kennzeichen `LIKE '%AB-1174-CD%'` bedeuten — ein Full Scan ohne Index, mit
 Fehltreffern. Hier ist es eine gewöhnliche Bedingung, auf die man einen Index aufbauen kann, und das
 werden wir.
 
@@ -519,7 +519,7 @@ db.passes.find({ entrances: "South" })
 ```
 
 Beachten Sie: die Bedingung wird geschrieben, als wäre `entrances` ein gewöhnliches Feld mit dem Wert
-`"Süd"`, obwohl es in Wirklichkeit eine Liste ist. **MongoDB versteht von selbst, dass die Bedingung,
+`"South"`, obwohl es in Wirklichkeit eine Liste ist. **MongoDB versteht von selbst, dass die Bedingung,
 wenn ein Feld eine Liste ist, gegen jedes Element geprüft werden muss.** Es ist keine gesonderte Syntax
 für „enthält“ nötig.
 
@@ -581,7 +581,7 @@ db.passes.aggregate([
 ])
 ```
 
-**Was Sie sehen sollten** — vier Zeilen der Form `{ _id: 'Einmalausweis', count: 1 }`.
+**Was Sie sehen sollten** — vier Zeilen der Form `{ _id: 'single-use', count: 1 }`.
 
 ## Schritt 5. Ein Index auf einem Feld, das die meisten nicht haben
 
@@ -805,7 +805,7 @@ Wir wenden die Regel an:
 mo < validator.js
 ```
 
-**Was Sie sehen sollten** — `Regel installiert`.
+**Was Sie sehen sollten** — `rule installed`.
 
 Wir versuchen, denselben Tippfehler zu wiederholen — jetzt unter der Aufsicht der Regel:
 

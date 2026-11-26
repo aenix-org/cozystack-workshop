@@ -79,7 +79,7 @@ se quedarán.
 ## Qué hay en la carpeta del laboratorio
 
 Ya tiene todos los archivos — los obtuvo junto con el repositorio. No hay nada que crear ni
-volver a escribir: dondequiera que abajo diga `kubectl apply -f nombre.yaml`, el archivo se
+volver a escribir: dondequiera que abajo diga `kubectl apply -f name.yaml`, el archivo se
 toma de aquí.
 
 ```bash
@@ -292,7 +292,7 @@ eso trata justamente el laboratorio sobre secretos.
 
 </details>
 
-Levante el Pod. Sustituya `workshopXX` por su número de tenant y `TuContraseñaAquí` por su
+Levante el Pod. Sustituya `workshopXX` por su número de tenant y `YourPasswordHere` por su
 contraseña:
 
 ```bash
@@ -388,7 +388,7 @@ cd labs/10-mongodb
 mo < passes.js
 ```
 
-**Lo que debería ver** — `documentos en la colección: 4`.
+**Lo que debería ver** — `documents in collection: 4`.
 
 <details>
 <summary><b>Recorriendo lo que pusimos</b></summary>
@@ -514,7 +514,7 @@ estructura del documento y puede llegar hacia adentro, en lugar de almacenar el 
 como un bloque de texto.
 
 La diferencia es práctica. Si `car` estuviera en una tabla relacional como una columna `TEXT`
-con JSON dentro, buscar por matrícula significaría `LIKE '%1174 BCD%'` — un escaneo completo
+con JSON dentro, buscar por matrícula significaría `LIKE '%AB-1174-CD%'` — un escaneo completo
 sin índice, con falsos positivos. Aquí es una condición ordinaria sobre la que se puede
 construir un índice, y lo haremos.
 
@@ -532,7 +532,7 @@ db.passes.find({ entrances: "South" })
 ```
 
 Fíjese: la condición está escrita como si `entrances` fuera un campo ordinario con el valor
-`"Sur"`, cuando en realidad es una lista. **MongoDB entiende por sí sola que si un campo es
+`"South"`, cuando en realidad es una lista. **MongoDB entiende por sí sola que si un campo es
 una lista, la condición debe comprobarse contra cada elemento.** No se requiere una sintaxis
 aparte para «contiene».
 
@@ -595,7 +595,7 @@ db.passes.aggregate([
 ])
 ```
 
-**Lo que debería ver** — cuatro filas de la forma `{ _id: 'puntual', count: 1 }`.
+**Lo que debería ver** — cuatro filas de la forma `{ _id: 'single-use', count: 1 }`.
 
 ## Paso 5. Un índice sobre un campo que la mayoría no tiene
 
@@ -824,7 +824,7 @@ Aplicamos la regla:
 mo < validator.js
 ```
 
-**Lo que debería ver** — `regla instalada`.
+**Lo que debería ver** — `rule installed`.
 
 Intentamos repetir la misma errata — ahora bajo la vigilancia de la regla:
 

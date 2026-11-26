@@ -121,7 +121,7 @@ external: false
 
 `## @param` 注释不是装饰，也不是给人看的文档。Cozystack 的生成器（`cozyvalues-gen`）根据它们构建 `values.schema.json` 以及 chart README 里的参数表。单一事实来源：改了注释，重新生成 schema，控制台里的表单就随之改变。
 
-格式是严格的：`## @param {类型} 名称=默认值 - 描述。`
+格式是严格的：`## @param {type} name=default-value - Description.`
 
 参数故意很少。每多一个参数，就是表单里多一个字段、多一种把应用部署错的方式、多一个要你维护的分支。一个好的 chart 让你配置各次安装之间真正有差异的东西，仅此而已。
 

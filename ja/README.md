@@ -14,7 +14,7 @@ VMware を管理していて、Cozystack とは何なのかをスライドでは
 | **ツール** | 自分でインストールします：`kubectl`、`virtctl`、`kubelogin` | bastion にインストール済み |
 | **クラスターへのアクセス** | ダッシュボードから取得した kubeconfig、ブラウザ経由でサインイン | SSH でログイン、アクセスは設定済み |
 | **ファイル内のテナント番号** | 自分で記入します | あらかじめ記入済み |
-| **アプリの確認** | `virtctl port-forward` + `localhost:8080` | ドメイン名 `app.<番号>.workshop.aenix.io` で |
+| **アプリの確認** | `virtctl port-forward` + `localhost:8080` | ドメイン名 `app.<number>.workshop.aenix.io` で |
 | **対象者** | 共有の bastion がない方 | bastion 付きの用意されたテスト環境がある方 |
 
 各フォルダの中には、それだけで完結するセットが入っています。それぞれの `README.md`

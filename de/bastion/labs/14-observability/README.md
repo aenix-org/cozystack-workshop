@@ -218,7 +218,7 @@ Die genaue Adresse ist im Dashboard notiert: Ihr Tenant → die App `Monitoring`
 nächste Analogon ist ein Eintrag auf einem Load Balancer, nur innerhalb desselben Clusters beschrieben. Dort liegt
 die Adresse vollständig, samt Hostname.
 
-Ein zweiter Ort ist die Ausgabe von `check.sh` aus genau diesem Lab: die Zeile „Grafana für Ihre Metriken“.
+Ein zweiter Ort ist die Ausgabe von `check.sh` aus genau diesem Lab: die Zeile „Grafana for your metrics“.
 Das Skript zieht die Adresse aus demselben Ingress, sodass Sie sie nicht von Hand eintippen müssen.
 
 ⚠️ **Wenn es in Ihrem Tenant keine App `Monitoring` gibt** — dann haben Sie auch keine eigene Grafana, und

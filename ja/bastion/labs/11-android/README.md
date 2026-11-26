@@ -250,7 +250,7 @@ secret/bucket-creds created
 ソースコードがそこにあるのも同じ理由です。ビルドにはファイルが必要ですが、6つのテキストファイルの
 ためにネットワークディスクを用意する意味はありません。
 
-アプリがすることは1つ、«ゲストパスを申請する» という行を表示することです。それで十分です。
+アプリがすることは1つ、«Request a guest pass» という行を表示することです。それで十分です。
 このラボはAndroidについてではなく、それがどこでビルドされるかについてだからです。
 
 **APK** が最後に出てくるものです。コンパイル済みのアプリケーション、画像、テキスト、どの画面を
@@ -630,9 +630,9 @@ kubectl logs -f job/propusk-build
 
 | ログのマーカー | だいたいいつ |
 |---|---|
-| `== 1/5 Android command-line tools をインストール中 ==` | すぐ |
-| `== 2/5 ライセンスに同意して SDK をダウンロード中（最も時間のかかるステップ） ==` | +1〜2分、そして最も長く止まる |
-| `== 3/5 APK をビルド中 ==` | 開始から+5〜15分 |
+| `== 1/5 installing Android command-line tools ==` | すぐ |
+| `== 2/5 accepting licenses and downloading the SDK (the longest step) ==` | +1〜2分、そして最も長く止まる |
+| `== 3/5 building the APK ==` | 開始から+5〜15分 |
 | `BUILD SUCCESSFUL in ...` | 開始から+10〜25分 |
 | `APK-UPLOADED bucket-.../propusk/propusk-...apk` | その直後 |
 

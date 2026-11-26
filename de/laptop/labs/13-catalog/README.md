@@ -147,7 +147,7 @@ Generator von Cozystack (`cozyvalues-gen`) die `values.schema.json` und die Para
 im README des Charts. Eine einzige Quelle der Wahrheit: ändern Sie den Kommentar, generieren Sie das Schema neu, und
 das Formular im Dashboard ändert sich mit.
 
-Das Format ist streng: `## @param {Typ} name=Standardwert - Beschreibung.`
+Das Format ist streng: `## @param {type} name=default-value - Description.`
 
 Es gibt bewusst wenige Parameter. Jeder neue Parameter ist ein weiteres Feld im Formular, eine
 weitere Möglichkeit, die Anwendung falsch auszurollen, und ein weiterer Zweig, den Sie pflegen müssen. Ein

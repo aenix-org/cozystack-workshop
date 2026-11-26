@@ -73,7 +73,7 @@ kubectl get nodes
 ## lab 폴더에 있는 것
 
 모든 파일은 이미 여러분의 것입니다 — 저장소와 함께 받았습니다. 새로 만들거나 다시 입력할 것은
-없습니다: 아래에서 `kubectl apply -f 이름.yaml`이라고 적힌 곳의 파일은 여기서 가져옵니다.
+없습니다: 아래에서 `kubectl apply -f name.yaml`이라고 적힌 곳의 파일은 여기서 가져옵니다.
 
 ```bash
 # every command in this lab is run from the lab folder — change into it
@@ -130,7 +130,7 @@ Harbor는 이미지 레이어를 S3 호환 스토리지에 저장하고, 그것�
 
 | 키 | 무엇이 들어 있나 |
 |---|---|
-| `url` | 여러분 레지스트리의 주소, `https://harbor-....<테스트베드 도메인>` 형태 |
+| `url` | 여러분 레지스트리의 주소, `https://harbor-....<testbed domain>` 형태 |
 | `admin-password` | 관리자 비밀번호 |
 | `redis-password` | Harbor의 내부 비밀번호, 여러분에게는 필요 없음 |
 

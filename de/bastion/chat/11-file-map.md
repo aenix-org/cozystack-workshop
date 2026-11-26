@@ -8,7 +8,7 @@ letzteren werden innerhalb des Clusters erstellt. Im Repository gibt es zwei Art
 und sie laufen an unterschiedlichen Orten.
 
 **Manifeste — `manifests/*.yaml`. Werden vom Bastion aus angewendet.**
-Sie beschreiben, was im Cluster erstellt werden soll. Der Befehl ist immer derselbe: `kubectl apply -f <datei>`.
+Sie beschreiben, was im Cluster erstellt werden soll. Der Befehl ist immer derselbe: `kubectl apply -f <file>`.
 
 • `01-bucket.yaml` — Speicher für das Image · Schritt 1
 • `02-conversion-vm.yaml` — die Konverter-Maschine · Schritt 2

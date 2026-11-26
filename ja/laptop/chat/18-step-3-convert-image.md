@@ -16,7 +16,7 @@ curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/maste
 nano convert.sh
 ```
 
-**ここで、ステップ1でメモしておいた3つの値が役に立ちます。** ファイルの先頭付近に「自分の値を入力」というラベルの付いたブロックがあります。その中のプレースホルダーを、引用符はそのままにして自分の値に置き換えてください:
+**ここで、ステップ1でメモしておいた3つの値が役に立ちます。** ファイルの先頭付近に「PASTE YOUR VALUES」というラベルの付いたブロックがあります。その中のプレースホルダーを、引用符はそのままにして自分の値に置き換えてください:
 
 ```
 BUCKET="your-bucket-name"

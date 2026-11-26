@@ -30,7 +30,7 @@ y veremos que la copia no vuelve. La diferencia entre estos dos casos es de lo q
 ## Qué hay en la carpeta del lab
 
 Ya tienes todos los archivos —los obtuviste junto con el repositorio. No hay nada que crear
-ni volver a teclear: donde más abajo diga `kubectl apply -f nombre.yaml`, el archivo se toma de aquí.
+ni volver a teclear: donde más abajo diga `kubectl apply -f name.yaml`, el archivo se toma de aquí.
 
 ```bash
 # All the lab's commands are run from this folder — otherwise the relative paths in them won't line up.

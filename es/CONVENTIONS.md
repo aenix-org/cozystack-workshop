@@ -46,7 +46,7 @@ Un archivo `README.md` en la carpeta de la lab. El orden de las secciones es est
    fragmentos sueltos en celdas distintas. No debe haber una columna aparte de «dónde falla la
    analogía»: fuera de contexto, su encabezado no significa nada
 5. **Qué hay en la carpeta de la lab** — una tabla de todos los archivos de la lab: archivo, qué
-   es, cuándo resulta útil. El lector no debe adivinar de dónde salió el `nombre.yaml` de un
+   es, cuándo resulta útil. El lector no debe adivinar de dónde salió el `name.yaml` de un
    comando `apply`, ni si tiene que crearlo él mismo. Cada archivo que la lab aplica debe estar en
    su carpeta (o en una vecina, y entonces la ruta se escribe de forma explícita:
    `../03-scale/hpa.yaml`)

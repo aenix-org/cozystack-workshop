@@ -31,7 +31,7 @@ El bucket está cerrado y, para poner algo en él, necesitas sus propias claves 
 
 El cuarto, `endpoint`, no hace falta que lo anotes: es el mismo para todos y ya está escrito en el script.
 
-**A dónde van.** En el paso 3 abrirás el archivo `convert.sh` en la máquina conversora, y dentro de él un bloque «PEGA TUS VALORES» de tres líneas:
+**A dónde van.** En el paso 3 abrirás el archivo `convert.sh` en la máquina conversora, y dentro de él un bloque «PASTE YOUR VALUES» de tres líneas:
 
 ```
 BUCKET="PASTE_bucketName"

@@ -128,7 +128,7 @@ cd labs/06-harbor
 
 | Ключ | Что в нём |
 |---|---|
-| `url` | адрес вашего реестра, вида `https://harbor-....<домен стенда>` |
+| `url` | адрес вашего реестра, вида `https://harbor-....<testbed domain>` |
 | `admin-password` | пароль администратора |
 | `redis-password` | внутренний пароль Harbor, вам не нужен |
 

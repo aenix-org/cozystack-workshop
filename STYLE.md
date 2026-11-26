@@ -33,10 +33,10 @@ it. A correct-but-wooden translation is a failed translation here.
   block quotes, `<details>`/`<summary>`, links, and image references.
 - Keep the callout markers verbatim: `📍`, `⚠️`, and the bold lead-ins like
   `**Где:**` → translate the label text but keep the marker and the bolding.
-- Comments **inside** code blocks (e.g. `# ...` in a bash block, `// ...`, `-- ...`)
-  *are* prose and **must** be translated — every one of them — while the code
-  tokens around them stay byte-identical. Leaving in-code comments in the source
-  language is a defect: it silently drops teaching and warnings.
+- Code is never translated, comments included. Scripts, manifests, SQL, app
+  sources and fenced code blocks are copied from `en/` byte for byte, so there is
+  one version to maintain. Explanations that matter go into the prose around the
+  block, in the target language.
 
 ## Terminology
 

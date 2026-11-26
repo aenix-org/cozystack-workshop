@@ -131,7 +131,7 @@ HarborはイメージのレイヤーをS3互換ストレージに保管し、そ
 
 | キー | 中身 |
 |---|---|
-| `url` | あなたのレジストリのアドレス。`https://harbor-....<テスト環境のドメイン>` の形式 |
+| `url` | あなたのレジストリのアドレス。`https://harbor-....<testbed domain>` の形式 |
 | `admin-password` | 管理者のパスワード |
 | `redis-password` | Harborの内部パスワード。あなたには不要 |
 

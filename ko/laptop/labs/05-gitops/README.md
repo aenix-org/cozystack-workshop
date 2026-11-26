@@ -262,7 +262,7 @@ kubectl apply -f https://github.com/fluxcd/flux2/releases/latest/download/instal
 
 Flux는 설치됐지만, 아직 어디로 가야 할지 모릅니다. 두 개의 객체로 알려줍니다.
 
-이 실습 폴더의 `flux/gitrepository.yaml`을 열고, `교체하세요` 자리표시자 대신 **본인** 저장소의 주소를 넣으세요:
+이 실습 폴더의 `flux/gitrepository.yaml`을 열고, `REPLACE-ME` 자리표시자 대신 **본인** 저장소의 주소를 넣으세요:
 
 ```yaml
   url: https://github.com/REPLACE-ME/passes-gitops

@@ -282,7 +282,7 @@ Pod'а задається один раз, і далі пароль у кома�
 </details>
 
 Піднімаємо Pod. Підставте свій номер тенанта замість `workshopXX` і свій пароль замість
-`ТутВашПароль`:
+`YourPasswordHere`:
 
 ```bash
 # KUBECONFIG — which access file kubectl uses. Here it's the lab cluster

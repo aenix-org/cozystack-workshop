@@ -47,7 +47,7 @@ El resto de las palabras de este laboratorio —Git, Commit, Rama, Pull request,
 
 ## Qué hay en la carpeta del laboratorio
 
-Todos los archivos ya son tuyos: los tomaste junto con el repositorio. No hay nada que crear ni volver a escribir: allí donde más abajo diga `kubectl apply -f nombre.yaml`, el archivo se toma de aquí.
+Todos los archivos ya son tuyos: los tomaste junto con el repositorio. No hay nada que crear ni volver a escribir: allí donde más abajo diga `kubectl apply -f name.yaml`, el archivo se toma de aquí.
 
 ```bash
 # From here on, all commands run from this folder: the paths in `kubectl apply -f` are relative to it.
@@ -262,7 +262,7 @@ La diferencia: así se levantan los cuatro servicios en vez de dos. Eso se notar
 
 Flux está instalado, pero todavía no sabe a dónde ir. Se lo diremos con dos objetos.
 
-Abre `flux/gitrepository.yaml` de la carpeta de este laboratorio y pon la dirección de **tu** repositorio en lugar del marcador `REEMPLAZAME`:
+Abre `flux/gitrepository.yaml` de la carpeta de este laboratorio y pon la dirección de **tu** repositorio en lugar del marcador `REPLACE-ME`:
 
 ```yaml
   url: https://github.com/REPLACE-ME/passes-gitops

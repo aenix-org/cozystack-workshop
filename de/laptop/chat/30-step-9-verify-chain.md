@@ -28,7 +28,7 @@ Schließen Sie das Fenster mit diesem Befehl nicht: der Tunnel lebt, solange er 
 
 ⚠️ **Hier ist `vmi/` erforderlich, während es in `virtctl console` genau umgekehrt ist — dort
 stört es.** Das ist kein Tippfehler und keine Marotte von uns: die beiden Befehle haben eine
-unterschiedliche Ziel-Syntax. `port-forward` verlangt `Typ/Name` und antwortet ohne das Präfix mit
+unterschiedliche Ziel-Syntax. `port-forward` verlangt `type/name` und antwortet ohne das Präfix mit
 `target must contain type and name separated by '/'`. `console` erwartet nur den Namen und
 antwortet mit dem Präfix mit `forbidden`, weil es das Wort `vmi` für den Namen der Maschine hält.
 

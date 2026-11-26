@@ -30,7 +30,7 @@ Kubernetes의 가장 요란한 약속인 자가 복구를 파헤쳐 봅시다. �
 ## 랩 폴더에 있는 것
 
 파일은 이미 모두 여러분에게 있습니다 — 저장소와 함께 받았습니다. 새로 만들거나 다시 타이핑할
-것은 없습니다: 아래에서 `kubectl apply -f 이름.yaml`이라고 적힌 곳의 파일은 여기서 가져옵니다.
+것은 없습니다: 아래에서 `kubectl apply -f name.yaml`이라고 적힌 곳의 파일은 여기서 가져옵니다.
 
 ```bash
 # All the lab's commands are run from this folder — otherwise the relative paths in them won't line up.

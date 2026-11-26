@@ -146,7 +146,7 @@ generador de Cozystack (`cozyvalues-gen`) construye `values.schema.json` y la ta
 parámetros en el README del chart. Una única fuente de verdad: cambias el comentario,
 regeneras el esquema, y el formulario en el panel cambia con él.
 
-El formato es estricto: `## @param {tipo} nombre=valor-por-defecto - Descripción.`
+El formato es estricto: `## @param {type} name=default-value - Description.`
 
 Los parámetros son pocos a propósito. Cada nuevo parámetro es un campo más en el formulario,
 una forma más de desplegar mal la aplicación y una rama más que tendrás que mantener. Un buen

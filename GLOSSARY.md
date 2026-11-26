@@ -69,11 +69,13 @@ These were pinned after review to stop drift. Use exactly these:
 | виртуалка / джамп-хост (the shared VM you SSH into) | **the bastion** | never "VM" — reserve "VM"/"virtual machine" for actual VMs and VMInstances |
 | Pod (the Kubernetes object) | **Pod** (capitalized) | even in running prose |
 
-## Reader-facing placeholders (translate — they are instructions, not code)
+## Placeholders, scripts and manifests: English only, in every language
 
-Descriptive fill-in placeholders are meant to be replaced by the reader, so they
-are localized in every language (in prose AND in the shipped file), even though
-they sit inside code:
+There is one copy of every script, manifest, SQL file and app source: the one in
+`en/`. Every other language folder carries byte-identical copies, and fenced code
+blocks in the guides match the `en/` guide. Placeholders are never localized,
+neither in files nor in inline code in the prose. The table maps the old Russian
+placeholders to the English ones now used everywhere:
 
 | ru placeholder | English |
 |---|---|
@@ -90,9 +92,9 @@ they sit inside code:
 | `<скрыто>` | `<hidden>` |
 | credential labels `логин:` / `пароль:` / `хост:` / `база:` | `login:` / `password:` / `host:` / `database:` |
 
-**Keep verbatim** (functional tokens the scripts/manifests actually depend on):
-`workshopXX`, `ВСТАВЬТЕ_PRESIGNED_URL`, `ВСТАВЬТЕ_...` fields in `convert.sh`,
-and every other identifier that appears unchanged in the shipped files.
+Functional tokens: `workshopXX`, `PASTE_PRESIGNED_URL` and the `PASTE_...` fields
+in `convert.sh` (formerly `ВСТАВЬТЕ_...`). When a guide quotes a script, its output
+or a placeholder, quote the English text exactly as it is in the file.
 
 ## Chinese (zh) — resolved canonical renderings
 
@@ -143,9 +145,7 @@ Pinned after review. Use exactly these; no raw English where a Spanish term exis
 | Pod (object) | **Pod** (capitalized) | even in running prose |
 
 Register: participant-facing material uses **tú** throughout; CONVENTIONS.md must
-use tú too (not usted). Reader-facing password placeholders localized like the
-mongodb lab: e.g. `tu-contraseña-analyst`, `TuContraseñaAquí`. Credential labels
-follow the glossary targets (login: / password: / host: / database:).
+use tú too (not usted). Placeholders stay English as in the files (e.g. `YourPasswordHere`).
 
 ### Spanish (es) — laptop-phase additions
 | Concept | Español | not |
@@ -188,9 +188,8 @@ Fixed product/CLI/Kubernetes-object names stay verbatim in these languages too
 | the instructor | 講師 | 강사 | die Lehrkraft | प्रशिक्षक |
 | workshop (event) | ワークショップ | 워크숍 | Workshop | वर्कशॉप |
 
-Reader-facing placeholders (YourPasswordHere, YOUR-LOGIN, etc.) are localized in
-each language the same way as the en/zh/es tables above; functional placeholders
-(workshopXX, ВСТАВЬТЕ_*) stay verbatim. Pod, Secret and other K8s object names
+Placeholders (YourPasswordHere, YOUR-LOGIN, PASTE_*, workshopXX, ...) stay English,
+exactly as in the files. Pod, Secret and other K8s object names
 stay in English in all languages.
 
 ### Japanese (ja) — resolved renderings
@@ -233,7 +232,7 @@ German quotes: opening low „ (U+201E) + closing high " (U+201C) — never a st
 | managed service | **प्रबंधित सेवा** | not raw "managed" |
 | application (spelling) | **एप्लिकेशन** | not ऐप्लिकेशन |
 Fixed callout (CONVENTIONS): stop-and-think = **आगे पढ़ने से पहले रुककर सोचिए।**
-Reader-facing password placeholders localized like the rest (e.g. CH_PASSWORD='आपका-analyst-पासवर्ड').
+Placeholders stay English as in the files (e.g. CH_PASSWORD='your-analyst-password').
 
 ## Ukrainian (uk) — concept terms
 

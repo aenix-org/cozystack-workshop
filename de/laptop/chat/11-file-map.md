@@ -6,7 +6,7 @@ Im Repository gibt es zwei Arten von Dateien, und sie liegen an unterschiedliche
 Wichtigste, was Sie verstehen sollten, bevor Sie mit dem praktischen Teil beginnen.
 
 **Manifeste — `manifests/*.yaml`. Werden von Ihrem Laptop aus angewendet.**
-Sie beschreiben, was im Cluster erstellt werden soll. Der Befehl ist immer derselbe: `kubectl apply -f <datei>`.
+Sie beschreiben, was im Cluster erstellt werden soll. Der Befehl ist immer derselbe: `kubectl apply -f <file>`.
 
 • `01-bucket.yaml` — Speicher für das Image · Schritt 1
 • `02-conversion-vm.yaml` — die Konverter-Maschine · Schritt 2

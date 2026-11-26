@@ -78,7 +78,7 @@ Kubernetes와 MongoDB 용어는 이 랩에서 처음 나올 때 설명하며, �
 ## 랩 폴더에 무엇이 있는가
 
 모든 파일은 이미 여러분에게 있습니다 — 저장소와 함께 받았습니다. 새로 만들거나 다시 입력할
-것은 없습니다: 아래에서 `kubectl apply -f 이름.yaml`이라고 쓰인 곳마다, 파일은 여기서
+것은 없습니다: 아래에서 `kubectl apply -f name.yaml`이라고 쓰인 곳마다, 파일은 여기서
 가져옵니다.
 
 ```bash
@@ -283,7 +283,7 @@ mongodb://passapp:password@host:27017/passes?authSource=admin&directConnection=t
 
 </details>
 
-Pod를 세웁니다. `workshopXX`를 여러분의 테넌트 번호로, `여기에비밀번호입력`을 여러분의
+Pod를 세웁니다. `workshopXX`를 여러분의 테넌트 번호로, `YourPasswordHere`를 여러분의
 비밀번호로 바꾸세요:
 
 ```bash
@@ -376,7 +376,7 @@ cd labs/10-mongodb
 mo < passes.js
 ```
 
-**여러분이 보게 될 것** — `컬렉션 문서 수: 4`.
+**여러분이 보게 될 것** — `documents in collection: 4`.
 
 <details>
 <summary><b>우리가 넣은 것 짚어 보기</b></summary>
@@ -496,7 +496,7 @@ db.passes.find({ "car.plate": "AB-1174-CD" })
 접근할 수 있으며, 중첩 객체를 텍스트 덩어리로 저장하지 않습니다.
 
 차이는 실질적입니다. 만약 `car`가 관계형 테이블에서 JSON을 담은 `TEXT` 컬럼으로 있었다면,
-번호판으로 검색하는 것은 `LIKE '%34가 1174%'`를 뜻했을 것입니다 — 인덱스 없는 전체 스캔,
+번호판으로 검색하는 것은 `LIKE '%AB-1174-CD%'`를 뜻했을 것입니다 — 인덱스 없는 전체 스캔,
 게다가 거짓 양성까지. 여기서는 인덱스를 만들 수 있는 평범한 조건이고, 실제로 만들 것입니다.
 
 ⚠️ `"car.plate"`를 감싸는 따옴표는 필수입니다: 그것이 없으면 JavaScript는 점을 객체 속성에
@@ -512,7 +512,7 @@ db.passes.find({ "car.plate": "AB-1174-CD" })
 db.passes.find({ entrances: "South" })
 ```
 
-주목하세요: 조건은 마치 `entrances`가 값 `"남문"`를 가진 평범한 필드인 것처럼 적혔지만,
+주목하세요: 조건은 마치 `entrances`가 값 `"South"`를 가진 평범한 필드인 것처럼 적혔지만,
 실제로는 목록입니다. **MongoDB는 필드가 목록이면 조건을 각 원소에 대해 검사해야 한다는 것을
 스스로 이해합니다.** "포함한다"를 위한 별도의 구문은 필요 없습니다.
 
@@ -573,7 +573,7 @@ db.passes.aggregate([
 ])
 ```
 
-**여러분이 보게 될 것** — `{ _id: '1회용', count: 1 }` 형태의 네 줄.
+**여러분이 보게 될 것** — `{ _id: 'single-use', count: 1 }` 형태의 네 줄.
 
 ## 단계 5. 대부분이 갖고 있지 않은 필드에 대한 인덱스
 
@@ -795,7 +795,7 @@ db.runCommand({
 mo < validator.js
 ```
 
-**여러분이 보게 될 것** — `규칙이 설치됨`.
+**여러분이 보게 될 것** — `rule installed`.
 
 같은 오타를 되풀이해 봅니다 — 이제 규칙의 감시 아래에서:
 

@@ -101,7 +101,7 @@ data:
     <div class="pod">served by pod<b>__POD__</b></div>
 ```
 
-Dentro hay una sola página: otro encabezado, otra gama de colores, una llamativa insignia «VERSIÓN 2». Las diferencias se hicieron deliberadamente vistosas — estarás mirando el navegador, no un diff.
+Dentro hay una sola página: otro encabezado, otra gama de colores, una llamativa insignia «VERSION 2». Las diferencias se hicieron deliberadamente vistosas — estarás mirando el navegador, no un diff.
 
 Fíjate en dos cosas.
 
@@ -327,7 +327,7 @@ Abre un túnel a la aplicación:
 kubectl port-forward svc/rickroll 8080:80
 ```
 
-📍 **En el navegador** <http://localhost:8080> — la página verde con la insignia «VERSIÓN 2». Refréscala unas cuantas veces: el nombre de la copia al pie cambia, porque el Service distribuye las peticiones entre las tres copias.
+📍 **En el navegador** <http://localhost:8080> — la página verde con la insignia «VERSION 2». Refréscala unas cuantas veces: el nombre de la copia al pie cambia, porque el Service distribuye las peticiones entre las tres copias.
 
 Cierra el túnel (`Ctrl+C`).
 

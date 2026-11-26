@@ -38,7 +38,7 @@ ganzen Weg bis zur Datenbank und zur Warteschlange.
 Ein Benutzername und ein Passwort — dieselben an allen drei Stellen:
 
 * **Dashboard** https://dashboard.workshop.aenix.io — Anmeldung über den Browser, namespace `tenant-workshopXX`
-* **der Bastion** — Anmeldung über SSH: `ssh workshopXX@<bastion-adresse>`
+* **der Bastion** — Anmeldung über SSH: `ssh workshopXX@<bastion-address>`
 * innerhalb des Bastion ist der Zugriff auf den Cluster bereits eingerichtet, und die kubeconfig liegt in `~/.kube/config`
 
 Ersetzen Sie überall im Folgenden `workshopXX` durch Ihre eigene Nummer (die Lehrkraft hat sie Ihnen gegeben).

@@ -83,10 +83,10 @@ Bild. `set -e` nicht verwenden.
 
 `check/lib.sh` — gemeinsame Funktionen, wird am Anfang jedes Skripts eingebunden:
 
-- `ok "Text"` / `fail "Text" "Hinweis"` / `warn "Text"` — ein Ergebnis ausgeben
+- `ok "text"` / `fail "text" "hint"` / `warn "text"` — ein Ergebnis ausgeben
 - `need_kubeconfig` — prüfen, dass `KUBECONFIG` gesetzt ist und der Cluster antwortet
 - `need_tenant` — prüfen, dass `COZY_TENANT` gesetzt ist
-- `evidence "Überschrift" "Wert"` — einen Nachweis zum Artefakt hinzufügen
+- `evidence "heading" "value"` — einen Nachweis zum Artefakt hinzufügen
 - `finish` — Fazit ziehen, den Bericht schreiben, den Exit-Code zurückgeben
 
 Exit-Code: `0` — alles bestanden, `1` — es gibt Fehlschläge. So lässt sich das Skript in der

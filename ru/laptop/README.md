@@ -383,7 +383,7 @@ curl -s http://localhost:8080/api/orders
 
 > **Префикс `vmi/` нужен не везде, и это не опечатка.** У двух команд разный синтаксис
 > цели. `virtctl console` ждёт просто имя и с префиксом отвечает `forbidden`, потому что
-> принимает слово `vmi` за имя машины. `virtctl port-forward` требует `тип/имя` и без
+> принимает слово `vmi` за имя машины. `virtctl port-forward` требует `type/name` и без
 > префикса отвечает `target must contain type and name separated by '/'`.
 
 ```bash

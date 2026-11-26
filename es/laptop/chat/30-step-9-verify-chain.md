@@ -28,7 +28,7 @@ No cierres la ventana con este comando: el túnel vive mientras siga corriendo.
 
 ⚠️ **Aquí `vmi/` es obligatorio, mientras que en `virtctl console` es al revés — estorba.** Esto
 no es una errata ni un capricho nuestro: los dos comandos tienen una sintaxis de destino distinta.
-`port-forward` exige `tipo/nombre` y sin el prefijo responde `target must contain type and name
+`port-forward` exige `type/name` y sin el prefijo responde `target must contain type and name
 separated by '/'`. `console` espera solo el nombre y con el prefijo responde `forbidden`, porque
 toma la palabra `vmi` por el nombre de la máquina.
 

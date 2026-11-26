@@ -31,7 +31,7 @@ Der Bucket ist verschlossen, und um etwas hineinzulegen, brauchen Sie seine eige
 
 Den vierten, `endpoint`, müssen Sie nicht notieren — er ist für alle gleich und im Skript bereits eingetragen.
 
-**Wohin sie kommen.** In Schritt 3 öffnen Sie auf der Konvertermaschine die Datei `convert.sh`, und darin einen Block „FÜGEN SIE IHRE WERTE EIN“ aus drei Zeilen:
+**Wohin sie kommen.** In Schritt 3 öffnen Sie auf der Konvertermaschine die Datei `convert.sh`, und darin einen Block „PASTE YOUR VALUES“ aus drei Zeilen:
 
 ```
 BUCKET="PASTE_bucketName"

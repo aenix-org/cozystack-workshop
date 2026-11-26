@@ -50,13 +50,13 @@ Tras el reinicio tendrás una consola Ubuntu, y de ahí en adelante trabajas en 
 sudo snap install kubectl --classic
 ```
 
-Los discos de Windows son visibles desde WSL bajo la ruta `/mnt/c/...`, así que los archivos descargados con un navegador normal están disponibles también dentro — no hace falta copiarlos a ningún sitio. Esto viene bien un poco más adelante, cuando obtengas el archivo de acceso al clúster: si lo guardas en Windows, desde WSL quedará en una ruta como `/mnt/c/Users/Ivan/Downloads/nombre-de-archivo`.
+Los discos de Windows son visibles desde WSL bajo la ruta `/mnt/c/...`, así que los archivos descargados con un navegador normal están disponibles también dentro — no hace falta copiarlos a ningún sitio. Esto viene bien un poco más adelante, cuando obtengas el archivo de acceso al clúster: si lo guardas en Windows, desde WSL quedará en una ruta como `/mnt/c/Users/Ivan/Downloads/filename`.
 
 ⚠️ **Si WSL está bloqueado por la política de seguridad** — algo habitual en un bastion corporativo — los labs igual se pueden hacer: todo lo que se hace en el panel es independiente del sistema operativo. Lo único que no podrás ejecutar son los scripts de comprobación y unos pocos pasos compuestos enteramente de comandos. Esos lugares están marcados aparte.
 
 ## Qué hay en la carpeta del lab
 
-Todos los archivos ya son tuyos — los tomaste junto con el repositorio. No hay nada que crear ni volver a teclear: allí donde más abajo diga `kubectl apply -f nombre.yaml`, el archivo se toma de aquí.
+Todos los archivos ya son tuyos — los tomaste junto con el repositorio. No hay nada que crear ni volver a teclear: allí donde más abajo diga `kubectl apply -f name.yaml`, el archivo se toma de aquí.
 
 ```bash
 # the path is counted from the repository root — you fetch it in the next step
@@ -212,7 +212,7 @@ De aquí se sigue algo importante: **Kubernetes aquí no reemplaza a la virtuali
 
 📍 **Dónde:** en el bastion; el archivo mismo se obtiene con un comando o desde el panel.
 
-**Qué obtenemos.** El kubeconfig del clúster `lab` — un archivo de texto donde están registradas la dirección de su servidor API y tus datos de acceso a él. Sin un archivo así, `kubectl` no sabe a dónde dirigirse ni como quién presentarse. El archivo lo creas tú mismo en tu bastion, con el nombre `~/lab.kubeconfig`; `~` en las rutas es tu carpeta personal: `/Users/nombre` en macOS, `/home/nombre` en Linux y WSL.
+**Qué obtenemos.** El kubeconfig del clúster `lab` — un archivo de texto donde están registradas la dirección de su servidor API y tus datos de acceso a él. Sin un archivo así, `kubectl` no sabe a dónde dirigirse ni como quién presentarse. El archivo lo creas tú mismo en tu bastion, con el nombre `~/lab.kubeconfig`; `~` en las rutas es tu carpeta personal: `/Users/name` en macOS, `/home/name` en Linux y WSL.
 
 ⚠️ **Este es un segundo archivo de acceso, no un reemplazo del primero.** El que te dieron junto con el tenant (en los labs está en la ruta `~/.kube/config`) lleva al clúster de gestión — allí donde pides aplicaciones y donde acabas de crear `lab`. El nuevo archivo lleva dentro del clúster `lab` en sí. Son dos clústeres distintos con direcciones distintas, y de aquí en adelante necesitas ambos: las órdenes a la plataforma van por el primer archivo, el trabajo dentro de tu propio clúster por el segundo.
 

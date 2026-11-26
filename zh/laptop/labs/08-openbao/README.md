@@ -73,7 +73,7 @@ init 容器——都会随着进度逐一引入，出现在各自第一次用到
 ## 实验文件夹里有什么
 
 所有文件你已经有了——它们是随仓库一起拿到的。不需要创建或重新敲入任何东西：
-下文凡是写到 `kubectl apply -f 名称.yaml` 的地方，文件都取自这里。
+下文凡是写到 `kubectl apply -f name.yaml` 的地方，文件都取自这里。
 
 ```bash
 cd labs/08-openbao
@@ -449,7 +449,7 @@ Storage Type       file
 ⚠️ **如果命令以 `connection refused`、`no such host` 或 `i/o timeout` 失败——**
 再往下走没有意义；先解决连通性。常见原因，按可能性从高到低：你没有把 `workshopXX`
 换成自己的编号；控制台里的应用还没就绪；名字里有拼写错误。名字是按
-`openbao-<应用名>` 这条规则拼出来的：你把应用命名为 `secrets`，所以地址里是
+`openbao-<application name>` 这条规则拼出来的：你把应用命名为 `secrets`，所以地址里是
 `openbao-secrets`，而不是 `secrets`。
 
 ## 一次可以预料的失败 · 存储拒绝服务
@@ -583,7 +583,7 @@ kubectl exec -it bao-workbench -- bao login
 输出里的 Initial Root Token 粘贴进去。
 
 ⚠️ **如果 `bao login` 抱怨它没法写入令牌文件**，那就在每条命令里都把令牌作为环境
-变量传进去：`kubectl exec bao-workbench -- env BAO_TOKEN='你的令牌' bao status`。
+变量传进去：`kubectl exec bao-workbench -- env BAO_TOKEN='your-token' bao status`。
 这法子管用，但令牌会落进你的命令历史里——在实验里可以忍，在生产环境里不行。
 
 ## 第 6 步。启用引擎并存入密码

@@ -46,7 +46,7 @@ kubectl get buckets.apps.cozystack.io -n tenant-workshopXX
 в скрипт.
 
 **Куда они пойдут.** На шаге 3 вы откроете в машине-конвертере файл `convert.sh`,
-а в нём — блок «ВСТАВЬТЕ СВОИ ЗНАЧЕНИЯ» из трёх строк:
+а в нём — блок «PASTE YOUR VALUES» из трёх строк:
 
 ```
 BUCKET="PASTE_bucketName"

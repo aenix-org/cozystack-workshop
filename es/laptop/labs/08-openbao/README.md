@@ -75,7 +75,7 @@ por primera vez. No hace falta memorizarlos ahora: separados de la acción, de t
 ## Qué hay en la carpeta de la práctica
 
 Ya tienes todos los archivos — los recibiste con el repositorio. No hay nada que crear ni volver a
-escribir: donde el texto de abajo dice `kubectl apply -f nombre.yaml`, el archivo viene de aquí.
+escribir: donde el texto de abajo dice `kubectl apply -f name.yaml`, el archivo viene de aquí.
 
 ```bash
 cd labs/08-openbao
@@ -461,7 +461,7 @@ Storage Type       file
 ⚠️ **Si el comando falla con `connection refused`, `no such host` o `i/o timeout` —**
 no tiene sentido seguir; primero la conectividad. Causas comunes, en orden decreciente de probabilidad:
 no sustituiste `workshopXX` por tu propio número; la aplicación en el panel aún no está lista; un error
-de tecleo en el nombre. El nombre se construye por la regla `openbao-<nombre de la aplicación>`: nombraste
+de tecleo en el nombre. El nombre se construye por la regla `openbao-<application name>`: nombraste
 la aplicación `secrets`, así que la dirección contiene `openbao-secrets`, no `secrets`.
 
 ## Un fallo predecible · El almacén se niega a servir
@@ -605,7 +605,7 @@ Initial Root Token de la salida de `init`.
 
 ⚠️ **Si `bao login` se queja de que no puede escribir el archivo del token**, pasa el token como variable
 de entorno en cada comando:
-`kubectl exec bao-workbench -- env BAO_TOKEN='tu-token' bao status`.
+`kubectl exec bao-workbench -- env BAO_TOKEN='your-token' bao status`.
 Funciona, pero el token acaba en tu historial de comandos — tolerable en la práctica, no en producción.
 
 ## Paso 6. Activa el motor y guarda la contraseña

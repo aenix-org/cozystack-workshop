@@ -262,7 +262,7 @@ mongodb://passapp:password@host:27017/passes?authSource=admin&directConnection=t
 
 </details>
 
-拉起这个 Pod。把 `workshopXX` 替换成你的租户编号，把 `你的密码` 替换成你自己的密码：
+拉起这个 Pod。把 `workshopXX` 替换成你的租户编号，把 `YourPasswordHere` 替换成你自己的密码：
 
 ```bash
 # KUBECONFIG — which access file kubectl uses. Here it's the lab cluster
@@ -348,7 +348,7 @@ cd labs/10-mongodb
 mo < passes.js
 ```
 
-**你应该看到** —— `集合中的文档数: 4`。
+**你应该看到** —— `documents in collection: 4`。
 
 <details>
 <summary><b>逐一解析我们放进去的内容</b></summary>
@@ -464,7 +464,7 @@ db.passes.find({ "car.plate": "AB-1174-CD" })
 而不是把嵌套对象当作一段文本来存。
 
 这个区别很实际。如果 `car` 作为一个内部塞了 JSON 的 `TEXT` 列放在关系表里，按车牌搜索就
-意味着 `LIKE '%京A12345%'` —— 没有索引的全表扫描，还带误报。这里它是一个可以在其上建索引
+意味着 `LIKE '%AB-1174-CD%'` —— 没有索引的全表扫描，还带误报。这里它是一个可以在其上建索引
 的普通条件，而我们也会这么做。
 
 ⚠️ `"car.plate"` 两边的引号是必需的：没有它们，JavaScript 会把点号理解成访问对象属性，
@@ -480,7 +480,7 @@ db.passes.find({ "car.plate": "AB-1174-CD" })
 db.passes.find({ entrances: "South" })
 ```
 
-注意：条件写得就好像 `entrances` 是一个值为 `"南门"` 的普通字段，而实际上它是一个列表。
+注意：条件写得就好像 `entrances` 是一个值为 `"South"` 的普通字段，而实际上它是一个列表。
 **MongoDB 自己就明白，如果一个字段是列表，条件就要对每个元素逐一检查。** 不需要单独的
 「包含」语法。
 
@@ -538,7 +538,7 @@ db.passes.aggregate([
 ])
 ```
 
-**你应该看到** —— 四行，形如 `{ _id: '一次性', count: 1 }`。
+**你应该看到** —— 四行，形如 `{ _id: 'single-use', count: 1 }`。
 
 ## 第 5 步。为一个大多数文档都没有的字段建索引
 
@@ -744,7 +744,7 @@ db.runCommand({
 mo < validator.js
 ```
 
-**你应该看到** —— `规则已安装`。
+**你应该看到** —— `rule installed`。
 
 我们试着重复同样的拼写错误——现在有规则盯着：
 

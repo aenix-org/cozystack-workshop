@@ -262,7 +262,7 @@ Der Unterschied: So kommen alle vier Dienste hoch statt zwei. Das macht sich bei
 
 Flux ist installiert, weiß aber noch nicht, wohin es gehen soll. Wir sagen es ihm, mit zwei Objekten.
 
-Öffnen Sie `flux/gitrepository.yaml` aus dem Ordner dieses Labs und tragen Sie die Adresse **Ihres** Repositorys anstelle des Platzhalters `ERSETZEN-MICH` ein:
+Öffnen Sie `flux/gitrepository.yaml` aus dem Ordner dieses Labs und tragen Sie die Adresse **Ihres** Repositorys anstelle des Platzhalters `REPLACE-ME` ein:
 
 ```yaml
   url: https://github.com/REPLACE-ME/passes-gitops

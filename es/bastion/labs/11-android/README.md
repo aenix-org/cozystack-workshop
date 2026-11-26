@@ -63,7 +63,7 @@ clúster: es lo que se le indicó.
 ## Qué hay en la carpeta de la lab
 
 Todos los archivos ya son tuyos — los recibiste con el repositorio. No hay nada que crear ni
-volver a escribir: allí donde más abajo diga `kubectl apply -f nombre.yaml`, el archivo viene de aquí.
+volver a escribir: allí donde más abajo diga `kubectl apply -f name.yaml`, el archivo viene de aquí.
 
 ```bash
 cd labs/11-android
@@ -252,7 +252,7 @@ junto con la descripción de la tarea.
 El código fuente vive ahí por la misma razón: la compilación necesita archivos, y no tiene
 sentido montar un disco de red para seis archivos de texto.
 
-La app hace una sola cosa: muestra la línea «Solicitar un pase de invitado». Con eso basta, porque
+La app hace una sola cosa: muestra la línea «Request a guest pass». Con eso basta, porque
 la lab no va sobre Android sino sobre dónde se compila.
 
 **Un APK** es lo que sale al final. Es un archivo comprimido que contiene la aplicación
@@ -647,9 +647,9 @@ kubectl logs -f job/propusk-build
 
 | Marca en el registro | Cuándo aproximadamente |
 |---|---|
-| `== 1/5 instalando las herramientas de línea de comandos de Android ==` | de inmediato |
-| `== 2/5 aceptando las licencias y descargando el SDK (el paso más largo) ==` | +1–2 minutos, y se queda colgado lo que más |
-| `== 3/5 compilando el APK ==` | +5–15 minutos desde el inicio |
+| `== 1/5 installing Android command-line tools ==` | de inmediato |
+| `== 2/5 accepting licenses and downloading the SDK (the longest step) ==` | +1–2 minutos, y se queda colgado lo que más |
+| `== 3/5 building the APK ==` | +5–15 minutos desde el inicio |
 | `BUILD SUCCESSFUL in ...` | +10–25 minutos desde el inicio |
 | `APK-UPLOADED bucket-.../propusk/propusk-...apk` | justo después |
 

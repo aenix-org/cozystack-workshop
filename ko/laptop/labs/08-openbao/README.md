@@ -460,7 +460,7 @@ Storage Type       file
 ⚠️ **명령이 `connection refused`, `no such host`, 또는 `i/o timeout`으로 실패하면 —**
 더 나아갈 이유가 없습니다; 연결이 먼저입니다. 가능성이 높은 순으로 흔한 원인:
 `workshopXX`를 자기 번호로 바꾸지 않았다; 대시보드의 애플리케이션이 아직 준비되지 않았다;
-이름에 오타. 이름은 `openbao-<애플리케이션 이름>` 규칙으로 만들어집니다: 애플리케이션을
+이름에 오타. 이름은 `openbao-<application name>` 규칙으로 만들어집니다: 애플리케이션을
 `secrets`라고 이름 지었으니, 주소에는 `secrets`가 아니라 `openbao-secrets`가 들어갑니다.
 
 ## 예고된 실패 · 저장소가 서비스를 거부한다
@@ -602,7 +602,7 @@ kubectl exec -it bao-workbench -- bao login
 
 ⚠️ **`bao login`이 토큰 파일을 쓸 수 없다고 불평하면**, 매 명령마다 토큰을 환경
 변수로 전달하세요:
-`kubectl exec bao-workbench -- env BAO_TOKEN='여러분의-토큰' bao status`.
+`kubectl exec bao-workbench -- env BAO_TOKEN='your-token' bao status`.
 동작은 하지만, 토큰이 명령 이력에 남습니다 — 랩에서는 참을 만하지만, 프로덕션에서는 아닙니다.
 
 ## 6단계. 엔진을 켜고 비밀번호를 저장한다

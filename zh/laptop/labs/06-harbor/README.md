@@ -125,7 +125,7 @@ secret，它里面有三个你需要的键：
 
 | 键 | 里面是什么 |
 |---|---|
-| `url` | 你的镜像仓库地址，形如 `https://harbor-....<测试环境域名>` |
+| `url` | 你的镜像仓库地址，形如 `https://harbor-....<testbed domain>` |
 | `admin-password` | 管理员的密码 |
 | `redis-password` | Harbor 的内部密码，你用不到 |
 

@@ -135,7 +135,7 @@ Secret mit den Registry-Zugangsdaten, und darin drei Schlüssel, die Sie brauche
 
 | Schlüssel | Was darin steht |
 |---|---|
-| `url` | die Adresse Ihrer Registry, in der Form `https://harbor-....<Testumgebungs-Domain>` |
+| `url` | die Adresse Ihrer Registry, in der Form `https://harbor-....<testbed domain>` |
 | `admin-password` | das Passwort des Administrators |
 | `redis-password` | Harbors internes Passwort, das Sie nicht brauchen |
 

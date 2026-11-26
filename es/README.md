@@ -14,7 +14,7 @@ trabajas con el clúster**. El instructor te dirá cuál es la tuya.
 | **Herramientas** | las instalas tú: `kubectl`, `virtctl`, `kubelogin` | ya están instaladas en el bastion |
 | **Acceso al clúster** | kubeconfig desde el panel, inicias sesión por el navegador | entras por SSH, el acceso ya está configurado |
 | **Número de tenant en los archivos** | lo pones tú | ya puesto de antemano |
-| **Comprobar la aplicación** | `virtctl port-forward` + `localhost:8080` | por nombre de dominio `app.<número>.workshop.aenix.io` |
+| **Comprobar la aplicación** | `virtctl port-forward` + `localhost:8080` | por nombre de dominio `app.<number>.workshop.aenix.io` |
 | **Para quién** | quienes no tienen un bastion compartido | un entorno de pruebas preparado con bastion |
 
 Dentro de cada carpeta hay un conjunto autosuficiente: su propio `README.md` (la ruta), `chat/`
