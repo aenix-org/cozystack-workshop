@@ -198,6 +198,8 @@ virtctl console --namespace=tenant-workshopXX vm-instance-convert
 中で: `nano convert.sh` を実行し、`scripts/convert.sh` の内容を貼り付け、`ВСТАВЬТЕ_...` の代わりに
 自分の `bucketName`、`accessKey`、`secretKey` を書き込み、`bash convert.sh` を実行します。
 
+**私たちのイベントではなく、ご自身でこのワークショップを進めていますか？** `convert.sh` の `OVA_URL` は、ワークショップ用クラウドのオブジェクトストレージにあるデモイメージを指しています。イベント中にすばやく、外部トラフィックを使わずにダウンロードできるようにそこに置いていますが、ワークショップが終わるとそのコピーはなくなります。リンクを公開コピー `https://github.com/aenix-org/cozystack-workshop/releases/download/vmware-demo-ova/app-1.ova`（約 810 MB）か、ご自身の OVA に置き換えてください。
+
 **表示されるはず:** 出力の最後、`Share:` という単語の後に、イメージへの署名付きリンク。次のフェーズで
 必要になります。
 
