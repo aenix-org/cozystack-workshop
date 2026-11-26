@@ -1,391 +1,825 @@
-# Workshop: migrating a VMware VM to Cozystack (via the bastion)
+# Workshop: move a VMware VM to Cozystack (through the bastion)
 
-We take an application that has run for years on a virtual machine in VMware and move
-it to Cozystack. You do all of it with your own hands.
+An order service has lived for years on three virtual machines in VMware: the application itself, a PostgreSQL database and a Kafka queue. Today you move the application VM to Cozystack and replace the other two with managed services from the Cozystack catalog. You write every manifest yourself, keep the whole infrastructure in Git, convert the disk with your own hands and fix what breaks inside the guest.
 
-**This is the path through the shared VM (the bastion).** You don't need to install
-anything on your own laptop: `kubectl`, `virtctl` and `git` are already on the bastion,
-and your access to the cluster there is already set up. You SSH into it and work right
-there, then open the finished application in a browser by its domain name.
+> This version runs on a shared VM (the bastion) where the tools and your access are already set up. If you work from your own laptop, use [`../laptop/`](../laptop/). The route is the same; only part 0 differs.
 
-> If you work from your own laptop (installing the tools yourself, reaching the application
-> through `port-forward`) — you need the other set, [`../laptop/`](../laptop/).
+Plan on about three hours. Each task says what to describe and which page of the documentation to read; the solution is hidden under a spoiler. Try first, then open it.
 
-This file is the route: what comes after what, which commands to type, and what you should
-end up with. The explanations of why things are built the way they are, and the line-by-line
-walkthroughs of the manifests and scripts, live in the [`chat/`](chat/) folder — one file
-per message. The links sit at the end of each step.
+## Route
 
-## The route
-
-The application lives on three machines: the application itself, the database, and the
-message queue. We move only the first — the database and the queue stay behind, and in
-their place we take ready-made ones from the Cozystack catalog.
-
-| Phase | What we do | Where |
+| Part | What you do | Time |
 |---|---|---|
-| 1 | Set up storage for the image | on the bastion |
-| 2 | Repackage the disk from the VMware format into the KVM format | in a temporary machine |
-| 3 | Bring the machine up in its new home | on the bastion |
-| 4 | Order the database and the queue from the catalog | on the bastion |
-| 5 | Fix networking and switch the application to the new addresses | in your machine |
+| 0 | Log in to the bastion, look around, read the VMware VM's description | 20 min |
+| 1 | Order object storage for the disk image, first in the dashboard, then in Git | 15 min |
+| 2 | Write a temporary conversion VM, convert the disk by hand, remove the VM through Git | 40 min |
+| 3 | Write the application VM, sized from VMware's description, and import the disk | 20 min |
+| 4 | Order PostgreSQL with a replica and Kafka from the catalog | 15 min |
+| 5 | Bring the application back to life and publish it over HTTPS | 40 min |
+| 6 | Day two: resize the VM, live-migrate it, lose the database primary | 25 min |
 
-After that comes the final check: an order created in the application makes it all the way
-to the database and the queue.
+## What the host gives you
 
-## What the instructor gave you
+- the bastion address: `95.217.173.146`
+- the Cozystack dashboard: https://dashboard.workshop.aenix.io
+- your login `vmwXX` and a password; the same pair works on the bastion, in the dashboard and in GitLab
+- your Git repository: `https://gitlab.workshop.aenix.io/vmwXX/vmware-migration`
 
-One username and one password — the same in all three places:
+Everywhere below, replace `vmwXX` with your login. Your tenant's namespace is `tenant-vmwXX`.
 
-* **dashboard** https://dashboard.workshop.aenix.io — log in through the browser, namespace `tenant-workshopXX`
-* **the bastion** — log in over SSH: `ssh workshopXX@<bastion-address>`
-* inside the bastion, access to the cluster is already set up, and the kubeconfig sits in `~/.kube/config`
+## Part 0. Log in and look around (20 min)
 
-Everywhere below, replace `workshopXX` with your own number (the instructor gave it to you).
+### 0.1 The bastion
 
-## Logging into the bastion
-
-```bash
-ssh workshopXX@<bastion-address>
-```
-
-The password is the same as for the dashboard. No SSH key is needed: login is by password.
-Let's check that access to the cluster is in place (no browser opens here — the bastion is
-set up for direct token access, without Keycloak):
+📍 On your laptop, then on the bastion.
 
 ```bash
-kubectl config current-context
-kubectl get vminstance -n tenant-workshopXX
+ssh vmwXX@95.217.173.146
 ```
 
-**You should see:** the context name `tenant-workshopXX` and a (still empty) list of machines.
-
-## The materials are already on the bastion
-
-There's nothing to clone — the materials folder is in your home directory, and your tenant
-number in the manifests and scripts **has already been filled in**: the `tenant-workshopXX`
-placeholders were replaced with your `tenant-workshopNN` when the bastion was prepared.
-There's nothing to find and replace — just apply the files as they are.
+Everything below runs on the bastion unless a step says otherwise. Your home folder already has what you need:
 
 ```bash
-cd ~/workshop
-ls manifests scripts
-grep -rl tenant-workshop manifests | head -1 | xargs grep -m1 namespace   # you will see your number
+ls ~
+cat ~/credentials.txt
+kubectl config get-contexts
+kubectl get resourcequota
 ```
 
-One spot is left as a placeholder on purpose: in `manifests/03-app-vm.yaml` the line
-`url: "PASTE_PRESIGNED_URL"` — you'll get that link after the second phase and fill it in yourself.
+**You should see:** `credentials.txt`, `vmware-migration` (your Git repository) and `workshop` (this guide with its files); one kubectl context, `tenant`, whose default namespace is `tenant-vmwXX`; and your quota, with `hard` limits and what is already `used`.
 
-In detail: [chat/10](chat/10-clone-and-set-number.md) ·
-file map [chat/11](chat/11-file-map.md)
+<details><summary>What a tenant is, in vSphere terms</summary>
 
----
+A tenant is roughly a resource pool with its own permissions and budget, plus its own catalog of services. Everything you create today lives in one namespace, `tenant-vmwXX`, and counts against one quota. Unlike a resource pool, a tenant orders databases, queues, object storage and whole Kubernetes clusters as easily as VMs.
 
-## Phase 1. Storage for the image
+</details>
 
-📍 On the bastion.
-
-The repackaged disk needs to go somewhere the platform can pull it from over the network.
-We set up a bucket — object storage with an S3 interface.
+See what you can order:
 
 ```bash
-kubectl apply -f manifests/01-bucket.yaml
-kubectl get buckets.apps.cozystack.io my-images -n tenant-workshopXX
+kubectl get applicationdefinitions -o custom-columns=KIND:.spec.application.kind
 ```
 
-**You should see:** `bucket.apps.cozystack.io/my-images created`, then `READY: True`.
+**You should see:** a few dozen kinds, among them `VMInstance`, `VMDisk`, `Bucket`, `Postgres` and `Kafka`. The **Catalog** page in the dashboard shows the same list; log in there as `vmwXX` too. Every one of them is ordered the same way: you describe what you want in a short YAML file, and the platform builds it.
 
-⚠️ **Write the type name in full, not `bucket`.** The word is taken three times in the cluster:
-our type from the catalog, the Flux type, and the type from the object-storage standard. Which
-of the three `kubectl` will substitute for the short name is not known in advance, and if it's
-the wrong one, you'll get a permissions denial on a resource you never asked for:
-`buckets.source.toolkit.fluxcd.io is forbidden`. This is not an access problem, and there's
-nothing to fix.
-
-⚠️ **If `apply` fails with `SchemaError … unknown model in reference`** — it's the client-side
-validation that trips up, not the cluster; the manifest is correct. To work around it:
-`kubectl apply -f manifests/01-bucket.yaml --validate=false`. The flag turns off only the local
-check; the server will still validate the object on its end.
-
-**You'll need the keys next:** dashboard → `Bucket` → `my-images` → the `Secrets` tab →
-the `bucket-my-images-app-credentials` secret. From there you take `bucketName`, `accessKey`
-and `secretKey` — you'll put them into the script in the next phase.
-
-Manifest walkthrough: [chat/13](chat/13-bucket-manifest.md) ·
-the whole step: [chat/14](chat/14-step-1-bucket.md)
-
----
-
-## Phase 2. Repackaging the disk
-
-📍 First on the bastion, then inside the temporary machine.
-
-The disk from VMware is written in the VMDK format, while KVM reads QCOW2. `virt-v2v` handles
-the repackaging; there's no point installing it on the bastion for a one-off, so we bring up
-a temporary machine with the tools already in place.
+### 0.2 Your infrastructure is a Git repository
 
 ```bash
-kubectl apply -f manifests/02-conversion-vm.yaml
-kubectl get vminstance convert -n tenant-workshopXX -w
+cd ~/vmware-migration
+git log --oneline
+cat platform/README.md
 ```
 
-**You should see:** two lines with `created`, then `Running`.
+**You should see:** one commit and a `platform/` folder with a single README. The same repository is at `https://gitlab.workshop.aenix.io/vmwXX/vmware-migration`; Git on the bastion already knows your password.
 
-⚠️ `Running` means "powered on", not "ready": inside, `cloudInit` keeps working for a few more
-minutes — installing packages and downloading `mc`. Log in too early and you won't find `virt-v2v`.
-
-Log in (username `ubuntu`, password `ubuntu`):
+The platform watches this repository. Once a minute Flux, the GitOps engine built into Cozystack, takes the `main` branch and applies every YAML file in `platform/` to your tenant. When you delete a file, Flux deletes the object. Look at the link:
 
 ```bash
-virtctl console --namespace=tenant-workshopXX vm-instance-convert
+kubectl get gitrepository,kustomization
+git log -1 --format=%h
 ```
 
-Inside: `nano convert.sh`, paste in the text of `scripts/convert.sh`, and put your own
-`bucketName`, `accessKey` and `secretKey` in place of `PASTE_...`.
+**You should see:** `infra` (where Flux reads from) and `platform` (what it applies), both `READY True`, and the same commit hash in their status as in `git log`.
 
-**Running this on your own, outside our workshop?** `OVA_URL` in `convert.sh` points to the demo image in the workshop cloud's object storage. We keep it there so that during the event the image downloads quickly and doesn't eat external traffic, but that copy is gone once the workshop ends. Replace the link with the public copy, `https://github.com/aenix-org/cozystack-workshop/releases/download/vmware-demo-ova/app-1.ova` (about 810 MB), or with your own OVA.
+From here on, every manifest goes into `~/vmware-migration/platform/`, then `git add`, `git commit`, `git push`. Give the platform about a minute after each push; `kubectl get kustomization platform` shows the last commit Flux applied.
 
-⚠️ **Run the conversion inside `screen`** — it takes about five minutes, and if your SSH session
-to the bastion drops, an ordinary run will be cut off halfway. `screen` keeps the process alive,
-even when the connection is gone:
+<details><summary>Why Git and not kubectl apply</summary>
+
+In vSphere the truth about a VM is whatever vCenter shows right now: someone resized it at night, someone added a disk, and nobody remembers why. With GitOps the truth is the repository. Every change has an author, a time and a message, can be reviewed before it lands and undone with `git revert`. If someone changes the platform by hand, Flux puts it back within a minute. You will see both effects today.
+
+</details>
+
+### 0.3 Read the VMware VM before you move it
+
+The VM was exported from vSphere as an OVA: a tar archive with an `.ovf` description and a `.vmdk` disk. Before moving anything, find out what it is. The description sits at the start of the archive, so the first 64 KB are enough:
 
 ```bash
-screen -S convert          # open a separate session
-sudo bash convert.sh       # run it inside that session
-#  connection dropped? ssh back into the bastion, then:  screen -r convert
+cd ~
+curl -sL -r 0-65535 https://github.com/aenix-org/cozystack-workshop/releases/download/vmware-demo-ova/app-1.ova | tar xO app-1.ovf 2>/dev/null > app-1.ovf
+grep -E 'osType|ElementName>|capacity=' app-1.ovf
 ```
 
-**You should see:** at the end of the output, after the word `Share:` — a signed link to the image.
-You'll need it in the next phase.
+Write down the guest OS, the number of vCPUs, the memory and the disk size. You will need them in part 3.
 
-Manifest walkthrough: [chat/15](chat/15-conversion-vm-manifest.md) ·
-script walkthrough: [chat/17](chat/17-convert-script.md) ·
-both steps in full: [chat/16](chat/16-step-2-conversion-vm.md),
-[chat/18](chat/18-step-3-convert-image.md)
+<details><summary>What you should have found</summary>
 
----
+- `vmw:osType="centos7_64Guest"`: CentOS 7, 64-bit.
+- `2 virtual CPU(s)` and `2048 MB of memory`.
+- `ovf:capacity="8591507456"`: an 8 GiB disk.
+- `E1000 ethernet adapter on "VM Network"`: an emulated Intel NIC on a port group called `VM Network`. Keep it in mind until part 5.
 
-## Phase 3. The machine in its new home
+</details>
 
-📍 On the bastion.
+## Part 1. Object storage for the disk image (15 min)
 
-⚠️ First shut down the converter machine — it has done its job and is holding 8Gi of your quota.
-If you don't remove it, the new machine will hang in `Pending`:
+The converted disk needs a place from which the platform can download it over HTTP. That place is a bucket: S3-compatible object storage from the catalog.
+
+### 1.1 Order a bucket in the dashboard
+
+📍 In the dashboard.
+
+Open **Catalog → Bucket**, name it `images` and add one user called `convert`. Create it, then look at it from the terminal:
 
 ```bash
-kubectl delete vminstance convert --namespace tenant-workshopXX
-kubectl delete vmdisk convert-tools --namespace tenant-workshopXX
+kubectl get buckets.apps.cozystack.io images
+kubectl get secret bucket-images-convert-credentials -o go-template='{{range $k, $v := .data}}{{$k}}{{"\n"}}{{end}}'
 ```
 
-Put the link you got into `manifests/03-app-vm.yaml` in place of
-`url: "PASTE_PRESIGNED_URL"`, then:
+**You should see:** `images` with `READY True`, and a Secret with four keys: `accessKey`, `bucketName`, `endpoint`, `secretKey`.
 
-```bash
-kubectl apply -f manifests/03-app-vm.yaml
-kubectl get vminstance app-1 -n tenant-workshopXX -w
-```
+A bucket "user" is not a person: it is a pair of S3 keys that opens only this bucket. Cozystack generates the keys and puts them into that Secret.
 
-**You should see:** two lines with `created`, then `Running`. The wait is longer here —
-the platform is downloading the image from your link.
+⚠️ Always type the full kind, `buckets.apps.cozystack.io`. The short word `bucket` is taken three times in the cluster (the catalog kind, a Flux kind and the object storage standard's kind), and `kubectl` may pick one you have no rights to and answer `forbidden`. It is not a permissions problem; use the full name.
 
-Log in (username `root`, password `cozydemo`):
-
-```bash
-virtctl console --namespace=tenant-workshopXX vm-instance-app-1
-```
-
-⚠️ **There will be no network inside.** This isn't a broken testbed — it's how it should be. We fix
-it in phase five.
-
-Manifest walkthrough: [chat/20](chat/20-app-vm-manifest.md) ·
-the whole step: [chat/21](chat/21-step-4-your-vm.md)
-
----
-
-## Phase 4. The database and the queue from the catalog
+### 1.2 Move the bucket into Git
 
 📍 On the bastion.
 
 ```bash
-kubectl apply -f manifests/04-managed.yaml
-kubectl get postgreses.apps.cozystack.io,kafkas.apps.cozystack.io -n tenant-workshopXX
+kubectl get buckets.apps.cozystack.io images -o yaml
 ```
 
-**You should see:** `postgres.apps.cozystack.io/db created` and
-`kafka.apps.cozystack.io/kafka created`. Kafka takes noticeably longer to come up than Postgres.
+Write `platform/bucket.yaml` with the same declaration. Take only `apiVersion`, `kind`, `metadata.name` and `spec`. Leave out `status`, `namespace` and everything the platform generated (`uid`, `resourceVersion`, `creationTimestamp`, `managedFields`, annotations and labels): Flux puts the object into your namespace by itself.
 
-Manifest walkthrough: [chat/23](chat/23-managed-manifest.md) ·
-the whole step: [chat/24](chat/24-step-5-database-and-queue.md)
+<details><summary>Solution</summary>
 
+```yaml
+apiVersion: apps.cozystack.io/v1alpha1
+kind: Bucket
+metadata:
+  name: images
+spec:
+  users:
+    convert: {}
+```
+
+</details>
+
+```bash
+cd ~/vmware-migration
+git add platform/bucket.yaml
+git commit -m "Keep the image bucket in Git"
+git push
+```
+
+Nothing changes on the platform, because the declaration is the same. What changed is who owns it: from now on the bucket is managed from the repository.
+
+### 1.3 Under the hood
+
+```bash
+kubectl get helmreleases | grep images
+```
+
+**You should see:** `bucket-images` and `bucket-images-system`, both `True`. Every catalog object becomes a Helm release, and the release creates the real resources. You never write Helm charts yourself: the catalog entry is the chart, your YAML is its values.
+
+## Part 2. A temporary VM to convert the disk (40 min)
+
+VMware stores disks as VMDK; Cozystack runs VMs on KVM. The tool that repacks the disk and also prepares the guest for KVM (drivers, boot loader) is `virt-v2v`. You will not install it on the bastion: you order a temporary Linux VM with the tools, use it once and throw it away.
+
+### 2.1 Write the conversion VM
+
+In Cozystack a VM is two objects: a `VMDisk` (the disk, and where its data comes from) and a `VMInstance` (CPU, memory, attached disks, boot settings). They live separately on purpose: delete the instance and the disk survives; attach the disk to another instance and it boots there.
+
+Read the docs for [VM disks](https://cozystack.io/docs/v1.7/virtualization/vm-disk/) and [VM instances](https://cozystack.io/docs/v1.7/virtualization/vm-instance/) and write `platform/convert.yaml` with both objects, both named `convert`:
+
+- the disk: from the platform's ready-made image `ubuntu-20.04`, 20Gi, storage class `replicated`;
+- the VM: the `ubuntu` profile, instance type `u1.large` (2 vCPU and 8 GiB: `virt-v2v` likes memory), the `convert` disk attached;
+- cloud-init that sets the password `ubuntu` for the `ubuntu` user, allows password login and installs `virt-v2v`, `libguestfs-tools`, `qemu-utils` and `awscli`.
+
+Hints: the image is `source.image.name`, the size is `instanceType`, the profile is `instanceProfile`, and cloud-init goes into `cloudInit` as a string that starts with `#cloud-config`. Put both objects in one file, separated by `---`.
+
+⚠️ Make the disk exactly 20Gi, the size of the image. It cannot be smaller, and on this testbed a larger one gets stuck while the cloned volume is being grown ([cozystack#5460](https://github.com/cozystack/cozystack/issues/5460)).
+
+<details><summary>Solution</summary>
+
+```yaml
+apiVersion: apps.cozystack.io/v1alpha1
+kind: VMDisk
+metadata:
+  name: convert
+spec:
+  source:
+    image:
+      name: ubuntu-20.04
+  storage: 20Gi
+  storageClass: replicated
 ---
+apiVersion: apps.cozystack.io/v1alpha1
+kind: VMInstance
+metadata:
+  name: convert
+spec:
+  instanceType: u1.large
+  instanceProfile: ubuntu
+  disks:
+    - name: convert
+  cloudInit: |
+    #cloud-config
+    password: ubuntu
+    chpasswd: { expire: false }
+    ssh_pwauth: true
+    package_update: true
+    packages: [virt-v2v, libguestfs-tools, qemu-utils, awscli]
+```
 
-## Phase 5. Wiring up the application
+</details>
 
-📍 Inside your virtual machine.
+```bash
+git add platform/convert.yaml
+git commit -m "Temporary VM for disk conversion"
+git push
+kubectl get vmdisks,vminstances -w
+```
 
-Three actions in strict order: without networking the script can't reach the database, and
-without the database it won't accept the schema.
+**You should see:** the `convert` disk and VM appear within a minute and turn `READY True` a minute or two later. Stop watching with `Ctrl-C`.
 
-| Step | What we fix | With what |
+<details><summary>What u1.large means</summary>
+
+An instance type is a named size, like an EC2 type: `u1.large` is 2 vCPU and 8 GiB. The platform has a ladder of them:
+
+```bash
+kubectl get virtualmachineclusterinstancetypes -o custom-columns=NAME:.metadata.name,CPU:.spec.cpu.guest,MEMORY:.spec.memory.guest
+```
+
+Named sizes keep VMs comparable and quotas predictable. When you need an exact shape, as in part 3, a `VMInstance` takes `resources` instead.
+
+</details>
+
+### 2.2 Convert the disk
+
+📍 Inside the conversion VM.
+
+`Running` means the VM is powered on, not that it is ready: cloud-init needs a few more minutes to install the packages.
+
+```bash
+virtctl console vm-instance-convert
+```
+
+Log in as `ubuntu` / `ubuntu` (press Enter if the screen stays blank), then:
+
+```bash
+sudo -i
+cloud-init status --wait
+which virt-v2v aws
+```
+
+**You should see:** `status: done`, then two paths. If it says `status: error` but both tools are there, carry on: an optional package step complained, and it does not matter here.
+
+Download the OVA. During the live workshop it comes from the testbed's own object storage, which is fast and costs no internet traffic. On your own, use the public copy on GitHub instead.
+
+```bash
+cd /root
+curl -fLo app-1.ova https://s3.workshop.aenix.io/bucket-a9209f83-4ac1-463e-8477-d8365bef787b/app-1.ova
+# on your own: https://github.com/aenix-org/cozystack-workshop/releases/download/vmware-demo-ova/app-1.ova
+tar tvf app-1.ova
+```
+
+**You should see:** about 800 MB downloaded and three files in the archive: `app-1.ovf` (the description), `app-1-disk1.vmdk` (the disk) and `app-1.mf` (checksums).
+
+Convert it:
+
+```bash
+mkdir -p /root/out
+virt-v2v -i ova app-1.ova -o local -os /root/out -of qcow2 -on app-1
+```
+
+Read the command as a sentence: the input (`-i`) is an OVA file; the output (`-o`) goes to a local folder (`-os`, which must already exist); the output format (`-of`) is QCOW2; the converted VM is called `app-1`. Without `-of qcow2` you get a raw image the full size of the disk.
+
+**You should see:** numbered stages over about five minutes: `Opening the source`, `Inspecting the overlay`, `Converting CentOS Linux release 7.8.2003 (Core) to run on KVM`, `Copying disk 1/1`, `Finishing off`. A warning about `grub/device.map` and `vda` is harmless.
+
+```bash
+ls -lh /root/out
+qemu-img info /root/out/app-1-sda
+```
+
+**You should see:** `app-1-sda` (the disk, about 1.7 GB) and `app-1.xml` (a libvirt description you will not need), `file format: qcow2`, `virtual size: 8 GiB`.
+
+<details><summary>What virt-v2v changed inside the guest</summary>
+
+It did more than repack the file. It opened the CentOS file system, made sure the virtio drivers are in the initramfs so the guest can see a KVM disk and NIC instead of VMware's SCSI controller and E1000, removed VMware Tools and fixed the boot configuration. A plain `qemu-img convert` would have produced a disk that often does not boot on KVM.
+
+</details>
+
+### 2.3 Upload the disk and get a link
+
+The bucket keys are in the Secret from 1.1. Open a second SSH session to the bastion:
+
+```bash
+kubectl get secret bucket-images-convert-credentials -o go-template='{{range $k, $v := .data}}{{$k}}={{$v | base64decode}}{{"\n"}}{{end}}'
+```
+
+📍 Back inside the conversion VM, paste your values:
+
+```bash
+export AWS_ACCESS_KEY_ID=<accessKey>
+export AWS_SECRET_ACCESS_KEY=<secretKey>
+export BUCKET=<bucketName>
+export S3=https://s3.workshop.aenix.io
+
+aws --endpoint-url $S3 s3 cp /root/out/app-1-sda s3://$BUCKET/app-1.qcow2
+aws --endpoint-url $S3 s3 ls s3://$BUCKET/
+aws --endpoint-url $S3 s3 presign s3://$BUCKET/app-1.qcow2 --expires-in 86400
+```
+
+The Secret's `endpoint` is the same host without `https://`.
+
+**You should see:** the upload progress, then `app-1.qcow2` in the bucket, then a long URL. Copy that URL. It is a presigned link: anyone holding it can download this one object for 24 hours without keys. The platform will use it in part 3.
+
+Log out of the VM (`exit` twice) and leave the console with `Ctrl-]`.
+
+### 2.4 Throw the conversion VM away through Git
+
+📍 On the bastion.
+
+The conversion VM holds 2 vCPU and 8 GiB of your quota. Remove it the GitOps way, by deleting its file:
+
+```bash
+cd ~/vmware-migration
+git rm platform/convert.yaml
+git commit -m "Conversion done, remove the temporary VM"
+git push
+kubectl get vminstances,vmdisks -w
+```
+
+**You should see:** within a minute or two `convert` disappears from both lists. Flux noticed the file was gone and deleted the objects it had created from it. That is the `prune: true` setting of your `platform` Kustomization (`kubectl get kustomization platform -o yaml`).
+
+> **Stop and think.** What would have happened if you had deleted the VM with `kubectl delete vminstance convert` and left the file in Git?
+
+<details><summary>Answer</summary>
+
+Flux would have recreated it within a minute: the repository still says it should exist. In GitOps you change the repository, not the platform. For the same reason a VM someone deletes by mistake comes back by itself.
+
+</details>
+
+## Part 3. The application VM (20 min)
+
+### 3.1 Write it
+
+Write `platform/app-1.yaml` with a `VMDisk` and a `VMInstance`, both named `app-1`:
+
+- the disk downloads its data from your presigned URL and is 10Gi on `replicated` storage (the guest disk is 8 GiB; leave some room);
+- the VM has exactly the shape you wrote down in 0.3, set with `resources` rather than an instance type, uses the profile for CentOS 7 and boots from the `app-1` disk.
+
+Hints: an HTTP source is `source.http.url`; put the URL in quotes, it contains `&` and `=`. The profile names are listed by `kubectl get virtualmachineclusterpreferences`.
+
+⚠️ `resources` sizes the VM only when `cpu`, `sockets` and `memory` are all set. If you give only some of them, the platform refuses the VM and explains why in the HelmRelease status. That message is worth reading once on purpose.
+
+<details><summary>Solution</summary>
+
+```yaml
+apiVersion: apps.cozystack.io/v1alpha1
+kind: VMDisk
+metadata:
+  name: app-1
+spec:
+  source:
+    http:
+      url: "<your presigned URL>"
+  storage: 10Gi
+  storageClass: replicated
+---
+apiVersion: apps.cozystack.io/v1alpha1
+kind: VMInstance
+metadata:
+  name: app-1
+spec:
+  instanceProfile: centos.7
+  resources:
+    cpu: 2
+    sockets: 1
+    memory: 2Gi
+  disks:
+    - name: app-1
+```
+
+</details>
+
+```bash
+git add platform/app-1.yaml
+git commit -m "Move app-1 from VMware"
+git push
+kubectl get datavolumes -w
+```
+
+**You should see:** `vm-disk-app-1` going through `ImportScheduled` and `ImportInProgress` with a percentage to `Succeeded`, in about two minutes. Then:
+
+```bash
+kubectl get vminstances app-1
+kubectl get virtualmachineinstances vm-instance-app-1 -o wide
+```
+
+**You should see:** `READY True`, the VM `Running` on one of the nodes, with an address from the cluster network (`10.244.x.x`).
+
+<details><summary>Under the hood: who downloaded the disk</summary>
+
+The `VMDisk` became a DataVolume of CDI (the Containerized Data Importer). CDI started an importer pod that downloaded the QCOW2 file from your link, converted it to a raw block device and wrote it to a replicated volume. The same mechanism imports from an image, from an upload (`virtctl image-upload`) or from another disk (`source.disk`); only the source changes.
+
+</details>
+
+### 3.2 Look inside
+
+📍 In the VM console.
+
+```bash
+virtctl console vm-instance-app-1
+```
+
+Log in as `root` / `cozydemo`. The VM booted on KVM, but:
+
+```bash
+ip -4 addr show eth0
+cat /etc/sysconfig/network-scripts/ifcfg-eth0
+```
+
+**You should see:** `192.168.10.21/24`, an address from the old VMware network, set statically in `ifcfg-eth0` together with a gateway that does not exist here. The VM has no working network. Leave it like that for now and log out (`Ctrl-]`); part 5 fixes it.
+
+## Part 4. Database and queue from the catalog (15 min)
+
+The application used to talk to a PostgreSQL VM at `192.168.10.30` and a Kafka VM at `192.168.10.40`. You do not move them: you order managed services instead.
+
+### 4.1 PostgreSQL with a replica
+
+Using the [PostgreSQL docs](https://cozystack.io/docs/v1.7/applications/postgres/), write `platform/postgres.yaml`: a `Postgres` named `orders` with a primary and one hot replica, 5Gi each on `replicated` storage, preset `t1.micro`, a user `orders` and a database `orders` that the user administers. Do not set a password: Cozystack generates one.
+
+<details><summary>Solution</summary>
+
+```yaml
+apiVersion: apps.cozystack.io/v1alpha1
+kind: Postgres
+metadata:
+  name: orders
+spec:
+  replicas: 2
+  size: 5Gi
+  storageClass: replicated
+  resourcesPreset: t1.micro
+  users:
+    orders: {}
+  databases:
+    orders:
+      roles:
+        admin: [orders]
+```
+
+</details>
+
+### 4.2 Kafka
+
+Using the [Kafka docs](https://cozystack.io/docs/v1.7/applications/kafka/), write `platform/kafka.yaml`: a `Kafka` named `events` with one broker, 5Gi on `replicated` storage, preset `c1.small`, and one topic `orders` with one partition and one replica. Kafka runs in KRaft mode, without ZooKeeper.
+
+<details><summary>Solution</summary>
+
+```yaml
+apiVersion: apps.cozystack.io/v1alpha1
+kind: Kafka
+metadata:
+  name: events
+spec:
+  kafka:
+    replicas: 1
+    size: 5Gi
+    storageClass: replicated
+    resourcesPreset: c1.small
+  topics:
+    - name: orders
+      partitions: 1
+      replicas: 1
+      config: {}
+```
+
+</details>
+
+```bash
+git add platform/postgres.yaml platform/kafka.yaml
+git commit -m "Order the database and the queue from the catalog"
+git push
+kubectl get postgres,kafka -w
+```
+
+**You should see:** both turn `READY True`, PostgreSQL within a few minutes and Kafka within about ten. Carry on with part 5 while they start.
+
+### 4.3 Under the hood: what you got
+
+```bash
+kubectl get pods -l cnpg.io/cluster=postgres-orders -L role
+kubectl get services | grep -E 'postgres-orders|kafka-events'
+```
+
+**You should see:** two pods, one `primary` and one `replica`, managed by the CloudNativePG operator, and the services the application will use: `postgres-orders-rw` (always points to the current primary) and `kafka-events-kafka-bootstrap` on port 9092.
+
+The generated password is in a Secret:
+
+```bash
+kubectl get secret postgres-orders-credentials -o jsonpath='{.data.orders}' | base64 -d; echo
+```
+
+## Part 5. Bring the application back to life (40 min)
+
+📍 Mostly inside the application VM. No scripts this time: for each problem you find the symptom, then the cause, then fix it. Hints are hidden; open them only when you are stuck.
+
+```bash
+virtctl console vm-instance-app-1
+```
+
+### 5.1 The network
+
+The VM still believes it lives in VMware's `192.168.10.0/24`. In Cozystack every VM gets its address from the cluster network over DHCP.
+
+Make `eth0` use DHCP, apply the change without a reboot and check that the cluster DNS answers.
+
+<details><summary>Hint</summary>
+
+On CentOS 7 the interface is configured in `/etc/sysconfig/network-scripts/ifcfg-eth0`. You need `BOOTPROTO=dhcp` and no `IPADDR`, `NETMASK`, `GATEWAY` or `DNS1` lines. `systemctl restart network` applies it.
+
+</details>
+
+<details><summary>Solution</summary>
+
+```bash
+sed -i 's/^BOOTPROTO=.*/BOOTPROTO=dhcp/; /^IPADDR/d; /^NETMASK/d; /^GATEWAY/d; /^DNS/d' /etc/sysconfig/network-scripts/ifcfg-eth0
+cat /etc/sysconfig/network-scripts/ifcfg-eth0
+systemctl restart network
+ip -4 addr show eth0
+cat /etc/resolv.conf
+getent hosts postgres-orders-rw kafka-events-kafka-bootstrap
+```
+
+</details>
+
+**You should see:** a `10.244.x.x` address, a `search tenant-vmwXX.svc.cozy.local ...` line in `resolv.conf`, and the two service names resolved to addresses.
+
+Thanks to that search line, short service names work inside the VM, exactly as they do for pods.
+
+### 5.2 The application's view of the world
+
+```bash
+systemctl status orders-api --no-pager | head -5
+curl -s -o /dev/null -w '%{http_code}\n' localhost:8080/actuator/health
+journalctl -u orders-api --no-pager | tail -5
+```
+
+**You should see:** the service is running but unhealthy, and the log complains about `192.168.10.30`.
+
+> **Stop and think.** The VM moved, it boots, the network works. Why is the application still broken?
+
+<details><summary>Answer, and a lesson broader than this error</summary>
+
+Its configuration still points at the database and the queue that lived on two other VMware VMs. We did not move them and never meant to. The application is fine, the VM is fine, the network is fine; only the assumption that the world around it stayed the same is broken.
+
+That is what a real migration looks like. Moving the disk is the easy part. What breaks is everything outside it: addresses, names, credentials, certificates, neighbouring systems.
+
+</details>
+
+Find the configuration file, point it at the managed services and give it the generated password from 4.3. Restart the application.
+
+<details><summary>Hint</summary>
+
+`systemctl cat orders-api` shows how the service starts and which file it reads. Three lines matter: `spring.datasource.url`, `spring.datasource.password` and `spring.kafka.bootstrap-servers`.
+
+</details>
+
+<details><summary>Solution</summary>
+
+```bash
+cat /etc/orders/application.properties
+PW='<password from postgres-orders-credentials>'
+sed -i "s#192.168.10.30:5432#postgres-orders-rw:5432#; s#192.168.10.40:9092#kafka-events-kafka-bootstrap:9092#; s#^spring.datasource.password=.*#spring.datasource.password=$PW#" /etc/orders/application.properties
+grep -E 'url|password|servers' /etc/orders/application.properties
+systemctl restart orders-api
+sleep 15
+curl -s -o /dev/null -w '%{http_code}\n' localhost:8080/actuator/health
+```
+
+</details>
+
+**You should see:** `200`.
+
+### 5.3 The first order
+
+```bash
+curl -s -X POST localhost:8080/api/orders -H 'Content-Type: application/json' -d '{"item":"test"}' -w '\nHTTP %{http_code}\n'
+```
+
+**You should see:** `HTTP 500`, although health said `200` a moment ago.
+
+<details><summary>Why health is green and the order still fails</summary>
+
+The health check only tests that a connection to the database opens. Whether the tables the application needs exist, it does not check. And they do not: you ordered an empty database. On the old VM the tables were created by hand years ago, and everybody forgot. `journalctl -u orders-api | grep relation` shows `relation "orders" does not exist`.
+
+</details>
+
+Create the schema. It is in this repository, [`scripts/orders-schema.sql`](scripts/orders-schema.sql): one table and one row of history. There is no point in installing a PostgreSQL client on a CentOS 7 machine whose repositories are long gone: the database is a managed service, so talk to it from the platform side. The database pods carry `psql`.
+
+📍 On the bastion:
+
+```bash
+cp ~/workshop/scripts/orders-schema.sql ~/
+cd ~
+kubectl get pods -l cnpg.io/cluster=postgres-orders -L role
+( echo 'SET ROLE orders;'; cat orders-schema.sql ) | kubectl exec -i postgres-orders-1 -c postgres -- psql -d orders -v ON_ERROR_STOP=1
+kubectl exec postgres-orders-1 -c postgres -- psql -d orders -c '\dt'
+```
+
+Use whichever pod is `primary`. `SET ROLE orders` makes the table belong to the application's user rather than to the superuser the pod logs you in as.
+
+**You should see:** `CREATE TABLE`, `INSERT 0 1`, then the `orders` table owned by `orders`.
+
+📍 Back in the VM:
+
+```bash
+curl -s -X POST localhost:8080/api/orders -H 'Content-Type: application/json' -d '{"item":"first order on Cozystack"}' -w '\nHTTP %{http_code}\n'
+```
+
+**You should see:** `HTTP 200` and the new order with `"status":"NEW"`.
+
+### 5.4 Did the event reach Kafka?
+
+The application writes every new order to the `orders` topic. Read the topic from the platform side.
+
+📍 On the bastion:
+
+```bash
+BROKER=$(kubectl get pods -l strimzi.io/name=kafka-events-kafka,strimzi.io/broker-role=true -o name | head -1)
+kubectl exec $BROKER -- bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic orders --from-beginning --timeout-ms 8000
+```
+
+The broker pods are labelled by the Strimzi operator that runs Kafka for the catalog; `broker-role=true` picks a broker rather than a KRaft controller.
+
+**You should see:** the ids of the orders you created. The chain VM → PostgreSQL → Kafka works.
+
+### 5.5 Publish the application over HTTPS
+
+In vSphere you would ask the network team for a VIP and a certificate. Here you describe both in Git: a Kubernetes `Service` that sends traffic to the VM, and an `Ingress` on the platform's ingress controller with a Let's Encrypt certificate.
+
+Write `platform/publish.yaml`:
+
+- a `Service` named `orders` that selects the VM's pod by the label `vm.kubevirt.io/name: vm-instance-app-1` and maps port 80 to 8080;
+- an `Ingress` named `orders` with `ingressClassName: tenant-root`, host `orders.vmwXX.workshop.aenix.io`, backend the `orders` Service on port 80, TLS with a certificate from the `letsencrypt-prod` cluster issuer.
+
+<details><summary>Solution</summary>
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: orders
+spec:
+  selector:
+    vm.kubevirt.io/name: vm-instance-app-1
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: orders
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    acme.cert-manager.io/http01-ingress-ingressclassname: tenant-root
+spec:
+  ingressClassName: tenant-root
+  rules:
+    - host: orders.vmwXX.workshop.aenix.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: orders
+                port:
+                  number: 80
+  tls:
+    - hosts: [orders.vmwXX.workshop.aenix.io]
+      secretName: orders-tls
+```
+
+</details>
+
+```bash
+git add platform/publish.yaml
+git commit -m "Publish the order service over HTTPS"
+git push
+```
+
+Give it a minute, then:
+
+```bash
+curl -s https://orders.vmwXX.workshop.aenix.io/actuator/health
+```
+
+**You should see:** a timeout, or `502 Bad Gateway`.
+
+> **Stop and think.** The application answers inside the VM. The Service and the Ingress exist. What is still in the way?
+
+<details><summary>Hint</summary>
+
+Something inside the guest that came over from VMware and decides which ports can be reached from outside.
+
+</details>
+
+<details><summary>Solution</summary>
+
+firewalld. The old VM only allowed SSH from the network; the application was reached through a load balancer that is not here any more. Inside the VM:
+
+```bash
+firewall-cmd --list-all
+systemctl disable --now firewalld
+```
+
+In a real migration you would open port 8080 instead (`firewall-cmd --add-port=8080/tcp --permanent && firewall-cmd --reload`). Either way, it is a decision about the guest, not about the platform.
+
+</details>
+
+```bash
+curl -s https://orders.vmwXX.workshop.aenix.io/actuator/health
+curl -s https://orders.vmwXX.workshop.aenix.io/api/orders
+```
+
+**You should see:** `{"status":"UP"}` over HTTPS with a valid certificate, and your orders. Open the same address in a browser.
+
+## Part 6. Day two (25 min)
+
+📍 On the bastion.
+
+The VM has moved. Now see what running it on Cozystack looks like.
+
+### 6.1 Give the VM more memory, through Git
+
+The application team asks for 4 GiB. Change `memory` in `platform/app-1.yaml`, commit and push. Then:
+
+```bash
+kubectl get virtualmachines vm-instance-app-1 -o jsonpath='{range .status.conditions[*]}{.type}={.status} {.message}{"\n"}{end}'
+```
+
+**You should see:** `RestartRequired=True`. CPU and memory of a running VM change only on restart, so the platform waits for you to choose the moment. Restart it:
+
+```bash
+virtctl restart vm-instance-app-1
+kubectl get virtualmachineinstances vm-instance-app-1 -o jsonpath='{.spec.domain.memory.guest}{" "}{.status.interfaces[0].ipAddress}{"\n"}'
+```
+
+**You should see:** `4Gi` and the same IP address as before. The change is in Git with your name on it, and the address survived the restart.
+
+### 6.2 Live-migrate the VM while it serves traffic
+
+Start a loop that creates an order every second. Keep it running in a second SSH session:
+
+```bash
+while true; do curl -s -o /dev/null -w "%{http_code} " -X POST https://orders.vmwXX.workshop.aenix.io/api/orders -H 'Content-Type: application/json' -d '{"item":"load"}'; sleep 1; done
+```
+
+In the first terminal, move the VM to another node, the way vMotion would:
+
+```bash
+kubectl get virtualmachineinstances vm-instance-app-1 -o wide
+virtctl migrate vm-instance-app-1
+kubectl get virtualmachineinstancemigrations -w
+```
+
+**You should see:** the migration going through `Scheduling`, `TargetReady`, `Running` to `Succeeded` in well under a minute, the VM on a different node afterwards with the same IP, and an unbroken row of `200` in the loop (at most one or two hiccups at the switch-over).
+
+The memory is copied while the VM runs; the disk does not move at all, because it sits on replicated storage that every node can reach.
+
+### 6.3 Lose the database primary
+
+Keep the loop running. Find the primary and kill it, as if its server lost power:
+
+```bash
+kubectl get pods -l cnpg.io/cluster=postgres-orders -L role
+kubectl delete pod <the primary> --grace-period=5
+kubectl get pods -l cnpg.io/cluster=postgres-orders -L role -w
+```
+
+**You should see:** within seconds the replica becomes `primary`, and the deleted pod comes back as a `replica`. In the loop, a few requests fail for about ten seconds, then `200` again. The application reconnected by itself, because it talks to `postgres-orders-rw`, a name that always points at the current primary.
+
+Stop the loop with `Ctrl-C`.
+
+> **Stop and think.** What did the old VMware setup do when the database VM's host died?
+
+<details><summary>Answer</summary>
+
+vSphere HA restarted the database VM on another host: a minute or two of downtime plus PostgreSQL's crash recovery, and no protection against a broken disk. Here the database is a managed cluster with a hot replica; the operator promotes it in seconds, and the old primary rejoins as a replica without anyone touching it.
+
+</details>
+
+## What you have now
+
+Everything you built is in your repository: `git log --oneline` tells the whole migration as a list of commits, and `platform/` describes the result. Hand that repository to a colleague and their tenant ends up the same.
+
+## If something goes wrong
+
+| Symptom | Likely cause | What to do |
 |---|---|---|
-| 5.1 | the machine has no network | `scripts/netfix-dhcp.sh` |
-| 5.2 | the application looks for the old addresses | `scripts/connect-managed.sh` |
-| 5.3 | the new database has no tables | `scripts/orders-schema.sql` |
-
-**5.1.** The script changes `BOOTPROTO=static` to `dhcp` and removes the address from the VMware
-network. You type it by hand — the machine still has no network, so you can't download the file.
-After that the machine needs a **reboot**: CentOS 7 applies network settings at boot.
-
-**5.2.** The script replaces the hard-wired addresses `192.168.10.30` and `192.168.10.40` in
-`/etc/orders/application.properties` with service names and restarts the application.
-
-**5.3.** We install the `psql` client and apply the schema. The commands live in the next
-section, because they go in a fixed order with the firewall:
-
-➡️ **Go to [The final check](#the-final-check-three-steps-in-order)** and do
-**Step 1** (shut down firewalld), then **Step 2. The database schema** — that is where `psql`
-is installed and `orders-schema.sql` is applied. In the chat this is step 8:
-[chat/28](chat/28-step-8-why-it-still-fails.md) · [chat/29](chat/29-step-8-apply-schema.md).
-
-In detail for 5.1 and 5.2: [chat/25](chat/25-step-6-fix-networking.md) ·
-[chat/26](chat/26-first-check-fails.md) ·
-[chat/27](chat/27-step-7-switch-app.md)
-
----
-
-## The final check: three steps in order
-
-### Step 1. Shut down firewalld
-
-📍 Inside your machine. The rules are left over from the old network and are cutting off requests to the application.
-
-```bash
-systemctl stop firewalld && systemctl disable firewalld
-curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/actuator/health
-```
-
-**You should see:** `200`. If `503` — something from the database or the queue didn't connect.
-Here `localhost` is the very machine you're sitting in: the application is being checked from the inside.
-
-### Step 2. The database schema
-
-📍 Inside your machine. The stock psql from CentOS 7 is version 9.2; it can't do SCRAM and
-answers `SCRAM authentication requires libpq version 10 or above`. We install a fresh one:
-
-```bash
-# 1. The PGDG repository — the source of PostgreSQL packages
-yum install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm
-
-# 2. libzstd: not in the CentOS 7 repositories, so we take it from the EPEL archive
-yum install -y https://archives.fedoraproject.org/pub/archive/epel/7/x86_64/Packages/l/libzstd-1.5.5-1.el7.x86_64.rpm
-
-# 3. The client itself — only from the live pgdg15 repository
-yum install -y --disablerepo='pgdg*' --enablerepo=pgdg15 postgresql15
-```
-
-⚠️ The second and third commands are not redundant. Without `libzstd` the install fails on
-`Requires: libzstd >= 1.4.0`. Without `--disablerepo`/`--enablerepo` — on
-`HTTPS Error 410 - Gone`: the repository package enables every PostgreSQL version at once,
-including the end-of-life 12 and 13, and before installing, `yum` walks every enabled
-repository and fails on the first dead one.
-
-```bash
-psql --version
-```
-
-If `command not found` — the client landed outside `PATH`: look at
-`ls /usr/pgsql-*/bin/psql`, then `export PATH="$PATH:/usr/pgsql-15/bin"`.
-
-We fetch the schema and apply it (this app-VM does reach the internet, so the file will download):
-
-```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/bastion/scripts/orders-schema.sql
-
-PGPASSWORD='Orders2019!' psql \
-  -h postgres-db-rw.tenant-workshopXX.svc.cozy.local -U orders -d orders \
-  -f orders-schema.sql
-
-PGPASSWORD='Orders2019!' psql \
-  -h postgres-db-rw.tenant-workshopXX.svc.cozy.local -U orders -d orders -c '\dt'
-```
-
-**You should see:** in the last command — the `orders` table.
-
-The database address is not an IP but a name: `postgres-db-rw` (the `db` service, read-write),
-`tenant-workshopXX` (your namespace), `svc.cozy.local` (the suffix for the cluster's internal
-names). The password is set in `manifests/04-managed.yaml`, so there's nowhere you need to
-hunt for it.
-
-In detail: [chat/28](chat/28-step-8-why-it-still-fails.md) ·
-[chat/29](chat/29-step-8-apply-schema.md)
-
-### Step 3. Checking from the outside — by domain name
-
-📍 In a browser on your own laptop, or via `curl` on the bastion.
-
-This is where the main difference of this path shows itself: **no port forwarding is needed.**
-The instructor has already created an `Ingress` in your tenant, and as soon as the application inside
-the machine is listening on `8080`, the shop is published at `https://app.workshopXX.workshop.aenix.io`
-(`XX` is your number). Check it right from there:
-
-```bash
-curl -s https://app.workshopXX.workshop.aenix.io/actuator/health
-
-curl -s -X POST https://app.workshopXX.workshop.aenix.io/api/orders \
-  -H 'Content-Type: application/json' -d '{"item":"test"}'
-
-curl -s https://app.workshopXX.workshop.aenix.io/api/orders
-```
-
-**You should see:** the order in the list. The whole journey is complete.
-
-⚠️ While the app-VM isn't up yet or is still booting, the domain answers `503` — that's normal:
-the `Ingress` is waiting for a backend. Once the machine has started (with `8080` being listened
-on inside) it becomes `200`.
-
-In detail: [chat/30](chat/30-step-9-verify-chain.md)
-
----
-
-## Cheat sheet
-
-> **The `vmi/` prefix isn't needed by every command, and that's not a typo.** Under tenant
-> permissions, `virtctl console` accepts only the **bare** name (`vm-instance-app-1`); with
-> `vmi/` it answers `forbidden`, having taken the word `vmi` for the machine's name. `virtctl ssh`
-> and `virtctl port-forward`, on the contrary, require the `vmi/<name>` form.
-
-```bash
-# log into the app-VM (root / cozydemo)
-virtctl console --namespace=tenant-workshopXX vm-instance-app-1
-
-# log into the conversion-VM (ubuntu / ubuntu)
-virtctl console --namespace=tenant-workshopXX vm-instance-convert
-
-# a shell inside the app-VM over SSH (once the machine's network is up)
-virtctl ssh ubuntu@vmi/vm-instance-app-1 --namespace=tenant-workshopXX
-```
-
-You check the application by domain, `https://app.workshopXX.workshop.aenix.io`; `port-forward`
-isn't needed on this path. To leave the console — `Ctrl+]`. If the screen is blank after you
-connect, press Enter. The same thing is available with the mouse: the **VNC** button on the
-machine's page in the dashboard.
-
-## Where it's easy to get stuck
-
-* For the conversion-VM, use only `ubuntu-20.04`. On 24.04 the kernel panics; on 22.04
-  `virt-v2v` can't parse the old CentOS 7 RPM database.
-* The VMDisk for a catalog image must be larger than the image itself, otherwise the clone
-  won't go through and the disk will hang in `Terminating`. For `ubuntu-20.04`, 25Gi is enough.
-* On a fresh app-VM, `netfix` first, then `connect` — otherwise the application won't see the
-  managed services.
-* Run the long conversion inside `screen` — otherwise an SSH drop will cut it off halfway.
-
-The rest of the pitfalls — [chat/31](chat/31-troubleshooting.md).
-
-## For those setting up the testbed
-
-Quotas, the order for creating tenants, and the platform version — in [REQUIREMENTS.md](../REQUIREMENTS.md).
-
-## All messages in order
-
-The list of 27 messages — [chat/README.md](chat/README.md).
+| A push changed nothing on the platform | Flux has not picked it up yet, or the YAML is invalid | `kubectl get kustomization platform`; the message names the file and the error |
+| `forbidden` on `bucket` | the short name matched another kind | use `buckets.apps.cozystack.io` |
+| A VM stays `READY False` | the HelmRelease rejected the values | `kubectl get helmrelease vm-instance-<name> -o yaml`, read `status.conditions` |
+| `cloud-init status` never finishes | package installation is still running | wait; `tail -f /var/log/cloud-init-output.log` |
+| `virt-v2v: error: -os /root/out ... does not exist` | the output folder must exist | `mkdir -p /root/out` |
+| DataVolume stays `ImportInProgress` at 0% or fails | the presigned link expired or was cut when pasting | generate a new link, update `platform/app-1.yaml` |
+| The console shows nothing | the screen is blank | press Enter; leave with `Ctrl-]` |
+| The VM is `Paused` with an IO error | a storage replica was re-attached under the VM (a known issue on this testbed's node image, [cozystack#3168](https://github.com/cozystack/cozystack/issues/3168)) | `virtctl restart vm-instance-app-1` |
+| Health is `200`, orders return `500` | no tables in the new database | part 5.3 |
+| HTTPS times out or returns `502` | firewalld in the guest | part 5.5 |
