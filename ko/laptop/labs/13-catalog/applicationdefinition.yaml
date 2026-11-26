@@ -1,61 +1,61 @@
 ---
-# 랩 13. Cozystack 카탈로그를 위한 애플리케이션 정의 — 바로 그 "카탈로그 항목".
+# Lab 13. Application definition for the Cozystack catalog — that very "catalog entry".
 #
-# 이 객체는 그 자체로는 아무것도 배포하지 않습니다. 세 가지를 연결합니다: 여러분의 차트
-# (무엇을 배포할지), API의 새로운 객체 타입(애플리케이션을 어떻게 주문하는지), 그리고
-# 대시보드의 카드(그 과정에서 사람이 무엇을 보는지). 이것이 없으면 차트는 플랫폼이
-# 전혀 알지 못하는 파일 폴더로 남고, Postgres와 Redis 옆의 애플리케이션 목록은 비어 있습니다.
+# On its own this object deploys nothing. It ties together three things: your chart
+# (what to deploy), a new object type in the API (how the application is ordered) and a card
+# in the dashboard (what a person sees while doing so). Until it exists, the chart remains a folder
+# of files that the platform knows nothing about, and the application list next to Postgres and Redis is empty.
 #
-# 단일 명령으로, namespace 없이 적용됩니다:
+# Applied with a single command, without a namespace:
 #   kubectl apply -f applicationdefinition.yaml
 #
-# 중요: 이 객체는 CLUSTER-SCOPED입니다 — namespace가 없고, 클러스터 전체에 하나만
-# 존재합니다. 테넌트는 이것을 적용할 수 없으며, 이는 검증되었습니다:
+# IMPORTANT: this object is CLUSTER-SCOPED — it has no namespace, there is one for the whole
+# cluster. A tenant CANNOT apply it, this is verified:
 #   kubectl auth can-i create applicationdefinitions   ->   no
-# 여러분의 작업은 파일을 작성하고 로컬에서 확인하는 것으로 끝납니다.
-# 플랫폼 관리자가 이것을 적용합니다. README의 "여러분의 권한이 어디서
-# 끝나는지" 섹션을 참고하세요.
+# Your work ends once the file is written and checked locally.
+# The platform admin applies it. See the README, section "Where your
+# rights end".
 apiVersion: cozystack.io/v1alpha1
 kind: ApplicationDefinition
 metadata:
   name: guest-pass
 spec:
-  # --- API에서 어떻게 보이는가 ----------------------------------------------
+  # --- HOW THIS LOOKS IN THE API ----------------------------------------------
   application:
-    # 새로운 객체 타입의 Kind. 적용 후 클러스터에 kind: GuestPass가 나타나며,
-    # 일반적인 kubectl로 다룰 수 있게 됩니다.
+    # Kind of the new object type. After applying, a kind: GuestPass will appear
+    # in the cluster, and you will be able to work with it using ordinary kubectl.
     kind: GuestPass
     plural: guestpasses
     singular: guestpass
-    # 값 스키마 — 차트에 values.schema.json 파일로 들어 있는 것과 동일하며,
-    # 단지 한 줄로 작성되었을 뿐입니다. API는 이것으로 잘못된 값을 거부하고,
-    # 대시보드는 이것으로 생성 폼을 렌더링합니다.
+    # Values schema — the same one that sits in the chart as the values.schema.json file,
+    # only written on a single line. The API uses it to reject invalid
+    # values, and the dashboard uses it to render the creation form.
     openAPISchema: |-
       {"title":"Chart Values","type":"object","properties":{"replicas":{"description":"Number of application replicas.","type":"integer","default":2},"greeting":{"description":"Text shown on the main page.","type":"string","default":"Order a pass for your guest"},"external":{"description":"Enable external access from outside the cluster.","type":"boolean","default":false},"resources":{"description":"Explicit CPU and memory configuration.","type":"object","default":{},"properties":{"cpu":{"description":"CPU available to each replica.","pattern":"^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$","anyOf":[{"type":"integer"},{"type":"string"}],"x-kubernetes-int-or-string":true},"memory":{"description":"Memory (RAM) available to each replica.","pattern":"^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$","anyOf":[{"type":"integer"},{"type":"string"}],"x-kubernetes-int-or-string":true}}}}}
 
-  # --- 무엇을 배포하는가 ----------------------------------------------------
+  # --- WHAT TO DEPLOY ----------------------------------------------
   release:
-    # 릴리스 이름 = prefix + 객체 이름. 이름이 `main`인 GuestPass 객체는
-    # `guest-pass-main` 릴리스로 배포됩니다. 접두사는 필수이며, 서로 다른
-    # 애플리케이션의 릴리스가 이름으로 충돌하지 않도록 하기 위해 존재합니다.
+    # Release name = prefix + object name. A GuestPass object named `main`
+    # deploys as release `guest-pass-main`. The prefix is mandatory and exists
+    # so that releases of different applications do not clash by name.
     prefix: guest-pass-
     labels:
-      # 같은 키로 Cozystack은 테넌트 릴리스를 Flux 샤드에 분산합니다.
-      # 이것이 없으면 릴리스를 처리할 주체가 없게 됩니다.
+      # With the same key Cozystack distributes tenant releases across Flux shards.
+      # Without it there will be no one to service the release.
       sharding.fluxcd.io/key: tenants
     chartRef:
-      # 차트를 어디서 가져올지. 허용되는 kind: OCIRepository, HelmChart,
-      # ExternalArtifact. 외부 카탈로그는 보통 GitRepository -> HelmChart를
-      # 통해 들어오며, 그 namespace는 cozy-public입니다.
+      # Where to take the chart from. Allowed kinds: OCIRepository, HelmChart,
+      # ExternalArtifact. External catalogs usually arrive via
+      # GitRepository -> HelmChart, and their namespace is cozy-public.
       kind: HelmChart
       name: cozystack-guest-pass
       namespace: cozy-public
 
-  # --- 대시보드에서 어떻게 보이는가 ------------------------------------------
+  # --- HOW THIS LOOKS IN THE DASHBOARD ------------------------------------------
   dashboard:
-    # 카탈로그 섹션. 사용되는 것: PaaS, IaaS, NaaS, Administration,
-    # Networking — 여러분만의 것을 만들지 말고 기존 것을 사용하세요,
-    # 그렇지 않으면 애플리케이션이 항목 하나짜리 섹션에 놓이게 됩니다.
+    # Catalog section. Used: PaaS, IaaS, NaaS, Administration,
+    # Networking — take an existing one, do not invent your own,
+    # otherwise the application ends up in a section with a single item.
     category: PaaS
     singular: Guest Pass
     plural: Guest Passes
@@ -63,9 +63,9 @@ spec:
     tags:
       - internal
       - web
-    # 아이콘 — base64로 된 SVG. 경로나 URL이 아니라 바로 base64입니다: 대시보드는
-    # 무언가를 다운로드하러 어디에도 가지 않습니다. 원본은 옆의 icon.svg에 있습니다.
+    # Icon — SVG in base64. Specifically base64, not a path and not a URL: the dashboard
+    # does not go anywhere to download anything. The source sits next to it in icon.svg.
     icon: PHN2ZyB3aWR0aD0iMTQ0IiBoZWlnaHQ9IjE0NCIgdmlld0JveD0iMCAwIDE0NCAxNDQiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxNDQiIGhlaWdodD0iMTQ0IiByeD0iMjQiIGZpbGw9IiMyRjZGRUQiLz4KPHJlY3QgeD0iMzAiIHk9IjQwIiB3aWR0aD0iODQiIGhlaWdodD0iNjQiIHJ4PSI4IiBmaWxsPSJ3aGl0ZSIvPgo8Y2lyY2xlIGN4PSI1NCIgY3k9IjY0IiByPSIxMSIgZmlsbD0iIzJGNkZFRCIvPgo8cGF0aCBkPSJNMzggOTJjMC05IDcuMi0xNCAxNi0xNHMxNiA1IDE2IDE0djRIMzh2LTR6IiBmaWxsPSIjMkY2RkVEIi8+CjxyZWN0IHg9Ijc4IiB5PSI1OCIgd2lkdGg9IjI2IiBoZWlnaHQ9IjYiIHJ4PSIzIiBmaWxsPSIjOURCQkY3Ii8+CjxyZWN0IHg9Ijc4IiB5PSI3MiIgd2lkdGg9IjI2IiBoZWlnaHQ9IjYiIHJ4PSIzIiBmaWxsPSIjOURCQkY3Ii8+CjxyZWN0IHg9Ijc4IiB5PSI4NiIgd2lkdGg9IjE4IiBoZWlnaHQ9IjYiIHJ4PSIzIiBmaWxsPSIjOURCQkY3Ii8+CjxyZWN0IHg9IjYyIiB5PSIyNCIgd2lkdGg9IjIwIiBoZWlnaHQ9IjIwIiByeD0iNiIgZmlsbD0iIzFCNENDMCIvPgo8L3N2Zz4K
-    # 객체의 YAML 표현에서의 필드 순서. 장식적이지만, 이것이 없으면
-    # 필드가 제멋대로 배열되고 폼이 더 읽기 어려워집니다.
+    # Field order in the object's YAML representation. Cosmetic, but without it
+    # the fields line up haphazardly and the form reads worse.
     keysOrder: [["apiVersion"], ["kind"], ["metadata"], ["metadata", "name"], ["spec", "replicas"], ["spec", "greeting"], ["spec", "external"], ["spec", "resources"]]

@@ -1,65 +1,66 @@
-// लैब 10 · passes कलेक्शन के लिए दस्तावेज़ सत्यापन नियम (स्कीमा वैलिडेटर)।
+// Lab 10 · a document validation rule (schema validator) for the passes collection.
 //
-// mongosh — MongoDB शेल — के लिए एक प्रोग्राम। यह VM पर,
-// लैब क्लस्टर में, README के छोटे कमांड `mo` से चलता है:
+// A program for mongosh — the MongoDB shell. It runs on the VM,
+// in the lab cluster, with the short command `mo` from the README:
 //     cd labs/10-mongodb && mo < validator.js
-// जवाब में आपको पंक्ति «नियम स्थापित किया गया» दिखेगी।
+// In response you will see the line «rule installed».
 //
-// सत्यापन स्कीमा क्या है। डिफ़ॉल्ट रूप से कलेक्शन में कोई स्कीमा नहीं होती: डेटाबेस
-// किसी भी आकार का दस्तावेज़ स्वीकार करता है और फ़ील्ड नाम में टाइपो («tipe» के बजाय «type») को चुपचाप रख लेता है —
-// ऐसी चूक चौकी पर तैनात गार्ड नहीं पकड़ेगा। वैलिडेटर इस बात का विवरण है कि दस्तावेज़
-// कैसा होना चाहिए। लागू होने के क्षण से, डेटाबेस हर इंसर्ट और हर बदलाव की जाँच
-// खुद करता है।
+// What a validation schema is. By default a collection has no schema: the database accepts
+// a document of any shape and silently stores a typo in a field name («tipe» instead of «type») —
+// a gap the guard at the checkpoint will not catch. A validator is a description of what
+// a document must look like. From the moment it is applied, the database checks every insert and every
+// change itself.
 //
-// नियम से मेल न खाने वाले दस्तावेज़ के साथ क्या होता है: वह लिखा नहीं जाता,
-// और ऑपरेशन एक त्रुटि लौटाता है MongoServerError: Document failed validation. जो दस्तावेज़
-// पहले से कलेक्शन में हैं, नियम स्थापित होने पर उनकी जाँच नहीं होती और उन्हें दोबारा
-// नहीं लिखा जाता — पर बाद में उनकी कोई भी संशोधन अस्वीकार होने लगेगी। इसीलिए कचरा
-// (type फ़ील्ड के बिना दस्तावेज़) इस फ़ाइल को लागू करने से पहले हटाया जाता है, बाद में नहीं।
+// What happens to a document that does not match the rule: it is not written,
+// and the operation returns an error MongoServerError: Document failed validation. Documents
+// that are already in the collection are not checked and not
+// rewritten when the rule is installed — but a later edit of them will start being rejected. That is why the junk
+// (documents without a type field) is removed before applying this file, not after.
 
-// runCommand — डेटाबेस को सीधे कमांड भेजना, सामान्य db.<कलेक्शन>.<...> को दरकिनार करते हुए।
-// collMod — «मौजूदा कलेक्शन की सेटिंग्स बदलो»। नियम जीवित कलेक्शन पर बाद में
-// जोड़ा जाता है: डेटाबेस रोकने और डेटा दोबारा लोड करने की ज़रूरत नहीं।
+// runCommand — send a command to the database directly, bypassing the usual db.<collection>.<...>.
+// collMod — «change the settings of an existing collection». The rule is attached to a live
+// collection after the fact: there is no need to stop the database and reload the data.
 db.runCommand({
   collMod: "passes",
-  // validator — नियम खुद। $jsonSchema — दस्तावेज़ का आकार वर्णन करने का तरीका:
-  // कौन-से फ़ील्ड अनिवार्य हैं, वे किस प्रकार के हैं और कौन-से मान अनुमत हैं।
+  // validator — the rule itself. $jsonSchema — a way to describe the shape of a document:
+  // which fields are required, what type they are and which values are allowed.
   validator: {
     $jsonSchema: {
-      // शीर्ष-स्तरीय दस्तावेज़ खुद — एक ऑब्जेक्ट।
+      // The top-level document itself — an object.
       bsonType: "object",
-      // वे फ़ील्ड जिनके बिना दस्तावेज़ स्वीकार नहीं होता। ध्यान दें कि सूची में क्या नहीं है:
-      // guest। समूह पास में अतिथि के बजाय संगठन होता है, और नियम इतना व्यापक
-      // होना चाहिए कि दस्तावेज़ का वैध रूप उससे होकर गुज़र सके। बाधा तुरंत महसूस
-      // होती है: दस्तावेज़ जितने विविध, सबसे एक साथ उतना ही कम माँगा जा सकता है।
+      // The fields without which a document is not accepted. Notice what is NOT in the list:
+      // guest. A group pass has an organization instead of a guest, and the rule must
+      // be broad enough for the legitimate form of the document to
+      // pass through it. The constraint is felt immediately: the more varied the documents,
+      // the less can be required of all of them at once.
       required: ["type", "host"],
-      // अलग-अलग फ़ील्ड के लिए आवश्यकताएँ। यहाँ सूचीबद्ध न किया गया फ़ील्ड किसी भी तरह
-      // जाँचा नहीं जाता — अनजान फ़ील्ड दस्तावेज़ में चला जाएगा। इसे रोका जा सकता है
-      // (additionalProperties: false), पर तब हर नए फ़ील्ड के लिए नियम में बदलाव करना
-      // होगा, और आप हर छोटी बात पर स्कीमा माइग्रेशन पर लौट आएँगे। रेखा कहाँ खींचनी है —
-      // आपका फ़ैसला है, और वह हमेशा एक समझौता है।
+      // Requirements for individual fields. A field not listed here is not checked
+      // in any way — an unknown field will pass into the document. This can be forbidden
+      // (additionalProperties: false), but then every new field will require editing
+      // the rule, and you are back to a schema migration for every little thing. Where to draw the line —
+      // is your decision, and it is always a compromise.
       properties: {
-        // पास का प्रकार — केवल सूचीबद्ध चार मानों में से एक। पाँचवाँ प्रकार इस नियम
-        // को बदलने की माँग करेगा, और यह अच्छा है: बदलाव सोच-समझकर होगा।
+        // The pass type — only one of the four listed values. A fifth type
+        // will require changing this rule, and that is good: the change will become deliberate.
         type: {
-          enum: ["एकल-उपयोग", "साप्ताहिक", "वाहन", "समूह"],
-          description: "पास का प्रकार, केवल सूची से"
+          enum: ["single-use", "weekly", "vehicle", "group"],
+          description: "pass type, only from the list"
         },
-        // किस कर्मचारी ने पास का आदेश दिया। फ़ील्ड अनिवार्य है, और यह एक
-        // स्ट्रिंग होनी चाहिए।
+        // Which employee ordered the pass. The field is required, and it must be
+        // a string.
         host: {
           bsonType: "string",
-          description: "किस कर्मचारी ने ऑर्डर दिया"
+          description: "which employee placed the order"
         },
-        // guest properties में है, पर required में नहीं: यदि फ़ील्ड दस्तावेज़ में मौजूद है,
-        // तो उसे स्ट्रिंग होना चाहिए; यदि नहीं है — दस्तावेज़ फिर भी वैध है।
+        // guest is in properties, but not in required: if the field is present in the document,
+        // it must be a string; if it is absent — the document is still valid.
         guest: {
           bsonType: "string"
         },
-        // नियम नेस्टेड ऑब्जेक्ट के अंदर भी काम करते हैं। car फ़ील्ड नहीं है — कोई
-        // आवश्यकता नहीं। है — तो यह एक ऑब्जेक्ट होना चाहिए, और उसमें कार का नंबर
-        // अनिवार्य है, जबकि ट्रेलर, यदि निर्दिष्ट हो, — एक बूलियन मान है, न कि स्ट्रिंग
-        // «नहीं»।
+        // Rules work inside nested objects too. There is no car field — no
+        // requirements. If there is one — it must be an object, and the car plate in it
+        // is required, while the trailer, if specified, — is a boolean value, not the string
+        // «no».
         car: {
           bsonType: "object",
           required: ["plate"],
@@ -70,8 +71,8 @@ db.runCommand({
             weight_kg: { bsonType: ["int", "long", "double"] }
           }
         },
-        // और सूचियों के अंदर भी। items वर्णन करता है कि प्रतिभागियों की सूची का हर
-        // तत्व कैसा होना चाहिए: name अनिवार्य है, age — यदि निर्दिष्ट हो — पूर्णांक।
+        // And inside lists. items describes what each element of the
+        // members list must be: name is required, age — if specified — an integer.
         members: {
           bsonType: "array",
           items: {
@@ -86,18 +87,18 @@ db.runCommand({
       }
     }
   },
-  // strict — सभी इंसर्ट और सभी बदलावों की जाँच करना। नरम विकल्प moderate नए दस्तावेज़ों
-  // और उन दस्तावेज़ों के संपादनों की जाँच करता है जो नियम से पहले से मेल खाते हैं, और पुराने
-  // मिश्रण को छोड़ देता है। moderate के साथ ही उस कलेक्शन पर जाँच चालू की जाती है, जिसमें
-  // पहले से कचरा जमा हो चुका है: पहले आगे बिगाड़ना बंद करते हैं, फिर पुराने को ठीक करते
-  // हैं, फिर strict पर जाते हैं।
+  // strict — check all inserts and all changes. The softer variant moderate
+  // checks new documents and edits of those that already match the rule, and leaves the old
+  // mishmash alone. It is precisely with moderate that you turn on validation on a collection
+  // that has already accumulated junk: first stop making it worse, then fix
+  // the old, then switch to strict.
   validationLevel: "strict",
-  // error — अनुपयुक्त दस्तावेज़ को अस्वीकार करना। warn विकल्प लॉग में लिखता है और फिर भी
-  // स्वीकार कर लेता है: अस्वीकृति चालू करके किसी के चालू कोड को तोड़ने से पहले एक हफ़्ता
-  // यह देखने के लिए उपयुक्त कि क्या आ रहा है।
+  // error — reject an unsuitable document. The warn variant writes to the log and still
+  // accepts it: good for spending a week watching what comes in, before turning on
+  // rejection and breaking someone's working code.
   validationAction: "error"
 });
 
-// runCommand एक ऑब्जेक्ट के साथ जवाब देता है जिसमें सफलता { ok: 1 } जैसी दिखती है। हम
-// अपनी पंक्ति छापते हैं ताकि फ़ाइल लागू करने का परिणाम एक नज़र में पढ़ा जा सके।
-print("नियम स्थापित किया गया");
+// runCommand replies with an object in which success looks like { ok: 1 }. We print
+// our own line so that the result of applying the file reads at a glance.
+print("rule installed");

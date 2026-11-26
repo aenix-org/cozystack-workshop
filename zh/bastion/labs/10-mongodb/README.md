@@ -143,7 +143,7 @@ spec:
   sharding: false
   users:
     passapp:
-      password: 你的密码
+      password: YourPasswordHere
   databases:
     passes:
       roles:
@@ -174,10 +174,10 @@ bastion（跳板机）上它已经配置好了——`~/.kube/config`（每个实
 自己那边把需要的一切拉起来。
 
 ```bash
-# apply = 「把集群变成文件里所描述的样子」。
-#   --kubeconfig ~/.kube/config  用哪个访问文件。不加它，kubectl
-#                                  会使用默认访问，跑到错误的集群上去
-#   -f mongodb.yaml                要应用哪个文件（-f = file）
+# apply = "bring the cluster to what's described in the file".
+#   --kubeconfig ~/.kube/config  which access file to use. Without it kubectl
+#                                  will take the default access and wander off to the wrong cluster
+#   -f mongodb.yaml                which file to apply (-f = file)
 kubectl --kubeconfig ~/.kube/config apply -f mongodb.yaml
 ```
 
@@ -187,9 +187,9 @@ kubectl --kubeconfig ~/.kube/config apply -f mongodb.yaml
 就绪需要三到五分钟：服务器启动、副本集初始化、用户被创建。你可以这样观察进展：
 
 ```bash
-# get = 「告诉我现在有什么」。READY 列会告诉你订单是否已进入可用状态。
-#   -n tenant-workshopXX  在哪个 namespace 里查找（namespace 是集群内部的一块隔断；
-#                         你的租户正是这样一个独立的 namespace）
+# get = "show me what's there". The READY column will tell you whether the order reached a working state.
+#   -n tenant-workshopXX  which namespace to look in (a namespace is a partition inside
+#                         the cluster; your tenant is exactly such a separate namespace)
 kubectl --kubeconfig ~/.kube/config get mongodb passes -n tenant-workshopXX
 ```
 
@@ -234,7 +234,7 @@ MongoDB 的命令行 shell，你不必在 bastion 上安装它。
 <summary><b>逐段解析连接字符串</b></summary>
 
 ```
-mongodb://passapp:密码@主机:27017/passes?authSource=admin&directConnection=true
+mongodb://passapp:password@host:27017/passes?authSource=admin&directConnection=true
 ```
 
 `mongodb://` —— 协议方案。接着是用户名、密码、地址、端口。
@@ -265,28 +265,28 @@ mongodb://passapp:密码@主机:27017/passes?authSource=admin&directConnection=t
 拉起这个 Pod。把 `workshopXX` 替换成你的租户编号，把 `你的密码` 替换成你自己的密码：
 
 ```bash
-# KUBECONFIG —— kubectl 使用哪个访问文件。这里是实验 0 的
-# 实验集群：你只在它里面启动自己的 Pod，用这个访问不进租户。
+# KUBECONFIG — which access file kubectl uses. Here it's the lab cluster
+# from lab 0: you launch your own Pods only in it, the tenant won't let you in with this.
 export KUBECONFIG=~/lab.kubeconfig
 
-# run = 「创建一个 Pod 并在其中运行这个镜像」。要紧的标志：
-#   --image=mongo:8.0        运行什么。镜像里带有 mongosh shell
-#   --restart=Never          只创建一个单独的 Pod，而不是 Deployment。否则
-#                            每次它结束，集群都会把它重新拉起
-#   --env=MONGO_URI=...      Pod 内部的环境变量。密码留在它里面，
-#                            而不是在后续每条命令里重复
-#   --command -- sleep 86400 用什么让容器保持忙碌。mongo 镜像默认会启动
-#                            数据库服务器——我们不需要它，我们要的是一个可以进去的
-#                            活着的容器。86400 秒就是一天
+# run = "create a single Pod and run this image in it". The flags that matter:
+#   --image=mongo:8.0        what to run. The image contains the mongosh shell
+#   --restart=Never          create exactly a single Pod, not a Deployment. Otherwise
+#                            the cluster would bring it back up every time it finished
+#   --env=MONGO_URI=...      an environment variable inside the Pod. The password stays in it,
+#                            rather than being repeated in every following command
+#   --command -- sleep 86400 what to keep the container busy with. The mongo image would by default start
+#                            the database server — we don't need it, we need a live container
+#                            you can step into. 86400 seconds is a day
 kubectl run mongo-workbench \
   --image=mongo:8.0 \
   --restart=Never \
-  --env=MONGO_URI="mongodb://passapp:你的密码@mongodb-passes-rs0.tenant-workshopXX.svc.cozy.local:27017/passes?authSource=admin&directConnection=true" \
+  --env=MONGO_URI="mongodb://passapp:YourPasswordHere@mongodb-passes-rs0.tenant-workshopXX.svc.cozy.local:27017/passes?authSource=admin&directConnection=true" \
   --command -- sleep 86400
 
-# wait = 「在条件满足之前不要交还控制权」
-#   --for=condition=Ready  我们一直等到 Pod 自己报告就绪
-#   --timeout=180s         等多久后返回错误，而不是永远挂着
+# wait = "don't return control until the condition is met"
+#   --for=condition=Ready  we wait until the Pod reports readiness itself
+#   --timeout=180s         how long to wait before returning an error rather than hanging forever
 kubectl wait --for=condition=Ready pod/mongo-workbench --timeout=180s
 ```
 
@@ -295,18 +295,18 @@ kubectl wait --for=condition=Ready pod/mongo-workbench --timeout=180s
 现在我们设置一条简短的命令，免得每次都要把这一大串都敲一遍，并检查与数据库的连接：
 
 ```bash
-# mo —— 一个存活到你关闭终端窗口为止的快捷方式：在 shell 里
-# 就是这样声明你自己的命令的。
-#   exec        在一个已经运行的 Pod 内部执行某些东西
-#   -i          把标准输入转发进去：没有它就没法喂入一段程序
-#   sh -c '...' 我们在 Pod 里运行一个 shell，好让它自己替换 $MONGO_URI。
-#               引号故意用单引号：替换变量的应该是 Pod，而不是
-#               你的终端——否则密码会进入命令历史
-#   --quiet     不打印 mongosh 的问候语，只留下答案
+# mo — a shortcut that lives until you close the terminal window: this is how you
+# declare your own command in the shell.
+#   exec        run something inside an already-running Pod
+#   -i          forward standard input inside: without it you can't feed in a program
+#   sh -c '...' we run a shell in the Pod so that it substitutes $MONGO_URI itself.
+#               The quotes are single on purpose: the pod should substitute the variable, not
+#               your terminal — otherwise the password ends up in the command history
+#   --quiet     don't print the mongosh greeting, leave only the answer
 mo() { kubectl exec -i mongo-workbench -- sh -c 'mongosh --quiet "$MONGO_URI"'; }
 
-# ping —— 一个服务请求，「你还活着吗？」。它不读也不写，只检查连接
-# 以及凭据是否被接受。| 号把这一行送到 mongosh 的输入
+# ping — a service request, "are you alive?". It reads and writes nothing, it checks the connection
+# and that the credentials were accepted. The | sign sends this line to mongosh's input
 echo 'db.runCommand({ ping: 1 })' | mo
 ```
 
@@ -325,8 +325,8 @@ echo 'db.runCommand({ ping: 1 })' | mo
 里面一条接一条地敲查询：
 
 ```bash
-# -it 而不是 -i：多了个 t ——「给我一个终端」。于是有了输入提示符、
-# 上箭头的命令历史，以及高亮。没有 t，shell 会默默等待输入。
+# -it instead of -i: a t is added — "give me a terminal". Hence the input prompt,
+# command history on the up arrow, and highlighting. Without t the shell would silently wait for input.
 kubectl exec -it mongo-workbench -- sh -c 'mongosh "$MONGO_URI"'
 ```
 
@@ -343,8 +343,8 @@ kubectl exec -it mongo-workbench -- sh -c 'mongosh "$MONGO_URI"'
 
 ```bash
 cd labs/10-mongodb
-# < 号把文件内容喂到命令的输入——就跟你在 mongosh shell 里
-# 手动把文件的全部文本敲一遍是一回事。
+# The < sign feeds the file's contents into the command's input — the same thing as if you
+# typed the whole text of the file by hand in the mongosh shell.
 mo < passes.js
 ```
 
@@ -362,12 +362,12 @@ mo < passes.js
 
 ```js
   {
-    type: "一次性",
-    guest: "王建国",
+    type: "single-use",
+    guest: "James P. Whitfield",
     host: "petrov@corp.example",
-    entrance: "北门",
+    entrance: "North",
     valid_on: ISODate("2026-09-01T09:00:00Z"),
-    purpose: "面试"
+    purpose: "job interview"
   }
 ```
 
@@ -381,7 +381,7 @@ mo < passes.js
 `entrances` 现在是**一个列表**：
 
 ```js
-    entrances: ["北门", "南门"],
+    entrances: ["North", "South"],
     badge_returned: false
 ```
 
@@ -395,8 +395,8 @@ mo < passes.js
 
 ```js
     car: {
-      plate: "京A12345",
-      model: "福特全顺",
+      plate: "AB-1174-CD",
+      model: "Ford Transit",
       trailer: false,
       weight_kg: 3500
     },
@@ -409,9 +409,9 @@ mo < passes.js
 
 ```js
     members: [
-      { name: "孙鹏", age: 16 },
-      { name: "周敏", age: 15 },
-      { name: "吴浩", age: 17 }
+      { name: "Peter Hale", age: 16 },
+      { name: "Mary Fenwick", age: 15 },
+      { name: "Isaac Hart", age: 17 }
     ]
 ```
 
@@ -434,9 +434,9 @@ mo < passes.js
 **某个具体日期的所有通行证：**
 
 ```js
-// find = 「显示符合条件的文档」
-// { valid_on: ISODate(...) } —— 文档的 valid_on 字段必须恰好等于这个
-// 日期。ISODate 是日期，不是字符串：比较按时间进行，而不是按写法
+// find = "show the documents that match the condition"
+// { valid_on: ISODate(...) } — the document's valid_on field must equal exactly this
+// date. ISODate is a date, not a string: the comparison is by time, not by spelling
 db.passes.find({ valid_on: ISODate("2026-09-02T07:30:00Z") })
 ```
 
@@ -445,16 +445,16 @@ db.passes.find({ valid_on: ISODate("2026-09-02T07:30:00Z") })
 **只看车辆通行证：**
 
 ```js
-// 针对普通字符串字段的条件：整体匹配，这里没有不区分大小写这回事
-db.passes.find({ type: "车辆" })
+// A condition on an ordinary string field: a whole match, there's no case-insensitivity here
+db.passes.find({ type: "vehicle" })
 ```
 
 **按车牌号搜索——通过点号深入嵌套对象内部：**
 
 ```js
-// "car.plate" —— 通往文档内部的路径：car 对象里的 plate 字段。
-// 路径两边的引号是必需的，否则 JavaScript 会按自己的方式理解这个点号
-db.passes.find({ "car.plate": "京A12345" })
+// "car.plate" — a path into the document: the plate field inside the car object.
+// The quotes around the path are mandatory, otherwise JavaScript will read the dot its own way
+db.passes.find({ "car.plate": "AB-1174-CD" })
 ```
 
 <details>
@@ -475,9 +475,9 @@ db.passes.find({ "car.plate": "京A12345" })
 **在多个入口处有效的通行证：**
 
 ```js
-// entrances 不是字符串，而是一个列表：["北门", "南门"]。条件仍然像对
-// 普通字段那样书写，MongoDB 会自己对列表的每个元素逐一检查
-db.passes.find({ entrances: "南门" })
+// entrances is not a string but a list: ["North", "South"]. The condition is still written
+// as for an ordinary field, MongoDB will check it against each element of the list itself
+db.passes.find({ entrances: "South" })
 ```
 
 注意：条件写得就好像 `entrances` 是一个值为 `"南门"` 的普通字段，而实际上它是一个列表。
@@ -487,9 +487,9 @@ db.passes.find({ entrances: "南门" })
 **含有未成年人的团体通行证：**
 
 ```js
-// 路径 members.age 深入一个对象列表——到达每个参加者的 age 字段。
-// $lt = less than，「小于」。带 $ 的条件不是值，而是一种比较方式：
-// 「字段必须小于 16」，而不是「字段必须等于 16」
+// The path members.age leads inside a list of objects — to the age field of each participant.
+// $lt = less than. A condition with $ is not a value but a way of comparing:
+// "the field must be less than 16", not "the field must equal 16"
 db.passes.find({ "members.age": { $lt: 16 } })
 ```
 
@@ -499,8 +499,8 @@ db.passes.find({ "members.age": { $lt: 16 } })
 **所有指定了车辆的通行证：**
 
 ```js
-// $exists 问的不是值，而是字段在文档中是否存在这件事本身：
-// 「这个文档到底有没有 car 字段？」
+// $exists asks not about the value but about the very presence of the field in the document:
+// "does this document have a car field at all?"
 db.passes.find({ car: { $exists: true } })
 ```
 
@@ -528,10 +528,10 @@ shell 里的命令管道，一个命令的输出进入下一个命令的输入�
 </details>
 
 ```js
-// aggregate = 「让文档穿过一串阶段」。阶段按顺序执行，
-// 每个阶段都接收上一个阶段产出的东西：
-//   $group —— 按 type 字段的值把文档分到各组，并对每组计数
-//   $sort  —— 按数量给各组排序，-1 表示「降序」
+// aggregate = "run the documents through a chain of stages". The stages go in order,
+// each receiving what the previous one produced:
+//   $group — sort the documents into groups by the value of the type field, and count each one
+//   $sort  — order the groups by count, -1 means "descending"
 db.passes.aggregate([
   { $group: { _id: "$type", count: { $sum: 1 } } },
   { $sort: { count: -1 } }
@@ -548,12 +548,12 @@ db.passes.aggregate([
 不是文档，而是一份关于数据库如何查找它们的报告。
 
 ```js
-// explain = 「别给我文档，告诉我你是怎么查找它们的」
-//   "executionStats"     报告模式：不只有计划，还有实际发生了什么
-//   .executionStats      我们从回答里只取这一节，免得把全部都读一遍
-// 报告里我们看 totalDocsExamined —— 为了返回一个文档，数据库读了
-// 多少个文档
-db.passes.find({ "car.plate": "京A12345" }).explain("executionStats").executionStats
+// explain = "don't give me the documents, tell me how you looked for them"
+//   "executionStats"     report mode: not only the plan, but what actually happened
+//   .executionStats      we take exactly this section from the answer, so as not to read all of it
+// In the report we look at totalDocsExamined — how many documents the database read,
+// to return one
+db.passes.find({ "car.plate": "AB-1174-CD" }).explain("executionStats").executionStats
 ```
 
 **你应该看到** —— `totalDocsExamined` 等于集合中的文档数。数据库把它们全都过了一遍，才
@@ -562,14 +562,14 @@ db.passes.find({ "car.plate": "京A12345" }).explain("executionStats").execution
 我们来建一个索引——一个数据库用来找到所需文档、而不必挨个读完的独立结构：
 
 ```js
-// createIndex = 「在这个字段上建一个索引，从此自己持续维护它」
-//   { "car.plate": 1 }   在哪个字段上。1 是「升序」
-//   name: "car_plate"    给索引起什么名字，以便日后认出并删除它
-//   sparse: true         只有拥有该字段的文档才进入索引
+// createIndex = "build an index on this field and keep maintaining it yourself from now on"
+//   { "car.plate": 1 }   on which field. 1 is "ascending" order
+//   name: "car_plate"    what to name the index, so you can recognize and delete it later
+//   sparse: true         only documents that have the field get into the index
 db.passes.createIndex({ "car.plate": 1 }, { name: "car_plate", sparse: true })
 
-// 我们重复同一份报告，并和上一份比较
-db.passes.find({ "car.plate": "京A12345" }).explain("executionStats").executionStats
+// We repeat the same report and compare it with the previous one
+db.passes.find({ "car.plate": "AB-1174-CD" }).explain("executionStats").executionStats
 ```
 
 **你应该看到** —— `totalDocsExamined` 等于一，而计划里出现了 `IXSCAN` 而不是 `COLLSCAN`。
@@ -608,10 +608,10 @@ db.passes.find({ "car.plate": "京A12345" }).explain("executionStats").execution
 我们继续。门口的值班人员又开了一张一次性通行证——通过一段匆忙写就的脚本：
 
 ```js
-// insertOne = 「添加一个文档」。里面有哪些字段，数据库不过问
+// insertOne = "add one document". What fields are in it, the database doesn't ask
 db.passes.insertOne({
-  tipe: "一次性",
-  guest: "韩明宇",
+  tipe: "single-use",
+  guest: "Nathan S. Graham",
   host: "petrov@corp.example",
   data: ISODate("2026-09-04T09:00:00Z")
 })
@@ -621,17 +621,17 @@ db.passes.insertOne({
 是数据库自己想出来的。我们来检查一下现在是不是有五个文档：
 
 ```js
-// countDocuments = 「对符合条件的文档计数」。
-// 空的花括号是没有任何限制的条件，也就是「全部」
+// countDocuments = "count the documents that match the condition".
+// Empty curly braces are a condition with no restrictions, that is, "all"
 db.passes.countDocuments({})
 ```
 
 五个。现在做保安每天早上做的事——打开一次性通行证的列表：
 
 ```js
-// 和搜索那一步一样的按类型筛选：显示 type 字段等于
-// "一次性" 的通行证
-db.passes.find({ type: "一次性" })
+// The same selection by type as in the search step: show the passes whose
+// type field equals "single-use"
+db.passes.find({ type: "single-use" })
 ```
 
 > **在继续读下去之前，停下来想一想。**
@@ -651,8 +651,8 @@ MongoDB 没有察觉，因为**集合没有模式，因此也没有关于哪些�
 我们来找出受害者——那些根本没有 `type` 字段的文档：
 
 ```js
-// $exists: false —— 与上一步相反：「字段不在文档里」。
-// 这样的查询值得随手备着：它能显示出绕过模式积累了什么
+// $exists: false — the opposite of the previous step: "the field is not in the document".
+// It's worth keeping such a query handy: it shows what has accumulated past the schema
 db.passes.find({ type: { $exists: false } })
 ```
 
@@ -671,8 +671,8 @@ db.passes.find({ type: { $exists: false } })
 我们删除没有类型的文档：
 
 ```js
-// deleteMany = 「删除所有符合条件的文档」。条件和上面搜索时
-// 一样——也就是说，你刚才看到的正是会被删掉的东西
+// deleteMany = "delete all documents that match the condition". The condition is the same
+// as in the search above — which means exactly what you just saw will be deleted
 db.passes.deleteMany({ type: { $exists: false } })
 ```
 
@@ -705,7 +705,7 @@ db.runCommand({
 
 ```js
         type: {
-          enum: ["一次性", "每周", "车辆", "团体"],
+          enum: ["single-use", "weekly", "vehicle", "group"],
         },
 ```
 
@@ -739,8 +739,8 @@ db.runCommand({
 我们应用这条规则：
 
 ```bash
-# 和 passes.js 一样的手法：文件内容被喂到 mongosh 的输入。
-# 规则挂到活着的集合上——不需要停数据库
+# The same trick as with passes.js: the file's contents are fed to mongosh's input.
+# The rule is hung on a live collection — no need to stop the database
 mo < validator.js
 ```
 
@@ -749,9 +749,9 @@ mo < validator.js
 我们试着重复同样的拼写错误——现在有规则盯着：
 
 ```js
-// tipe 字段规则并不认识，而文档里没有必填的 type。
-// 以前，这样的文档会悄无声息地落进集合
-db.passes.insertOne({ tipe: "一次性", guest: "检查", host: "x@corp.example" })
+// The tipe field is unknown to the rule, and there's no required type in the document.
+// Before, such a document would silently settle into the collection
+db.passes.insertOne({ tipe: "single-use", guest: "Check", host: "x@corp.example" })
 ```
 
 **你应该看到** —— `MongoServerError: Document failed validation`。现在拼写错误过不去了。
@@ -780,15 +780,15 @@ db.passes.insertOne({ tipe: "一次性", guest: "检查", host: "x@corp.example"
 
 ```js
 db.passes.aggregate([
-  // $lookup = 「对每张通行证，去另一个集合把一条记录取回来」
+  // $lookup = "for each pass, go to another collection and bring back a record from there"
   { $lookup: {
-      from: "staff",          // 去哪儿 —— 员工集合
-      localField: "host",     // 比较通行证的哪个字段
-      foreignField: "email",  // 与员工的哪个字段
-      as: "host_info"         // 用什么名字把找到的放进文档
+      from: "staff",          // where to go — the employees collection
+      localField: "host",     // which pass field to compare
+      foreignField: "email",  // with which employee field
+      as: "host_info"         // under what name to put what's found into the document
   } },
-  // 找到的东西总是以列表放入，哪怕只有一个匹配。
-  // $unwind 把列表展开回单个值
+  // What's found is always put as a list, even if there's a single match.
+  // $unwind unrolls the list back into a single value
   { $unwind: "$host_info" }
 ])
 ```
@@ -824,10 +824,10 @@ db.passes.aggregate([
 试试看：
 
 ```js
-// host 字段按含义指向一名员工。这样的员工并不存在——
-// 数据库会检查这件事吗？文档满足上一步的规则：type 在
-// 且来自列表，host 是字符串
-db.passes.insertOne({ type: "一次性", host: "不存在@corp.example", guest: "测试" })
+// The host field, by meaning, refers to an employee. No such employee exists —
+// will the database check this? The document satisfies the rule from the last step: type is
+// in place and from the list, host is a string
+db.passes.insertOne({ type: "single-use", host: "does-not-exist@corp.example", guest: "Test" })
 ```
 
 文档会被插入。没有哪个员工用这个邮箱，而数据库不会去管这个。
@@ -841,8 +841,8 @@ db.passes.insertOne({ type: "一次性", host: "不存在@corp.example", guest: 
 别忘了删掉测试文档：
 
 ```js
-// deleteOne = 「删除一个符合条件的文档」，而不是一次删掉全部
-db.passes.deleteOne({ host: "不存在@corp.example" })
+// deleteOne = "delete one document that matches the condition", not all of them at once
+db.passes.deleteOne({ host: "does-not-exist@corp.example" })
 ```
 
 </details>
@@ -859,11 +859,11 @@ db.passes.deleteOne({ host: "不存在@corp.example" })
 开启一个事务：
 
 ```js
-// 会话是与数据库的一次单独「对话」，在它内部你可以声明一个事务
+// A session is a separate "conversation" with the database, within which you can declare a transaction
 const s = db.getMongo().startSession();
-s.startTransaction();          // 从这一刻起改动开始累积，但谁也看不见
-// … 通过 s.getDatabase("passes") 进行的操作 …
-s.commitTransaction();         // 一次性全部应用。要一次性全部取消 —— abortTransaction()
+s.startTransaction();          // from this point changes accumulate, but are visible to no one
+// … operations through s.getDatabase("passes") …
+s.commitTransaction();         // apply it all at once. To cancel it all at once — abortTransaction()
 ```
 
 **还有第三条真相，最实用的：** MongoDB 里的事务比关系数据库里更贵，它们有时间限制，而整个
@@ -889,15 +889,15 @@ s.commitTransaction();         // 一次性全部应用。要一次性全部取�
 
 ```js
 db.passes.aggregate([
-  // $$ROOT —— 整个完整的文档。$objectToArray 把它拆成
-  // 「字段名 —— 值」的对，好让你之后把字段当作数据来处理
+  // $$ROOT — the whole document in full. $objectToArray breaks it into
+  // "field name — value" pairs, so you can then work with the fields as data
   { $project: { fields: { $objectToArray: "$$ROOT" } } },
-  // 我们展开这些对的列表：一个对 —— 下一个阶段输入端的一行
+  // We unroll the list of pairs: one pair — one row at the input of the next stage
   { $unwind: "$fields" },
-  // 我们同时按两个属性分组：字段名（k）和它的值类型（t），
-  // 并统计这样的组合出现了多少次
+  // We group by two attributes at once: the field name (k) and its value type (t),
+  // and count how many times such a combination occurred
   { $group: { _id: { k: "$fields.k", t: { $type: "$fields.v" } }, n: { $sum: 1 } } },
-  { $sort: { "_id.k": 1 } }   // 按字母顺序，好让一个字段和它自己的各种类型挨在一起
+  { $sort: { "_id.k": 1 } }   // alphabetically, so one field sits next to its own types
 ])
 ```
 
@@ -932,13 +932,13 @@ db.passes.aggregate([
 
 ```bash
 cd labs/10-mongodb
-# 和上面各步一样的访问文件：脚本从实验集群内部工作
+# The same access file as in the steps above: the script works from inside the lab cluster
 export KUBECONFIG=~/lab.kubeconfig
-# 租户编号：脚本会用它拼出数据库地址。替换成你自己的
+# The tenant number: from it the script will assemble the database address. Substitute your own
 export COZY_TENANT=workshop03
-# 密码用单引号括起来：单引号内 shell 不会处理字符串里的 $、! 和 &。
-# 密码不会进入报告
-export MONGO_PASSWORD='你的passapp密码'
+# The password in single quotes: inside them the shell doesn't touch $, ! and & within the string.
+# The password doesn't make it into the report
+export MONGO_PASSWORD='your-passapp-password'
 ./check.sh
 ```
 
@@ -956,8 +956,8 @@ export MONGO_PASSWORD='你的passapp密码'
 工作 Pod 不再需要了——这一整段时间里它都用 `sleep` 命令让容器保持忙碌：
 
 ```bash
-# delete = 「从集群里移除」。Pod 连同它的 MONGO_URI 变量一起消失，
-# 所以密码不会留在集群里
+# delete = "remove from the cluster". The Pod disappears along with its MONGO_URI variable,
+# so the password doesn't remain in the cluster
 kubectl delete pod mongo-workbench
 ```
 

@@ -50,7 +50,7 @@
 파일은 이미 전부 여러분 것입니다 — 저장소와 함께 가져왔으니까요. 새로 만들거나 다시 입력할 것은 없습니다: 아래에서 `kubectl apply -f 이름.yaml`이라고 적힌 곳이면, 그 파일은 여기서 가져옵니다.
 
 ```bash
-# 지금부터 모든 명령은 이 폴더에서 실행합니다: `kubectl apply -f`의 경로는 이 폴더를 기준으로 합니다.
+# From here on, all commands run from this folder: the paths in `kubectl apply -f` are relative to it.
 cd labs/05-gitops
 ```
 
@@ -79,11 +79,11 @@ cd labs/05-gitops
 저장소를 본인 컴퓨터로 가져오세요:
 
 ```bash
-# clone = 저장소를 편집 이력 전체와 함께 통째로 내려받습니다. 공유 폴더에 대한 접근이
-# 아니라 디스크에 놓인 자기만의 전체 복사본을 얻습니다: 네트워크 없이도 작업할 수 있습니다.
-# `본인-로그인`을 본인의 GitHub 로그인으로 바꾸세요. 그러지 않으면 명령이 남의 저장소로 갑니다.
-git clone https://github.com/본인-로그인/passes-gitops.git
-# clone은 저장소 이름으로 폴더를 만듭니다. 지금부터는 그 안에서 작업합니다.
+# clone = download the repository in full, together with its entire edit history. You get
+# not access to a shared folder but your own full copy on disk: you can work with it offline.
+# Replace `YOUR-LOGIN` with your own GitHub login, or the command will go to someone else's repository.
+git clone https://github.com/YOUR-LOGIN/passes-gitops.git
+# clone creates a folder named after the repository. From here on we work inside it.
 cd passes-gitops
 ```
 
@@ -94,12 +94,12 @@ cd passes-gitops
 이 실습 폴더에는 파일이 두 개 있습니다: `app/namespace.yaml`와 `app/passes.yaml`. 이것들을 본인 저장소의 `apps` 폴더로 복사하세요:
 
 ```bash
-# apps — Flux가 기술을 가져올 폴더입니다. 이름은 우리가 정했고, Flux 설정에 적힌 것과
-# 정확히 같은 이름이므로 이유 없이 바꿀 까닭이 없습니다.
-#   -p  폴더가 이미 있어도 오류로 치지 않습니다
+# apps — the folder Flux will pull descriptions from. We chose the name, and it's the exact
+# same one named in the Flux configuration, so there's no reason to change it without cause.
+#   -p  don't treat it as an error if the folder already exists
 mkdir -p apps
-# 워크숍 자료(~/workshop에 있음)에서 두 파일을 본인 저장소로
-# 복사합니다; `*.yaml`이 두 파일을 한 번에 가져갑니다.
+# Copy both files from the workshop materials (they live in ~/workshop) into your own
+# repository; `*.yaml` will take both files at once.
 cp ~/workshop/labs/05-gitops/app/*.yaml apps/
 ```
 
@@ -163,13 +163,13 @@ spec:
 GitHub으로 보냅니다. Git은 무엇이든 무작정 기억하는 게 아니라, 명시적으로 보여준 것만 기억합니다 — 그래서 명령이 세 개이고, 각자 자기 일을 합니다:
 
 ```bash
-# add = 다음 이력 항목에 들어갈 파일을 표시합니다.
+# add = mark the files that will go into the next history entry.
 git add apps
-# commit = 표시된 것을 하나의 항목으로 저장합니다: 내용, 작성자, 시각, 그리고 이유.
-#   -m "..."  바로 그 이유. 이력에 영원히 남고, 사람들이 읽게 됩니다.
-# 커밋은 지금은 여러분의 bastion에만 있습니다 — 아직 GitHub에는 없습니다.
+# commit = save what's marked as one entry: contents, author, time, and reason.
+#   -m "..."  that very reason. It stays in the history forever, and people will read it.
+# The commit lives only on your bastion for now — it's not yet in GitHub.
 git commit -m "add passes service v1"
-# push = 쌓인 커밋을 GitHub으로 보냅니다. 이 명령 전까지는 거기서 아무것도 바뀌지 않습니다.
+# push = send the accumulated commits to GitHub. Until this command, nothing there changes.
 git push
 ```
 
@@ -188,36 +188,36 @@ Flux는 클러스터 안의 여러 서비스입니다. 하나는 Git으로 들�
 macOS:
 
 ```bash
-# Homebrew는 Flux 프로젝트의 저장소에서 formula를 가져와 실행 파일 하나를 놓습니다.
+# Homebrew takes the formula from the Flux project's repository and drops one executable file.
 brew install fluxcd/tap/flux
 ```
 
 Linux:
 
 ```bash
-# Flux 사이트의 스크립트가 여러분의 아키텍처를 감지해 파일을 /usr/local/bin에 놓습니다.
-#   -s          curl이 다운로드 표시 없이 조용히 동작합니다
-#   | sudo bash 내려받은 텍스트가 곧바로 관리자 권한으로 실행됩니다 — 시스템 폴더에
-#               쓰기 때문에 그 권한이 필요합니다
+# The script from the Flux site detects your architecture and drops the file into /usr/local/bin.
+#   -s          curl works silently, without a download indicator
+#   | sudo bash the downloaded text is executed straight away with administrator rights — they're
+#               needed because of the write into a system folder
 curl -s https://fluxcd.io/install.sh | sudo bash
 ```
 
 Windows (PowerShell, Chocolatey가 설치돼 있다면):
 
 ```powershell
-# choco — Windows용 서드파티 패키지 매니저; 똑같은 flux.exe 파일 하나를 설치합니다.
+# choco — a third-party package manager for Windows; it installs the same single flux.exe file.
 choco install flux
 ```
 
 이제 서비스 자체를 클러스터에 설치합니다:
 
 ```bash
-# 접근 파일을 지정합니다: 아래 명령은 클러스터에 객체를 만드는데, 어느 클러스터인지가 중요합니다.
+# Set the access file: the command below creates objects in the cluster, and it matters in which one.
 export KUBECONFIG=~/lab.kubeconfig
-# flux install은 클러스터에 `flux-system` namespace를 만들고 그 안에 서비스를 배포합니다.
-#   --components=...  정확히 어느 것을 설치할지:
-#     source-controller     Git으로 들어가 저장소의 최신 복사본을 유지합니다
-#     kustomize-controller  내려받은 것을 클러스터에 적용하고 어긋남을 감시합니다
+# flux install sets up a `flux-system` namespace in the cluster and deploys the services into it.
+#   --components=...  which ones exactly to install:
+#     source-controller     reaches into Git and keeps a fresh copy of the repository
+#     kustomize-controller  applies what was downloaded to the cluster and watches for divergences
 flux install --components=source-controller,kustomize-controller
 ```
 
@@ -234,8 +234,8 @@ flux install --components=source-controller,kustomize-controller
 서비스가 떴는지 확인하세요:
 
 ```bash
-# -n flux-system — Flux가 자리 잡은 namespace. 이 플래그가 없으면 kubectl은
-# default namespace를 보고 아무것도 보여주지 않습니다.
+# -n flux-system — the namespace Flux settled into. Without this flag kubectl looks in the
+# default namespace and shows nothing.
 kubectl get pods -n flux-system
 ```
 
@@ -247,8 +247,8 @@ kubectl get pods -n flux-system
 똑같은 것을 도구 없이 평범한 매니페스트로 설치할 수 있습니다:
 
 ```bash
-# 같은 서비스 세트를, 다만 완성된 기술로: -f는 디스크의 경로뿐 아니라
-# 링크도 받습니다. kubectl이 파일을 내려받아 그 내용을 적용합니다.
+# The same set of services, but as a ready-made description: -f accepts not only a path on disk
+# but also a link. kubectl will download the file and apply its contents.
 kubectl apply -f https://github.com/fluxcd/flux2/releases/latest/download/install.yaml
 ```
 
@@ -265,7 +265,7 @@ Flux는 설치됐지만, 아직 어디로 가야 할지 모릅니다. 두 개의
 이 실습 폴더의 `flux/gitrepository.yaml`을 열고, `교체하세요` 자리표시자 대신 **본인** 저장소의 주소를 넣으세요:
 
 ```yaml
-  url: https://github.com/교체하세요/passes-gitops
+  url: https://github.com/REPLACE-ME/passes-gitops
 ```
 
 <details>
@@ -277,7 +277,7 @@ Flux는 설치됐지만, 아직 어디로 가야 할지 모릅니다. 두 개의
 kind: GitRepository
 spec:
   interval: 1m
-  url: https://github.com/교체하세요/passes-gitops
+  url: https://github.com/REPLACE-ME/passes-gitops
   ref:
     branch: main
 ```
@@ -315,18 +315,18 @@ spec:
 둘 다 적용합니다:
 
 ```bash
-# -f는 파일이 아니라 폴더를 가리킵니다: 그 안의 모든 매니페스트가 적용됩니다 —
-# GitRepository도 Kustomization도. 둘 다 flux-system namespace에 만들어집니다.
+# -f points at a folder, not a file: all the manifests in it will be applied —
+# both GitRepository and Kustomization. Both are created in the flux-system namespace.
 kubectl apply -f flux/
 ```
 
 무엇이 됐는지 봅시다:
 
 ```bash
-# Flux에게 조정 상태를 물어봅니다.
-#   --watch  창을 계속 붙잡아 두고 변화가 생길 때마다 줄을 갱신합니다
-# READY: True는 저장소의 내용이 클러스터에 도달해 적용됐다는 뜻입니다.
-# REVISION — 브랜치와, 현재 적용된 커밋의 짧은 식별자.
+# We ask Flux about the reconciliation state.
+#   --watch  keep the window busy and refresh the line as things change
+# READY: True means the repository's contents reached the cluster and were applied.
+# REVISION — the branch and the short identifier of the commit currently applied.
 flux get kustomizations --watch
 ```
 
@@ -340,8 +340,8 @@ passes   main@sha1:a1b2c3d   False      True   Applied revision: main@sha1:a1b2c
 `Ctrl+C`로 관찰을 멈추고 클러스터에 무엇이 나타났는지 보세요:
 
 ```bash
-# all — 주요 객체 유형을 한 번에 가리키는 약칭: Pod, Deployment, Service 등.
-# `passes` namespace는 손으로 만들지 않았습니다: 애플리케이션과 함께 저장소에서 왔습니다.
+# all — a shorthand for the main object types at once: Pods, Deployment, Service, and the rest.
+# You didn't create the `passes` namespace by hand: it arrived from the repository along with the application.
 kubectl get all -n passes
 ```
 
@@ -365,7 +365,7 @@ spec:
 보냅니다:
 
 ```bash
-# 첫 전송 때와 같은 세 단계: 파일 표시, 이유와 함께 저장, 전송.
+# The same three steps as in the first send: mark the file, save with a reason, send.
 git add apps/passes.yaml
 git commit -m "passes: two replicas so the gate does not go dark during rollout"
 git push
@@ -374,8 +374,8 @@ git push
 이제 클러스터를 지켜보며 기다립니다:
 
 ```bash
-# -w = 「지켜보며 계속 덧붙이기」: 창은 계속 붙잡혀 있고, 복제본의 상태가
-# 바뀔 때마다 새 줄이 나타납니다. 나가려면 Ctrl+C.
+# -w = "watch and keep appending": the window stays busy, a new line appears every time
+# the state of the copies changes. Exit with Ctrl+C.
 kubectl get pods -n passes -w
 ```
 
@@ -384,19 +384,19 @@ kubectl get pods -n passes -w
 1분을 기다리기 싫다면 — Flux에게 지금 바로 조정하라고 요청할 수 있습니다:
 
 ```bash
-# reconcile = 「다음 1분을 기다리지 말고 지금 바로 조정하라.」
-#   kustomization passes  어느 객체를 조정할지
-#   --with-source         먼저 Git으로 가서 최신 커밋을 가져오고 그다음에야 적용합니다;
-#                         이 플래그가 없으면 조정은 앞서 내려받은 복사본을 기준으로 진행됩니다
+# reconcile = "reconcile right now, without waiting for the next minute."
+#   kustomization passes  which object to reconcile
+#   --with-source         first go to Git for the fresh commit and only then apply;
+#                         without this flag the reconciliation goes off the copy downloaded earlier
 flux reconcile kustomization passes --with-source
 ```
 
 커밋 메시지를 눈여겨보세요. `two replicas so the gate does not go dark during rollout` — 이게 이유입니다. 반년 뒤, 누군가 「왜 여기 하나가 아니라 둘이지」라고 물으면, 답을 5초 만에 찾습니다:
 
 ```bash
-# log = 커밋 이력, 최신이 맨 위.
-#   --oneline         커밋당 한 줄: 짧은 식별자와 이유 텍스트
-#   apps/passes.yaml  바로 이 파일을 건드린 커밋만 보여줍니다
+# log = the history of commits, freshest on top.
+#   --oneline         one line per commit: a short identifier and the reason text
+#   apps/passes.yaml  show only the commits that touched this exact file
 git log --oneline apps/passes.yaml
 ```
 
@@ -409,8 +409,8 @@ git log --oneline apps/passes.yaml
 밤, 장애, 서비스에 복제본이 모자랍니다. 여러분은 늘 하던 대로 합니다:
 
 ```bash
-# Git을 건너뛰고 클러스터에서 곧바로 복제본 수를 바꿉니다 — 오늘까지 하던 대로.
-#   -n passes  애플리케이션은 이 namespace에 있습니다; 플래그가 없으면 명령이 찾지 못합니다
+# Change the number of copies right in the cluster, bypassing Git — as you did until today.
+#   -n passes  the application lives in this namespace; without the flag the command won't find it
 kubectl scale deployment passes -n passes --replicas=5
 ```
 
@@ -421,14 +421,14 @@ deployment.apps/passes scaled
 됐습니다. 확인해 봅시다:
 
 ```bash
-# READY 열은 「준비됨/주문됨」으로 읽힙니다: 몇 개의 복제본이 응답하고, 몇 개여야 하는지.
+# The READY column reads as "ready/ordered": how many copies respond and how many there should be.
 kubectl get deployment passes -n passes
 ```
 
 복제본 다섯. 1분 기다렸다가 다시 보세요:
 
 ```bash
-# 같은 명령. 유일한 차이는 두 번의 실행 사이에 1분이 지났다는 것뿐입니다.
+# The same command. The only difference is that a minute passed between the two runs.
 kubectl get deployment passes -n passes
 ```
 
@@ -468,15 +468,15 @@ Flux가 되돌렸고, 그것이 바로 Flux를 설치한 이유입니다.
 **언제 방해가 되나.** 장애가 났을 때, 정말로 무언가를 즉시 바꿔야 하고 논의할 시간이 없을 때 방해가 됩니다. 그런 경우를 위해 Flux는 일시 정지할 수 있습니다:
 
 ```bash
-# suspend = 이 객체에 대한 조정을 일시 정지합니다. Flux는 클러스터를 기술에
-# 맞추기를 멈추고, 손으로 한 변경이 살아남기 시작합니다. 그동안 Git의 내용은 바뀌지 않습니다.
+# suspend = pause reconciliation for this object. Flux stops bringing the cluster to the
+# description, and manual changes start to live. The contents of Git don't change meanwhile.
 flux suspend kustomization passes
 ```
 
 이 뒤로 조정은 돌지 않고, 손으로 무엇이든 할 수 있습니다. 되돌리려면:
 
 ```bash
-# resume = 조정을 다시 켭니다. 바로 다음 조정이 손으로 한 것을 전부 제거합니다.
+# resume = turn reconciliation back on. The very next reconciliation removes everything done by hand.
 flux resume kustomization passes
 ```
 
@@ -505,8 +505,8 @@ flux resume kustomization passes
 보냅니다. 뻔히 나쁜 변경도 좋은 변경과 같은 길을 갑니다: 지금은 여러분의 `push`와 클러스터 사이에 아무 검사도 없습니다 — 그리고 그게 이 단계의 요점입니다.
 
 ```bash
-# 같은 add, commit, push. 커밋의 이유는 정직하게 적습니다 — 5분 뒤,
-# 변경을 되돌려야 할 때 쓸모가 있습니다.
+# The same add, commit, push. The reason in the commit is written honestly — it'll come in handy
+# in five minutes, when the change has to be undone.
 git add apps/passes.yaml
 git commit -m "passes: trim memory limit"
 git push
@@ -515,14 +515,14 @@ git push
 기다리며 지켜봅니다:
 
 ```bash
-# 조정이 새 기술을 가져올 때까지 복제본을 지켜봅니다.
+# Watch the copies until the reconciliation brings the new description.
 kubectl get pods -n passes -w
 ```
 
 **보게 될 것** — 새 복제본이 뜨지 않습니다. `OOMKilled` 상태는 프로세스가 메모리 리밋을 초과해 종료됐다는 뜻이고, `CrashLoopBackOff`는 클러스터가 이미 그 복제본을 연달아 여러 번 재시작했으며 이제 다음 시도까지 점점 더 오래 기다린다는 뜻입니다. Nginx는 4메가바이트에 들어가지 못하고 시작하자마자 죽습니다.
 
 ```bash
-# 같은 목록이지만, 지켜보지 않고 한 번의 스냅샷으로.
+# The same list, but as a single snapshot, without watching.
 kubectl get pods -n passes
 ```
 
@@ -537,7 +537,7 @@ passes-7f8a1b2c3-qq7lp    0/1     CrashLoopBackOff   3          90s
 **예전이라면 이렇게 롤백했을 겁니다:**
 
 ```bash
-# undo는 Deployment를 이전 리비전으로 — 편집 이전의 설정으로 되돌립니다.
+# undo would return the Deployment to the previous revision — to the settings from before the edit.
 kubectl rollout undo deployment/passes -n passes
 ```
 
@@ -546,20 +546,20 @@ kubectl rollout undo deployment/passes -n passes
 **`rollout undo`를 하지 마세요. 진실이 사는 곳에서 롤백하세요** — Git에서:
 
 ```bash
-# revert = 지정한 커밋의 변경을 되돌리는 새 커밋을 추가합니다.
-#   HEAD       「현재 브랜치의 마지막 커밋」 — 바로 나쁜 리밋이 든 그 커밋
-#   --no-edit  커밋 메시지용 편집기를 열지 않습니다; Git이 제목을 스스로 씁니다
+# revert = add a new commit that undoes the changes of the specified one.
+#   HEAD       "the last commit of the current branch" — the very one with the bad limit
+#   --no-edit  don't open an editor for the commit message; Git writes the header itself
 git revert --no-edit HEAD
-# 되돌리는 커밋이 GitHub으로 보내지기 전까지, Flux는 그것에 대해 아무것도 모릅니다.
+# Until the reverting commit is sent to GitHub, Flux knows nothing about it.
 git push
 ```
 
 **보게 될 것** — `Revert "passes: trim memory limit"` 제목의 새 커밋, 그리고 1분 안에 클러스터에 다시 동작하는 복제본 둘.
 
 ```bash
-# 복제본이 다시 뜹니다: 동작하는 메모리 리밋이 돌아왔습니다.
+# The copies come up again: the working memory limit is back.
 kubectl get pods -n passes
-# 그리고 여기서 지금 어느 커밋이 적용됐는지 볼 수 있습니다 — 되돌리는 커밋과 일치해야 합니다.
+# And here you can see which commit is applied now — it should match the reverting one.
 flux get kustomizations
 ```
 
@@ -569,7 +569,7 @@ flux get kustomizations
 `git revert`는 나쁜 커밋을 지우지 않습니다. 나쁜 커밋의 변경을 되돌리는 **새** 커밋을 추가합니다. 이력에는 전부 남습니다: 무엇이 망가졌는지, 언제 알아챘는지, 무엇을 롤백했는지.
 
 ```bash
-# -4 — 가장 최근 커밋 네 개를 보여줍니다; 맨 위가 가장 최신입니다.
+# -4 — show the four most recent commits; the top one is the freshest.
 git log --oneline -4
 ```
 
@@ -597,9 +597,9 @@ c71a4f9 passes: two replicas so the gate does not go dark during rollout
 변경을 위한 브랜치를 만드세요:
 
 ```bash
-# checkout -b = 새 브랜치를 만들고 곧바로 그리로 전환합니다. 브랜치는 변경의 별도 갈래입니다:
-# 거기서 만든 커밋은 `main`에 닿지 않고, 따라서 클러스터에도 닿지 않습니다.
-#   passes/version-line  브랜치 이름; 이름의 슬래시는 허용되며 그룹화에 쓰입니다
+# checkout -b = start a new branch and switch to it right away. A branch is a separate line
+# of changes: commits made in it don't reach `main`, and therefore don't reach the cluster either.
+#   passes/version-line  the branch name; a slash in the name is allowed and serves for grouping
 git checkout -b passes/version-line
 ```
 
@@ -608,9 +608,9 @@ git checkout -b passes/version-line
 ```bash
 git add apps/passes.yaml
 git commit -m "passes: bump the version shown on the page"
-# origin — Git이 여러분이 저장소를 clone해 온 주소를 기억하는 이름.
-#   -u origin passes/version-line  GitHub에 같은 이름의 브랜치를 만들고 그 연결을
-#                                  기억해서, 이후로는 맨 `git push`만으로 충분하게 합니다
+# origin — the name under which Git remembers the address you cloned the repository from.
+#   -u origin passes/version-line  create a branch of the same name in GitHub and remember
+#                                  the link with it, so that a bare `git push` is enough later
 git push -u origin passes/version-line
 ```
 
@@ -623,10 +623,10 @@ git push -u origin passes/version-line
 **Merge pull request**를 누르세요 — 변경이 `main`에 안착하고, 다음 조정이 그것을 클러스터로 가져옵니다. 1분 뒤 터널을 열어 서비스가 무엇을 내보내는지 봅니다:
 
 ```bash
-# port-forward = bastion에서 클러스터 안으로 이어지는 임시 터널.
-#   -n passes     서비스가 사는 namespace
-#   svc/passes    어디로 이끄는지: 특정 복제본이 아니라 Service로
-#   8080:80       왼쪽은 bastion의 포트, 오른쪽은 클러스터 안 서비스의 포트
+# port-forward = a temporary tunnel from the bastion into the cluster.
+#   -n passes     the namespace the service lives in
+#   svc/passes    where we lead: to the Service, not a specific copy
+#   8080:80       on the left the port on the bastion, on the right the service's port inside the cluster
 kubectl port-forward -n passes svc/passes 8080:80
 ```
 
@@ -654,10 +654,10 @@ kubectl port-forward -n passes svc/passes 8080:80
 📍 **위치:** bastion에서, `kubectl`로 작업하던 바로 그 터미널 창.
 
 ```bash
-# 실습 폴더로 돌아갑니다: 스크립트는 거기 있고, 여러분은 본인 저장소 폴더에서 작업하고 있었습니다.
+# Return to the lab folder: the script lives there, and you worked in your own repository's folder.
 cd labs/05-gitops
 export KUBECONFIG=~/lab.kubeconfig
-# 스크립트는 클러스터에서 아무것도 바꾸지 않습니다: 상태를 읽어 보고서를 출력할 뿐입니다.
+# The script changes nothing in the cluster: it only reads the state and prints a report.
 ./check.sh
 ```
 
@@ -668,8 +668,8 @@ export KUBECONFIG=~/lab.kubeconfig
 스크립트가 여러분 저장소의 이력까지 보게 하고 싶다면 — clone이 어디 있는지 알려주세요:
 
 ```bash
-# LAB_REPO — 스크립트가 여러분 저장소의 clone이 어디 있는지 알아내는 변수.
-# 홈 폴더가 아닌 다른 곳에 clone했다면 본인 경로를 넣으세요.
+# LAB_REPO — the variable from which the script learns where the clone of your repository lives.
+# Put in your own path if you cloned it somewhere other than the home folder.
 export LAB_REPO=~/passes-gitops
 ./check.sh
 ```
@@ -683,8 +683,8 @@ export LAB_REPO=~/passes-gitops
 모든 실습을 끝냈다면, 이렇게 전부를 한 번에 제거할 수 있습니다:
 
 ```bash
-# delete kustomization = 조정 객체를 클러스터에서 제거합니다.
-#   --silent  확인을 다시 묻지 않습니다
+# delete kustomization = remove the reconciliation object from the cluster.
+#   --silent  don't ask for confirmation again
 flux delete kustomization passes --silent
 ```
 

@@ -38,19 +38,19 @@ virtctl がクライアントとクラスターのバージョンの違いにつ
 それでもポートフォワーディングが立ち上がらない場合は、同じトンネルをマシンの Pod 経由でも作れます。
 ```bash
 kubectl get pod -n tenant-workshopXX -l vm.kubevirt.io/name=vm-instance-app-1
-kubectl port-forward -n tenant-workshopXX <出力に表示されたPod名> 8080:8080
+kubectl port-forward -n tenant-workshopXX <pod-name-from-output> 8080:8080
 ```
 
 別のターミナルウィンドウで:
 ```bash
-# ヘルスチェック
+# health
 curl -s http://localhost:8080/actuator/health
 
-# 注文を作成する
+# create an order
 curl -s -X POST http://localhost:8080/api/orders \
   -H 'Content-Type: application/json' -d '{"item":"test"}'
 
-# 記録されたことを確認する
+# see that it was recorded
 curl -s http://localhost:8080/api/orders
 ```
 

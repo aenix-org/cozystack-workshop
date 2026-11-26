@@ -36,7 +36,7 @@ zu erstellen oder abzutippen: Wo unten `kubectl apply -f name.yaml` steht, wird 
 genommen.
 
 ```bash
-# Der Pfad wird relativ zur Wurzel des Repositorys angegeben, das Sie in Lab 0 geholt haben
+# the path is relative to the root of the repository you pulled in lab 0
 cd labs/01-deploy
 ```
 
@@ -66,10 +66,10 @@ Objektbeschreibungen an seinen API-Server sendet und Ihnen zeigt, was dort gerad
 Verbinden wir uns:
 
 ```bash
-# KUBECONFIG — die Variable, aus der kubectl abliest, welche Zugangsdatei zu verwenden ist.
-# Hier ist das der Zugang zum lab-Cluster, nicht zum Tenant: unterschiedliche Dateien, unterschiedliche Cluster.
+# KUBECONFIG — the variable kubectl reads to learn which access file to use.
+# Here that's access to the lab cluster, not to the tenant: different files, different clusters.
 export KUBECONFIG=~/lab.kubeconfig
-# get nodes = „zeige die Nodes“. Die Antwort bestätigt, dass kubectl mit dem richtigen Ort spricht.
+# get nodes = "show the nodes". The answer confirms kubectl is talking to the right place.
 kubectl get nodes
 ```
 
@@ -132,7 +132,7 @@ metadata:
   name: rickroll-page-v1
 data:
   index.html: |
-    ...<div class="pod">bedient von Pod<b>__POD__</b></div>...
+    ...<div class="pod">served by pod<b>__POD__</b></div>...
 ```
 
 Eben jenes `__POD__`, das nginx ersetzen wird. Das `-v1` im Namen ist kein Zufall: Im Lab über das
@@ -256,9 +256,9 @@ eintragen.
 Jetzt wenden wir es an:
 
 ```bash
-# apply = „bringe den Cluster in den in der Datei beschriebenen Zustand“. Alle vier Objekte werden
-# mit einem einzigen Befehl erstellt; die Reihenfolge innerhalb der Datei ermittelt der Cluster selbst.
-#   -f   nimm die Beschreibung aus einer Datei
+# apply = "bring the cluster to what's described in the file". All four objects are created
+# with a single command; the cluster works out the order within the file on its own.
+#   -f   take the description from a file
 kubectl apply -f rickroll.yaml
 ```
 
@@ -274,8 +274,8 @@ service/rickroll created
 Warten Sie, bis die Kopie hochgefahren ist:
 
 ```bash
-# rollout status wartet, bis das Deployment die Sache durchgezogen hat: die geforderte Anzahl Kopien
-# läuft und ist bereit, Anfragen anzunehmen. Der Befehl endet von selbst, sobald das eintritt.
+# rollout status waits until the Deployment sees the job through: the required number of copies
+# is running and ready to accept requests. The command finishes on its own when that happens.
 kubectl rollout status deployment/rickroll
 ```
 
@@ -292,8 +292,8 @@ Der Cluster speichert nicht die Datei selbst, sondern die Objekte, die er daraus
 wir, wie das, was wir angewendet haben, jetzt aussieht:
 
 ```bash
-# get deployment rickroll = zeige ein einzelnes Objekt nach Typ und Name.
-#   -o yaml   gib es vollständig aus, in derselben Form, in der Sie es von Hand schreiben könnten
+# get deployment rickroll = show a single object by type and name.
+#   -o yaml   print it in full, in the same form you could write it by hand
 kubectl get deployment rickroll -o yaml
 ```
 
@@ -329,10 +329,10 @@ niemand, Sie eingeschlossen, warum genau dieser Wert gesetzt wurde.
 Der Befehl unten legt einen Tunnel vom Bastion nach innen.
 
 ```bash
-# port-forward = ein Tunnel vom Bastion in den Cluster, lebt so lange, wie der Befehl läuft.
-#   svc/rickroll   führe den Tunnel zum Service namens rickroll, der die Anfrage seinerseits
-#                  an eine lebende Kopie der Anwendung weiterleitet
-#   8080:80        die linke Zahl ist der Port auf dem Bastion, die rechte der Service-Port im Cluster
+# port-forward = a tunnel from the bastion into the cluster, alive as long as the command runs.
+#   svc/rickroll   run the tunnel to the Service named rickroll, which in turn routes
+#                  the request to a live copy of the application
+#   8080:80        the left number is the port on the bastion, the right is the Service port in the cluster
 kubectl port-forward svc/rickroll 8080:80
 ```
 
@@ -351,9 +351,9 @@ export KUBECONFIG=~/lab.kubeconfig
 ```
 
 ```bash
-# get pods = „zeige die laufenden Kopien“.
-#   -l app=rickroll   zeige nicht alle Pods, sondern nur die mit dem Label app=rickroll —
-#                     eben jenem, über das der Service sie findet
+# get pods = "show the running copies".
+#   -l app=rickroll   show not all Pods, but only those with the label app=rickroll —
+#                     the very one the Service uses to find them
 kubectl get pods -l app=rickroll
 ```
 
@@ -366,8 +366,8 @@ Zum Schließen des Tunnels — `Ctrl+C`.
 📍 **Wo:** auf dem Bastion, im selben Terminalfenster, in dem Sie mit `kubectl` gearbeitet haben.
 
 ```bash
-# Führen Sie es aus dem Lab-Ordner aus: Das Skript sucht seine Dateien neben sich selbst.
-# Das ./ vor dem Namen bedeutet „führe die Datei genau von hier aus“, nicht sie in Systemordnern zu suchen
+# run it from the lab folder: the script looks for its files next to itself.
+# the ./ before the name means "run the file from right here", not look for it in system folders
 ./check.sh
 ```
 

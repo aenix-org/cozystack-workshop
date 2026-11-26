@@ -1,100 +1,100 @@
 #!/usr/bin/env bash
-# Prüfung für Lab 0: Der Trainings-Cluster läuft und Sie haben sich mit ihm verbunden.
+# Check for lab 0: the training cluster is up and you have connected to it.
 #
-# Wir prüfen nicht «das Objekt wurde erstellt», sondern dass der Cluster im Kern funktioniert:
-#   1) der lab-Cluster antwortet über Ihre Zugriffsdatei (KUBECONFIG=~/lab.kubeconfig),
-#   2) mindestens ein Knoten ist im Zustand Ready,
-#   3) auf den Knoten sind freie Ressourcen für künftige Anwendungen vorhanden.
-# Wenn COZY_TENANT gesetzt ist — prüfen wir zusätzlich auf dem MANAGEMENT-Cluster, dass die
-# Bestellung Kubernetes/lab den Zustand Ready erreicht hat und die Metrikerfassung aktiviert ist (ohne sie ist Lab 14 leer).
+# We check not "the object was created", but that the cluster essentially works:
+#   1) the lab cluster responds via your access file (KUBECONFIG=~/lab.kubeconfig),
+#   2) at least one node is in the Ready state,
+#   3) the nodes have free resources for future applications.
+# If COZY_TENANT is set — additionally check on the MANAGEMENT cluster that the
+# Kubernetes/lab order reached Ready and that metrics collection is enabled (without it lab 14 is empty).
 #
-# Wird auf der VM ausgeführt, aus dem Ordner dieses Labs:
+# Run it on the VM, from this lab's folder:
 #     export KUBECONFIG=~/lab.kubeconfig
-#     export COZY_TENANT=workshopXX      # für Prüfungen auf der Tenant-Seite (optional)
+#     export COZY_TENANT=workshopXX      # for tenant-side checks (optional)
 #     cd labs/00-cluster && ./check.sh
 #
-# Das Skript liest nur — es ändert den Zustand des Clusters nicht.
+# The script is read-only — it does not change the cluster state.
 LAB_NAME="00-cluster"
-LAB_TITLE="Lab 0 · Ihr eigener Kubernetes-Cluster"
+LAB_TITLE="Lab 0 · Your own Kubernetes cluster"
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
-# Ohne Zugriff auf den lab-Cluster selbst gibt es nichts zu prüfen — das ist der wichtigste
-# Nachweis des Labs. need_kubeconfig hält das Skript mit einem verständlichen Hinweis an,
-# wenn KUBECONFIG nicht gesetzt ist oder der Cluster nicht antwortet.
+# Without access to the lab cluster itself there is nothing to check — this is the main
+# proof of the lab. need_kubeconfig stops the script with a clear hint
+# if KUBECONFIG is not set or the cluster does not respond.
 need_kubeconfig
 
 COZY_KUBECONFIG="${COZY_KUBECONFIG:-$HOME/.kube/config}"
 cozy() { kubectl --kubeconfig "$COZY_KUBECONFIG" "$@" 2>/dev/null; }
 
-# --- 1) Verbindung zum lab-Cluster -------------------------------------------
-# need_kubeconfig hat bereits sichergestellt, dass der Server antwortet. Wir halten das als eigenes
-# Ergebnis fest und legen die Server-Version in den Bericht.
+# --- 1) Connection to the lab cluster ----------------------------------------
+# need_kubeconfig already made sure the server responds. We record this as a separate
+# result and put the server version into the report.
 KVER="$(server_version)"
-ok "lab-Cluster antwortet — die Zugriffsdatei funktioniert"
-[ -n "$KVER" ] && evidence "Server-Version des lab-Clusters" "$KVER"
+ok "lab cluster responds — the access file works"
+[ -n "$KVER" ] && evidence "lab cluster server version" "$KVER"
 
-# --- 2) Knoten im Einsatz ----------------------------------------------------
-# Wir zählen, wie viele Knoten im Zustand Ready sind. Eine leere Liste bedeutet, dass der Cluster
-# läuft, aber die Knotengruppe md0 sich noch aufbaut.
+# --- 2) Nodes in service -----------------------------------------------------
+# Count how many nodes are in the Ready state. An empty list means the cluster
+# is up, but the md0 node group is still deploying.
 NODES_WIDE="$(kubectl get nodes -o wide 2>/dev/null)"
 READY_NODES="$(kubectl get nodes \
   -o jsonpath='{range .items[*]}{range .status.conditions[?(@.type=="Ready")]}{.status}{"\n"}{end}{end}' 2>/dev/null \
   | grep -c '^True')"
 TOTAL_NODES="$(kubectl get nodes --no-headers 2>/dev/null | grep -c .)"
 if [ "${READY_NODES:-0}" -ge 1 ]; then
-  ok "Knoten im Einsatz: ${READY_NODES} von ${TOTAL_NODES} im Zustand Ready"
-  [ -n "$NODES_WIDE" ] && evidence "Cluster-Knoten" "$NODES_WIDE"
+  ok "nodes in service: ${READY_NODES} of ${TOTAL_NODES} in Ready state"
+  [ -n "$NODES_WIDE" ] && evidence "Cluster nodes" "$NODES_WIDE"
 else
-  fail "kein Knoten ist im Zustand Ready (Knoten insgesamt: ${TOTAL_NODES:-0})" \
-       "warten Sie ein paar Minuten, bis sich die Knotengruppe md0 aufbaut; der Status steht im Dashboard der lab-Anwendung, oder: kubectl get nodes"
-  evidence "Cluster-Knoten" "${NODES_WIDE:-keine Knoten}"
+  fail "no node is in Ready state (nodes in total: ${TOTAL_NODES:-0})" \
+       "wait a couple of minutes for the md0 node group to deploy; the status is in the dashboard on the lab application, or: kubectl get nodes"
+  evidence "Cluster nodes" "${NODES_WIDE:-no nodes}"
 fi
 
-# --- 3) Gibt es Platz für künftige Anwendungen ------------------------------
-# allocatable des ersten Knotens: wenn keine Ressourcen da sind, startet weiter nichts.
+# --- 3) Is there room for future applications -------------------------------
+# allocatable of the first node: if there are no resources, nothing will start further.
 ALLOC_CPU="$(kubectl get nodes -o jsonpath='{.items[0].status.allocatable.cpu}' 2>/dev/null)"
 ALLOC_MEM="$(kubectl get nodes -o jsonpath='{.items[0].status.allocatable.memory}' 2>/dev/null)"
 if [ -n "$ALLOC_MEM" ]; then
-  ok "auf den Knoten sind Ressourcen für Anwendungen vorhanden (auf dem Knoten: ${ALLOC_CPU} CPU, $(human_bytes "$ALLOC_MEM") RAM)"
-  evidence "Freie Knotenressourcen (allocatable)" "cpu: ${ALLOC_CPU}, memory: $(human_bytes "$ALLOC_MEM")"
+  ok "the nodes have resources for applications (on the node: ${ALLOC_CPU} CPU, $(human_bytes "$ALLOC_MEM") RAM)"
+  evidence "Free node resources (allocatable)" "cpu: ${ALLOC_CPU}, memory: $(human_bytes "$ALLOC_MEM")"
 else
-  warn "freie Knotenressourcen konnten nicht gelesen werden" \
-       "in der Regel ist das vorübergehend — wiederholen Sie es in einer Minute"
+  warn "could not read the free node resources" \
+       "usually this is temporary — retry in a minute"
 fi
 
-# --- 4) Von der Seite des Management-Clusters (wenn ein Tenant gesetzt ist) ---
-# Nicht erforderlich für Lab 0: die Verbindung zum Cluster selbst oben hat bereits alles bewiesen.
-# Aber wenn Tenant-Zugriff vorhanden ist — bestätigen wir die Bestellung und prüfen die Metrikerfassung.
+# --- 4) From the management cluster side (if a tenant is set) -----------------
+# Not required for lab 0: the connection to the cluster itself above already proved everything.
+# But if tenant access is available — we confirm the order and check metrics collection.
 if [ -n "${COZY_TENANT:-}" ]; then
   TENANT_NS="tenant-${COZY_TENANT}"
   if [ ! -r "$COZY_KUBECONFIG" ]; then
-    warn "Tenant-Zugriff ${COZY_KUBECONFIG} nicht gefunden — die Cluster-Bestellung auf dem Management-Cluster wurde nicht geprüft" \
-         "das ist kein Fehlschlag des Labs; der Pfad wird gesetzt mit: export COZY_KUBECONFIG=~/.kube/config"
+    warn "tenant access ${COZY_KUBECONFIG} not found — the cluster order on the management cluster was not checked" \
+         "this is not a lab failure; the path is set with: export COZY_KUBECONFIG=~/.kube/config"
   else
     LAB_READY="$(cozy get kubernetes.apps.cozystack.io lab -n "$TENANT_NS" \
       -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')"
     if [ "$LAB_READY" = "True" ]; then
-      ok "auf dem Management-Cluster ist die Bestellung Kubernetes/lab im Zustand Ready"
+      ok "on the management cluster the Kubernetes/lab order is in Ready state"
     elif [ -n "$LAB_READY" ]; then
-      warn "die Bestellung Kubernetes/lab ist noch nicht Ready (aktuell: ${LAB_READY})" \
-           "der Cluster antwortet bereits, die Plattform gleicht ihn noch an den gewünschten Zustand an; sehen Sie nach mit: kubectl --kubeconfig ~/.kube/config -n ${TENANT_NS} get kubernetes.apps.cozystack.io lab"
+      warn "the Kubernetes/lab order is not Ready yet (currently: ${LAB_READY})" \
+           "the cluster already responds, the platform is still reconciling it to the desired state; look at: kubectl --kubeconfig ~/.kube/config -n ${TENANT_NS} get kubernetes.apps.cozystack.io lab"
     else
-      warn "die Bestellung Kubernetes/lab im Tenant ${TENANT_NS} nicht gefunden" \
-           "wenn Sie den Cluster anders benannt haben — setzen Sie Ihren eigenen Namen ein; oder die Rolle im Tenant erlaubt diesen Befehl nicht (kein Lab-Fehler)"
+      warn "could not find the Kubernetes/lab order in tenant ${TENANT_NS}" \
+           "if you named the cluster differently — substitute your own name; or the role in the tenant does not allow this command (not a lab error)"
     fi
-    # Metrikerfassung: Lab 14 stützt sich auf Daten, die ab dem Moment der Aktivierung anfallen.
+    # Metrics collection: lab 14 relies on data that accumulates from the moment it is enabled.
     MON="$(cozy get kubernetes.apps.cozystack.io lab -n "$TENANT_NS" \
       -o jsonpath='{.spec.addons.monitoringAgents.enabled}')"
     if [ "$MON" = "true" ]; then
-      ok "Metrikerfassung ist aktiviert (wird in Lab 14 benötigt)"
+      ok "metrics collection is enabled (needed in lab 14)"
     elif [ -n "$LAB_READY" ]; then
-      warn "Metrikerfassung ist deaktiviert — Lab 14 bleibt ohne Daten" \
-           "aktivieren: Dashboard → lab-Anwendung → Addons → Monitoring agents (Metriken erscheinen nicht rückwirkend)"
+      warn "metrics collection is disabled — lab 14 will be left without data" \
+           "to enable: dashboard → lab application → Addons → Monitoring agents (metrics will not appear retroactively)"
     fi
   fi
 else
-  warn "COZY_TENANT ist nicht gesetzt — Prüfungen auf der Seite des Management-Clusters werden übersprungen" \
-       "nicht erforderlich für Lab 0; zum Aktivieren: export COZY_TENANT=workshopXX"
+  warn "COZY_TENANT is not set — management-cluster-side checks are skipped" \
+       "not required for lab 0; to enable: export COZY_TENANT=workshopXX"
 fi
 
 finish

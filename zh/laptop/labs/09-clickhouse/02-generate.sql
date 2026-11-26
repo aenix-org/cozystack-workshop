@@ -1,73 +1,74 @@
--- 实验 9 · 数据生成器：一百万条闸机通行记录，由 ClickHouse 自己虚构生成。
+-- Lab 9 · data generator: a million turnstile entries, invented by ClickHouse itself.
 --
--- 在哪里运行：在笔记本上，在实验集群里，用 README 中的简短命令 `ch`：
+-- Where it runs: on the laptop, in the lab cluster, with the short command `ch`
+-- from the README:
 --     cd labs/09-clickhouse && ch < 02-generate.sql
--- 在此之前，必须已经创建好表——01-schema.sql。
+-- Before this, the table must already be created — 01-schema.sql.
 --
--- 要等多久：一百万行会在几秒内完全在服务器内部计算并写入。
--- 数据不经过网络，也不经过你的笔记本。
--- INSERT 的返回为空——这就是成功。检查方法：echo 'SELECT count() FROM passes' | ch
+-- How long to wait: a million rows are computed and written in a few seconds,
+-- entirely inside the server. The data does not travel over the network and does not pass through your laptop.
+-- The INSERT reply is empty — that means success. To check: echo 'SELECT count() FROM passes' | ch
 --
--- 运行该文件两次，行数会变成两百万：INSERT 只追加，不替换任何内容。
--- 若要重新开始：TRUNCATE TABLE passes，然后再次运行此文件。
+-- Run the file twice and there will be two million rows: INSERT only appends and
+-- replaces nothing. To start over: TRUNCATE TABLE passes, then run this file again.
 --
--- 下面是单条 INSERT ... SELECT 命令：行不是从外部传入的，而是由紧随其后的
--- 查询计算得出。
+-- Below is a single INSERT ... SELECT command: the rows do not come from outside, they are computed
+-- by the query that follows.
 INSERT INTO passes
 SELECT
-    -- 通行证编号。number 在生成器范围内唯一——因此 pass_id
-    -- 也是唯一的。
+    -- Pass number. number is unique within the generator — so pass_id
+    -- is unique too.
     number AS pass_id,
-    -- 通行时间由三部分拼装而成：日、时、分。每一部分都是
-    -- 各自的伪随机数，通过 cityHash64(number, '盐') 得到。
-    -- cityHash64 是一个快速哈希函数：对同一个输入它总是给出
-    -- 同一个结果，所以数据可复现，而不同的「盐」
-    -- （'day'、'hour'、'minute'、……）能把同一个 number 变成任意多个
-    -- 彼此独立的随机值。
+    -- The entry time is assembled from three parts: day, hour, and minute. Each part is
+    -- its own pseudo-random number, obtained as cityHash64(number, 'salt').
+    -- cityHash64 is a fast hash function: for the same input it always gives
+    -- the same result, so the data is reproducible, while a different 'salt'
+    -- ('day', 'hour', 'minute', ...) turns a single number into as many
+    -- mutually independent random values as you like.
     addMinutes(
         addHours(
             addDays(
-                -- 起点是 1 月 1 日。对 57600 取余得到一个不超过 57599 的数，
-                -- 它的平方根是 0 到 239 之间的天数，也就是八个月。
-                -- 这里的平方根不是为了好看：它让通行记录向周期末端聚集。
-                -- 随着时间推移访客越来越多——就像现实中一样，
-                -- 而管理层正想在报表中看到这种增长。
+                -- The reference point is January 1st. The remainder modulo 57600 gives a number up to 57599,
+                -- its square root is a day from 0 to 239, that is, eight months.
+                -- The square root here is not for looks: it clusters entries
+                -- toward the end of the period. Over time there are more guests — as
+                -- in real life, and it is exactly this growth that management wants to see in the report.
                 toDateTime('2026-01-01 00:00:00'),
                 toUInt16(sqrt(cityHash64(number, 'day') % 57600))
             ),
-            -- 到访时刻不是「从 8 到 18」均匀取值，而是从一个数组里取，数组中
-            -- 各小时以不同的频率重复：10 出现三次，15 出现三次，
-            -- 8 出现一次。于是形成两个明显的高峰，午饭前和午饭后；
-            -- 报表应当把它们找出来。当测试数据中包含我们打算在其中
-            -- 查找的东西时，是件好事。
-            -- ClickHouse 中数组下标从 1 开始，因此有 1 + …
+            -- The arrival hour is taken not uniformly "from 8 to 18", but from an array where
+            -- hours repeat with different frequency: 10 appears three times, 15 three times,
+            -- 8 once. The result is two pronounced peaks, before lunch and after;
+            -- the report should find them. It is good when the test data contains what
+            -- we intend to look for in it.
+            -- Array indexing in ClickHouse starts at one, hence 1 + …
             [8, 9, 9, 10, 10, 10, 11, 11, 12,
              13, 14, 14, 15, 15, 15, 16, 17, 18][1 + cityHash64(number, 'hour') % 18]
         ),
-        -- 小时内的分钟——是从同一个 number 得到的又一个独立值。
+        -- The minutes within the hour are yet another independent value from the same number.
         cityHash64(number, 'minute') % 60
     ) AS created_at,
-    -- 每一行的访客姓名各不相同：一列里有一百万个不同的值。
-    -- 在实验稍后你会看到，在磁盘上这是最重的一列。
-    concat('访客编号 ', toString(number)) AS guest_name,
-    -- 接待员工所在的部门：五个值，均匀分布。
-    ['销售部', '研发部', '财务部',
-     '人事部', '物流部'][1 + cityHash64(number, 'dept') % 5] AS host_dept,
-    -- 进出口。用同样的手法，但分布不均匀：「北门」占
-    -- 六个格子里的三个，拿到一半的流量，「南门」占三分之一，「西门」
-    -- 占剩下的部分。均匀的数据在报表里显得不真实，而且什么也
-    -- 说明不了。
-    ['北门', '北门', '北门',
-     '南门', '南门', '西门'][1 + cityHash64(number, 'entrance') % 6] AS entrance,
-    -- 通行证类型：十个格子里六个给一次性的，各两个给周卡，
-    -- 各一个给车辆和团体——在门口看到的就是这样的分布。
-    ['一次性', '一次性', '一次性', '一次性', '一次性', '一次性',
-     '每周', '每周',
-     '车辆', '团体'][1 + cityHash64(number, 'type') % 10] AS pass_type,
-    -- 访问时长从 30 到 329 分钟。需要 toUInt16 是因为该列
-    -- 声明为 UInt16，而算术运算的结果更宽，本身不会自动收窄。
+    -- The guest name is unique to each row: a million different values in a single column.
+    -- A bit further into the lab it will be clear that on disk this is the heaviest column.
+    concat('Guest No. ', toString(number)) AS guest_name,
+    -- The host employee's department: five values, distributed equally.
+    ['Sales', 'Engineering', 'Accounting',
+     'HR', 'Logistics'][1 + cityHash64(number, 'dept') % 5] AS host_dept,
+    -- The entrance. The same trick, but the distribution is uneven: "North" takes
+    -- three cells out of six and gets half the flow, "South" a third, "West"
+    -- the rest. Uniform data looks implausible in a report and shows
+    -- nothing.
+    ['North', 'North', 'North',
+     'South', 'South', 'West'][1 + cityHash64(number, 'entrance') % 6] AS entrance,
+    -- Pass type: six cells out of ten go to single-use, two each to weekly,
+    -- one each to vehicle and group — that is how it looks at the entrance.
+    ['single-use', 'single-use', 'single-use', 'single-use', 'single-use', 'single-use',
+     'weekly', 'weekly',
+     'vehicle', 'group'][1 + cityHash64(number, 'type') % 10] AS pass_type,
+    -- Visit duration from 30 to 329 minutes. toUInt16 is needed because the column
+    -- is declared as UInt16, while the result of the arithmetic is wider and will not narrow itself.
     toUInt16(30 + cityHash64(number, 'duration') % 300) AS duration_min
--- numbers(1000000) 是内置的生成器表：一百万行，只有一列 number，
--- 取值从 0 到 999999。它不在磁盘上，而是即时计算得出。
--- 需要更多或更少的数据时，只需改动这个数字。
+-- numbers(1000000) is a built-in generator table: a million rows with a single
+-- column number holding values from 0 to 999999. It is not on disk, it is computed
+-- on the fly. If you need more or less data, only this number changes.
 FROM numbers(1000000)

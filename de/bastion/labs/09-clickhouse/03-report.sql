@@ -1,42 +1,42 @@
--- Lab 9 · der Bericht, für den die Geschäftsführung kam: wie viele Gäste pro Monat,
--- wie lange ein Besuch im Schnitt dauert, zu welcher Stunde sie am häufigsten kommen und welcher
--- Eingang stärker ausgelastet ist.
+-- Lab 9 · the report management came asking for: how many guests each month,
+-- how long a visit lasts on average, at which hour they arrive most often, and which
+-- entrance is busier.
 --
--- Wo es läuft: auf der VM, im Labor-Cluster, mit dem kurzen Befehl `ch`
--- aus der README:
+-- Where it runs: on the VM, in the lab cluster, with the short command `ch`
+-- from the README:
 --     cd labs/09-clickhouse && ch < 03-report.sql
--- Davor müssen 01-schema.sql und 02-generate.sql ausgeführt worden sein.
+-- Before this, 01-schema.sql and 02-generate.sql must have been run.
 --
--- Wie das Ergebnis zu lesen ist: eine Zeile pro Monat, der in den Daten vorkommt (es sind
--- acht), Monate aufsteigend, die Gästezahl wächst von Monat zu Monat.
+-- How to read the result: one row per month present in the data (there are
+-- eight of them), months in ascending order, the guest count growing month over month.
 --
--- Warum eine Million Zeilen in Millisekunden gezählt werden. ClickHouse speichert jede Spalte
--- als eigene Datei. Diese Abfrage berührt drei von sieben Spalten — die anderen vier,
--- darunter die schwerste guest_name, werden gar nicht von der Platte gelesen. In einer Datenbank, in der eine Zeile
--- als Ganzes auf der Platte liegt, müsste man alle Millionen Zeilen mit allen Feldern heraufholen,
--- nur um über drei davon zu zählen. Daher der Zeitunterschied.
--- Um es in Zahlen zu sehen: hängen Sie die Zeile FORMAT JSON ans Ende der Abfrage — in der Antwort
--- erscheint ein Statistikblock mit der verbrauchten Zeit und dem gelesenen Volumen.
+-- Why a million rows are counted in milliseconds. ClickHouse stores each column
+-- as a separate file. This query touches three columns out of seven — the other four,
+-- including the heaviest guest_name, are not read from disk at all. In a database where a row
+-- sits on disk in one piece, you would have to lift all million rows with all their fields
+-- just to count over three of them. Hence the difference in time.
+-- To see it in numbers: append the line FORMAT JSON to the end of the query — the response
+-- will include a statistics block with the elapsed time and the volume read.
 --
--- Eine Berichtszeile pro Monat, der in den Daten vorkam.
+-- One report row per month that appeared in the data.
 SELECT
-    -- Welchem Monat der Durchgang zuzuordnen ist. toStartOfMonth verwandelt die exakte Zeit
-    -- in den ersten Tag des Monats: ein einziger Wert, nach dem gruppiert und sortiert wird,
-    -- statt einem Paar aus «Jahr plus Monat».
+    -- Which month to attribute the pass to. toStartOfMonth turns the exact time
+    -- into the first day of the month: a single value to both group and sort by,
+    -- instead of a "year plus month" pair.
     toStartOfMonth(created_at)          AS month,
-    -- Wie viele Zeilen in die Gruppe gefallen sind — das ist «wie viele Gäste pro Monat».
+    -- How many rows fell into the group — that is "how many guests per month".
     count()                             AS guests,
-    -- Durchschnittliche Besuchsdauer, auf ganze Minuten gerundet.
+    -- Average visit duration, rounded to whole minutes.
     round(avg(duration_min))            AS avg_minutes,
-    -- Die häufigste Ankunftsstunde — die eigentliche Stoßzeit. topK(1)(x) liefert ein Array
-    -- aus dem einen häufigsten Wert, [1] holt ihn dort heraus (Zählung ab eins).
+    -- The most frequent arrival hour — the very rush hour. topK(1)(x) returns an array
+    -- of the single most frequent value, [1] pulls it out of there (counting from one).
     topK(1)(toHour(created_at))[1]      AS peak_hour,
-    -- Der am stärksten ausgelastete Eingang dieses Monats, mit demselben Kniff.
+    -- The busiest entrance of this month, by the same technique.
     topK(1)(entrance)[1]                AS busiest_entrance
--- Beachten Sie, was die Abfrage nicht hat: Unterabfragen, temporäre Tabellen und Joins.
--- Alles wird in einem einzigen Durchlauf über die Daten berechnet.
+-- Note what the query does not have: subqueries, temporary tables, or joins.
+-- Everything is computed in a single pass over the data.
 FROM passes
--- Alle Zeilen eines Monats zu einer Antwortzeile zusammenfassen.
+-- Collapse all rows of one month into a single response row.
 GROUP BY month
--- Monate aufsteigend ausgeben, damit das Wachstum von oben nach unten lesbar ist.
+-- Output months in ascending order so the growth reads top to bottom.
 ORDER BY month

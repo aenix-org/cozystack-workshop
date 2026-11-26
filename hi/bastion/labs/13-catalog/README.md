@@ -32,12 +32,12 @@
 जा सकता है, इस दौरान कुछ बनाए बिना।
 
 ```bash
-# KUBECONFIG — वह वेरिएबल जिससे kubectl क्लस्टर का पता और आपके लॉगिन डेटा को पढ़ता है।
-# यहाँ यह टेनेंट एक्सेस है, वही फ़ाइल जो बाकी हर लैब में थी।
+# KUBECONFIG — the variable kubectl reads to find the cluster's address and your credentials.
+# Here it is the tenant access, the same file as in every other lab.
 export KUBECONFIG=~/.kube/config
-# auth can-i = "क्या मुझे इसकी अनुमति है?"। क्लस्टर yes या no जवाब देता है और कुछ नहीं बदलता:
-#   create                   हम कौन-सी क्रिया जाँच रहे हैं
-#   applicationdefinitions   किस प्रकार के ऑब्जेक्ट पर
+# auth can-i = "am I allowed to?". The cluster answers yes or no and changes nothing:
+#   create                   which action we are checking
+#   applicationdefinitions   on which type of object
 kubectl auth can-i create applicationdefinitions
 ```
 
@@ -92,13 +92,13 @@ cd labs/13-catalog
 
 ```
 chart/
-├── Chart.yaml            नाम, वर्शन, विवरण
-├── values.yaml           पैरामीटर और डिफ़ॉल्ट मान
-├── values.schema.json    किन मानों को मान्य माना जाए
+├── Chart.yaml            name, version, description
+├── values.yaml           parameters and default values
+├── values.schema.json    which values to consider valid
 └── templates/
-    ├── configmap.yaml    पेज और nginx कॉन्फ़िग
-    ├── deployment.yaml   एप्लिकेशन स्वयं
-    └── service.yaml      पता
+    ├── configmap.yaml    the page and the nginx config
+    ├── deployment.yaml   the application itself
+    └── service.yaml      the address
 ```
 
 <details>
@@ -152,10 +152,10 @@ external: false
 पैरामीटर में एक स्ट्रिंग डाल दें।
 
 ```bash
-# template = "चार्ट से मैनिफ़ेस्ट जोड़ो और उन्हें छापो", क्लस्टर को इस दौरान छुआ नहीं जाता:
-#   gp                    वह रिलीज़ नाम जिसके तहत चार्ट काल्पनिक रूप से डिप्लॉय होता है
-#   chart                 चार्ट वाला फ़ोल्डर
-#   --set replicas=abc    सीधे कमांड लाइन पर एक ही पैरामीटर को ओवरराइड करना
+# template = "assemble the manifests from the chart and print them", the cluster is not touched:
+#   gp                    the release name the chart is notionally deployed under
+#   chart                 the folder with the chart
+#   --set replicas=abc    override a single parameter right on the command line
 helm template gp chart --set replicas=abc
 ```
 
@@ -226,9 +226,9 @@ Cozystack एप्लिकेशन ठीक ऐसे ही बने ह�
 
 ```bash
 cd labs/13-catalog
-# lint = "पैकेज को प्रारूप त्रुटियों और अनिवार्य फ़ील्ड के लिए जाँचो"
-#   chart   चार्ट फ़ोल्डर का पथ; उसके भीतर Helm Chart.yaml, values.yaml
-#           और templates/ फ़ोल्डर की अपेक्षा करता है
+# lint = "check the package for formatting errors and required fields"
+#   chart   path to the chart folder; inside it Helm expects Chart.yaml, values.yaml
+#           and the templates/ folder
 helm lint chart
 ```
 
@@ -249,8 +249,8 @@ helm lint chart
 टेक्स्ट में प्रतिस्थापित करता है, और परिणाम छापता है।
 
 ```bash
-# main — रिलीज़ नाम, यानी चार्ट के इस विशिष्ट डिप्लॉयमेंट का। यह बनाए गए
-# ऑब्जेक्ट के नामों में जाता है, इसलिए अगल-बगल दो इंस्टॉलेशन नामों में नहीं टकराएँगे।
+# main — the release name, that is, of this specific deployment of the chart. It goes
+# into the names of the objects created, so two installations side by side will not clash.
 helm template main chart
 ```
 
@@ -261,10 +261,10 @@ helm template main chart
 आउटपुट में केवल वही पंक्ति रखते हैं जिसे बदलना था।
 
 ```bash
-# --set replicas=5 एक बार के रन की अवधि के लिए values.yaml से मान को ओवरराइड करता है।
-# | grep 'replicas:' — पूरे आउटपुट में से केवल इस शब्द वाली पंक्तियाँ रखो।
+# --set replicas=5 overrides the value from values.yaml for the duration of one run.
+# | grep 'replicas:' — from the whole output keep only the lines with this word.
 helm template main chart --set replicas=5 | grep 'replicas:'
-# बूलियन पैरामीटर के लिए भी वही: external तय करता है कि कौन-सा Service टाइप मैनिफ़ेस्ट में जाएगा
+# the same for the boolean parameter: external decides which Service type ends up in the manifest
 helm template main chart --set external=true | grep 'type:'
 ```
 
@@ -317,11 +317,11 @@ metadata:
 डेफ़िनिशन लागू करता है, ये दो कमांड किसी भी टेनेंट के लिए काम करेंगी:
 
 ```bash
-# get = "दिखाओ वहाँ क्या है"। guestpasses नीचे दिए plural फ़ील्ड से वही नाम है:
-#   -n tenant-workshopXX   किस namespace में देखना है; XX को अपने नंबर से बदलें
+# get = "show me what's there". guestpasses is that very name from the plural field below:
+#   -n tenant-workshopXX   which namespace to look in; replace XX with your own number
 kubectl get guestpasses -n tenant-workshopXX
-# describe = "एक ऑब्जेक्ट के बारे में सब कुछ दिखाओ": पैरामीटर, स्थिति, हाल की घटनाएँ।
-# main यहाँ किसी विशिष्ट ऑर्डर किए गए एप्लिकेशन का नाम है, प्रकार का नाम नहीं।
+# describe = "show me everything about one object": parameters, state, recent events.
+# main here is the name of a specific ordered application, not the name of the type.
 kubectl describe guestpass main -n tenant-workshopXX
 ```
 
@@ -412,9 +412,9 @@ kubectl describe guestpass main -n tenant-workshopXX
 स्ट्रिंग चाहिए — इसलिए पंक्ति-विरामों को एक अलग स्टेप में हटा दिया जाता है।
 
 ```bash
-# base64 = एक बाइनरी फ़ाइल को अक्षरों, अंकों और चिह्नों + / = की स्ट्रिंग में बदलो
-#   -i icon.svg   क्या एन्कोड करना है (macOS और BSD के लिए फ़्लैग का लेखन)
-# tr -d '\n' = आउटपुट से हर पंक्ति-विराम हटा दो, उसे एक में जोड़ते हुए
+# base64 = turn a binary file into a string of letters, digits and the signs + / =
+#   -i icon.svg   what to encode (the flag spelling for macOS and BSD)
+# tr -d '\n' = drop every line break from the output, gluing it into one
 base64 -i icon.svg | tr -d '\n'
 ```
 
@@ -443,9 +443,9 @@ Linux पर उसी कमांड के अलग फ़्लैग ह�
 क्या कमी थी।
 
 ```bash
-# टेनेंट एक्सेस — वही जिसके साथ आपने पूरे वर्कशॉप में काम किया
+# tenant access — the same one you have worked with throughout the workshop
 export KUBECONFIG=~/.kube/config
-# apply = "क्लस्टर को उसके अनुरूप ले आओ जो फ़ाइल में लिखा है"; -f — किसी फ़ाइल से पढ़ना
+# apply = "bring the cluster into line with what's written in the file"; -f — read from a file
 kubectl apply -f applicationdefinition.yaml
 ```
 
@@ -491,10 +491,10 @@ resource "applicationdefinitions" in API group "cozystack.io" at the cluster sco
 पूछें, फिर `kubectl` से पूरी फ़ाइल पार्स कराएँ, उसे कहीं न भेजते हुए।
 
 ```bash
-# auth can-i = "क्या मुझे इसकी अनुमति है?"। जवाब yes या no होता है, और क्लस्टर बदलता नहीं।
+# auth can-i = "am I allowed to?". The answer is yes or no, and the cluster is not changed.
 kubectl auth can-i create applicationdefinitions
-# --dry-run=client = "फ़ाइल पार्स करो और दिखाओ क्या निकलता, पर क्लस्टर में मत जाओ"।
-# client का मतलब पूरी जाँच bastion पर चलती है और क्लस्टर को इसकी भनक तक नहीं लगती।
+# --dry-run=client = "parse the file and show what would come out, but do not go to the cluster".
+# client means the whole check runs on the bastion and the cluster never even hears about it.
 kubectl apply -f applicationdefinition.yaml --dry-run=client
 ```
 
@@ -563,7 +563,7 @@ spec:
 चार्ट की स्कीमा से मेल खाती है।
 
 ```bash
-# ./ नाम से पहले का मतलब "वर्तमान फ़ोल्डर की फ़ाइल", यानी labs/13-catalog से
+# ./ before the name means "the file from the current folder", that is, from labs/13-catalog
 ./check.sh
 ```
 

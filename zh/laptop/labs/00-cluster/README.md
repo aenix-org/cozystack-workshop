@@ -37,16 +37,16 @@
 解决办法是 **WSL**——Windows 内部的一个 Linux 子系统。用以管理员身份运行的 PowerShell 里的一条命令就能装上它：
 
 ```powershell
-# 把 Linux 子系统装进 Windows：内核、服务，以及默认的
-# Ubuntu 发行版。安装完成后 Windows 会要求你重启。
+# installs the Linux subsystem inside Windows: the kernel, the service and the default
+# Ubuntu distribution. After installation Windows will ask you to reboot.
 wsl --install
 ```
 
 重启之后你就会有一个 Ubuntu 控制台——从这里开始你就在里面工作，和其他人一样。在 WSL 内部你需要一个自己的 `kubectl`——就是你用来连接集群的那个命令：
 
 ```bash
-# snap 是 Ubuntu 的包管理器。--classic 以不隔离的方式安装该包：
-# 在隔离模式下 kubectl 看不到你主目录里的访问文件。
+# snap is Ubuntu's package manager. --classic installs the package without isolation:
+# in isolated mode kubectl won't see the access file in your home folder.
 sudo snap install kubectl --classic
 ```
 
@@ -59,7 +59,7 @@ Windows 的磁盘从 WSL 里可以在 `/mnt/c/...` 路径下看到，所以用�
 所有文件都已经是你的了——你把它们连同仓库一起取来了。没什么要创建或重新敲的：下面凡是写 `kubectl apply -f name.yaml` 的地方，文件都取自这里。
 
 ```bash
-# 路径从仓库根目录算起——它你在下一步取来
+# the path is counted from the repository root — you fetch it in the next step
 cd labs/00-cluster
 ```
 
@@ -75,8 +75,8 @@ cd labs/00-cluster
 仓库里放着清单（manifest）——描述要在集群里创建什么的文件——和检查脚本。从这个实验起你就需要它们：
 
 ```bash
-# clone = 把整个仓库下载下来，连同它的变更历史。
-# 旁边会出现一个 cozystack-migration-workshop 文件夹，我们进到里面去。
+# clone = download the entire repository, together with its change history.
+# A folder cozystack-migration-workshop appears alongside; we move into it.
 git clone https://github.com/aenix-org/cozystack-migration-workshop.git
 cd cozystack-migration-workshop
 ```
@@ -92,8 +92,8 @@ cd cozystack-migration-workshop
 这个路径在每个实验里都会用到——如果你把文件保存到别的地方，从这里往后每次都得替换成你自己的路径。
 
 ```bash
-# 检查文件可读、且集群有响应。
-# --kubeconfig 告诉 kubectl 在这条命令里用哪个访问文件。
+# Check that the file is readable and the cluster answers.
+# --kubeconfig tells kubectl which access file to use in this command.
 kubectl --kubeconfig ~/.kube/workshop get kubernetes.apps.cozystack.io -n tenant-workshopXX
 ```
 
@@ -162,18 +162,19 @@ spec:
 ⚠️ 下面的命令在**管理集群上**运行——用连同租户一起发给你的那份访问权限。`lab` 集群本身的访问文件还不存在：它只在集群起来之后才出现。
 
 ```bash
-# 进入实验文件夹——从这里往后所有文件都从这里取
+# move into the lab folder — from here on all files are taken from here
 cd labs/00-cluster
-# 应用之前，把文件里的 XX 换成你自己的租户编号。
-# apply =「把集群带到文件里所描述的样子」。这条命令并不自己把集群
-# 起起来——它把订单交给平台，由平台决定创建什么、以什么顺序创建。
-#   -f   从文件取描述
+# before applying, substitute your own tenant number in the file in place of XX.
+# apply = "bring the cluster to what's described in the file". The command doesn't bring
+# the cluster up itself — it hands the order to the platform, which decides what to
+# create and in what order.
+#   -f   take the description from the file
 kubectl apply -f cluster.yaml
-# get =「显示有什么」。kubernetes.apps.cozystack.io 是对象类型的全名，
-# 正是文件里描述的那个（kind: Kubernetes），lab 是你那份订单的名字。
-#   -n   在哪个 namespace 里查找；不带这个标志 kubectl 会在默认 namespace 里看
-#   -w   持续观察并打印变化。要退出——Ctrl+C，安装不会因此中断
-# 一直等到 READY 列里出现 True。
+# get = "show what's there". kubernetes.apps.cozystack.io is the full name of the object
+# type, the very one described in the file (kind: Kubernetes), lab is the name of your order.
+#   -n   which namespace to look in; without the flag kubectl looks in the default namespace
+#   -w   watch and print changes. To exit — Ctrl+C, the installation won't be interrupted by it
+# Wait until True appears in the READY column.
 kubectl -n tenant-workshopXX get kubernetes.apps.cozystack.io lab -w
 ```
 
@@ -186,9 +187,9 @@ kubectl -n tenant-workshopXX get kubernetes.apps.cozystack.io lab -w
 ⚠️ **如果过了二十多分钟状态还没变——原因可能不在你的集群上。** 平台上所有应用的安装都由一条共享队列驱动，如果队列里排着某人的一个耗时操作，你的集群就在等轮到自己。要看它是否已被拿去处理：
 
 ```bash
-# 看订单本身，以及平台关于它写了什么。
-# 输出末尾的 status.conditions 一段就是它的报告：有没有被拿去处理、
-# 什么在阻塞、它在等什么。
+# Look at the order itself and at what the platform writes about it.
+# The status.conditions section at the end of the output is its report: whether it's been
+# picked up for work, what's blocking, what it's waiting for.
 kubectl --kubeconfig ~/.kube/workshop -n tenant-workshopXX \
   get kubernetes.apps.cozystack.io lab -o yaml
 ```
@@ -196,7 +197,7 @@ kubectl --kubeconfig ~/.kube/workshop -n tenant-workshopXX \
 如果那里也看不出什么名堂——看看租户的事件。这是平台对你的对象都做了些什么的日志：
 
 ```bash
-# events = 事件日志。我们按时间排序，好让最新的在最下面。
+# events = a log of incidents. We sort by time so the freshest is at the bottom.
 kubectl --kubeconfig ~/.kube/workshop -n tenant-workshopXX \
   get events --sort-by=.lastTimestamp | tail -20
 ```
@@ -226,12 +227,12 @@ kubectl --kubeconfig ~/.kube/workshop -n tenant-workshopXX \
 **主要办法——用命令。** Cozystack 在你的集群上设置了一条单独的访问规则，只允许读这一个 Secret，别的什么都不许。命令在**管理集群上**运行，用连同租户一起发给你的那份访问权限，结果放进笔记本上的一个文件里：
 
 ```bash
-# get secret = 显示 Secret；-o go-template ——不整个打印它，
-# 而是从中抽出一个字段并以文本形式输出：
-#   index .data "admin.conf"   从 Secret 里取 admin.conf 这个键
-#   base64decode               Secret 的内容是以 base64 编码存放的，
-#                              这个函数返回原始文本
-#   > ~/lab.kubeconfig         把输出写进文件而不是打到屏幕上
+# get secret = show the Secret; -o go-template — don't print it whole,
+# but pull one field out of it and output it as text:
+#   index .data "admin.conf"   take the admin.conf key from the Secret
+#   base64decode               the contents of Secrets are stored base64-encoded,
+#                              this function returns the original text
+#   > ~/lab.kubeconfig         write the output to a file instead of the screen
 kubectl -n tenant-workshopXX get secret kubernetes-lab-admin-kubeconfig \
   -o go-template='{{ printf "%s\n" (index .data "admin.conf" | base64decode) }}' > ~/lab.kubeconfig
 ```
@@ -247,18 +248,18 @@ kubectl -n tenant-workshopXX get secret kubernetes-lab-admin-kubeconfig \
 macOS 和 Linux：
 
 ```bash
-# KUBECONFIG 是 kubectl 从中得知要取哪个访问文件的变量。
-# export 让它对这个终端窗口里往后运行的所有命令可见。
+# KUBECONFIG is the variable from which kubectl learns which access file to take.
+# export makes it visible to all commands run further in this terminal window.
 export KUBECONFIG=~/lab.kubeconfig
-# nodes 是集群的节点，正是你的应用将要在其上运行的那些虚拟机。
-# 这个回应顺带证明了访问文件是可用的。
+# nodes are the cluster's nodes, the very virtual machines your applications will run on.
+# The answer also proves the access file works.
 kubectl get nodes
 ```
 
 Windows PowerShell——仅当你没能装上 WSL 时：
 
 ```powershell
-# 在 PowerShell 里环境变量通过 $env: 设置，一直存活到窗口关闭
+# in PowerShell environment variables are set via $env: and live until the window closes
 $env:KUBECONFIG="$HOME\lab.kubeconfig"
 kubectl get nodes
 ```
@@ -279,10 +280,10 @@ kubernetes-lab-md0-xxxxx    Ready    <none>   3m    v1.35.6
 📍 **在哪里：** 在笔记本上，就在你刚才用 `kubectl` 工作的那个终端窗口里。
 
 ```bash
-# 脚本从实验文件夹里运行：它在自己旁边找文件
+# the script runs from the lab folder: it looks for files next to itself
 cd labs/00-cluster
-# 名字前的 ./ 意思是「就从这里运行这个文件」；不加它，shell
-# 就会在系统文件夹里找 check.sh 这个命令，然后找不到
+# ./ before the name means "run the file right from here"; without it the shell
+# will look for the check.sh command among the system folders and won't find it
 ./check.sh
 ```
 

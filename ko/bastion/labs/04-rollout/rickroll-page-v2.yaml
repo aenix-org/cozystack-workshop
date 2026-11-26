@@ -1,39 +1,39 @@
 ---
-# 랩 4. 페이지의 두 번째 버전 — 부하 상태에서 롤아웃하는 대상.
-# 눈에 띄게 달라야 한다: 참가자는 diff가 아니라 브라우저를 보고 있다.
+# Lab 4. The second version of the page — the one we roll out under load.
+# It should differ noticeably: the participant is looking at the browser, not at a diff.
 #
-# 객체 하나. 관리 클러스터의 테넌트가 아니라, 여러분의 학습용 클러스터 `lab`에
-# 적용된다:
+# One object. Applied to your `lab` training cluster, not to the tenant
+# on the management cluster:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl apply -f rickroll-page-v2.yaml
-# 여기에는 tenant-workshopXX 같은 자리표시자가 없다 — 어디에도 자기 번호를 넣을 필요가 없다.
+# There are no placeholders like tenant-workshopXX here — you don't need to substitute your number anywhere.
 #
-# 여기서 사람들이 가장 많이 걸려 넘어지는 지점: 이 apply 자체는 아무것도 롤아웃하지 않는다.
-# 그저 클러스터에 첫 번째 것 옆으로 설정 파일 하나를 더 놓을 뿐이다. Deployment의 `page`
-# 볼륨이 rickroll-page-v1을 참조하는 동안에는 사용자에게 첫 번째 버전이 보인다.
-# 롤아웃은 랩의 다음 단계 — 볼륨을 이 ConfigMap으로 전환하는 것 — 에서 이루어진다.
-# 여기서 두 객체로 이루어진 구조 전체가 나온다: 첫 번째 버전은 클러스터에 손대지 않은 채
-# 그대로 남고, 롤백은 그것을 기억으로 재구성하는 게 아니라 통째로 되돌린다.
+# The main thing people stumble over here: this apply by itself rolls out nothing.
+# It puts one more settings file into the cluster next to the first. As long as the `page`
+# volume of the Deployment references rickroll-page-v1, users see the first version.
+# The rollout becomes the next step of the lab — switching the volume to this ConfigMap.
+# Hence the whole construction with two objects: the first version stays in the cluster
+# untouched, and the rollback returns it as a whole rather than reconstructing it from memory.
 #
-# 만약 그 대신 ConfigMap rickroll-page-v1을 제자리에서 수정했다면, 롤백할 곳이
-# 없었을 것이고, 파드는 복사본 교체 없이 그리고 리비전 기록에 남지 않은 채로
-# 새 내용을 받았을 것이다 — 즉, 랩이 존재하는 목적 전부가 빠진 채로.
+# Had we instead edited the ConfigMap rickroll-page-v1 in place, there would be
+# nowhere to roll back to, and the pods would get new content without replacing copies and without a record
+# in the revision history — that is, without everything the lab is made for.
 #
-# 객체 이름은 바꾸면 안 된다: README의 패치와 check.sh의 검사가
-# rickroll-page-v2를 참조한다.
+# The object name must not be changed: the patch from the README references rickroll-page-v2,
+# as does the check in check.sh.
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: rickroll-page-v2
 data:
-  # `|` 뒤의 들여쓰기 아래에 있는 모든 것은 컨테이너 안에 들어갈 index.html 파일의
-  # 문자 그대로의 내용이다. 이것은 더 이상 YAML이 아니다: 여기에는 주석이 없고
-  # 있을 수도 없다, 해시 기호는 페이지에 일반 텍스트로 찍힐 것이다.
+  # Everything below the indentation after `|` is the verbatim content of the index.html file
+  # that will end up inside the container. This is no longer YAML: there are no comments here
+  # and there can be none — a hash would land on the page as ordinary text.
   #
-  # 마크업에서 check.sh가 보는 두 가지가 중요하다: 라벨 «버전 2» —
-  # 이것으로 검사가 두 번째 버전을 첫 번째와 구별한다, 그리고 자리표시자 __POD__ — 이것은
-  # ConfigMap rickroll-conf(랩 1)의 규칙에 따라 nginx 파드 이름으로 대체된다.
-  # 둘 중 하나라도 지우면 롤아웃은 성공하더라도 랩 검사는 통과하지 못한다.
+  # Two things in the markup matter to check.sh: the label «VERSION 2» —
+  # by it the check tells the second version from the first, and the placeholder __POD__ — it is
+  # replaced with the nginx pod name by the rule from the ConfigMap rickroll-conf (lab 1).
+  # Remove either of them and the lab check will not pass, even though the rollout will succeed.
   index.html: |
     <!doctype html>
     <html lang="ru">
@@ -56,9 +56,9 @@ data:
       .pod b{display:block;margin-top:.4em;color:#00ffa3;font-size:1.35em;word-break:break-all}
       .hint{margin-top:3em;color:#3f5561;font-size:14px}
     </style>
-    <div class="tag">버전 2</div>
+    <div class="tag">VERSION 2</div>
     <h1>We're No Strangers To Love</h1>
     <p class="lyr">You know the rules &middot; And so do I</p>
-    <div class="pod">요청을 처리한 Pod<b>__POD__</b></div>
-    <p class="hint">업데이트가 부하 상태에서 롤아웃되었습니다. Fortio를 확인하세요: 오류 0건.</p>
+    <div class="pod">served by pod<b>__POD__</b></div>
+    <p class="hint">The update rolled out under load. Check Fortio: zero errors.</p>
     </html>

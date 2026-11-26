@@ -1,31 +1,32 @@
 ---
-# 实验 6 · 你自己的私有镜像仓库。此文件是故意不完整的。
+# Lab 6 · Your own private image registry. THIS FILE IS DELIBERATELY INCOMPLETE.
 #
-# 它不会正常工作，而这是有意为之：你应当亲眼看到失败，并自己
-# 弄清楚集群缺少了什么。这里缺少的只有一样东西——当集群前来取镜像时，
-# 它对这个封闭的仓库自称的身份。仓库不会把镜像随便交给任何人，
-# 而这份描述里没有任何东西能帮助集群证明自己的
-# 权利。到底是哪一行修好了它——你会在实验过程中弄明白；可用的版本
-# 就放在旁边的 passes.yaml 里，在讲解之前打开它没有意义。
+# It will not work, and that is intended: you should see the failure with your own eyes and
+# figure out for yourself what the cluster was missing. Only one thing is missing here — what
+# the cluster calls itself to the closed registry when it comes for an image. The registry does
+# not hand out images to just anyone, and there is nothing in this description that would help
+# the cluster prove its right. Which exact line fixes it — you will work out over the course of
+# the lab; the working version sits next to it, in passes.yaml, and there is no point opening it
+# before the walkthrough.
 #
-# 这里只有一个 Deployment，没有 Service：暂时还不需要给服务一个稳定的名字——
-# 反正镜像下载不下来，我们根本到不了一个能响应的 pod。
+# Here there is only a Deployment, no Service: a stable name for the service is not needed yet —
+# we will not get as far as a responding pod anyway, since the image will not download.
 #
-# 在你的 `lab` 集群、默认命名空间中应用：
+# Applied on your `lab` cluster, in the default namespace:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl apply -f passes-broken.yaml
 #     kubectl get pods -l app=passes-api -w
 #
-# 注意：HARBOR-HOST 是占位符，不是可用的地址。请替换成你自己 Harbor 的地址，
-# 否则你得到的会是另一种错误，而不是这个文件为之编写的那种（带占位符的行有两处）：
+# NOTE: HARBOR-HOST is a placeholder, not a working address. Substitute the address of your Harbor,
+# otherwise you will get a different error than the one this file was written for (there are two lines with the placeholder):
 #   sed -i    's|HARBOR-HOST|harbor.workshop03.example.org|g' passes-broken.yaml   # Linux
 #   sed -i '' 's|HARBOR-HOST|harbor.workshop03.example.org|g' passes-broken.yaml   # macOS
 #
-# 在下面的对象中：apiVersion——描述模式的版本，kind——我们要创建什么，
-# metadata.name——对象的名字。下文不再单独解释。
+# In the object below: apiVersion — the version of the description schema, kind — what we are creating,
+# metadata.name — the object name. Not explained separately further down.
 #
-# Deployment 不是「运行一个容器」，而是「保持运行这么多份这样的容器副本」。
-# 一份副本消失了——集群会不加询问地创建一份新的。
+# A Deployment is not "run a container" but "keep so many copies of this container running".
+# A copy disappears — the cluster creates a new one without asking.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -33,23 +34,23 @@ metadata:
   labels:
     app: passes-api
 spec:
-  # 一份副本：要讲解这次失败，一份就够了，而且日志和
-  # kubectl describe 的输出里噪声会更少。
+  # One copy: to walk through the failure, one is enough, and there will be less noise in the logs
+  # and in the output of kubectl describe.
   replicas: 1
-  # 条件「我的副本是带有标签 app: passes-api 的 pod」。下面 pod 模板里的标签
-  # 必须与此一致，否则集群会拒绝这份清单。
+  # The condition "my copies are pods with the label app: passes-api". The label in the pod template below
+  # must match this one, otherwise the cluster will reject the manifest.
   selector:
     matchLabels:
       app: passes-api
-  # 用来冲压出副本的模板。里面的一切都描述了单个 pod。
+  # The template from which copies are stamped out. Everything inside describes a single pod.
   template:
     metadata:
       labels:
         app: passes-api
     spec:
-      # 对整个 pod 的安全约束：不以 root 运行，以
-      # 非特权用户 10001 工作，把系统调用集合限制为
-      # 标准配置。镜像也是按这个构建的（见 app/Dockerfile 里的 USER 行）。
+      # Security constraints for the whole pod: do not run as root, work as the
+      # unprivileged user 10001, restrict the set of system calls to the
+      # standard profile. The image is built for this too (see app/Dockerfile, the USER line).
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
@@ -57,25 +58,25 @@ spec:
           type: RuntimeDefault
       containers:
         - name: api
-          # 容器级别的权限：不给自己添加额外特权，并放弃所有特殊的
-          # 内核 capability。应用只需要一个网络端口，其余都是多余的。
+          # Container-level rights: do not grant itself extra privileges and drop all special
+          # kernel capabilities. The application needs a single network port, the rest is unnecessary.
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # 镜像名的第一部分是仓库地址。正因如此，迁移到你自己的
-          # 仓库会改变清单：镜像名变得不同了。如果没有地址，
-          # 集群就会去 Docker Hub 取镜像——也就是安全团队禁止去的地方。
+          # The first part of the image name is the registry address. That is exactly why moving to your own
+          # registry changes the manifests: the image name becomes different. Were there no address,
+          # the cluster would go for the image to Docker Hub — that is, to where the security team forbade.
           image: HARBOR-HOST/passes/passes-api:v1
-          # 应用的端口。名字 `http` 在下文被就绪探针使用，
-          # 因此端口号只在一个地方设置，而不是两个。
+          # The application port. The name `http` is used further down by the readiness probe,
+          # so the port number is set in one place, not in two.
           ports:
             - containerPort: 8080
               name: http
-          # 应用从这些环境变量得知它是谁、来自哪里。
-          # 它在响应中打印的正是这些（见 app/main.go 里的 identity 结构体）。
-          # APP_VERSION 和 IMAGE_REGISTRY 以文本形式设置——由我们自己写；接下来的三个
-          # 在副本启动时由集群自己填入，应用无从得知它们。
+          # Environment variables from which the application learns who it is and where it came from.
+          # It prints exactly these in the response (see app/main.go, the identity struct).
+          # APP_VERSION and IMAGE_REGISTRY are set as text — we write them ourselves; the next three
+          # are filled in by the cluster itself at the moment a copy starts, the application has no way to know them.
           env:
             - name: APP_VERSION
               value: "v1"
@@ -93,10 +94,10 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
-          # requests——为一份副本预留什么：调度器按这些数字挑选
-          # 节点。limits——上限：内存超过上限容器会被杀掉，CPU
-          # 超过则被限流。16Mi 够用是因为这个应用是用 Go 写的、没有
-          # 依赖。20m 是一个 CPU 核心的两万分之二十。
+          # requests — what to reserve for a copy: the scheduler picks a node by these numbers.
+          # limits — the ceiling: for memory above the ceiling the container is killed, for
+          # CPU it is throttled. 16Mi is enough because the application is in Go with no
+          # dependencies. 20m is twenty thousandths of a CPU core.
           resources:
             requests:
               cpu: 20m
@@ -104,9 +105,9 @@ spec:
             limits:
               cpu: 300m
               memory: 64Mi
-          # 就绪探针：在应用于 /healthz 上响应之前，流量不会
-          # 流向该副本。今天不会走到这一步——它检查的是已经运行的
-          # 进程，而对我们来说更早的一步会卡住，即镜像下载。
+          # Readiness probe: until the application responds on /healthz, traffic to the copy
+          # will not flow. Today it will not come to this — it checks an already running
+          # process, and for us an earlier step will get stuck, the image download.
           readinessProbe:
             httpGet:
               path: /healthz

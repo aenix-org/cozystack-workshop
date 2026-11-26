@@ -1,41 +1,41 @@
-# 랩 8 · OpenBao 시크릿 저장소 주문.
-# 대시보드에서 마우스로 주문하는 것과 똑같은 작업 — 다만 텍스트로 할 뿐입니다.
-# 랩 클러스터가 아니라, 관리 클러스터의 테넌트에 적용합니다:
+# Lab 8 · ordering an OpenBao secrets store.
+# The same thing you would order with the mouse in the dashboard — only as text.
+# Applied NOT to the lab cluster, but to a tenant on the management cluster:
 #   kubectl --kubeconfig="$HOME/.kube/workshop" apply -f openbao.yaml
 #
-# 적용하기 전에: tenant-workshopXX를 자신의 네임스페이스로 바꾸세요. XX는 자리표시자일 뿐
-# 이름의 일부가 아닙니다; 자신의 번호는 비밀번호와 함께 받았습니다. 남의 테넌트로 들어가면
-# 접근 거부를 받게 되며, 그것이 가능한 결과 중 최선입니다.
+# BEFORE APPLYING: replace tenant-workshopXX with your own namespace. XX is a placeholder,
+# not part of the name; you received your own number together with the password. If it goes
+# into someone else's tenant, you get an access denied — and that is the best possible outcome.
 #
-# kind: OpenBAO는 내장된 Kubernetes 객체가 아니라 Cozystack이 추가하는 타입입니다.
-# 무엇이 필요한지 기술하면, 플랫폼이 스스로 파드, 디스크, 서비스를 배포하고
-# 이후에도 알아서 업데이트를 유지합니다. 이는 넘겨받은 가상머신에 소프트웨어를
-# 설치하는 것보다는 카탈로그에서 서비스를 주문하는 것에 더 가깝습니다.
+# kind: OpenBAO is not a built-in Kubernetes object, but a type added by
+# Cozystack. You describe what you need, and the platform itself deploys the pods, disks,
+# and services and then keeps them updated on its own. It is closer to ordering a service from
+# a catalog than to installing software on a VM you were handed.
 apiVersion: apps.cozystack.io/v1alpha1
 kind: OpenBAO
 metadata:
-  # 이름은 대시보드의 카드에만 영향을 주는 것이 아닙니다: 저장소의 내부 주소가
-  # 이 이름으로 만들어집니다 — openbao-secrets.<namespace>.svc.cozy.local. 이름을 바꾸면
-  # secrets-demo.yaml과 check.sh의 BAO_APP 변수에서 주소를 고치세요.
+  # The name affects more than just the card in the dashboard: the store's internal address
+  # is built from it — openbao-secrets.<namespace>.svc.cozy.local. If you rename it,
+  # fix the address in secrets-demo.yaml and in the BAO_APP variable for check.sh.
   name: secrets
   namespace: tenant-workshopXX
 spec:
-  # 복제본 하나. 프로덕션에서는 세 개를 두어 Raft 복제를 얻습니다: 차트는 replicas > 1이 되는
-  # 즉시 스스로 이를 활성화합니다. 이쪽저쪽으로 전환하려면 데이터 마이그레이션이
-  # 필요하므로, 결정은 나중이 아니라 미리 내립니다.
+  # One copy. In production three are used, which gives Raft replication: the chart enables
+  # it itself as soon as replicas > 1. Switching back and forth requires
+  # migrating the data, so the decision is made before, not after.
   replicas: 1
-  # 저장소 데이터용 디스크. 2기가바이트면 넉넉합니다: 시크릿은 바이트 단위로 가벼우며,
-  # 공간은 버전 히스토리와 감사 로그에 쓰입니다. 생성 후 볼륨을 줄일 수는
-  # 없지만 보통 늘릴 수는 있으므로, 여기서 인색할 이유가 없습니다.
+  # Disk for the store's data. Two gigabytes is plenty: secrets weigh bytes,
+  # the space goes to version history and the audit log. You cannot shrink the volume after
+  # creation, but you can usually grow it, so there is no point being stingy here.
   size: 2Gi
-  # replicated 스토리지 클래스는 데이터가 여러 노드에 여러 복사본으로
-  # 보관됨을 의미합니다. 노드 하나가 고장 나도 모든 비밀번호가 함께 사라지지 않습니다 — 그리고
-  # 시크릿 저장소를 백업에서 복구하는 것은 그 자체로 별개의 불쾌한 일입니다.
+  # The replicated storage class means the data is kept in several copies on
+  # different nodes. A node failure does not carry away all your passwords — and restoring
+  # a secrets store from a backup is a separately unpleasant affair.
   storageClass: replicated
-  # 미리 준비된 "CPU와 메모리를 얼마나" 세트. 플랫폼이 이를 목록으로 제공하여,
-  # 모두가 요청량과 제한량을 손으로 계산하지 않아도 되게 합니다.
+  # A ready-made "how much CPU and memory" set. The platform offers them as a list,
+  # so as not to force everyone to compute requests and limits by hand.
   resourcesPreset: t1.small
-  # 웹 인터페이스는 클러스터 내부에서 뜹니다. 우리는 이를 외부로 노출하지 않습니다:
-  # external: true는 LoadBalancer를 붙이게 되는데, 랩에서는 그것이 필요 없습니다.
+  # The web interface comes up inside the cluster. We do not expose it outward:
+  # external: true would attach a LoadBalancer, and we don't need it in the lab.
   ui: true
   external: false

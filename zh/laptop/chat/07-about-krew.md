@@ -26,9 +26,9 @@ tar zxvf "krew-${OS}_${ARCH}.tar.gz" &&
 ```
 然后把 krew 加入 PATH —— 这一行需要追加到你的 profile 里，否则下次启动终端时就会被遗忘：
 ```bash
-echo 'export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"' >> ~/.zshrc   # zsh 用，macOS 默认
-echo 'export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"' >> ~/.bashrc  # bash 用，通常是 Linux
-source ~/.zshrc    # 或 source ~/.bashrc
+echo 'export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"' >> ~/.zshrc   # for zsh, the default on macOS
+echo 'export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"' >> ~/.bashrc  # for bash, usually Linux
+source ~/.zshrc    # or source ~/.bashrc
 ```
 
 **Windows**（PowerShell）

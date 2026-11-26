@@ -106,14 +106,14 @@ bucketは**マネージドサービス**、つまりすぐ使えるカタログ�
 なくテナントのアクセスファイルが必要です。
 
 ```bash
-# KUBECONFIG — kubectlがどのアクセスファイルを使うか。ここではテナントのもの。bucketは
-# lab クラスターではなく管理クラスターで注文されるからです
+# KUBECONFIG — which access file kubectl uses. Here it's the tenant's: the bucket
+# is ordered on the management cluster, not in the lab cluster
 export KUBECONFIG=~/.kube/config
 
-# apply = 「ファイルに書かれた状態にクラスターを合わせる」。このコマンドはストレージ自体を
-# 作るのではなく、注文をプラットフォームに渡します。
-#   -f bucket.yaml   どのファイルをapplyするか。その前に、ファイル内の
-#                    tenant-workshopXX を自分の namespace に置き換えること。さもないと注文が別の場所へ行きます
+# apply = "bring the cluster to what's described in the file." The command doesn't create
+# the storage itself — it hands the order to the platform.
+#   -f bucket.yaml   which file to apply. Before this, replace
+#                    tenant-workshopXX in it with your namespace, or the order goes elsewhere
 kubectl apply -f bucket.yaml
 ```
 
@@ -179,15 +179,15 @@ bucketへのアクセス拒否を食らい、タイプミス探しに10分費や
 取り出します。残りも同じ方法で取得でき、変わるのはフィールド名だけです。
 
 ```bash
-# 前のステップと同じテナントアクセスで作業します。シークレットはテナントにあります。
-# get secret = 「パスワードとキーの入ったオブジェクトを見せる」。シークレット内の値は
-# base64でエンコードされています——これは暗号化ではなく、バイナリデータをテキストで書く方法にすぎません。
-#   -n tenant-workshopXX   どの namespace を見るか
-#   -o jsonpath='...'      オブジェクト全体ではなく、その中の1つのフィールドだけを返す:
-#                          .data.accessKey — data セクション内の accessKey フィールド
-#   base64 -d              読める形に戻す（d = decode）
-#   ; echo                 改行を足す: これがないと値が次の
-#                          ターミナルプロンプトとくっついてしまう
+# We work with the same tenant access as in the previous step: the secret lives in the tenant.
+# get secret = "show the object with passwords and keys." The values inside the secret are
+# base64-encoded — this isn't encryption, just a way of writing binary data as text.
+#   -n tenant-workshopXX   which namespace to look in
+#   -o jsonpath='...'      return not the whole object, but a single field from it:
+#                          .data.accessKey — the accessKey field inside the data section
+#   base64 -d              decode it back into readable form (d = decode)
+#   ; echo                 add a line break: without it the value would run into
+#                          the next terminal prompt
 kubectl -n tenant-workshopXX get secret bucket-builds-ci-credentials \
   -o jsonpath='{.data.accessKey}' | base64 -d; echo
 ```
@@ -207,20 +207,20 @@ secrets` は `no` と答えます。権限は特定の名前に絞って付与�
 変えないでください。ビルドスクリプトはまさにこの名前の変数を探します。
 
 ```bash
-# ここからラボの最後まで、テナントではなく lab クラスターで作業します
+# From here to the end of the lab we work with the lab cluster, not the tenant
 export KUBECONFIG=~/lab.kubeconfig
 
-# create secret generic = 「これから列挙する値からシークレットを作る」。
-# generic は「任意の名前と値のペアの集合」を意味し、イメージレジストリのパスワードや
-# TLS証明書向けの既製の型ではありません。
-#   bucket-creds        シークレットの名前。Job はこの名前で参照します
-#   --from-literal=name='value'   1つのペア。ВСТАВЬТЕ_... の代わりに、
-#                       ダッシュボードのbucketのカードにある値を入れます
+# create secret generic = "create a secret from the values I'm about to list."
+# generic means "an arbitrary set of name-value pairs," not a ready-made type
+# for an image-registry password or a TLS certificate.
+#   bucket-creds        the secret's name. The Job will reference it by this name
+#   --from-literal=name='value'   one pair. In place of PASTE_..., substitute
+#                       the values from the bucket's card in the dashboard
 kubectl create secret generic bucket-creds \
-  --from-literal=endpoint='ВСТАВЬТЕ_endpoint' \
-  --from-literal=bucketName='ВСТАВЬТЕ_bucketName' \
-  --from-literal=accessKey='ВСТАВЬТЕ_accessKey' \
-  --from-literal=secretKey='ВСТАВЬТЕ_secretKey'
+  --from-literal=endpoint='PASTE_endpoint' \
+  --from-literal=bucketName='PASTE_bucketName' \
+  --from-literal=accessKey='PASTE_accessKey' \
+  --from-literal=secretKey='PASTE_secretKey'
 ```
 
 **表示されるはず:**
@@ -341,7 +341,7 @@ class MainActivity : Activity() {
 ファイルにすぎません。
 
 ```bash
-# 中に6つのファイルを持つ ConfigMap を作成します。配置されたか確認するには:
+# Creates a ConfigMap with six files inside. To check it's in place:
 # kubectl get configmap propusk-src
 kubectl apply -f propusk-src.yaml
 ```
@@ -378,10 +378,10 @@ kubectl apply -f propusk-src.yaml
 3行が、より詳しく見る価値があります。
 
 ```bash
-# yes — 「y」を延々と出力するコマンド: こうして「ライセンスに同意しますか？
-# [y/n]」というひとまとまりの質問に、人手なしで答えます。
-#   >/dev/null 2>&1   通常の出力もエラー出力も捨てる: ここでは不要
-#   || true           「コマンドがエラーを返しても、問題なしとみなす」
+# yes — a command that prints "y" endlessly: this way a batch of "accept the
+# license? [y/n]" questions gets answered without a human.
+#   >/dev/null 2>&1   discard both normal output and error output: it's not needed here
+#   || true           "even if the command returned an error, treat it as fine"
 yes | sdkmanager --sdk_root="$ANDROID_SDK_ROOT" --licenses >/dev/null 2>&1 || true
 ```
 
@@ -391,11 +391,11 @@ yes | sdkmanager --sdk_root="$ANDROID_SDK_ROOT" --licenses >/dev/null 2>&1 || tr
 拒否するので、エラーを隠しているわけではありません。
 
 ```bash
-# alias set = 「ストレージのアドレスとキーを builds という短い名前で覚えておく」。こうして
-# 後続のコピーコマンドで毎回繰り返さずに済みます。
-#   "https://${endpoint}"   アドレス: https:// のプレフィックスは自分で足す。シークレットには入っていない
-#   ${accessKey} ${secretKey}   S3流に言うログインとパスワード。シークレットから来る
-#   >/dev/null              出力を消す
+# alias set = "remember the storage address and keys under the short name builds," so
+# we don't repeat them in every copy command that follows.
+#   "https://${endpoint}"   the address: we add the https:// prefix ourselves, it's not in the secret
+#   ${accessKey} ${secretKey}   the login and password in S3 terms, they come from the secret
+#   >/dev/null              suppress the output
 mc alias set builds "https://${endpoint}" "${accessKey}" "${secretKey}" >/dev/null
 ```
 
@@ -403,8 +403,8 @@ mc alias set builds "https://${endpoint}" "${accessKey}" "${secretKey}" >/dev/nu
 アクセスできる全員に見えるので、キーがそこに残ってはいけません。
 
 ```bash
-# echo はタスクのログに1行出力します。何の作業もしません——直前のコピーコマンドが
-# 最後まで走ったことを示すマーカーです
+# echo prints a line to the task's log. It does no work — it's a marker
+# that the previous copy command ran to completion
 echo "APK-UPLOADED ${bucketName}/propusk/propusk-${STAMP}.apk"
 ```
 
@@ -504,14 +504,14 @@ ConfigMapのキーはスラッシュを含められませんが、マウント�
 jobをapplyし、それが作成したPodをすぐに見ます。
 
 ```bash
-# ファイルから2つのオブジェクトを作成します: スクリプトの入った ConfigMap と Job そのもの。
-# この瞬間からクラスターは、ビルド用のノードを見つけて起動する義務を負います
+# Creates two objects from the file: a ConfigMap with the script and the Job itself.
+# From this moment the cluster is obliged to find a node for the build and start it
 kubectl apply -f android-build.yaml
 
-# get pods = 「Pod を見せる」。タスクの Pod には固有の名前がありません——Job が自分の名前に
-# ランダムな末尾を付けて自分で作ります。だから名前ではなくラベルで探します:
-#   -l job-name=propusk-build   job-name ラベルが job の名前と等しい Pod を選ぶ。
-#                               このラベルは Job が自分の Pod に自分で付けます
+# get pods = "show the Pods." The task's Pod has no name of its own — the Job invents it
+# itself, appending a random tail to its own name. So we search not by name but by label:
+#   -l job-name=propusk-build   select Pods with the job-name label equal to the job's name.
+#                               The Job attaches this label to its Pods itself
 kubectl get pods -l job-name=propusk-build
 ```
 
@@ -526,10 +526,10 @@ propusk-build-x7k2p    0/1     Pending   0          40s
 クラスターはその理由をPodのイベントに書きます——誰が何をしようとしたかの、そのPodの記録です。
 
 ```bash
-# describe = 「オブジェクトについて分かっていることをすべて見せる」: 設定、状態、イベント。
-# 出力は長いので、末尾だけを残します:
-#   sed -n '/Events:/,$p'   「Events:」が現れる行から、
-#                           出力の最後まで($ — 末尾)の行を印字する
+# describe = "show everything known about the object": settings, state, events.
+# The output is long, so we keep only its tail:
+#   sed -n '/Events:/,$p'   print lines from the one where "Events:" appears,
+#                           through the end of the output ($ — end)
 kubectl describe pod -l job-name=propusk-build | sed -n '/Events:/,$p'
 ```
 
@@ -595,11 +595,11 @@ vSphereではあなたは両方に馴染みがあります。DRSが配置の際�
 新しいノードを待ちます。`lab` クラスターにはグラフィカルコンソールがないので、コマンドで監視します:
 
 ```bash
-# get nodes = 「クラスターのノードを見せる」——Pod が動いている、まさにその
-# 仮想マシンです。
-#   -w   watch、「終了せず、変更のたびに行を追加する」。古いノードは
-#        リストから消え、新しいノードが現れて STATUS=Ready に達します。
-#        監視を抜けるには Ctrl+C。クラスターには何の影響もありません
+# get nodes = "show the cluster's nodes" — those very virtual machines on which
+# the Pods run.
+#   -w   watch, "don't exit; append lines on every change." The old node
+#        will drop from the list, a new one will appear and reach STATUS=Ready.
+#        To leave the watch — Ctrl+C, which has no effect on the cluster
 kubectl get nodes -w
 ```
 
@@ -607,8 +607,8 @@ kubectl get nodes -w
 `Pending` のPodを絶えず見直しているので、頼む必要はありません。動き出したことを確認します:
 
 ```bash
-# ノードを編集する前と同じクエリです。今度は STATUS カラムに
-# ContainerCreating が表示され、1〜2分後に Running になるはずです
+# The same query as before the node edit. Now the STATUS column should show
+# ContainerCreating, and in a minute or two Running
 kubectl get pods -l job-name=propusk-build
 ```
 
@@ -619,10 +619,10 @@ kubectl get pods -l job-name=propusk-build
 ビルドはそのログで——つまり、コンテナ内でスクリプトが画面に出力するもので——見守ります。
 
 ```bash
-# logs = 「タスクが出力したものを見せる」。
-#   -f                  follow: 終了せず、行が現れるたびに追加する。
-#                       抜けるには Ctrl+C。ビルドはそれに関係なく続きます
-#   job/propusk-build   Pod ではなく Job 自体を指せます: kubectl が自分でその Pod を見つけます
+# logs = "show what the task printed."
+#   -f                  follow: don't exit, but append lines as they appear.
+#                       Exit — Ctrl+C, the build keeps going regardless
+#   job/propusk-build   you can point at the Job itself, not the Pod: kubectl will find its Pod on its own
 kubectl logs -f job/propusk-build
 ```
 
@@ -642,8 +642,8 @@ kubectl logs -f job/propusk-build
 メモリを食べているか見てください:
 
 ```bash
-# top = 「今どれだけ消費しているか」。requests の申告ではなく、まさにこの瞬間の
-# 実際の使用量です。CPU がゼロでなければ、内部で作業が進んでいるということです
+# top = "how much it's consuming right now." Not the requests claim, but actual usage
+# this very second. Non-zero CPU means work is happening inside
 kubectl top pod -l job-name=propusk-build
 ```
 
@@ -651,7 +651,7 @@ Jobは、Podがコード0で終了したときに完了とみなされます（�
 「エラーなく走った」の意味です）:
 
 ```bash
-# Pod ではなく job 自体を見ます: Pod にはないカラムがあります
+# We look not at the Pod but at the job itself: it has columns the Pod doesn't
 kubectl get job propusk-build
 ```
 
@@ -703,8 +703,8 @@ propusk/propusk-latest.apk
 📍 **場所:** bastion上、あなたが `kubectl` で作業したのと同じターミナルウィンドウで。
 
 ```bash
-# スクリプトは、あなたと同じアクセスファイルで lab クラスターにアクセスします。bucket の
-# 認証情報は bucket-creds シークレットから取ります——別途何かを入力する必要はありません
+# The script reaches the lab cluster with the same access file as you. The bucket
+# credentials it takes from the bucket-creds secret — you don't need to enter anything separately
 export KUBECONFIG=~/lab.kubeconfig
 ./check.sh
 ```
@@ -725,11 +725,11 @@ Jobが正常に終わり、ログに `BUILD SUCCESSFUL` があり、APKがbucket
 すぐに削除する必要はありません。ログはまだ役に立ちます。済んだら:
 
 ```bash
-# delete -f = 「このファイルに書かれたものをクラスターから取り除く」。Job と一緒に
-# そのログも消えるので、このコマンドは時間的に最初ではなく最後に来ます
+# delete -f = "remove from the cluster what's described in this file." Along with the Job
+# its logs will disappear too, so this command comes last in time, not first
 kubectl delete -f android-build.yaml
 kubectl delete -f propusk-src.yaml
-# シークレットは別途削除します: それ用のファイルはなく、コマンドで作ったからです
+# We delete the secret separately: there's no file for it, you created it with a command
 kubectl delete secret bucket-creds
 ```
 

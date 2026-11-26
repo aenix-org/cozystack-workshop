@@ -1,49 +1,49 @@
 ---
-# लैब 5 · Git में इंफ्रास्ट्रक्चर। कार्य: रिपॉज़िटरी से वास्तव में क्या क्लस्टर पर लागू करना है।
+# Lab 5 · Infrastructure in Git. Task: what exactly from the repository to apply to the cluster.
 #
-# आपके `lab` क्लस्टर पर पड़ोसी gitrepository.yaml के साथ लागू किया जाता है:
+# Applied to your `lab` cluster together with the adjacent gitrepository.yaml:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl apply -f flux/
 #
-# हर ऑब्जेक्ट में: apiVersion — विवरण स्कीमा का संस्करण, kind — हम क्या बनाते हैं,
-# metadata.name — ऑब्जेक्ट का नाम। इन्हें नीचे अलग से नहीं समझाया गया है।
+# In each object: apiVersion — the version of the description schema, kind — what we create,
+# metadata.name — the object's name. These are not explained separately below.
 #
-# ज़िम्मेदारियों का विभाजन: GitRepository रिपॉज़िटरी डाउनलोड करता है और कुछ भी लागू नहीं करता,
-# यह ऑब्जेक्ट डाउनलोड की गई चीज़ लेता है और क्लस्टर को उसके अनुरूप लाता है। Kustomization नाम
-# kustomize उपयोगिता के नाम से मेल खाता है, पर ये अलग चीज़ें हैं — यहाँ यह क्लस्टर में एक ऑब्जेक्ट है।
+# Separation of duties: GitRepository downloads the repository and applies nothing,
+# this object takes what was downloaded and brings the cluster in line with it. The name Kustomization matches
+# the name of the kustomize utility, but they are different things — here it is an object in the cluster.
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
   name: passes
-  # वहीं रहता है जहाँ Flux की सेवाएँ — वरना kustomize-controller इसे नहीं उठाएगा।
+  # Lives in the same place as the Flux services — otherwise the kustomize-controller won't pick it up.
   namespace: flux-system
 spec:
-  # क्लस्टर की वास्तविक स्थिति की तुलना Git में वर्णित स्थिति से कितनी बार करनी है।
-  # यह «हर मिनट फिर से लागू करना» नहीं है — यह «हर मिनट तुलना करना और
-  # भिन्नताओं को ठीक करना» है। भले ही Git में कुछ न बदला हो, kubectl edit के ज़रिए हाथ से
-  # की गई कोई तब्दीली चुपचाप वापस पलट दी जाएगी। यह अंतर आप लैब में थोड़ा आगे तब देखेंगे,
-  # जब आप खुद Git को दरकिनार कर क्लस्टर में कुछ बदलेंगे।
+  # How often to reconcile the actual state of the cluster with the one described in Git.
+  # This is not "re-apply once a minute" — it is "compare once a minute and
+  # fix the differences". Even if nothing changed in Git, a change made
+  # by hand via kubectl edit will be silently rolled back. You will see the difference
+  # a bit further into the lab, when you change something in the cluster outside of Git yourself.
   interval: 1m
-  # रिपॉज़िटरी के अंदर का फ़ोल्डर। इसमें जो कुछ भी है वह क्लस्टर में जाएगा; इसके बगल की फ़ाइलें —
-  # उदाहरण के लिए रूट में README.md — छुई नहीं जाएँगी। नाम `apps` हमने चुना है, पर यह
-  # उस फ़ोल्डर से मेल खाना चाहिए जिसमें आप अपनी रिपॉज़िटरी में मैनिफ़ेस्ट रखते हैं।
+  # The folder inside the repository. Everything in it goes into the cluster; files next to
+  # it — for example README.md at the root — are not touched. The name `apps` was chosen by us, but it
+  # must match the folder into which you put manifests in your own repository.
   path: ./apps
-  # क्लस्टर से उन ऑब्जेक्ट्स को हटाना जो Git से गायब हो चुके हैं।
-  # इसके बिना Git पूर्ण विवरण नहीं रह जाता: रिपॉज़िटरी से हटाई गई चीज़
-  # क्लस्टर में चलती रहती और किसी को इसका पता न चलता।
+  # Delete from the cluster objects that have disappeared from Git.
+  # Without this, Git stops being the complete description: something deleted from the repository
+  # would keep running in the cluster, and no one would know about it.
   prune: true
-  # किस स्रोत को देखना है। नाम `passes` gitrepository.yaml का metadata.name है,
-  # GitHub पर रिपॉज़िटरी का नाम नहीं। वहाँ नाम बदलें — यहाँ भी सुधारें, वरना Flux
-  # एक ऐसे स्रोत का इंतज़ार करता रहेगा जो मौजूद ही नहीं, और Kustomization तैयार नहीं होगा।
+  # Which source to look at. The name `passes` is metadata.name from gitrepository.yaml,
+  # not the repository name on GitHub. Rename it there — fix it here too, otherwise Flux
+  # will wait for a source that doesn't exist, and the Kustomization won't become ready.
   sourceRef:
     kind: GitRepository
     name: passes
-  # apply के तुरंत बाद रिपोर्ट देने के बजाय लागू किए गए संसाधनों के तैयार होने का इंतज़ार करना।
-  # अंतर ठीक वही है जो «आवेदन भेज दिया» और «आवेदन पूरा हुआ» के बीच होता है: wait के बिना
-  # Flux सफलता की सूचना दे देगा, भले ही उसके बाद पॉड्स ऊपर न आएँ।
+  # Wait for the applied resources to become ready, rather than reporting back immediately after apply.
+  # The difference is exactly that between "the request was submitted" and "the request was completed": without wait
+  # Flux will report success even if the pods fail to come up afterwards.
   wait: true
-  # इस तैयारी के लिए कितनी देर इंतज़ार करना है, इससे पहले कि लागू करना असफल घोषित हो।
-  # तीन मिनट — खाली नोड पर इमेज खींचने के लिए गुंजाइश समेत। बहुत छोटा
-  # मान धीमे नेटवर्क पर झूठी असफलताएँ देगा, बहुत बड़ा — आप स्पष्ट त्रुटि के बजाय
-  # देर तक «प्रक्रिया जारी है» देखते रहेंगे।
+  # How long to wait for this readiness before declaring the apply unsuccessful.
+  # Three minutes — with a margin for pulling the image onto an empty node. Too small a
+  # value gives false failures on a slow network, too large a one — you'll be
+  # staring at "in progress" for a long time instead of a clear error.
   timeout: 3m

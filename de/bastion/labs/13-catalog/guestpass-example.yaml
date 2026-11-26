@@ -1,26 +1,26 @@
 ---
-# Lab 13. So wird die Bestellung Ihrer Anwendung aussehen, NACHDEM
-# der Admin applicationdefinition.yaml angewendet hat. Wird in Ihrem Tenant angewendet:
+# Lab 13. This is what ordering your application will look like AFTER
+# the admin applies applicationdefinition.yaml. Apply it in your tenant:
 #   kubectl apply -f guestpass-example.yaml
 #
-# ACHTUNG: tenant-workshopXX ist ein Platzhalter, kein Namespace-Name. Ersetzen Sie XX durch
-# Ihre Tenant-Nummer vor dem Anwenden, sonst verweigert kubectl: einen solchen Namespace gibt es nicht,
-# und in einen fremden werden Sie nicht gelassen.
+# ATTENTION: tenant-workshopXX is a placeholder, not a namespace name. Replace XX with your
+# tenant number before applying, otherwise kubectl will refuse: there is no such namespace,
+# and you won't be allowed into someone else's.
 #
-# Beachten Sie: Die Gruppe apps.cozystack.io ist dieselbe wie bei Bucket,
-# VMInstance und den übrigen Anwendungen des Katalogs. Ihre Anwendung reiht sich
-# neben ihnen ein, nicht irgendwo abseits.
+# Note: the apps.cozystack.io group is the same one used by Bucket,
+# VMInstance and the other catalog applications. Your application will stand
+# in line with them, not off to the side.
 #
-# Diese Datei anzuwenden, bevor der Admin die Definition registriert hat,
-# ist nicht möglich: kubectl antwortet `no matches for kind "GuestPass"`.
+# You can't apply this file before the admin has registered the definition:
+# kubectl will reply `no matches for kind "GuestPass"`.
 apiVersion: apps.cozystack.io/v1alpha1
 kind: GuestPass
 metadata:
   name: main
   namespace: tenant-workshopXX
-# Die Felder in spec sind genau die Parameter, die in chart/values.yaml beschrieben und vom
-# Bestellformular im Dashboard angezeigt werden. Hier sind sie als Text ausgeschrieben: dasselbe wie das Drücken
-# einer Schaltfläche im Dashboard, aber eine solche Datei kann man reviewen, in Git ablegen und zurückrollen.
+# The fields in spec are exactly the parameters described in chart/values.yaml and shown by
+# the order form in the dashboard. Here they are written out as text: the same as pressing
+# a button in the dashboard, but such a file can be reviewed, put in Git and rolled back.
 spec:
   replicas: 2
   greeting: "Order a pass for your guest"

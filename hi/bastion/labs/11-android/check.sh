@@ -1,40 +1,40 @@
 #!/usr/bin/env bash
-# लैब 11 की जाँच: Android बिल्ड पूरी तरह चला, और APK बकेट तक पहुँचा।
+# Check for lab 11: the Android build ran to completion, and the APK made it to the bucket.
 #
-# हम "Job बना" नहीं, बल्कि तीन अलग-अलग दावों की जाँच करते हैं, और वे एक-दूसरे के बराबर नहीं हैं:
-#   1) Job सफलतापूर्वक पूरा हुआ,
-#   2) उसके भीतर सचमुच एक APK बना (BUILD SUCCESSFUL),
-#   3) फ़ाइल सचमुच ऑब्जेक्ट स्टोरेज तक पहुँची (APK-UPLOADED मार्कर)।
-# Job सफलतापूर्वक पूरा हो सकता है और कुछ भी न बना सके — अगर किसी ने स्क्रिप्ट बदल दी हो।
+# We verify not "the Job was created", but three separate claims, and they are not equal to each other:
+#   1) the Job finished successfully,
+#   2) an APK was actually built inside it (BUILD SUCCESSFUL),
+#   3) the file actually went to object storage (the APK-UPLOADED marker).
+# A Job can finish successfully and build nothing — if someone edited the script.
 #
-# यह VM पर, इसी लैब के फ़ोल्डर से, प्रशिक्षण क्लस्टर `lab` की पहुँच के साथ चलता है
-# (प्रबंधन क्लस्टर पर के टेनंट पर नहीं — बिल्ड क्लस्टर में चलता है):
+# Runs on the VM, from this lab's folder, using access to the training cluster `lab`
+# (not the tenant on the management cluster — the build runs in the cluster):
 #     export KUBECONFIG=~/lab.kubeconfig
 #     cd labs/11-android && ./check.sh
 #
-# स्क्रिप्ट क्लस्टर में कुछ नहीं बदलती — केवल पढ़ती है और HTTP अनुरोध भेजती है।
-# इसे सफ़ाई से पहले चलाएँ: Job को हटाने पर उसके लॉग भी हट जाते हैं, और लॉग के बिना
-# ऊपर के तीन में से दो दावों की पुष्टि करने को कुछ नहीं बचता।
+# The script changes nothing in the cluster — it only reads and sends HTTP requests.
+# Run it before cleanup: deleting the Job also deletes its logs, and without the logs
+# there is nothing left to confirm two of the three claims above.
 
-# ये दो वेरिएबल lib.sh उठाता है — ये रिपोर्ट के शीर्षक में और फ़ाइल नाम
-# report-<लैब>-<तारीख>.md में जाते हैं, जिसे स्क्रिप्ट अपने पास रखती है।
+# These two variables are picked up by lib.sh — they go into the report header and into the
+# file name report-<lab>-<date>.md, which the script places next to itself.
 LAB_NAME="11-android"
-LAB_TITLE="लैब 11 · क्लस्टर में मोबाइल ऐप की बिल्डिंग"
-# साझा जाँच लाइब्रेरी: ok / fail / warn / evidence / finish, क्लस्टर-भीतर का अनुरोध और
-# रिपोर्ट लिखना — सब यहीं से आते हैं। पथ इस आधार पर हल होता है कि स्क्रिप्ट खुद
-# कहाँ रहती है, इसलिए किसी भी डायरेक्ट्री से चलाने पर एक जैसा काम करता है।
+LAB_TITLE="Lab 11 · Building a mobile app in the cluster"
+# Shared check library: ok / fail / warn / evidence / finish, the in-cluster request, and
+# writing the report all come from here. The path is resolved relative to where the script
+# itself lives, so running from any directory works the same.
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
-# अगर KUBECONFIG सेट नहीं है तो तुरंत रुक जाएँ। इसके बिना kubectl क्लस्टर को
-# VM पर ही ढूँढता है, नहीं पाता, और हर जाँच को लगातार एक ही त्रुटि से गिरा देता है,
-# जिससे असली कारण दिखाई नहीं देता।
+# Stop immediately if KUBECONFIG is not set. Without it kubectl looks for a cluster
+# on the VM itself, doesn't find one, and fails every check in a row with the same error,
+# from which the real cause is invisible.
 need_kubeconfig
 
 JOB=propusk-build
 SECRET=bucket-creds
 
-# सीक्रेट कुंजी का मान। base64 -d हर जगह एक जैसा नहीं होता (BSD बनाम GNU),
-# इसलिए हम पायथन से डिकोड करते हैं — जाँच लाइब्रेरी को यह पहले से ही चाहिए।
+# The value of a secret key. base64 -d is not the same everywhere (BSD vs GNU),
+# so we decode with python — the check library already needs it.
 secret_val() {
   kubectl get secret "$SECRET" -o jsonpath="{.data.$1}" 2>/dev/null \
     | python3 -c 'import sys,base64
@@ -42,71 +42,71 @@ d=sys.stdin.read().strip()
 print(base64.b64decode(d).decode("utf-8", "replace") if d else "")' 2>/dev/null
 }
 
-# --- बकेट पहुँच वाला सीक्रेट -------------------------------------------
-# हम यह नहीं जाँचते कि सीक्रेट मौजूद है, बल्कि यह कि उसमें चारों फ़ील्ड भरे हैं।
-# सीक्रेट हाथ से बनाया जाता है, लगातार चार --from-literal के साथ, और सबसे आम
-# मुसीबत खाली या छूटा हुआ मान है: ऑब्जेक्ट तब सफलतापूर्वक बन जाता है, पर बिल्ड आख़िरी
-# चरण पर गिरता है, जब बिल्ड पहले ही निकल चुका होता है। अभी पता लगाना सस्ता है।
+# --- secret with bucket access --------------------------------------------
+# We check not that the secret exists, but that all four fields in it are filled in.
+# The secret is created by hand, with four --from-literal in a row, and the most common
+# trouble is an empty or missing value: the object is created successfully, but the build fails
+# at the last step, after the build has already passed. Cheaper to find out now.
 if kubectl get secret "$SECRET" >/dev/null 2>&1; then
   MISSING=""
   for k in endpoint bucketName accessKey secretKey; do
     [ -z "$(secret_val "$k")" ] && MISSING="$MISSING $k"
   done
   if [ -z "$MISSING" ]; then
-    ok "सीक्रेट ${SECRET} मौजूद है, चारों कुंजियाँ भरी हैं"
-    # कुंजियों के मान रिपोर्ट में नहीं जाते — केवल फ़ील्ड के नाम।
-    evidence "सीक्रेट ${SECRET} के फ़ील्ड" "endpoint: $(secret_val endpoint)
+    ok "secret ${SECRET} is in place, all four keys are filled in"
+    # The key values do not go into the report — only the field names.
+    evidence "Fields of secret ${SECRET}" "endpoint: $(secret_val endpoint)
 bucketName: $(secret_val bucketName)
-accessKey: <छिपा हुआ>
-secretKey: <छिपा हुआ>"
+accessKey: <hidden>
+secretKey: <hidden>"
   else
-    fail "सीक्रेट ${SECRET} में अधूरे फ़ील्ड हैं:${MISSING}" \
-         "README की कमांड से सीक्रेट फिर बनाएँ, मान डैशबोर्ड में लिए जाते हैं: Bucket -> builds -> Secrets"
+    fail "secret ${SECRET} has unfilled fields:${MISSING}" \
+         "recreate the secret with the command from the README, values are taken in the dashboard: Bucket -> builds -> Secrets"
   fi
 else
-  fail "क्लस्टर में सीक्रेट ${SECRET} नहीं है" \
-       "सीक्रेट बनाएँ: kubectl create secret generic ${SECRET} --from-literal=endpoint=... (चार फ़ील्ड)"
+  fail "there is no secret ${SECRET} in the cluster" \
+       "create the secret: kubectl create secret generic ${SECRET} --from-literal=endpoint=... (four fields)"
 fi
 
-# --- क्या स्टोरेज क्लस्टर के भीतर से पहुँच में है --------------------------
-# "Job पाँचवें चरण पर गिरा" का सबसे आम कारण कुंजियाँ नहीं, बल्कि यह है कि
-# क्लस्टर से स्टोरेज तक पहुँचा नहीं जा सकता। इसे बिल्ड से अलग जाँचते हैं।
-# अनुरोध पॉड से जाता है, VM से नहीं: VM का अपना नेटवर्क और अपने रूट हैं,
-# और उसका सफल जवाब इस बारे में कुछ नहीं कहता कि बिल्ड वहाँ पहुँच पाएगी या नहीं।
+# --- is storage reachable from inside the cluster --------------------------
+# The most common reason for "the Job failed at step five" is not the keys, but that
+# storage is unreachable from the cluster. We check this separately from the build.
+# The request goes from a pod, not from the VM: the VM has its own network and its own routes,
+# and its successful response would say nothing about whether the build can reach there.
 EP="$(secret_val endpoint)"
 if [ -n "$EP" ]; then
-  # -k जानबूझकर नहीं: बिल्ड स्टोरेज तक प्रमाणपत्र सत्यापन के साथ जाती है, और जाँच
-  # को वहीं गिरना चाहिए जहाँ Job गिरेगा, न कि एक्सपायर्ड सर्ट पर हरा दिखाना चाहिए।
+  # Deliberately without -k: the build goes to storage with certificate verification, and the check
+  # must fail in the same place the Job fails, not report green on an expired cert.
 CODE="$(in_cluster_curl "https://${EP}/" "-o /dev/null -w %{http_code}")"
   case "$CODE" in
     2*|3*|4*)
-      ok "स्टोरेज ${EP} क्लस्टर के भीतर से जवाब देता है (HTTP ${CODE})"
-      evidence "स्टोरेज का जवाब" "GET https://${EP}/ -> HTTP ${CODE}
-कोड 403 और 404 यहाँ सामान्य हैं: S3 रूट पर गुमनाम अनुरोध को अस्वीकार होना ही चाहिए।"
+      ok "storage ${EP} responds from inside the cluster (HTTP ${CODE})"
+      evidence "Storage response" "GET https://${EP}/ -> HTTP ${CODE}
+Codes 403 and 404 are normal here: an anonymous request to the S3 root should indeed be rejected."
       ;;
     5*)
-      warn "स्टोरेज ${EP} त्रुटि HTTP ${CODE} से जवाब देता है" \
-           "बिल्ड निकल सकती है, पर APK अपलोड नहीं; प्रस्तुतकर्ता को बताएँ"
+      warn "storage ${EP} responds with error HTTP ${CODE}" \
+           "the build may pass, but the APK upload won't; tell the instructor"
       ;;
     *)
-      fail "स्टोरेज ${EP} क्लस्टर के भीतर से जवाब नहीं देता" \
-           "सीक्रेट में endpoint फ़ील्ड जाँचें: यह https:// के बिना और अंत में स्लैश के बिना होना चाहिए"
+      fail "storage ${EP} does not respond from inside the cluster" \
+           "check the endpoint field in the secret: it must be WITHOUT https:// and without a trailing slash"
       ;;
   esac
 else
-  warn "स्टोरेज की उपलब्धता नहीं जाँच रहा" \
-       "पहले endpoint फ़ील्ड वाला सीक्रेट ${SECRET} चाहिए"
+  warn "not checking storage availability" \
+       "the secret ${SECRET} with the endpoint field is needed first"
 fi
 
-# --- Job स्वयं ---------------------------------------------------------------
-# हम .status.succeeded देखते हैं, न कि यह कि Job मौजूद है: ऑब्जेक्ट तुरंत और
-# हमेशा सफलतापूर्वक बनता है, जबकि कार्य की सफलता का मतलब है कि पॉड कोड 0 के साथ पूरा हुआ।
-# पॉड की स्थिति अलग से जाँची जाती है, क्योंकि "अभी भी चल रहा" और "Pending में अटका"
-# इंसान के लिए अलग खबर हैं: पहला मतलब इंतज़ार करो, दूसरा मतलब इंतज़ार बेकार है
-# और नोड बड़ा करना होगा।
+# --- the Job itself --------------------------------------------------------
+# We look at .status.succeeded, not at the fact that the Job exists: the object is created
+# instantly and always successfully, while task success means the pod finished with code 0.
+# The pod state is examined separately, because "still running" and "stuck in Pending" are
+# different news for a human: the first means wait, the second means waiting is pointless
+# and the node needs to be enlarged.
 if ! kubectl get job "$JOB" >/dev/null 2>&1; then
-  fail "क्लस्टर में Job ${JOB} नहीं है" \
-       "बिल्ड शुरू करें: kubectl apply -f android-build.yaml"
+  fail "there is no Job ${JOB} in the cluster" \
+       "start the build: kubectl apply -f android-build.yaml"
 else
   SUCCEEDED="$(kubectl get job "$JOB" -o jsonpath='{.status.succeeded}' 2>/dev/null)"
   FAILED="$(kubectl get job "$JOB" -o jsonpath='{.status.failed}' 2>/dev/null)"
@@ -115,57 +115,57 @@ else
     -o jsonpath='{.items[-1:].status.phase}' 2>/dev/null)"
 
   if [ "${SUCCEEDED:-0}" -ge 1 ] 2>/dev/null; then
-    ok "Job ${JOB} सफलतापूर्वक पूरा हुआ"
+    ok "Job ${JOB} finished successfully"
     evidence "Job" "$(kubectl get job "$JOB" -o wide 2>/dev/null)
-पूरा हुआ: ${DURATION:-अज्ञात}"
+completed: ${DURATION:-unknown}"
   elif [ "$POD_PHASE" = "Pending" ]; then
-    fail "बिल्ड पॉड Pending में अटका है — यह शुरू नहीं हुआ और खुद से शुरू नहीं होगा" \
-         "कारण देखें: kubectl describe pod -l job-name=${JOB} | grep -A5 Events; Insufficient memory पर नोड को u1.large तक बड़ा करें — कैसे, यह README में लिखा है"
-    evidence "बिल्ड पॉड की घटनाएँ" \
+    fail "the build pod is stuck in Pending — it did not start and won't start on its own" \
+         "check the reason: kubectl describe pod -l job-name=${JOB} | grep -A5 Events; on Insufficient memory enlarge the node to u1.large — how to do it is written in the README"
+    evidence "Build pod events" \
       "$(kubectl describe pod -l "job-name=${JOB}" 2>/dev/null | sed -n '/Events:/,$p' | head -20)"
   elif [ "${FAILED:-0}" -ge 1 ] 2>/dev/null; then
-    fail "Job ${JOB} त्रुटि के साथ पूरा हुआ (असफल प्रयास: ${FAILED})" \
-         "लॉग की आख़िरी पंक्तियाँ देखें: kubectl logs job/${JOB} --tail=40"
-    evidence "गिरी हुई बिल्ड के लॉग का अंत" \
+    fail "Job ${JOB} finished with an error (failed attempts: ${FAILED})" \
+         "look at the last lines of the log: kubectl logs job/${JOB} --tail=40"
+    evidence "Tail of the failed build's log" \
       "$(kubectl logs "job/${JOB}" --tail=30 2>/dev/null)"
   else
-    fail "Job ${JOB} अभी पूरा नहीं हुआ (पॉड की स्थिति: ${POD_PHASE:-अज्ञात})" \
-         "पहली बिल्ड कुछ मिनटों से लेकर पौने घंटे तक लेती है, कनेक्शन पर निर्भर; साथ चलें: kubectl logs -f job/${JOB}"
+    fail "Job ${JOB} has not finished yet (pod state: ${POD_PHASE:-unknown})" \
+         "the first build takes from a couple of minutes to a quarter of an hour, depending on the connection; follow along: kubectl logs -f job/${JOB}"
   fi
 
-  # --- भीतर ठीक-ठीक क्या हुआ ----------------------------------------
-  # सफल Job अपने आप में शून्य रिटर्न कोड के अलावा कुछ साबित नहीं करता।
-  # इसलिए हम लॉग खोलते हैं और उसमें दो अलग सबूत ढूँढते हैं: BUILD SUCCESSFUL —
-  # कि कम्पाइलेशन पूरी तरह चला, और मार्कर पंक्ति APK-UPLOADED, जिसे स्क्रिप्ट
-  # फ़ाइल को बकेट में कॉपी करने के बाद ही छापती है। दूसरा पहले से ज़्यादा मज़बूत है: APK बन
-  # सकता है और उस पॉड के भीतर पड़ा रह सकता है जो अभी गायब होने वाला है।
+  # --- what exactly happened inside ----------------------------------------
+  # A successful Job by itself proves nothing beyond a zero return code.
+  # So we open up the log and look in it for two different pieces of evidence: BUILD SUCCESSFUL —
+  # that compilation ran to completion, and the marker line APK-UPLOADED, which the script prints
+  # only after copying the file to the bucket. The second is stronger than the first: an APK can be built
+  # and stay lying inside a pod that is about to disappear.
   LOGS="$(kubectl logs "job/${JOB}" --tail=-1 2>/dev/null)"
   if [ -z "$LOGS" ]; then
-    warn "बिल्ड लॉग उपलब्ध नहीं" \
-         "बिल्ड पॉड हट गया या अभी बना नहीं; लॉग के बिना पुष्टि नहीं की जा सकती कि APK सचमुच बना"
+    warn "build logs are unavailable" \
+         "the build pod was deleted or not yet created; without logs you cannot confirm that the APK was actually built"
   else
     if printf '%s' "$LOGS" | grep -q 'BUILD SUCCESSFUL'; then
       GRADLE_LINE="$(printf '%s' "$LOGS" | grep -m1 'BUILD SUCCESSFUL')"
-      ok "APK सचमुच बना (${GRADLE_LINE})"
+      ok "the APK was actually built (${GRADLE_LINE})"
     else
-      fail "लॉग में BUILD SUCCESSFUL पंक्ति नहीं है — कम्पाइलेशन पूरी तरह नहीं चला" \
-           "FAILURE वाली पहली पंक्ति ढूँढें: kubectl logs job/${JOB} | grep -n -m1 -A20 FAILURE"
+      fail "there is no BUILD SUCCESSFUL line in the logs — compilation did not run to completion" \
+           "look for the first line with FAILURE: kubectl logs job/${JOB} | grep -n -m1 -A20 FAILURE"
     fi
 
     UPLOADED="$(printf '%s' "$LOGS" | grep -m1 '^APK-UPLOADED ' | awk '{print $2}')"
     if [ -n "$UPLOADED" ]; then
-      ok "APK बकेट तक पहुँचा: ${UPLOADED}"
-      evidence "बिल्ड के बाद बकेट की सामग्री" \
-        "$(printf '%s' "$LOGS" | sed -n '/5\/5 APK को bucket में अपलोड कर रहा हूँ/,$p' | grep -v '^APK-UPLOADED ' | head -20)"
+      ok "the APK went to the bucket: ${UPLOADED}"
+      evidence "Bucket contents after the build" \
+        "$(printf '%s' "$LOGS" | sed -n '/5\/5 uploading the APK to the bucket/,$p' | grep -v '^APK-UPLOADED ' | head -20)"
     else
-      fail "APK बना, पर बकेट तक नहीं पहुँचा" \
-           "लॉग का अंत देखें: kubectl logs job/${JOB} --tail=20; अक्सर bucketName ही दोषी होता है — इसमें डैशबोर्ड का लंबा नाम चाहिए, 'builds' नहीं"
+      fail "the APK was built, but did not go to the bucket" \
+           "look at the tail of the log: kubectl logs job/${JOB} --tail=20; most often bucketName is to blame — it needs the long name from the dashboard, not 'builds'"
     fi
   fi
 fi
 
-# --- क्या ऐसी बिल्ड के लिए नोड में पर्याप्त जगह है --------------------------
-# फ़ैसला नहीं, बल्कि व्याख्या: अगर Job नहीं समाया, तो कारण लगभग हमेशा यहीं है।
+# --- does the node have enough room for such a build -----------------------
+# Not a verdict, but an explanation: if the Job didn't fit, the cause is almost always here.
 BIGGEST_MEM="$(kubectl get nodes -o jsonpath='{range .items[*]}{.status.allocatable.memory}{"\n"}{end}' 2>/dev/null \
   | sort -n | tail -1)"
 if [ -n "$BIGGEST_MEM" ]; then
@@ -175,18 +175,18 @@ if [ -n "$BIGGEST_MEM" ]; then
       GB="${BIGGEST_H%Gi}"
       GB_INT="${GB%%.*}"
       if [ "${GB_INT:-0}" -ge 6 ] 2>/dev/null; then
-        ok "सबसे बड़ा नोड ${BIGGEST_H} मेमोरी देता है — बिल्ड के लिए पर्याप्त है"
+        ok "the largest node offers ${BIGGEST_H} of memory — enough for the build"
       else
-        warn "सबसे बड़ा नोड केवल ${BIGGEST_H} मेमोरी देता है" \
-             "बिल्ड अकेले requests के लिए 4Gi माँगती है; अगर Job Pending में अटके, तो नोड प्रकार को u1.large तक बड़ा करें — कैसे, README में लिखा है"
+        warn "the largest node offers only ${BIGGEST_H} of memory" \
+             "the build requests 4Gi for requests alone; if the Job hangs in Pending, enlarge the node type to u1.large — how, is written in the README"
       fi
       ;;
     *)
-      warn "नोडों पर एक गीगाबाइट से कम उपलब्ध मेमोरी है (${BIGGEST_H})" \
-           "Android बिल्ड वहाँ नहीं समाएगी, नोड प्रकार बड़ा करें — कैसे, README में लिखा है"
+      warn "nodes have less than a gigabyte of available memory (${BIGGEST_H})" \
+           "an Android build won't fit there, enlarge the node type — how, is written in the README"
       ;;
   esac
-  evidence "नोड संसाधन" "$(kubectl get nodes -o wide 2>/dev/null)"
+  evidence "Node resources" "$(kubectl get nodes -o wide 2>/dev/null)"
 fi
 
 finish

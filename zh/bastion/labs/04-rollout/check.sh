@@ -1,47 +1,48 @@
 #!/usr/bin/env bash
-# 实验 4 检查：发布新版本并回滚。
+# Check for lab 4: rolling out a new version and rolling back.
 #
-# 我们检查的是实质，而不是敲了哪些命令：
-#   - 应用的历史里有多个修订版本，即版本确实被改过；
-#   - 第二个版本的 ConfigMap 作为独立对象存在于集群中，而不是在第一个上直接修改；
-#   - 容器带有 readinessProbe——没有它就无法复现零停机；
-#   - 发布跑到了完成，而不是卡住；
-#   - Service 提供的页面与描述所引用的 ConfigMap 一致。这能捕捉到
-#     “描述已回滚，但 Pod 没有被重建”的情况。
+# We verify the substance, not the commands typed:
+#   - the application history has several revisions, i.e. the version was actually changed;
+#   - the second version's ConfigMap sits in the cluster as a separate object, not an edit of the first;
+#   - the container has a readinessProbe — without it zero downtime is not reproducible;
+#   - the rollout ran to completion and did not get stuck;
+#   - the page served by the Service matches the ConfigMap that the spec
+#     references. This catches the case "the spec was rolled back, but the pods weren't recreated".
 #
-# 脚本不会修改任何东西。那个一次性 Pod 只是用来从集群内部取回页面，
-# 并且会自行清理。
+# The script changes nothing. The one-off pod is only needed to fetch the page
+# from inside the cluster and it removes itself.
 #
-# 在虚拟机上运行，从本实验的目录，使用对学习集群 `lab` 的访问权限
-# （不是管理集群上的租户）：
+# Runs on the VM, from this lab's folder, using access to the training cluster `lab`
+# (not to the tenant on the management cluster):
 #     export KUBECONFIG=~/lab.kubeconfig
 #     cd labs/04-rollout && ./check.sh
-# 这里不需要 COZY_TENANT 变量：整个实验都在 `lab` 集群内部进行。
+# The COZY_TENANT variable is not needed here: the whole lab runs inside the `lab` cluster.
 #
-# 在清理之前、并在回滚完成之后运行：修订历史与 Deployment 一同存在，
-# 也随它一同消失。
+# Run it BEFORE cleanup and after the rollback has finished: the revision history lives
+# together with the Deployment, and disappears together with it.
 
-# 这些会进入报告标题，以及脚本旁边的文件名 report-<实验>-<日期>.md。
+# These go into the report header and into the file name report-<lab>-<date>.md next to the script.
 LAB_NAME="04-rollout"
-LAB_TITLE="实验 4 · 发布新版本并回滚"
-# 公共库：ok / fail / warn / evidence / finish，从集群内部发起请求，
-# 写入报告。路径按脚本自身的位置计算，而不是当前目录。
+LAB_TITLE="Lab 4 · Rolling out a new version and rolling back"
+# Shared library: ok / fail / warn / evidence / finish, in-cluster requests,
+# writing the report. The path is computed from the script's own location, not the current directory.
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
-# 没有 KUBECONFIG，kubectl 会在虚拟机上找集群，并用一个错误把所有东西一起搞挂，
-# 从中根本看不出真正的原因。我们立刻停下。
+# Without KUBECONFIG kubectl looks for a cluster on the VM and fails everything with a single error
+# in which the real cause is impossible to make out. We stop right away.
 need_kubeconfig
 
 APP=rickroll
 
-# --- 应用就位并已进入工作状态 ------------------
-# 没有应用就没什么可检查的，所以这里是唯一的提前退出。
-# 再往后我们不仅看就绪副本的数量，还看 Progressing 条件中的原因：
-# NewReplicaSetAvailable 表示发布已经完成。仅有就绪副本还不够——更新卡住时
-# 运行的是旧版本，计数器显示了预期的数字，而新副本却一次都没起来过。
+# --- application is in place and brought to a working state ------------------
+# Without the application there is nothing to check, so this is the only early exit.
+# Further on we look not only at the number of ready copies, but also at the reason in the
+# Progressing condition: NewReplicaSetAvailable means the rollout is COMPLETE. Ready copies
+# alone are not enough — with a stuck update the old version is running, the counter
+# shows the expected number, yet the new copy never came up even once.
 if ! kubectl get deployment "$APP" >/dev/null 2>&1; then
-  fail "应用 ${APP} 不在集群中" \
-       "部署它：kubectl apply -f ../01-deploy/rickroll.yaml"
+  fail "application ${APP} is not in the cluster" \
+       "deploy it: kubectl apply -f ../01-deploy/rickroll.yaml"
   finish
   exit $?
 fi
@@ -54,150 +55,150 @@ PROG_REASON="$(kubectl get deployment "$APP" \
   -o jsonpath='{range .status.conditions[?(@.type=="Progressing")]}{.reason}{end}' 2>/dev/null)"
 
 if [ "$HAVE" = "$WANT" ] && [ "${HAVE:-0}" -ge 1 ] && [ "$PROG_REASON" = "NewReplicaSetAvailable" ]; then
-  ok "发布跑到了完成：${WANT} 个副本中已就绪 ${HAVE} 个"
+  ok "rollout ran to completion: ${HAVE} of ${WANT} copies ready"
 else
-  fail "应用未处于完成状态（${WANT} 个中就绪 ${HAVE} 个，原因：${PROG_REASON:-无}）" \
-       "如果发布卡住了——用回滚脱身：kubectl rollout undo deployment/${APP}"
+  fail "application is not in a completed state (${HAVE} of ${WANT} ready, reason: ${PROG_REASON:-none})" \
+       "if the rollout is stuck — get out via rollback: kubectl rollout undo deployment/${APP}"
 fi
-evidence "应用状态" "$(kubectl get deployment,rs,pods -l app=${APP} 2>/dev/null)"
+evidence "Application state" "$(kubectl get deployment,rs,pods -l app=${APP} 2>/dev/null)"
 
-# --- readinessProbe：为零停机付出的代价 -----------------------
+# --- readinessProbe: what pays for zero downtime -----------------------
 PROBE="$(kubectl get deployment "$APP" \
   -o jsonpath='{.spec.template.spec.containers[0].readinessProbe.httpGet.path}' 2>/dev/null)"
 if [ -n "$PROBE" ]; then
-  ok "容器带有 readinessProbe（${PROBE}）——副本只有在就绪之后才会被替换"
+  ok "the container has a readinessProbe (${PROBE}) — copies are replaced only after they are ready"
 else
-  fail "容器没有 readinessProbe" \
-       "没有它，集群会把流量发给未就绪的副本；请应用 ../01-deploy/rickroll.yaml"
+  fail "the container has no readinessProbe" \
+       "without it the cluster sends traffic to a not-ready copy; apply ../01-deploy/rickroll.yaml"
 fi
 
-# --- 版本被做成了独立的对象 --------------------------------------
-# 页面的两个版本都必须作为两个独立的 ConfigMap 存在于集群中。
-# 那些改成就地修改 rickroll-page-v1 的人，会在屏幕上看到新页面，
-# 并认为实验做完了——但他将无处可回滚，
-# 副本替换和修订历史记录也根本不会发生。
+# --- versions made as separate objects --------------------------------------
+# Both versions of the page must live in the cluster as two separate ConfigMaps.
+# Whoever edited rickroll-page-v1 in place instead will see the new page on screen
+# and decide the lab is done — but there will be nowhere to roll back to,
+# and no copy replacement or revision-history entry will happen at all.
 if kubectl get configmap rickroll-page-v2 >/dev/null 2>&1; then
-  ok "ConfigMap rickroll-page-v2 作为独立对象存在于集群中"
+  ok "ConfigMap rickroll-page-v2 sits in the cluster as a separate object"
 else
-  fail "集群中没有 ConfigMap rickroll-page-v2" \
-       "请应用它：kubectl apply -f rickroll-page-v2.yaml"
+  fail "there is no ConfigMap rickroll-page-v2 in the cluster" \
+       "apply it: kubectl apply -f rickroll-page-v2.yaml"
 fi
 
 if kubectl get configmap rickroll-page-v1 >/dev/null 2>&1; then
-  ok "页面的第一个版本也被保留了——有地方可以回滚"
+  ok "the first version of the page is also preserved — there is somewhere to roll back to"
 else
-  warn "集群中未找到 ConfigMap rickroll-page-v1" \
-       "没有它，回滚到第一个版本不会把 Pod 起来：kubectl apply -f ../01-deploy/rickroll.yaml"
+  warn "ConfigMap rickroll-page-v1 not found in the cluster" \
+       "a rollback to the first version without it will not bring the pods up: kubectl apply -f ../01-deploy/rickroll.yaml"
 fi
 
-# --- 修订历史 -------------------------------------------------------
-# 我们看的是最新修订版本的编号，而不是历史里的行数。回滚
-# 不会新增 ReplicaSet——它复用旧的并提升其编号，
-# 所以回滚后历史里的行数不变，而编号在增长。
-#   1 — 描述从未被改过
-#   2 — 版本被切换了
-#   3 及以上 — 切换了又回滚了
+# --- revision history -------------------------------------------------------
+# We look at the NUMBER of the latest revision, not the number of lines in the history. A rollback
+# does not add a new ReplicaSet — it reuses the old one and bumps its number,
+# so after a rollback there are just as many lines in the history, while the number grows.
+#   1 — the spec was never changed
+#   2 — the version was switched
+#   3 and more — switched and rolled back
 REV_MAX="$(kubectl rollout history deployment/${APP} 2>/dev/null \
   | awk '$1 ~ /^[0-9]+$/ { if ($1+0 > m) m = $1+0 } END { print m+0 }')"
 [ -z "$REV_MAX" ] && REV_MAX=0
 
 if [ "$REV_MAX" -ge 3 ]; then
-  ok "应用的最新修订版本是 ${REV_MAX}：版本被切换过又回滚过"
+  ok "the application's latest revision is ${REV_MAX}: the version was switched and rolled back"
 elif [ "$REV_MAX" -eq 2 ]; then
-  warn "最新修订版本是 2：发布做了，回滚还没做" \
-       "恢复第一个版本：kubectl rollout undo deployment/${APP}"
+  warn "latest revision is 2: the rollout is done, the rollback is not yet" \
+       "restore the first version: kubectl rollout undo deployment/${APP}"
 else
-  fail "最新修订版本是 ${REV_MAX}：应用的描述从未被改过" \
-       "用实验里的补丁把卷切换到第二个版本，然后回滚"
+  fail "latest revision is ${REV_MAX}: the application's spec was never changed" \
+       "switch the volume to the second version with the patch from the lab, then roll back"
 fi
-evidence "修订历史" "$(kubectl rollout history deployment/${APP} 2>/dev/null)"
+evidence "Revision history" "$(kubectl rollout history deployment/${APP} 2>/dev/null)"
 
-# --- 描述指向的是哪个版本 --------------------------------------
-# 我们按名称 page 来查找卷，尽管实验里的补丁是按索引寻址它的。
-# 差别恰好在这里被捕捉：如果补丁打到了列表里错误的元素上，
-# 名称 page 会指向之前的 ConfigMap 或者消失，参与者会用文字得知这一点，
-# 而不是通过一个奇怪的 nginx 错误。
+# --- which version the spec points at --------------------------------------
+# We look up the volume BY THE NAME page, even though the patch in the lab addresses it by index.
+# The difference is exactly what gets caught here: if the patch went to the wrong list element,
+# the name page will point at the previous ConfigMap or disappear, and the participant will learn
+# about it in words, rather than through a strange nginx error.
 VOL_CM="$(kubectl get deployment "$APP" \
   -o jsonpath='{range .spec.template.spec.volumes[?(@.name=="page")]}{.configMap.name}{end}' 2>/dev/null)"
 
 case "$VOL_CM" in
   rickroll-page-v1)
-    ok "应用描述已回滚到页面的第一个版本"
+    ok "the application spec has been rolled back to the first version of the page"
     ;;
   rickroll-page-v2)
-    warn "应用描述指向页面的第二个版本" \
-         "实验以回滚结束；如果这是有意为之——无需担心，否则：kubectl rollout undo deployment/${APP}"
+    warn "the application spec points at the second version of the page" \
+         "the lab ends with a rollback; if this is intended — nothing to worry about, otherwise: kubectl rollout undo deployment/${APP}"
     ;;
   "")
-    fail "描述里没有名为 page 的卷" \
-         "看起来补丁打错了地方（按索引寻址！）；请重新应用 ../01-deploy/rickroll.yaml"
+    fail "the spec has no volume named page" \
+         "looks like the patch landed in the wrong place (addressing by index!); apply ../01-deploy/rickroll.yaml again"
     ;;
   *)
-    fail "卷 page 指向 ConfigMap ${VOL_CM}，而这个实验并未创建它" \
-         "回滚：kubectl rollout undo deployment/${APP}"
+    fail "volume page points at ConfigMap ${VOL_CM}, which the lab did not create" \
+         "roll back: kubectl rollout undo deployment/${APP}"
     ;;
 esac
 
-# --- 实际提供给客户端的是什么 ------------------------------------
-# 最有实质意义的检查：把描述与用户看到的内容做对比。
-# 这里出现不一致，意味着 Pod 没有为新描述而被重建。
-# 是八个请求，而不是一个。服务后面有三个副本；如果发布没有完全收敛，
-# 单个请求有三分之一的概率打到正确的版本，从而掩盖不一致。
+# --- what is actually served to the client ------------------------------------
+# The most substantive check: we compare the spec with what the user sees.
+# A mismatch here means the pods were not recreated for the new spec.
+# Eight requests, not one. There are three copies behind the service; if the rollout did not fully converge,
+# a single request has a one-in-three chance of hitting the right version and hiding the mismatch.
 BODIES="$(in_cluster_curl_many "http://${APP}/" 8)"
 BODY="$BODIES"
 
 if [ -z "$BODY" ]; then
-  fail "Service ${APP} 没有从集群内部返回页面" \
-       "检查端点：kubectl get endpointslices -l kubernetes.io/service-name=${APP}"
+  fail "Service ${APP} did not return a page from inside the cluster" \
+       "check the endpoints: kubectl get endpointslices -l kubernetes.io/service-name=${APP}"
 else
-  # 我们对两个版本都做肯定式判定，各按自己的标记。“如果不是 v2，就是
-  # v1” 那种分支会把任何东西都算成第一个版本：nginx 默认页、404、别人的
-  # 应用、垃圾内容——已验证，遇到垃圾内容时脚本会打印 “实验通过”。
-  if printf '%s' "$BODY" | grep -q '版本 2'; then
+  # We detect both versions POSITIVELY, each by its own marker. The "if not v2, then
+  # v1" branch counted anything as the first version: the default nginx page, a 404, someone else's
+  # application, garbage — verified, on garbage the script would print "LAB PASSED".
+  if printf '%s' "$BODY" | grep -q 'VERSION 2'; then
     SERVED_VER="rickroll-page-v2"
   elif printf '%s' "$BODY" | grep -q 'Never Gonna Give You Up'; then
     SERVED_VER="rickroll-page-v1"
   else
     SERVED_VER=""
-    fail "服务地址上提供的不是应用页面" \
-         "响应里没有一个熟悉的标记——恢复原样：kubectl apply -f ../01-deploy/rickroll.yaml"
-    evidence "返回的不是页面而是什么" "$(printf '%s' "$BODY" | head -12)"
+    fail "the service address serves something other than the application page" \
+         "not a single familiar marker in the response — restore the original: kubectl apply -f ../01-deploy/rickroll.yaml"
+    evidence "What was returned instead of the page" "$(printf '%s' "$BODY" | head -12)"
   fi
 
   if [ -n "$VOL_CM" ] && [ "$SERVED_VER" = "$VOL_CM" ]; then
-    ok "提供给客户端的正是描述中记录的那个版本（${SERVED_VER}）"
+    ok "the client is served exactly the version recorded in the spec (${SERVED_VER})"
   elif [ -n "$VOL_CM" ]; then
-    fail "描述指向 ${VOL_CM}，而提供给客户端的是 ${SERVED_VER}" \
-         "副本没有为新描述而被重建：kubectl rollout status deployment/${APP}"
+    fail "the spec points at ${VOL_CM}, but the client is served ${SERVED_VER}" \
+         "the copies were not recreated for the new spec: kubectl rollout status deployment/${APP}"
   fi
 
   if printf '%s' "$BODY" | grep -q '__POD__'; then
-    fail "副本名称没有被填入页面" \
-         "丢失了 ConfigMap rickroll-conf：完整应用 ../01-deploy/rickroll.yaml"
+    fail "the copy name is not substituted into the page" \
+         "ConfigMap rickroll-conf is lost: apply ../01-deploy/rickroll.yaml in full"
   else
     SERVED_POD="$(printf '%s' "$BODY" | grep -o "${APP}-[a-z0-9]*-[a-z0-9]*" | head -1)"
     if [ -n "$SERVED_POD" ] && kubectl get pod "$SERVED_POD" >/dev/null 2>&1; then
-      ok "页面由一个存活的副本 ${SERVED_POD} 提供"
+      ok "the page was served by a live copy ${SERVED_POD}"
     else
-      warn "无法把页面里的名称与一个运行中的副本对应起来" \
-           "很可能副本正好在检查过程中发生了变化——请再运行一次脚本"
+      warn "could not match the name from the page with a running copy" \
+           "the copies were probably changing during the check itself — run the script again"
     fi
   fi
 
-  evidence "所提供的页面（片段）" \
+  evidence "Served page (fragment)" \
     "$(printf '%s' "$BODY" | grep -o '<h1>[^<]*</h1>' | head -1)
-$(printf '%s' "$BODY" | grep -o "为您服务的 Pod<b>${APP}-[a-z0-9-]*</b>" | head -1)"
+$(printf '%s' "$BODY" | grep -o "served by pod<b>${APP}-[a-z0-9-]*</b>" | head -1)"
 fi
 
-# --- 为后续实验做好准备 ------------------------------------
-# 本实验把副本扩到三个，好让替换能一个一个地看清楚。剩下的三个
-# 副本不会弄坏任何东西——所以是 warn 而不是 fail——但它们会占用学习节点上的空间，
-# 而后续相邻的实验会不够用。
+# --- readiness for the next labs ------------------------------------------
+# The lab scaled the copies up to three so the replacement could be seen one by one. The three
+# leftover copies break nothing — hence a warn, not a fail — but they take up space on the training
+# node, which the neighboring labs will run short of further on.
 if [ "$WANT" = "1" ]; then
-  ok "副本数量已恢复到一个"
+  ok "the number of copies has been returned to one"
 else
-  warn "当前请求的副本数：${WANT}" \
-       "实验之后最好恢复到一个：kubectl scale deployment ${APP} --replicas=1"
+  warn "currently requested copies: ${WANT}" \
+       "after the lab it is worth returning to one: kubectl scale deployment ${APP} --replicas=1"
 fi
 
 finish

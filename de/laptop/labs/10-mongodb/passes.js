@@ -1,64 +1,64 @@
-// Lab 10 · vier Ausweise in vier verschiedenen Formen in der Collection passes.
+// Lab 10 · four passes of four different shapes in the passes collection.
 //
-// Dies ist keine Konfigurationsdatei, sondern ein Programm für mongosh — die MongoDB-Shell,
-// die JavaScript versteht. Es läuft auf Ihrem Laptop, im Lab-Cluster, mit dem kurzen
-// Befehl `mo` aus der README (er startet mongosh innerhalb des Arbeits-Pods):
+// This is not a settings file but a program for mongosh — the MongoDB shell, which
+// understands JavaScript. It runs on your laptop, in the lab cluster, with the short
+// `mo` command from the README (it launches mongosh inside the working pod):
 //     cd labs/10-mongodb && mo < passes.js
-// Als Antwort sehen Sie die Zeile «Dokumente in der Sammlung: 4».
+// In response you will see the line "documents in collection: 4".
 //
-// Führen Sie die Datei zweimal aus, und es werden acht Dokumente: insertMany fügt nur hinzu.
+// Run the file twice and there will be eight documents: insertMany only adds.
 
-// db ist die Datenbank, mit der Sie verbunden sind; passes ist eine Collection darin (das
-// nächste Analogon einer Tabelle); insertMany bedeutet «füge diese Dokumente hinzu». Sie
-// müssen keine Tabelle im Voraus anlegen, und es gibt keinen Ort, um die Felder zu
-// beschreiben: die Collection entsteht im Moment der ersten Einfügung, und die Datenbank hat
-// standardmäßig keine Meinung darüber, welche Felder ein Dokument haben darf.
-// Deshalb haben die vier Dokumente unten unterschiedliche Feldsätze und liegen dennoch
-// nebeneinander, in einer Collection. Genau dafür existiert das Dokumentmodell: keine leeren
-// Spalten, keine vier Tabellen für vier Ausweistypen, keine fünfte, die sie verbindet.
+// db is the database you are connected to; passes is a collection in it (the closest
+// analogue of a table); insertMany means "add these documents". You do not need to
+// create any table in advance, and there is nowhere to describe the fields: the
+// collection appears at the moment of the first insert, and by default the database
+// has no opinion about which fields a document may have.
+// That is why the four documents below have different sets of fields and yet lie side
+// by side, in one collection. This is exactly why the document model exists: no empty
+// columns, no four tables for four pass types, no fifth one to link them together.
 db.passes.insertMany([
   {
-    // Einmal-Ausweis — die kürzeste Form: sechs Felder, alle einfache Werte.
-    // In einer gewöhnlichen Tabelle wäre das eine gewöhnliche Zeile.
-    // ISODate(...) ist keine Zeichenkette, sondern eben ein Datum. MongoDB speichert Dokumente
-    // im binären BSON-Format, wo ein Wert einen Typ hat: Datum, Ganzzahl, Fließkomma, Boolean.
-    // Nach dem Datum kann man vergleichen und sortieren, nach der Zeichenkette «2026-09-01» nur,
-    // wenn man mit dem Format der Aufzeichnung Glück hatte.
-    type: "Einmalausweis",
-    guest: "Johannes M. Weber",
+    // A single-visit pass — the shortest shape: six fields, all simple values.
+    // In an ordinary table this would be an ordinary row.
+    // ISODate(...) is not a string but a date. MongoDB stores documents in the binary
+    // BSON format, where a value has a type: date, integer, float, boolean.
+    // A date can be compared and sorted; the string "2026-09-01" only if you are
+    // lucky with how it was written.
+    type: "single-use",
+    guest: "James P. Whitfield",
     host: "petrov@corp.example",
-    entrance: "Nord",
+    entrance: "North",
     valid_on: ISODate("2026-09-01T09:00:00Z"),
-    purpose: "Vorstellungsgespräch"
+    purpose: "job interview"
   },
   {
-    // Wochen-Ausweis. Statt valid_on gibt es ein Paar valid_from und valid_to, statt eines
-    // einzelnen Eingangs eine Liste entrances direkt im Feld. In einer Tabelle würde eine solche
-    // Liste entweder eine separate Tabelle «Ausweis — Eingang» oder eine Zeichenkette mit
-    // Kommas erfordern, nach der man dann nicht mehr richtig suchen kann.
-    // Ein Feld badge_returned ist aufgetaucht, das der Einmal-Ausweis gar nicht hat:
-    // nicht NULL und nicht leer, sondern eben kein solches Feld in jenem Dokument. Das sind
-    // verschiedene Dinge, und sie werden unterschiedlich gesucht.
-    type: "Wochenausweis",
-    guest: "Anna L. Bergmann",
+    // A weekly pass. Instead of valid_on there is a pair valid_from and valid_to, and
+    // instead of a single entrance a list of entrances right there in the field. In a
+    // table such a list would require either a separate "pass — entrance" table, or a
+    // comma-separated string that you then cannot search properly.
+    // A badge_returned field has appeared, which the single-visit pass does not have
+    // at all: not NULL and not empty, but simply no such field in that document. These
+    // are different things, and they are searched for differently.
+    type: "weekly",
+    guest: "Emma L. Prescott",
     host: "petrov@corp.example",
-    entrances: ["Nord", "Süd"],
+    entrances: ["North", "South"],
     valid_from: ISODate("2026-09-01T00:00:00Z"),
     valid_to: ISODate("2026-09-07T23:59:59Z"),
-    purpose: "externe Prüfung",
+    purpose: "external audit",
     badge_returned: false
   },
   {
-    // Fahrzeug-Ausweis. Alles, was das Auto betrifft, liegt innerhalb eines einzigen Feldes
-    // car. Das ist keine Zeichenkette mit JSON darin, sondern eine vollwertige verschachtelte
-    // Struktur: nach car.plate kann man suchen und darauf einen Index aufbauen.
-    type: "Fahrzeugausweis",
-    guest: "Viktor S. Schmidt",
+    // A vehicle pass. Everything related to the car lives inside a single field car.
+    // This is not a string with JSON inside, but a full nested structure: you can
+    // search by car.plate and build an index on it.
+    type: "vehicle",
+    guest: "Victor S. Marsh",
     host: "logistics@corp.example",
     entrance: "West",
     valid_on: ISODate("2026-09-02T07:30:00Z"),
     car: {
-      plate: "M-AB 1234",
+      plate: "AB-1174-CD",
       model: "Ford Transit",
       trailer: false,
       weight_kg: 3500
@@ -66,30 +66,30 @@ db.passes.insertMany([
     parking: "P2"
   },
   {
-    // Gruppen-Ausweis. Hier eine Liste von Objekten: jeder Teilnehmer hat seine eigenen Felder,
-    // die Länge der Liste ist beliebig.
-    // Und das Wichtigste — dieses Dokument hat gar kein Feld guest: statt eines Gastes
-    // eine Organisation und eine Kontaktperson. Die Form unterscheidet sich von den übrigen
-    // nicht durch ein Feld, sondern im Wesen. Weiter im Lab wird das nachhallen: die
-    // Dokument-Prüfregel wird guest nicht von allen verlangen können, sonst käme ein
-    // legitimer Gruppen-Ausweis nicht durch.
-    type: "Gruppenausweis",
-    organization: "Gymnasium Nr. 1",
-    contact: "Olivia W. Fischer",
+    // A group pass. Here there is a list of objects: each member has their own fields,
+    // and the length of the list is arbitrary.
+    // And most importantly — this document has no guest field at all: instead of a
+    // guest there is an organization and a contact person. The shape differs from the
+    // others not by one field but in essence. This will echo later in the lab: the
+    // document validation rule will not be able to require guest from everyone,
+    // otherwise a legitimate group pass would not pass.
+    type: "group",
+    organization: "City High School No. 1",
+    contact: "Olivia W. Grant",
     host: "hr@corp.example",
-    entrance: "Nord",
+    entrance: "North",
     valid_on: ISODate("2026-09-03T10:00:00Z"),
-    escort: "Alexander A. Fuchs",
+    escort: "Alan A. Foster",
     members: [
-      { name: "Peter Adler", age: 16 },
-      { name: "Maria Wolf", age: 15 },
-      { name: "Elias Hartmann", age: 17 }
+      { name: "Peter Hale", age: 16 },
+      { name: "Mary Fenwick", age: 15 },
+      { name: "Isaac Hart", age: 17 }
     ]
   }
 ]);
 
-// countDocuments({}) — zählt die Dokumente, die eine Bedingung erfüllen; eine leere Bedingung
-// bedeutet «alle». Die Ausgabe ist nötig, damit die Datei ein sichtbares Ergebnis hat: insertMany
-// selbst antwortet mit einer Liste der ausgegebenen Bezeichner, und darin kann man leicht
-// übersehen, wie viele Dokumente tatsächlich abgelegt wurden.
-print("Dokumente in der Sammlung: " + db.passes.countDocuments({}));
+// countDocuments({}) — count the documents matching a condition; an empty condition
+// means "all". The print is needed so the file has a visible result: insertMany itself
+// replies with a list of issued identifiers, and in it you can easily miss how many
+// documents actually landed.
+print("documents in collection: " + db.passes.countDocuments({}));

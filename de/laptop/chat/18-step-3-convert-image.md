@@ -9,7 +9,7 @@ Datei selbst herunter — Sie müssen nichts über die Zwischenablage kopieren.
 
 Holen Sie das Skript direkt von GitHub auf den Rechner:
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/laptop/scripts/convert.sh
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/laptop/scripts/convert.sh
 ```
 
 Öffnen Sie es:
@@ -22,9 +22,9 @@ Datei gibt es einen Block „FÜGEN SIE IHRE WERTE EIN" (im Skript «FÜGEN SIE 
 Platzhalter durch Ihre eigenen und lassen Sie die Anführungszeichen stehen:
 
 ```
-BUCKET="ihr-bucket-name"
-ACCESS_KEY="ihr-accessKey"
-SECRET_KEY="ihr-secretKey"
+BUCKET="your-bucket-name"
+ACCESS_KEY="your-accessKey"
+SECRET_KEY="your-secretKey"
 ```
 
 Die Zeile `S3_ENDPOINT` und den Link zum Quell-Image lassen Sie unangetastet — sie sind bereits
@@ -33,7 +33,7 @@ korrekt und für alle gleich.
 Speichern in nano: `Ctrl+O`, dann `Enter`, dann `Ctrl+X` zum Beenden. Prüfen Sie, dass keine
 Platzhalter übrig sind:
 ```bash
-grep ВСТАВЬТЕ convert.sh || echo "all filled in, ready to run"
+grep PASTE_ convert.sh || echo "all filled in, ready to run"
 ```
 
 Führen Sie es aus — immer über `sudo`, das Skript braucht root-Rechte:
@@ -55,7 +55,7 @@ Am Ende gibt das Skript einen **presigned Link** zu Ihrem Image aus — suchen S
 die mit dem Wort `Share:` beginnt, der Link steht direkt dahinter.
 
 **Was Sie damit tun:** Kopieren Sie ihn in denselben Notizzettel. Im nächsten Schritt kehren Sie zu Ihrem Laptop zurück, öffnen `manifests/03-app-vm.yaml` und fügen ihn in das Feld `url` ein — dorthin, wo
-aktuell der Platzhalter `ВСТАВЬТЕ_PRESIGNED_URL` steht. Genau der, vor dem ich Sie gewarnt habe,
+aktuell der Platzhalter `PASTE_PRESIGNED_URL` steht. Genau der, vor dem ich Sie gewarnt habe,
 als wir die Nummern eingetragen haben.
 
 Das ist ein temporärer signierter Link: Der Speicher ist nach außen nicht offen, und den Link haben Sie

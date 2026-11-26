@@ -93,7 +93,7 @@ ssh_pwauth: true
 write_files:
   - path: /opt/directory/index.html
     content: |
-      <!doctype html><html lang="ru"><head><meta charset="utf-8"><title>名簿</title></head><body><h1>社員名簿</h1><ul><li>田中 — 101</li><li>山田 — 102</li></ul></body></html>
+      <!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Directory</title></head><body><h1>Staff directory</h1><ul><li>Whitfield J. — 101</li><li>Petersen P. — 102</li></ul></body></html>
   - path: /etc/systemd/system/directory.service
     content: |
       [Unit]
@@ -114,12 +114,12 @@ runcmd: [ "systemctl daemon-reload", "systemctl enable --now directory" ]
 **同じものをテキストで。** ディスクとマシンという二つのオブジェクトはどちらも一つのファイル `staff-directory-vm.yaml` に入っていて、一つのコマンドで作られます。まずディスク、次にマシンです。適用する前にファイルを開き、その中の `tenant-workshopXX` というプレースホルダーを自分のテナントの名前に置き換えてください。さもないとオブジェクトが違う場所に行ってしまいます。
 
 ```bash
-# KUBECONFIG は kubectl がクラスターのアドレスとログイン情報を読み取る変数です。
-# ここではテナントのアクセスファイルが必要です。仮想マシンは管理クラスター上のテナント内に存在します。
+# KUBECONFIG is the variable kubectl reads the cluster address and login data from.
+# Here you need the TENANT access file: the VM lives in the tenant on the management cluster.
 export KUBECONFIG=~/.kube/workshop
-# apply = 「ファイルに書かれた状態にクラスターを合わせる」。オブジェクトが無ければ作成し、
-# 有ればその記述された状態へ合わせます。
-#   -f   記述をファイルから読む
+# apply = "bring the cluster to what's written in the file". No objects — it creates them,
+# objects present — it brings them to the described state.
+#   -f   read the description from a file
 kubectl apply -f staff-directory-vm.yaml
 ```
 
@@ -204,8 +204,8 @@ cloud-init は、あらゆるクラウド向け Linux イメージが理解す�
 講師が事前に名簿を公開しています。あなたのテナントにはすでに、ホスト `spravochnik.workshopXX.workshop.aenix.io` を持つ `Ingress spravochnik` と、マシン内部のポート 8080 へ振り分ける `Service spravochnik-http` があります。公開は、名簿が応答を返し始めた瞬間に受け入れる準備ができています。マシンの読み込みが終わるのを待たず、今すぐ確認しましょう。
 
 ```bash
-# curl — 「アドレスへ行って応答を見せる」。XX は自分のテナント番号に置き換えます。
-#   --max-time 5   長く待たずに5秒であきらめる
+# curl — "go to the address and show the response". Replace XX with your own tenant number.
+#   --max-time 5   give up after 5 seconds instead of waiting a long time
 curl --max-time 5 http://spravochnik.workshopXX.workshop.aenix.io
 ```
 
@@ -253,13 +253,13 @@ curl --max-time 5 http://spravochnik.workshopXX.workshop.aenix.io
 その構文の一つの癖は、前もって取り上げておく価値があります。さもないと、いちばん最初のコマンドが拒否で返ってきます。`virtctl` のターゲットは、裸の名前ではなくタイプの接頭辞をつけて指定します。`vmi/<name>` です。`vmi` は virtual machine instance、マシンの **実行中インスタンス** です。あなたが作った `VMInstance` オブジェクトと、実行中インスタンスは、API 上の二つの別のオブジェクトです。テナントアクセスのもとでは、権限は `virtualmachineinstances` の **サブリソース**（`console` と `portforward`）に付与されており、`virtualmachines` オブジェクトまるごとには付与されていません。裸の名前は vm オブジェクトに当たり、`forbidden` で返ってきます。プラットフォームはインスタンス名を、接頭辞 `vm-instance-` にあなたのマシンの名前をつなげて組み立てます。`spravochnik` はインスタンス `vm-instance-spravochnik` です。
 
 ```bash
-# テナントアクセス:マシンはテナント内に存在します
+# tenant access: the machine lives in the tenant
 export KUBECONFIG=~/.kube/workshop
-# console = マシンのシリアルコンソールに接続します。vSphere の「Open Console」が与えるのと
-# 同じ画面ですが、テキストベースです:
-#   --namespace  クラスターのどのセクションを見るか。あなたのテナントでは
-#                tenant- にあなたのログインをつけた名前です。XX は自分の番号に置き換えます
-#   vmi/...      ターゲット:VMInstance の記述ではなく、マシンの実行中インスタンス
+# console = connect to the machine's serial console. It's the same screen that
+# "Open Console" gives you in vSphere, only text-based:
+#   --namespace  which section of the cluster to look in; for your tenant it's called
+#                tenant- plus your login, replace XX with your own number
+#   vmi/...      the target: the running instance of the machine, not the VMInstance description
 virtctl console --namespace=tenant-workshopXX vmi/vm-instance-spravochnik
 ```
 
@@ -268,9 +268,9 @@ virtctl console --namespace=tenant-workshopXX vmi/vm-instance-spravochnik
 内側から見れば、ふつうの Ubuntu です。名簿が立ち上がったことを確認しましょう。
 
 ```bash
-uname -a                       # カーネルとアーキテクチャ:ベアメタルサーバーと同じ行
-systemctl status directory     # 名簿サービス:active (running) であるべき
-curl -s localhost:8080 | head  # 同じページ。ただしマシン自身の内側から要求したもの
+uname -a                       # kernel and architecture: the same line as on a bare-metal server
+systemctl status directory     # the directory service: should be active (running)
+curl -s localhost:8080 | head  # the same page, but requested from inside the machine itself
 ```
 
 `systemctl status directory` が `active (running)` を示し、`localhost:8080` への `curl` が社員一覧を含む HTML を返したなら、サーバーは準備ができていて、外側の公開はもうすぐ `503` をページに切り替えます。内側に Kubernetes の痕跡はまったくなく、あるべきでもありません。ゲストは自分がクラスターの中にいることを知りません。vSphere の仮想マシンが vCenter について知る必要がないのと、まったく同じです。
@@ -288,7 +288,7 @@ curl http://spravochnik.workshopXX.workshop.aenix.io
 **見えるはずのもの** — 名簿ページの HTML:
 
 ```html
-<h1>社員名簿</h1><ul><li>田中 — 101</li><li>山田 — 102</li></ul>
+<h1>Staff directory</h1><ul><li>Whitfield J. — 101</li><li>Petersen P. — 102</li></ul>
 ```
 
 このアドレスをブラウザで開けば、同じ一覧が見えます。名簿は、人にやさしいドメイン名で、プラットフォームからの HTTPS つきで、ネットワークへの申請票も証明書への申請票も一枚も出さずに、外部から見えています。
@@ -306,12 +306,12 @@ Kubernetes について何も知らない Ubuntu の仮想マシンが、ふつ�
 スクリプトはオブジェクトの有無ではなく、実質的な動作を確認します。ドメイン名で `200` が返り、それが名簿ページであること、マシン自身が動いていること、それを公開する `Ingress` が所定の場所にあること、です。ドメインによる確認はテナントアクセスがなくても動きます。`curl` があれば足ります。テナントアクセスがあると、マシンの状態のチェックが加わります。
 
 ```bash
-# テナントアクセス:ここからスクリプトは仮想マシン自体と Ingress を取ります
+# tenant access: from here the script takes the VM itself and the Ingress
 export KUBECONFIG=~/.kube/workshop
-# tenant- という語をつけないあなたのログイン:これからスクリプトはセクション名 tenant-workshopXX と
-# ドメイン名 spravochnik.workshopXX.workshop.aenix.io の両方を組み立てます
+# your login without the word tenant-: from it the script builds both the section name tenant-workshopXX
+# and the domain name spravochnik.workshopXX.workshop.aenix.io
 export COZY_TENANT=workshopXX
-# 名前の前の ./ は「現在のフォルダにあるファイル」、つまり labs/12-vm のものを意味します
+# the ./ before the name means "the file from the current folder", i.e. from labs/12-vm
 ./check.sh
 ```
 

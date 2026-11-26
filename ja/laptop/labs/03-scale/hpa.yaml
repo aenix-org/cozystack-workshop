@@ -1,75 +1,75 @@
 ---
-# ラボ3。CPU負荷に応じてレプリカを増やす。
-# 目標は requests.cpu（20m）の50%、つまりしきい値はPodあたり10m。
-# あえて低く設定している：負荷は数秒で発動しなければならない、
-# ラボに使えるのは半日ではなく30分だ。
+# Lab 3. Scaling replicas by CPU load.
+# Target is 50% of requests.cpu (20m), i.e. the threshold is 10m per pod.
+# Deliberately set low: the load must trigger within seconds,
+# we have half an hour for the lab, not half a day.
 #
-# オブジェクトは1つ。テナントではなく、あなたの学習用クラスタ `lab` に適用する
-# （管理クラスタ上のテナントではない）：
+# A single object. Applied on your training cluster `lab`, not in a tenant
+# on the management cluster:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl apply -f hpa.yaml
-# ここには tenant-workshopXX のようなプレースホルダはない — 自分の番号をどこかに差し込む必要はない。
+# There are no placeholders like tenant-workshopXX here — you don't need to substitute your number anywhere.
 #
-# オブジェクトは作成されるが動作しない、という2つの条件：
-#   1. rickroll コンテナに requests.cpu が設定されていること — さもないとパーセンテージを計算する対象がなく、
-#      `kubectl get hpa` の TARGETS 列には永遠に <unknown> が表示される。
-#   2. クラスタで metrics-server が動いていること — Podの現在の消費量のソースだ。
-# どちらの条件も、このフォルダの check.sh が確認する。
+# Two conditions without which the object will be created but won't work:
+#   1. The rickroll container has requests.cpu set — otherwise there's nothing to compute percentages from,
+#      and the TARGETS column of `kubectl get hpa` will forever show <unknown>.
+#   2. metrics-server is running in the cluster — the source of current pod consumption.
+# Both conditions are checked by check.sh in this folder.
 #
-# HPAが存在する限り、Deployment の replicas フィールドはHPAのものだ。`kubectl scale` で手動で
-# コピー数を変えることはできるが、HPAは数秒のうちに自分の値へ戻す。
-# だからラボ4ではロールアウト前にこのオブジェクトを削除する：1つのフィールドに2つの仕組み —
-# 何が起きたのか理解できなくなる確実な方法だ。
+# As long as the HPA exists, the Deployment's replicas field belongs to it. You can change the number
+# of copies by hand via `kubectl scale`, but the HPA will restore its own within seconds.
+# That's why in lab 4 this object is deleted before rollout: two mechanisms over one field —
+# a guaranteed way to not understand what happened.
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  # HPAの名前はアプリケーション名と一致する必要はない — ここで一致させているのは便宜のためだ。
-  # 何を管理するかは、この名前ではなく下の scaleTargetRef が決める。
+  # The HPA name doesn't have to match the application name — the match here is for convenience.
+  # What it manages is determined by scaleTargetRef below, not by this name.
   name: rickroll
 spec:
-  # 誰を監視し、誰の replicas フィールドを変えるか。3つのフィールドをまとめて指定するのは、型のない
-  # 名前だけでは曖昧だからだ：Deployment と StatefulSet が同じ名前を持ちうる。
+  # Who to watch and whose replicas field to change. Three fields together, because a name
+  # without a type is ambiguous: a Deployment and a StatefulSet can be named the same.
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
     name: rickroll
-  # どんな負荷でもHPAが越えない範囲。下限はラボが始まったときと同じ
-  # 1コピー。上限は6：limits.cpu 300m で学習用ノードに収まる数であり、
-  # かつPod一覧でひと目で分かる程度の数だ。
-  # maxReplicas: 1 にすると、オブジェクトは作成されるが何もしない。
+  # The corridor the HPA won't leave under any load. The lower bound is the same
+  # single copy the lab started with. The upper is six: that's how many fit
+  # on the training node at limits.cpu 300m and is still noticeable at a glance in the pod list.
+  # Set maxReplicas: 1 and the object will be created and do nothing.
   minReplicas: 1
   maxReplicas: 6
-  # 何を基準に判断するか。メトリクスは複数あってもよく、その場合HPAはより多くの
-  # コピーを必要とするものを採用する。ここでは1つだけ — CPUだ。
+  # What to base the decision on. There can be several metrics, then the HPA takes the one
+  # that requires more copies. Here there's just one — CPU.
   metrics:
     - type: Resource
       resource:
         name: cpu
-        # Utilization — ノードの容量ではなく、コンテナの requests.cpu に対する割合だ。
-        # ここから直感に反する帰結が生まれる：値が平然と600%になることがあり、これは
-        # エラーではない：Podは予約した6倍を消費している。
-        # 代替は AverageValue で、そこではしきい値をミリコアで直接指定する。
+        # Utilization — a fraction of the container's requests.cpu, not of the node's capacity.
+        # Hence a counterintuitive consequence: the value calmly reaches 600%, and that's
+        # not an error: the pod eats six times more than it reserved.
+        # The alternative is AverageValue, where the threshold is set in millicores directly.
         target:
           type: Utilization
           averageUtilization: 50
-  # どれだけ機敏に反応するか。このブロックは任意：なければデフォルト値が使われ、
-  # それはデモではなく本番運用向けに設計されている。
+  # How briskly to react. The block is optional: without it the default values are used,
+  # designed for production operation, not for a demonstration.
   behavior:
     scaleUp:
-      # デフォルトでは Kubernetes は安定化を待ち、ゆっくり増える。
-      # ラボではこれが「何も起きていない」ように見えるので、加速させる。
+      # By default Kubernetes waits for stabilization and grows slowly.
+      # In a lab this looks like "nothing is happening", so we speed it up.
       stabilizationWindowSeconds: 0
-      # 15秒ごとに新しいコピーは2つまで。このステップは経験的に選んだ：
-      # 増加が増加として見え、1から一気に6への瞬間的なジャンプにはならない、
-      # そうなると参加者には観察するものが何もない。
+      # No more than two new copies every fifteen seconds. The step was chosen empirically:
+      # growth is seen as growth, not as an instant jump from one straight to six,
+      # in which the participant has nothing to observe.
       policies:
         - type: Pods
           value: 2
           periodSeconds: 15
     scaleDown:
-      # だが下げるときは逆に — 瞬間的ではない、さもないと参加者が観察しきる前に
-      # Podが消えてしまう。
-      # デフォルトの5分ではなく1分：ラボは30分で進む、縮小を5分も待っても
-      # その時間を埋めるものがない。本番クラスタでは長い窓がむしろ役に立つ —
-      # 不均一な負荷でのシーソーを鎮めてくれる。
+      # But downward it's the opposite — not instant, otherwise the pods would disappear
+      # before the participant manages to observe them.
+      # A minute instead of the default five: the lab runs for half an hour, waiting five of them
+      # for the scale-down has nothing to fill it with. In a production cluster a long window is actually useful —
+      # it dampens the seesaw on uneven load.
       stabilizationWindowSeconds: 60

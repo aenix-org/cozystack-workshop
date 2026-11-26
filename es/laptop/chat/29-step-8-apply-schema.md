@@ -17,14 +17,14 @@ Lo tomamos del repositorio PGDG — para CentOS 7 lo más nuevo disponible ahí 
 Tres comandos seguidos, una razón para cada uno:
 
 ```bash
-# 1. Conectamos el repositorio PGDG — la fuente de los paquetes de PostgreSQL.
+# 1. Wire up the PGDG repository — the source of PostgreSQL packages.
 yum install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm
 
-# 2. La biblioteca libzstd, sin la cual el cliente no se instala. No está en los
-#    repositorios de CentOS 7, así que la tomamos del archivo de EPEL.
+# 2. The libzstd library, without which the client won't install. It's not in the CentOS 7
+#    repositories, so we take it from the EPEL archive.
 yum install -y https://archives.fedoraproject.org/pub/archive/epel/7/x86_64/Packages/l/libzstd-1.5.5-1.el7.x86_64.rpm
 
-# 3. El cliente en sí — solo desde el repositorio activo pgdg15.
+# 3. The client itself — only from the live pgdg15 repository.
 yum install -y --disablerepo='pgdg*' --enablerepo=pgdg15 postgresql15
 ```
 
@@ -55,7 +55,7 @@ psql --version
 **Toma el archivo del esquema** — la máquina ya tiene red:
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/laptop/scripts/orders-schema.sql
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/laptop/scripts/orders-schema.sql
 ```
 
 **Lo aplicamos.** Desglosemos el comando parte por parte, para que no lo escribas a ciegas:

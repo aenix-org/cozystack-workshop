@@ -1,53 +1,53 @@
-# ラボ 10 · さまざまな種類の通行証を格納する MongoDB データベースを注文する。
-# 何を得たいかの記述。サービスの組み立てと設定はプラットフォームが行う。
-# ダッシュボードでマウスを使って注文するのと同じもの — ただしテキストで。
-# 適用先はラボ用クラスターではなく、管理クラスター上のテナント:
+# Lab 10 · ordering a MongoDB database for passes of different kinds.
+# A description of what you want to get; the platform assembles and configures the service.
+# The same thing you would order with the mouse in the dashboard — only as text.
+# Applied NOT to the lab cluster, but to a tenant on the management cluster:
 #   kubectl --kubeconfig="$HOME/.kube/workshop" apply -f mongodb.yaml
 #
-# 適用する前に: tenant-workshopXX を自分の namespace に、
-# ЗдесьВашПароль を自分で考えたパスワードに置き換えてください。
+# BEFORE APPLYING: replace tenant-workshopXX with your namespace,
+# and YourPasswordHere with a password you come up with.
 apiVersion: apps.cozystack.io/v1alpha1
 kind: MongoDB
 metadata:
   name: passes
   namespace: tenant-workshopXX
 spec:
-  # コピーは 1 つ。MongoDB は 3 つのレプリカセットを想定して設計されている:
-  # それらはどれがプライマリかを投票で決め、1 つの喪失に耐える。コピーが 1 つだと
-  # 一緒に投票する相手がいないため、チャートはそのための別の「安全でない」モードを有効にする。
-  # ラボには十分だが、本番には向かない。
+  # A single copy. MongoDB is designed for a replica set of three: they vote on who
+  # is primary and survive the loss of one. With a single copy there is no one to vote
+  # with, and the chart enables a separate "unsafe" mode for this. Fine for a lab,
+  # not for production.
   replicas: 1
-  # データ用のディスク。4 つの学習用ドキュメントには 1 メガバイトで足りるが、
-  # ボリュームは後で拡張するより最初から余裕をもって確保するほうが楽。
+  # Disk for data. A megabyte would be enough for four learning documents, but it is
+  # easier to size the volume generously up front than to expand it later.
   size: 5Gi
-  # replicated — クラスターの別ノードにコピーを持つボリューム: ノードが脱落しても
-  # データは残る。
+  # replicated — volumes that have a copy on another cluster node: a node drops out,
+  # the data remains.
   storageClass: replicated
-  # データベースの pod に割り当てる CPU とメモリ。4 つのドキュメントには十分すぎる。
+  # CPU and memory allocated to the database pod. More than enough for four documents.
   resourcesPreset: s1.small
-  # MongoDB のブランチ。稼働中のデータベースで後から変更するにはアップグレードが必要。
+  # MongoDB branch. Changing it after the fact on a live database is not possible without an upgrade.
   version: v8
-  # false — データベースはクラスター内部からのみアクセス可能で、外部にポートは公開されない。
-  # アクセスは、隣で起動される作業用 pod から行う。
+  # false — the database is reachable only from inside the cluster, no port is exposed outward.
+  # You will access it from a working pod started alongside it.
   external: false
-  # シャーディングはデータを複数のサーバーセットに分割する。データが 1 台のサーバーに
-  # 収まらない場合に必要; 4 つの通行証は収まる。
+  # Sharding splits data across several sets of servers. Needed when
+  # the data does not fit on a single server; four passes do fit.
   sharding: false
-  # データベースのユーザーとそのパスワード。自分でパスワードを考えて覚えておくこと:
-  # それは作業用 pod(接続文字列 MONGO_URI の中)とチェックスクリプト
-  # (変数 MONGO_PASSWORD)で必要になる。アカウントはサービス用データベース admin に作成される —
-  # そのため接続文字列では authSource=admin が必須。
+  # The database user and its password. Come up with your own password and remember it: it is needed
+  # by the working pod (in the MONGO_URI connection string) and by the check script
+  # (the MONGO_PASSWORD variable). The account is created in the service database admin —
+  # that is why authSource=admin is mandatory in the connection string.
   users:
     passapp:
-      password: ЗдесьВашПароль
-  # passes データベースとその中の権限: passapp ユーザーにはこのデータベースの admin ロールが付与され、
-  # つまり読み取り、書き込み、インデックス作成、コレクション設定の変更ができる。
-  # これは他のデータベースへの権限は与えない。
+      password: YourPasswordHere
+  # The passes database and permissions in it: the passapp user is granted the admin role of this database,
+  # meaning it can read, write, build indexes and change collection settings.
+  # This does not grant rights to other databases.
   databases:
     passes:
       roles:
         admin:
           - passapp
-  # オブジェクトストレージへのバックアップ。学習用スタンドでは無効。
+  # Backups to object storage. Disabled on the learning stand.
   backup:
     enabled: false

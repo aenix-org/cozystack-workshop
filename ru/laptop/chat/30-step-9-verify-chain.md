@@ -37,19 +37,19 @@ virtctl port-forward --namespace=tenant-workshopXX vmi/vm-instance-app-1 8080:80
 Если проброс всё равно не поднимается, тот же туннель делается через под машины:
 ```bash
 kubectl get pod -n tenant-workshopXX -l vm.kubevirt.io/name=vm-instance-app-1
-kubectl port-forward -n tenant-workshopXX <имя-пода-из-вывода> 8080:8080
+kubectl port-forward -n tenant-workshopXX <pod-name-from-output> 8080:8080
 ```
 
 В другом окне терминала:
 ```bash
-# здоровье
+# health
 curl -s http://localhost:8080/actuator/health
 
-# создаём заказ
+# create an order
 curl -s -X POST http://localhost:8080/api/orders \
   -H 'Content-Type: application/json' -d '{"item":"test"}'
 
-# смотрим, что он записался
+# see that it was recorded
 curl -s http://localhost:8080/api/orders
 ```
 

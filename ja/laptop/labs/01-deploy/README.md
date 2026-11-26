@@ -35,7 +35,7 @@
 必要はありません。以下で `kubectl apply -f name.yaml` と書かれている箇所では、ファイルはここから取られます。
 
 ```bash
-# パスはラボ 0 で取得したリポジトリのルートからの相対
+# the path is relative to the root of the repository you pulled in lab 0
 cd labs/01-deploy
 ```
 
@@ -64,10 +64,10 @@ Cozystack のダッシュボードは、あなたが**プラットフォーム�
 接続しましょう:
 
 ```bash
-# KUBECONFIG — kubectl がどのアクセスファイルを使うかを読み取る変数。
-# ここでは lab クラスターへのアクセスであって、テナントへのものではない: ファイルが違えば、クラスターも違う。
+# KUBECONFIG — the variable kubectl reads to learn which access file to use.
+# Here that's access to the lab cluster, not to the tenant: different files, different clusters.
 export KUBECONFIG=~/lab.kubeconfig
-# get nodes = 「ノードを表示せよ」。応答は kubectl が正しい相手と通信していることを確認してくれる。
+# get nodes = "show the nodes". The answer confirms kubectl is talking to the right place.
 kubectl get nodes
 ```
 
@@ -81,14 +81,14 @@ kubectl get nodes
 このラボのフォルダへ移動します — リポジトリはラボ 0 で取得済みです:
 
 ```bash
-# パスはリポジトリをクローンしたフォルダからの相対
+# the path is relative to the folder you cloned the repository into
 cd labs/01-deploy
 ```
 
 まだリポジトリがない場合:
 
 ```bash
-# clone = リポジトリを丸ごとダウンロードする; 隣に同じ名前のフォルダが現れる
+# clone = download the whole repository; a folder with the same name will appear next to you
 git clone https://github.com/aenix-org/cozystack-migration-workshop.git
 cd labs/01-deploy
 ```
@@ -137,7 +137,7 @@ metadata:
   name: rickroll-page-v1
 data:
   index.html: |
-    ...<div class="pod">対応したPod<b>__POD__</b></div>...
+    ...<div class="pod">served by pod<b>__POD__</b></div>...
 ```
 
 nginx が置き換えることになる、あの `__POD__` です。名前の `-v1` は偶然ではありません。バージョンの
@@ -250,9 +250,9 @@ Service と Pod の間のつながりは、アドレスのリストではなく*
 さて、適用します:
 
 ```bash
-# apply = 「ファイルに記述された状態にクラスターを合わせよ」。4つのオブジェクトすべてが
-# 1つのコマンドで作成され、ファイル内の順序はクラスターが自分で解決する。
-#   -f   記述をファイルから取る
+# apply = "bring the cluster to what's described in the file". All four objects are created
+# with a single command; the cluster works out the order within the file on its own.
+#   -f   take the description from a file
 kubectl apply -f rickroll.yaml
 ```
 
@@ -268,8 +268,8 @@ service/rickroll created
 コピーが起動するまで待ちます:
 
 ```bash
-# rollout status は Deployment がやり遂げるまで待つ: 必要な数のコピーが
-# 実行され、リクエストを受け付ける準備ができるまで。条件が満たされると、コマンドは自分で終了する。
+# rollout status waits until the Deployment sees the job through: the required number of copies
+# is running and ready to accept requests. The command finishes on its own when that happens.
 kubectl rollout status deployment/rickroll
 ```
 
@@ -286,8 +286,8 @@ kubectl rollout status deployment/rickroll
 今どう見えるかを尋ねてみましょう:
 
 ```bash
-# get deployment rickroll = 1つのオブジェクトを型と名前で表示する。
-#   -o yaml   手で書けるのと同じ形で、全体を出力する
+# get deployment rickroll = show a single object by type and name.
+#   -o yaml   print it in full, in the same form you could write it by hand
 kubectl get deployment rickroll -o yaml
 ```
 
@@ -321,10 +321,10 @@ spec:
 ノートPCから内側へトンネルを張ります。
 
 ```bash
-# port-forward = ノートPCからクラスターの内側へのトンネル。コマンドが動いている間だけ生きている。
-#   svc/rickroll   rickroll という名前の Service へトンネルを張る。Service はそれをさらに
-#                  アプリケーションの生きたコピーへとルーティングする
-#   8080:80        左の番号は ノートPC上のポート、右はクラスター内の Service のポート
+# port-forward = a tunnel from the laptop into the cluster, alive as long as the command runs.
+#   svc/rickroll   run the tunnel to the Service named rickroll, which in turn routes
+#                  the request to a live copy of the application
+#   8080:80        the left number is the port on the laptop, the right is the Service port in the cluster
 kubectl port-forward svc/rickroll 8080:80
 ```
 
@@ -343,9 +343,9 @@ export KUBECONFIG=~/lab.kubeconfig
 ```
 
 ```bash
-# get pods = 「実行中のコピーを表示せよ」。
-#   -l app=rickroll   すべての Pod ではなく、ラベル app=rickroll を持つものだけを表示する —
-#                     まさに Service がそれらを見つけるのに使うラベル
+# get pods = "show the running copies".
+#   -l app=rickroll   show not all Pods, but only those with the label app=rickroll —
+#                     the very one the Service uses to find them
 kubectl get pods -l app=rickroll
 ```
 
@@ -358,8 +358,8 @@ kubectl get pods -l app=rickroll
 📍 **場所:** ノートPC上、`kubectl` で作業していたのと同じターミナルウィンドウ内。
 
 ```bash
-# ラボのフォルダから実行すること: スクリプトは自分のそばにあるファイルを探す。
-# 名前の前の ./ は「ちょうどここからファイルを実行せよ」を意味し、システムフォルダで探せという意味ではない
+# run it from the lab folder: the script looks for its files next to itself.
+# the ./ before the name means "run the file from right here", not look for it in system folders
 ./check.sh
 ```
 

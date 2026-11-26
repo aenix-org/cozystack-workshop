@@ -34,9 +34,9 @@ kubectl get buckets.apps.cozystack.io -n tenant-workshopXX
 **Куди вони підуть.** На кроці 3 ви відкриєте на машині-конвертері файл `convert.sh`, а в ньому — блок «ВСТАВТЕ СВОЇ ЗНАЧЕННЯ» з трьох рядків:
 
 ```
-BUCKET="ВСТАВЬТЕ_bucketName"
-ACCESS_KEY="ВСТАВЬТЕ_accessKey"
-SECRET_KEY="ВСТАВЬТЕ_secretKey"
+BUCKET="PASTE_bucketName"
+ACCESS_KEY="PASTE_accessKey"
+SECRET_KEY="PASTE_secretKey"
 ```
 
 Рівно ці три значення туди і вставите, кожне у свої лапки. Більше вони ніде не знадобляться: скрипт сам заллє готовий образ у ваш бакет і сам зробить посилання на нього.

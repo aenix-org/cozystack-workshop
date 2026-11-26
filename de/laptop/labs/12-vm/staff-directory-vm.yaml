@@ -1,32 +1,32 @@
 ---
-# Lab 12. Eine virtuelle Maschine für ein Legacy-Mitarbeiterverzeichnis: die Festplatte und die Maschine selbst,
-# zwei Objekte in einer Datei, getrennt durch die Zeile `---`.
+# Lab 12. A virtual machine for a legacy staff directory: the disk and the machine itself,
+# two objects in one file, separated by the `---` line.
 #
-# Dies sind Tenant-Objekte: sie leben NICHT im Cluster `lab`, sondern in Ihrem Namespace
-# auf dem Management-Cluster. Sie brauchen die Tenant-Kubeconfig.
+# These are tenant objects: they live NOT in the `lab` cluster, but in your namespace
+# on the management cluster. You need the tenant kubeconfig.
 #
-# Ersetzen Sie vor dem Anwenden tenant-workshopXX durch Ihren Namespace, sonst geht die Bestellung
-# in den falschen Tenant statt in Ihren.
+# Before applying, replace tenant-workshopXX with your namespace, otherwise the order will go
+# to the wrong tenant, not yours.
 #
 #     export KUBECONFIG=~/.kube/workshop
 #     kubectl apply -f staff-directory-vm.yaml
 #
-# Dasselbe lässt sich mit der Maus im Tenant-Dashboard erledigen (Anwendung erstellen -> VM Disk,
-# dann VM Instance) — das Ergebnis ist identisch.
+# The same can be done with the mouse in the tenant dashboard (Create application -> VM Disk,
+# then VM Instance) — the result is identical.
 #
-# ACHTUNG: der Name, unter dem die Maschine später angesprochen wird, stimmt NICHT mit metadata.name überein, und das ist
-# kein Tippfehler in der Lab. Ein VMInstance-Objekt mit dem Namen X rollt die Plattform mit dem Chart
-# `vm-instance` aus, und der Chart-Name wird mit dem Release-Namen zusammengeklebt: die laufende Instanz
-# heißt vm-instance-X. Hinzu kommt, dass das Ziel mit einem Typ-Präfix angegeben wird, weil
-# die Tenant-Rechte auf Instanzen (virtualmachineinstances, auch vmi genannt) vergeben sind, nicht auf
-# virtualmachines — ein nackter Name gibt forbidden zurück. Daher der Befehl zum Anmelden an der Konsole:
+# ATTENTION: the name the machine is called by later does NOT match metadata.name, and this is
+# not a typo in the lab. The platform deploys a VMInstance object named X with the
+# `vm-instance` chart, and the chart name is glued to the release name: the running instance
+# is called vm-instance-X. On top of that, the target is specified with a type prefix, because
+# tenant permissions are granted on instances (virtualmachineinstances, aka vmi), not on
+# virtualmachines — a bare name will return forbidden. Hence the console login command:
 #     virtctl console --namespace=tenant-workshopXX vmi/vm-instance-spravochnik
-# Liste der laufenden Instanzen: kubectl get vmi -n tenant-workshopXX
-# Und `kubectl get vminstance spravochnik` zeigt nicht die Instanz, sondern Ihre Bestellung dafür —
-# genau das Objekt, das unten beschrieben ist.
+# List of running instances: kubectl get vmi -n tenant-workshopXX
+# And `kubectl get vminstance spravochnik` shows not the instance, but your order for it —
+# the very object described below.
 #
-# Die Festplatte und die Maschine sind ZWEI VERSCHIEDENE Objekte, und das ist keine Bürokratie: die Festplatte überlebt
-# die Maschine. Die Maschine kann gelöscht und neu erstellt werden, wobei dieselbe Festplatte angehängt wird.
+# The disk and the machine are TWO DIFFERENT objects, and this is not bureaucracy: the disk
+# outlives the machine. The machine can be deleted and recreated, attaching the same disk.
 apiVersion: apps.cozystack.io/v1alpha1
 kind: VMDisk
 metadata:
@@ -35,16 +35,16 @@ metadata:
 spec:
   source:
     image:
-      # Ein Name aus der gemeinsamen Image-Sammlung der Plattform, keine URL.
-      # Die Liste ist im Dashboard beim Erstellen einer Festplatte sichtbar.
+      # A name from the platform's shared image collection, not a URL.
+      # The list is visible in the dashboard when creating a disk.
       name: ubuntu-22.04
-  # Festplattengröße. Sie kann nicht kleiner sein als das Quell-Image: ubuntu-22.04 entpackt sich
-  # auf 20Gi, und eine 10Gi-Festplatte würde die Plattform nicht befüllen. Die Festplatte lässt sich später vergrößern,
-  # aber nicht verkleinern, deshalb kostet ein zu niedriger Wert hier mehr als ein zu hoher.
+  # Disk size. It cannot be smaller than the source image: ubuntu-22.04 expands
+  # to 20Gi, and the platform would refuse to fill a 10Gi disk. The disk can later be expanded,
+  # but not shrunk, so underestimating here costs more than overestimating.
   storage: 20Gi
-  # Storage-Klasse. `replicated` — die Daten werden in mehreren Kopien auf verschiedene Knoten
-  # der Plattform geschrieben: ein Knoten mit einer Kopie kann ausfallen, die Maschine läuft weiter. Im Grunde ist das
-  # ein Spiegel, nur über das Netzwerk zusammengesetzt. Dieselbe Klasse verwenden die Datenbanken in den benachbarten Labs.
+  # Storage class. `replicated` — data is written in several copies on different platform
+  # nodes: a node with a copy can die, and the machine keeps working. In essence it is a
+  # mirror, only assembled over the network. The same class is used by databases in neighboring labs.
   storageClass: replicated
 ---
 apiVersion: apps.cozystack.io/v1alpha1
@@ -53,44 +53,44 @@ metadata:
   name: spravochnik
   namespace: tenant-workshopXX
 spec:
-  # 1 Prozessor, 4 GB. Dieselbe Katalog-Referenz, aus der die
-  # Größen der Kubernetes-Knoten stammen: Maschinen und Knoten werden hier gleich gemessen.
+  # 1 CPU, 4 GB. The same catalog reference from which Kubernetes
+  # node sizes are taken: machines and nodes are measured the same way here.
   instanceType: u1.medium
-  # Profil des Gast-Betriebssystems: welche Treiber und Geräte der Maschine untergeschoben werden.
+  # Guest OS profile: which drivers and devices to give the machine.
   instanceProfile: ubuntu
-  # Always bedeutet „eingeschaltet halten": schaltet sie sich selbst aus — wird sie wieder eingeschaltet.
-  # Halted — ausgeschaltet, Manual — so wie hinterlassen.
+  # Always means "keep it running": if it shuts down on its own, it gets started again.
+  # Halted — off, Manual — as left.
   runStrategy: Always
-  # Welche Festplatten an die Maschine angeschlossen werden. Die Referenz erfolgt über den Namen des VMDisk-Objekts oben — genau
-  # jenes, das diese Maschine überleben wird.
+  # Which disks to attach to the machine. The reference is by the name of the VMDisk object above — the
+  # very one that will outlive this machine.
   disks:
     - name: spravochnik
-  # Beachten Sie: ein replicas-Feld gibt es hier NICHT und wird es nicht geben.
-  # Eine virtuelle Maschine ist ein einziges Objekt. Braucht man zwei Maschinen — zwei Objekte
-  # mit unterschiedlichen Namen. Das ist ein grundlegender Unterschied zu Deployment,
-  # siehe den README-Abschnitt darüber, wo dieser Unterschied wehtut.
-  # Erstkonfiguration des Gast-Betriebssystems. cloud-init ist der Standardmechanismus von Cloud-Images
-  # für Linux: beim ersten Start liest die Maschine diesen Text und wendet ihn auf sich selbst an. Von der Rolle her
-  # ist es die Gast-Anpassung in vSphere — Passwörter, Dateien, Dienste — nur per Beschreibung, nicht
-  # per Assistent. Alles unterhalb der Einrückung nach `|` geht wortwörtlich in den Gast und wird
-  # dort geparst, nicht von Kubernetes.
+  # Note: there is NO replicas field here and there won't be.
+  # A virtual machine is a single object. If you need two machines — two objects
+  # with different names. This is a fundamental difference from Deployment,
+  # see the README section on where this difference hurts.
+  # Initial guest OS setup. cloud-init is the standard mechanism of Linux cloud
+  # images: on first boot the machine reads this text and applies it to itself. By role
+  # it is guest customization in vSphere — passwords, files, services — only via description, not
+  # a wizard. Everything below the indentation after `|` goes into the guest verbatim and is parsed
+  # there, not by Kubernetes.
   #
-  # Hier macht cloud-init aus dem Verzeichnis einen Server: es legt eine HTML-Seite ab und richtet einen Dienst ein,
-  # der sie über HTTP auf Port 8080 ausliefert. python3 ist im ubuntu-Image bereits vorhanden — das Internet
-  # wird dafür nicht benötigt. Port 8080 ist nicht zufällig: der Leiter hat in Ihrem Tenant im Voraus
-  # einen Service `spravochnik-http` (80 -> 8080) und einen Ingress `spravochnik` erstellt, und sobald der Dienst
-  # innerhalb der Maschine hochfährt, wird das Verzeichnis auf der Tenant-Domain veröffentlicht.
+  # Here cloud-init turns the directory into a server: it places an HTML page and sets up a service
+  # that serves it over HTTP on port 8080. python3 is already in the ubuntu image — the internet
+  # is not needed for this. Port 8080 is not random: the instructor has pre-created in your tenant
+  # a Service `spravochnik-http` (80 -> 8080) and an Ingress `spravochnik`, and as soon as the service
+  # inside the machine comes up, the directory will be published on the tenant domain.
   cloudInit: |
     #cloud-config
-    # Das Passwort wird gebraucht, um sich vom Dashboard aus an der Konsole anzumelden. Auf einer Produktionsmaschine
-    # sollte man das nicht tun — dort sshKeys.
+    # The password is needed to log into the console from the dashboard. On a production machine
+    # you should not do this — use sshKeys there.
     password: ubuntu
     chpasswd: { expire: false }
     ssh_pwauth: true
     write_files:
       - path: /opt/directory/index.html
         content: |
-          <!doctype html><html lang="de"><head><meta charset="utf-8"><title>Verzeichnis</title></head><body><h1>Mitarbeiterverzeichnis</h1><ul><li>Weber J. — 101</li><li>Peters P. — 102</li></ul></body></html>
+          <!doctype html><html lang="en"><head><meta charset="utf-8"><title>Directory</title></head><body><h1>Staff directory</h1><ul><li>Whitfield J. — 101</li><li>Petersen P. — 102</li></ul></body></html>
       - path: /etc/systemd/system/directory.service
         content: |
           [Unit]

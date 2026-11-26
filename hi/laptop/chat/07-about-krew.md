@@ -29,9 +29,9 @@ tar zxvf "krew-${OS}_${ARCH}.tar.gz" &&
 फिर krew को अपने PATH में जोड़िए — यह लाइन आपको अपनी प्रोफ़ाइल में जोड़नी होगी, वरना
 टर्मिनल के अगली बार शुरू होने पर यह भूल जाएगी:
 ```bash
-echo 'export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"' >> ~/.zshrc   # zsh के लिए, macOS में डिफ़ॉल्ट यही है
-echo 'export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"' >> ~/.bashrc  # bash के लिए, आमतौर पर Linux
-source ~/.zshrc    # या source ~/.bashrc
+echo 'export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"' >> ~/.zshrc   # for zsh, the default on macOS
+echo 'export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"' >> ~/.bashrc  # for bash, usually Linux
+source ~/.zshrc    # or source ~/.bashrc
 ```
 
 **Windows** (PowerShell)

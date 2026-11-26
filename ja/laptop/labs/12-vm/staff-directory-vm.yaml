@@ -1,33 +1,32 @@
 ---
-# ラボ12。レガシーな従業員名簿を載せる仮想マシン: ディスクとマシン本体という
-# 2つのオブジェクトを1つのファイルにまとめ、`---` 行で区切っています。
+# Lab 12. A virtual machine for a legacy staff directory: the disk and the machine itself,
+# two objects in one file, separated by the `---` line.
 #
-# これらはテナントのオブジェクトです: `lab` クラスタではなく、管理クラスタ上の
-# あなたの namespace に置かれます。テナント用の kubeconfig が必要です。
+# These are tenant objects: they live NOT in the `lab` cluster, but in your namespace
+# on the management cluster. You need the tenant kubeconfig.
 #
-# 適用する前に tenant-workshopXX を自分の namespace に置き換えてください。さもないと
-# 注文があなたのテナントではなく別のテナントに送られてしまいます。
+# Before applying, replace tenant-workshopXX with your namespace, otherwise the order will go
+# to the wrong tenant, not yours.
 #
 #     export KUBECONFIG=~/.kube/workshop
 #     kubectl apply -f staff-directory-vm.yaml
 #
-# 同じことはテナントのダッシュボードでマウス操作でもできます(アプリケーションを作成 -> VM Disk、
-# 続いて VM Instance) — 結果は同じです。
+# The same can be done with the mouse in the tenant dashboard (Create application -> VM Disk,
+# then VM Instance) — the result is identical.
 #
-# 注意: 以降でマシンを呼び出すときの名前は metadata.name と一致しません。これはラボの
-# 誤記ではありません。名前 X の VMInstance オブジェクトを、プラットフォームは
-# `vm-instance` チャートでデプロイし、チャート名はリリース名と連結されます: 起動した
-# インスタンスは vm-instance-X という名前になります。加えて、ターゲットはタイプの接頭辞を
-# 付けて指定します。テナント権限はインスタンス(virtualmachineinstances、別名 vmi)に対して
-# 付与されており、virtualmachines には付与されていないためです — 裸の名前は forbidden を
-# 返します。そこからコンソールへのログインコマンドは次のとおりです:
+# ATTENTION: the name the machine is called by later does NOT match metadata.name, and this is
+# not a typo in the lab. The platform deploys a VMInstance object named X with the
+# `vm-instance` chart, and the chart name is glued to the release name: the running instance
+# is called vm-instance-X. On top of that, the target is specified with a type prefix, because
+# tenant permissions are granted on instances (virtualmachineinstances, aka vmi), not on
+# virtualmachines — a bare name will return forbidden. Hence the console login command:
 #     virtctl console --namespace=tenant-workshopXX vmi/vm-instance-spravochnik
-# 起動中のインスタンス一覧: kubectl get vmi -n tenant-workshopXX
-# 一方 `kubectl get vminstance spravochnik` はインスタンスではなく、それに対するあなたの注文を
-# 表示します — まさに以下で記述されているオブジェクトです。
+# List of running instances: kubectl get vmi -n tenant-workshopXX
+# And `kubectl get vminstance spravochnik` shows not the instance, but your order for it —
+# the very object described below.
 #
-# ディスクとマシンは2つの異なるオブジェクトであり、これは官僚主義ではありません: ディスクは
-# マシンより長く存続します。マシンは削除して作り直し、同じディスクを接続できます。
+# The disk and the machine are TWO DIFFERENT objects, and this is not bureaucracy: the disk
+# outlives the machine. The machine can be deleted and recreated, attaching the same disk.
 apiVersion: apps.cozystack.io/v1alpha1
 kind: VMDisk
 metadata:
@@ -36,16 +35,16 @@ metadata:
 spec:
   source:
     image:
-      # URL ではなく、プラットフォームの共有イメージコレクションからの名前です。
-      # 一覧はディスク作成時にダッシュボードで確認できます。
+      # A name from the platform's shared image collection, not a URL.
+      # The list is visible in the dashboard when creating a disk.
       name: ubuntu-22.04
-  # ディスクサイズ。ソースイメージより小さくはできません: ubuntu-22.04 は 20Gi に
-  # 展開され、10Gi のディスクをプラットフォームは満たすのを拒否します。ディスクは後で拡張
-  # できますが縮小はできないので、ここで少なく見積もる方が多く見積もるより高くつきます。
+  # Disk size. It cannot be smaller than the source image: ubuntu-22.04 expands
+  # to 20Gi, and the platform would refuse to fill a 10Gi disk. The disk can later be expanded,
+  # but not shrunk, so underestimating here costs more than overestimating.
   storage: 20Gi
-  # ストレージクラス。`replicated` — データはプラットフォームの複数の異なるノードに複数コピー
-  # 書き込まれます: コピーを持つノードが死んでもマシンは動き続けます。要はミラーで、ただし
-  # ネットワーク越しに組まれたものです。同じクラスを近隣のラボのデータベースも使っています。
+  # Storage class. `replicated` — data is written in several copies on different platform
+  # nodes: a node with a copy can die, and the machine keeps working. In essence it is a
+  # mirror, only assembled over the network. The same class is used by databases in neighboring labs.
   storageClass: replicated
 ---
 apiVersion: apps.cozystack.io/v1alpha1
@@ -54,44 +53,44 @@ metadata:
   name: spravochnik
   namespace: tenant-workshopXX
 spec:
-  # 1 CPU、4 GB。Kubernetes のノードサイズを取ってくるのと同じカタログの参照です:
-  # ここではマシンとノードは同じ物差しで測られます。
+  # 1 CPU, 4 GB. The same catalog reference from which Kubernetes
+  # node sizes are taken: machines and nodes are measured the same way here.
   instanceType: u1.medium
-  # ゲスト OS のプロファイル: どのドライバとデバイスをマシンに与えるか。
+  # Guest OS profile: which drivers and devices to give the machine.
   instanceProfile: ubuntu
-  # Always は「起動したままにする」という意味です: 自分で止まっても再び起動されます。
-  # Halted — 停止、Manual — 残したまま。
+  # Always means "keep it running": if it shuts down on its own, it gets started again.
+  # Halted — off, Manual — as left.
   runStrategy: Always
-  # どのディスクをマシンに接続するか。参照は上の VMDisk オブジェクトの名前で行います — まさに
-  # このマシンより長く存続するものです。
+  # Which disks to attach to the machine. The reference is by the name of the VMDisk object above — the
+  # very one that will outlive this machine.
   disks:
     - name: spravochnik
-  # 注意: ここには replicas フィールドはありませんし、今後もありません。
-  # 仮想マシンは1つのオブジェクトです。マシンが2台必要なら、異なる名前の2つの
-  # オブジェクトです。これは Deployment との根本的な違いであり、
-  # この違いがどこで痛むかについては README のセクションを参照してください。
-  # ゲスト OS の初期設定。cloud-init は Linux クラウドイメージの標準的な仕組みです:
-  # 初回起動時にマシンはこのテキストを読み、自分自身に適用します。役割としては
-  # vSphere のゲストカスタマイズ — パスワード、ファイル、サービス — ですが、ウィザードではなく
-  # 記述によるものです。`|` の後のインデントより下はすべてゲストへ字義どおり渡され、
-  # Kubernetes ではなくそこで解釈されます。
+  # Note: there is NO replicas field here and there won't be.
+  # A virtual machine is a single object. If you need two machines — two objects
+  # with different names. This is a fundamental difference from Deployment,
+  # see the README section on where this difference hurts.
+  # Initial guest OS setup. cloud-init is the standard mechanism of Linux cloud
+  # images: on first boot the machine reads this text and applies it to itself. By role
+  # it is guest customization in vSphere — passwords, files, services — only via description, not
+  # a wizard. Everything below the indentation after `|` goes into the guest verbatim and is parsed
+  # there, not by Kubernetes.
   #
-  # ここで cloud-init は名簿をサーバーにします: HTML ページを置き、ポート 8080 で HTTP 経由で
-  # それを配信するサービスを立てます。python3 は ubuntu イメージに既に入っています — このために
-  # インターネットは不要です。ポート 8080 は偶然ではありません: 進行役があなたのテナントに
-  # あらかじめ Service `spravochnik-http` (80 -> 8080) と Ingress `spravochnik` を作成しており、
-  # マシン内のサービスが立ち上がるとすぐ、名簿はテナントのドメインで公開されます。
+  # Here cloud-init turns the directory into a server: it places an HTML page and sets up a service
+  # that serves it over HTTP on port 8080. python3 is already in the ubuntu image — the internet
+  # is not needed for this. Port 8080 is not random: the instructor has pre-created in your tenant
+  # a Service `spravochnik-http` (80 -> 8080) and an Ingress `spravochnik`, and as soon as the service
+  # inside the machine comes up, the directory will be published on the tenant domain.
   cloudInit: |
     #cloud-config
-    # このパスワードはダッシュボードからコンソールにログインするために必要です。本番マシンでは
-    # このようにしてはいけません — そこでは sshKeys を使います。
+    # The password is needed to log into the console from the dashboard. On a production machine
+    # you should not do this — use sshKeys there.
     password: ubuntu
     chpasswd: { expire: false }
     ssh_pwauth: true
     write_files:
       - path: /opt/directory/index.html
         content: |
-          <!doctype html><html lang="ja"><head><meta charset="utf-8"><title>名簿</title></head><body><h1>社員名簿</h1><ul><li>田中 — 101</li><li>山田 — 102</li></ul></body></html>
+          <!doctype html><html lang="en"><head><meta charset="utf-8"><title>Directory</title></head><body><h1>Staff directory</h1><ul><li>Whitfield J. — 101</li><li>Petersen P. — 102</li></ul></body></html>
       - path: /etc/systemd/system/directory.service
         content: |
           [Unit]

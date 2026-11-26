@@ -35,14 +35,14 @@ kubectl port-forward -n tenant-workshopXX <pod-name-from-output> 8080:8080
 
 在另一个终端窗口里：
 ```bash
-# 健康检查
+# health
 curl -s http://localhost:8080/actuator/health
 
-# 创建一个订单
+# create an order
 curl -s -X POST http://localhost:8080/api/orders \
   -H 'Content-Type: application/json' -d '{"item":"test"}'
 
-# 看看它是否被记录下来了
+# see that it was recorded
 curl -s http://localhost:8080/api/orders
 ```
 

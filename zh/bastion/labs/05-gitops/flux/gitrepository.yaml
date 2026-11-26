@@ -1,39 +1,39 @@
 ---
-# 实验 5 · Git 中的基础设施。源：Flux 从哪里拉取期望状态。
+# Lab 5 · Infrastructure in Git. Source: where Flux pulls the desired state from.
 #
-# 与相邻的 kustomization.yaml 一起应用到你的 `lab` 集群：
+# Applied on your `lab` cluster together with the neighboring kustomization.yaml:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl apply -f flux/
 #
-# 注意：应用之前请把 url 替换为你自己仓库的地址：字符串
-# ЗАМЕНИТЕ-МЕНЯ 是占位符，保留它 Flux 会去访问一个不存在的地址并因错误
-# 停止。也要检查分支：GitHub 创建新仓库时使用 main 分支。
+# WARNING: REPLACE url with the address of YOUR repository before applying: the
+# REPLACE-ME string is a placeholder; with it Flux will go to a non-existent address and halt
+# with an error. Check the branch too: GitHub creates new repositories with a main branch.
 #
-# 每个对象中：apiVersion 是描述模式的版本，kind 是我们要创建的内容，
-# metadata.name 是后续引用该对象所用的名称。下文不再重复。
+# In every object: apiVersion is the schema version of the description, kind is what we create,
+# metadata.name is the name by which the object is referenced later. Not repeated below.
 #
-# 这个对象唯一的任务就是在集群中保存仓库的最新副本。
-# 它不应用任何东西：只负责下载。应用由相邻的 Kustomization 完成，
-# 它通过名称 `passes` 引用这里，因此不能单独更改这个名称。
+# The only job of this object is to keep a fresh copy of the repository in the cluster.
+# It applies nothing: it only downloads. The neighboring Kustomization applies it,
+# and it references this by the name `passes`, so the name can't be changed alone.
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: GitRepository
 metadata:
   name: passes
-  # flux-system 是 flux install 命令创建的命名空间；其中运行着
-  # Flux 服务本身。配置对象也放到那里，否则服务看不到它们。
+  # flux-system is the namespace created by the flux install command; it hosts
+  # the Flux services themselves. Configuration objects go there too, otherwise the services won't see them.
   namespace: flux-system
 spec:
-  # 多久去 Git 获取一次新状态。一分钟适用于实验；
-  # 生产环境中通常是 1–5 分钟，而即时响应用来自 GitHub 的 webhook 实现。
+  # How often to go to Git for the new state. One minute is for the lab;
+  # in production it's usually 1–5 minutes, and instant reaction is done with a webhook from GitHub.
   interval: 1m
-  # 仓库地址。它是公开的，所以这里既没有登录名也没有密钥——
-  # 这是教学环境的简化。生产环境中仓库是私有的，旁边会出现
-  # 一个指向包含 deploy 密钥的 secret 的引用（secretRef 字段）。
-  url: https://github.com/ЗАМЕНИТЕ-МЕНЯ/passes-gitops
-  # 把哪个分支视为真理之源。合并进 main 的内容会进入集群；
-  # 存在于其他分支中的内容不会。评审正是由此而来：变更
-  # 首先存在于自己的分支中，可以在那里查看，只有合并进 main
-  # 才使其生效。如果仓库是用旧的 master 分支创建的——
-  # 请在这里修正，否则 Flux 找不到要读取的内容。
+  # The repository address. It's public, so there's neither a login nor a key here —
+  # this is a simplification of the training stand. In production the repository is private, and next to it appears
+  # a reference to a secret with a deploy key (the secretRef field).
+  url: https://github.com/REPLACE-ME/passes-gitops
+  # Which branch to treat as the source of truth. What is merged into main goes to the cluster;
+  # what lies in other branches does not. This is where review comes from: a change
+  # first lives in its own branch, where it can be reviewed, and only the merge into main
+  # makes it effective. If the repository was created with the old master branch —
+  # fix it here, otherwise Flux won't find what to read.
   ref:
     branch: main

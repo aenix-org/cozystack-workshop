@@ -1,36 +1,36 @@
-// Лаба 6 · Свій приватний реєстр образів. Сервіс «Перепустка», навчальна версія.
+// Lab 6 · Your own private image registry. The "Pass" service, training version.
 //
-// ЩО ЦЯ ПРОГРАМА РОБИТЬ. Піднімає веб-сервер і відповідає на дві адреси.
-// Адреса /healthz віддає коротке «ok»: за нею кластер розуміє, що копія жива
-// і готова приймати трафік. Адреса / віддає невелику відповідь у форматі JSON (текст
-// виду «поле: значення»), де перелічено, яка копія і на якому вузлі обслужила
-// запит. Більше нічого: ні бази, ні диска, ні стану. Так і задумано — у цій лабі
-// цікавий не код, а шлях, яким він потрапляє в кластер:
-// вихідник -> образ -> свій реєстр -> кластер.
+// WHAT THIS PROGRAM DOES. It starts a web server and answers on two addresses.
+// The /healthz address returns a short "ok": from it the cluster understands that the
+// replica is alive and ready to accept traffic. The / address returns a small response in
+// JSON format (text of the form "field: value"), where it lists which replica and on which
+// node served the request. Nothing more: no database, no disk, no state. That is by design — in
+// this lab the interesting part is not the code, but the path by which it gets into the cluster:
+// source -> image -> your own registry -> cluster.
 //
-// Читати цей файл на Go вміти не потрібно, достатньо розуміти, що тут відбувається;
-// коментарі нижче розставлені з розрахунком на те, що ви бачите Go вперше.
+// You do not need to be able to read this Go file, it is enough to understand what happens here;
+// the comments below are written on the assumption that you are seeing Go for the first time.
 //
-// Зовнішніх залежностей немає: використовується лише стандартна бібліотека, яка
-// приїжджає разом із компілятором. Тому збірка не ходить в інтернет за
-// бібліотеками, і зібрати образ можна там, де вихід назовні закритий, — а саме
-// з цього і починається вся лаба.
+// There are no external dependencies: only the standard library is used, which
+// comes together with the compiler. Therefore the build does not go to the internet for
+// libraries, and you can build the image where outbound access is closed off, — and that
+// is exactly where the whole lab begins.
 //
-// Збирається не напряму, а через сусідній Dockerfile, командою
+// It is built not directly, but through the neighboring Dockerfile, with the command
 // docker build --platform linux/amd64 -t HARBOR-HOST/passes/passes-api:v1 app/
 //
-// package main — так у Go позначають програму, яку можна запустити (на відміну
-// від бібліотеки). Точка входу під час запуску — функція main у самому низу файлу.
+// package main — this is how in Go you mark a program that can be run (as opposed
+// to a library). The entry point when running is the main function at the very bottom of the file.
 package main
 
-// Що беремо зі стандартної бібліотеки:
-//   encoding/json — зібрати відповідь у форматі JSON
-//   log           — писати повідомлення; у контейнері вони йдуть у стандартний вивід,
-//                   звідки їх забирає kubectl logs. Файлів із логами всередині немає,
-//                   і заводити їх не треба — це норма для контейнерів
-//   net/http      — сам веб-сервер
-//   os            — прочитати змінні оточення
-//   time          — мітка часу у відповіді та таймаут сервера
+// What we take from the standard library:
+//   encoding/json — assemble the response in JSON format
+//   log           — write messages; in a container they go to standard output,
+//                   from where kubectl logs picks them up. There are no log files inside,
+//                   and there is no need to create them — this is normal for containers
+//   net/http      — the web server itself
+//   os            — read environment variables
+//   time          — timestamp in the response and server timeout
 import (
 	"encoding/json"
 	"log"
@@ -39,12 +39,12 @@ import (
 	"time"
 )
 
-// Форма відповіді: набір полів, які застосунок повідомляє про себе. Майже всі вони —
-// те, що застосунок дізнається від кластера: ми їх не обчислюємо і не вгадуємо, кластер
-// сам кладе їх у змінні оточення (див. passes.yaml, блок env і downward API).
+// The shape of the response: a set of fields that the application reports about itself. Almost all of them —
+// are what the application learns from the cluster: we do not compute or guess them, the cluster
+// itself puts them into environment variables (see passes.yaml, the env block and downward API).
 //
-// Текст у зворотних лапках справа — ім'я поля в готовому JSON. Без нього поле поїхало б
-// у відповідь як Namespace, а не як namespace; перевірка в check.sh шукає рядкове «pod».
+// The text in backticks on the right is the field name in the final JSON. Without it the field would go
+// into the response as Namespace, not as namespace; the check in check.sh looks for the lowercase "pod".
 type identity struct {
 	Service   string `json:"service"`
 	Version   string `json:"version"`
@@ -55,9 +55,9 @@ type identity struct {
 	Time      string `json:"time"`
 }
 
-// Прочитати змінну оточення, а якщо її немає або вона порожня — повернути запасне
-// значення. Потрібна, щоб програму можна було запустити і поза кластером, без жодного
-// налаштування: вона не впаде, а чесно напише у відповіді «невідомо».
+// Read an environment variable, and if it is missing or empty — return a fallback
+// value. It is needed so that the program can be run outside the cluster too, without a single
+// setting: it will not crash, but honestly write "unknown" in the response.
 func env(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
@@ -65,64 +65,64 @@ func env(key, fallback string) string {
 	return fallback
 }
 
-// Точка входу: з цієї функції починається робота програми.
+// Entry point: the program's work begins with this function.
 func main() {
-	// На якому порту слухати. Порт можна перевизначити змінною PORT, не перезбираючи
-	// образ, але за замовчуванням це 8080 — те саме число, що в passes.yaml (containerPort)
-	// і в Dockerfile (EXPOSE). Розійдуться — Service буде стукати в зачинені двері.
+	// Which port to listen on. The port can be overridden with the PORT variable, without rebuilding
+	// the image, but by default it is 8080 — the same number as in passes.yaml (containerPort)
+	// and in the Dockerfile (EXPOSE). If they diverge — the Service will knock on a closed door.
 	port := env("PORT", "8080")
 
-	// Таблиця маршрутів: яку адресу який обробник обслуговує.
+	// The routing table: which address which handler serves.
 	mux := http.NewServeMux()
 
-	// Перевірка готовності. Кластер стукає сюди і не пускає трафік на копію,
-	// поки не отримає відповідь. Відповідає завжди і швидко, нічого не перевіряючи:
-	// застосунку нічого перевіряти, у нього немає ні бази, ні диска.
+	// Readiness check. The cluster knocks here and does not let traffic onto the replica,
+	// until it gets a response. It answers always and fast, checking nothing:
+	// the application has nothing to check, it has neither a database nor a disk.
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		_, _ = w.Write([]byte("ok\n"))
 	})
 
-	// Основна відповідь. Збираємо ті самі поля і віддаємо їх одним JSON. Значення читаються
-	// при кожному запиті, тому друга копія сервісу відповість своїм ім'ям Pod —
-	// за цим ім'ям у лабі і видно, що копій дійсно дві.
+	// The main response. We assemble those very fields and hand them out as a single JSON. The values are read
+	// on every request, so the second replica of the service will answer with its own pod name —
+	// by that name in the lab you can see that there really are two replicas.
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		body := identity{
 			Service:   "passes-api",
 			Version:   env("APP_VERSION", "v1"),
-			Pod:       env("POD_NAME", "невідомо"),
-			Node:      env("NODE_NAME", "невідомо"),
-			Namespace: env("POD_NAMESPACE", "невідомо"),
-			Registry:  env("IMAGE_REGISTRY", "не вказано"),
+			Pod:       env("POD_NAME", "unknown"),
+			Node:      env("NODE_NAME", "unknown"),
+			Namespace: env("POD_NAMESPACE", "unknown"),
+			Registry:  env("IMAGE_REGISTRY", "not set"),
 			Time:      time.Now().UTC().Format(time.RFC3339),
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		enc := json.NewEncoder(w)
 		enc.SetIndent("", "  ")
-		// SetEscapeHTML(false), інакше кирилиця і символи на кшталт < поїдуть у \uXXXX
-		// і відповідь стане нечитабельною в терміналі.
+		// SetEscapeHTML(false), otherwise Cyrillic and symbols like < would go into \uXXXX
+		// and the response would become unreadable in the terminal.
 		enc.SetEscapeHTML(false)
 		if err := enc.Encode(body); err != nil {
-			log.Printf("не вдалося віддати відповідь: %v", err)
+			log.Printf("failed to send response: %v", err)
 		}
 	})
 
-	// Налаштування сервера. ReadHeaderTimeout — скільки чекати заголовків запиту, перш
-	// ніж обірвати з'єднання. П'ять секунд стоять не для швидкості: без цього таймауту
-	// відкриті і покинуті з'єднання накопичуються, поки не з'їдять пам'ять контейнера,
-	// а пам'ять обмежена лімітом з маніфесту.
+	// Server settings. ReadHeaderTimeout — how long to wait for the request headers, before
+	// cutting off the connection. The five seconds are there not for speed: without this timeout
+	// opened and abandoned connections pile up until they eat up the container's memory,
+	// and the memory is limited by the limit from the manifest.
 	srv := &http.Server{
 		Addr:              ":" + port,
 		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
-	// Перше, що ви побачите в kubectl logs. Рядок потрібен, щоб відрізнити «застосунок
-	// не запустився» від «запустився, але не відповідає» — це різні діагнози.
-	log.Printf("passes-api %s слухає порт %s, Pod %s",
-		env("APP_VERSION", "v1"), port, env("POD_NAME", "невідомо"))
-	// Запускаємо сервер і працюємо, поки нас не зупинять. Якщо порт зайнятий або сервер
-	// упав — пишемо причину і виходимо з помилкою. Кластер побачить завершений процес
-	// і підніме копію заново; лагодити перезапуск усередині програми не потрібно.
+	// The first thing you will see in kubectl logs. The line is needed to distinguish "the application
+	// did not start" from "started, but does not respond" — these are different diagnoses.
+	log.Printf("passes-api %s listening on port %s, pod %s",
+		env("APP_VERSION", "v1"), port, env("POD_NAME", "unknown"))
+	// We start the server and work until we are stopped. If the port is taken or the server
+	// crashed — we write the reason and exit with an error. The cluster will see the finished process
+	// and bring up the replica anew; there is no need to fix the restart inside the program.
 	log.Fatal(srv.ListenAndServe())
 }

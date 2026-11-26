@@ -1,95 +1,95 @@
-// ラボ 10 · passes コレクションに 4 つの異なる形の 4 件のパス。
+// Lab 10 · four passes of four different shapes in the passes collection.
 //
-// これは設定ファイルではなく、mongosh — JavaScript を理解する MongoDB シェル —
-// 向けのプログラムです。ノートパソコン上、ラボクラスタ内で、README の短い
-// `mo` コマンドで実行します（作業ポッド内で mongosh を起動します）:
+// This is not a settings file but a program for mongosh — the MongoDB shell, which
+// understands JavaScript. It runs on your laptop, in the lab cluster, with the short
+// `mo` command from the README (it launches mongosh inside the working pod):
 //     cd labs/10-mongodb && mo < passes.js
-// 応答として「コレクション内のドキュメント数: 4」という行が表示されます。
+// In response you will see the line "documents in collection: 4".
 //
-// このファイルを 2 回実行するとドキュメントは 8 件になります。insertMany は追加するだけです。
+// Run the file twice and there will be eight documents: insertMany only adds.
 
-// db は接続先のデータベース、passes はその中のコレクション（テーブルに最も近い
-// 類似物）、insertMany は「これらのドキュメントを追加せよ」の意味です。テーブルを
-// 事前に作成する必要はなく、フィールドを記述する場所もありません。コレクションは
-// 最初の挿入の瞬間に現れ、データベースは既定ではドキュメントにどんなフィールドが
-// あるべきかについての意見を持ちません。
-// だから以下の 4 件のドキュメントは異なるフィールドの組を持ちながら、同じ 1 つの
-// コレクションに並んで置かれます。ドキュメントモデルはまさにこのために存在します。
-// 空の列もなく、4 種類のパス用の 4 つのテーブルもなく、それらを結び付ける 5 つ目もない。
+// db is the database you are connected to; passes is a collection in it (the closest
+// analogue of a table); insertMany means "add these documents". You do not need to
+// create any table in advance, and there is nowhere to describe the fields: the
+// collection appears at the moment of the first insert, and by default the database
+// has no opinion about which fields a document may have.
+// That is why the four documents below have different sets of fields and yet lie side
+// by side, in one collection. This is exactly why the document model exists: no empty
+// columns, no four tables for four pass types, no fifth one to link them together.
 db.passes.insertMany([
   {
-    // 一回きりのパス — 最も短い形: 6 フィールド、すべて単純な値。
-    // 通常のテーブルなら、これは普通の行になるでしょう。
-    // ISODate(...) は文字列ではなく、まさに日付です。MongoDB はドキュメントを
-    // バイナリの BSON 形式で保存し、そこでは値に型があります: 日付、整数、浮動小数、論理値。
-    // 日付は比較もソートもできますが、文字列「2026-09-01」でそれができるのは
-    // 記録形式に恵まれた場合だけです。
-    type: "一回券",
-    guest: "田中 太郎",
+    // A single-visit pass — the shortest shape: six fields, all simple values.
+    // In an ordinary table this would be an ordinary row.
+    // ISODate(...) is not a string but a date. MongoDB stores documents in the binary
+    // BSON format, where a value has a type: date, integer, float, boolean.
+    // A date can be compared and sorted; the string "2026-09-01" only if you are
+    // lucky with how it was written.
+    type: "single-use",
+    guest: "James P. Whitfield",
     host: "petrov@corp.example",
-    entrance: "北口",
+    entrance: "North",
     valid_on: ISODate("2026-09-01T09:00:00Z"),
-    purpose: "面接"
+    purpose: "job interview"
   },
   {
-    // 週間パス。valid_on の代わりに valid_from と valid_to のペア、単一の入口の
-    // 代わりに entrances のリストをフィールドの中に直接持ちます。テーブルではこの
-    // ようなリストのために、別途「パス — 入口」テーブルか、あるいは後でまともに
-    // 検索できないカンマ区切りの文字列が必要になったでしょう。
-    // badge_returned フィールドが現れました。これは一回きりのパスにはまったく
-    // 存在しません: NULL でも空でもなく、そのドキュメントにそういうフィールドが
-    // ないというだけです。これらは別のものであり、検索の仕方も異なります。
-    type: "週間券",
-    guest: "佐藤 恵子",
+    // A weekly pass. Instead of valid_on there is a pair valid_from and valid_to, and
+    // instead of a single entrance a list of entrances right there in the field. In a
+    // table such a list would require either a separate "pass — entrance" table, or a
+    // comma-separated string that you then cannot search properly.
+    // A badge_returned field has appeared, which the single-visit pass does not have
+    // at all: not NULL and not empty, but simply no such field in that document. These
+    // are different things, and they are searched for differently.
+    type: "weekly",
+    guest: "Emma L. Prescott",
     host: "petrov@corp.example",
-    entrances: ["北口", "南口"],
+    entrances: ["North", "South"],
     valid_from: ISODate("2026-09-01T00:00:00Z"),
     valid_to: ISODate("2026-09-07T23:59:59Z"),
-    purpose: "外部監査",
+    purpose: "external audit",
     badge_returned: false
   },
   {
-    // 自動車パス。車に関するすべては 1 つのフィールド car の中に置かれます。
-    // これは JSON を内部に持つ文字列ではなく、れっきとしたネストされた構造です:
-    // car.plate で検索でき、それに対してインデックスを構築できます。
-    type: "車両券",
-    guest: "鈴木 健一",
+    // A vehicle pass. Everything related to the car lives inside a single field car.
+    // This is not a string with JSON inside, but a full nested structure: you can
+    // search by car.plate and build an index on it.
+    type: "vehicle",
+    guest: "Victor S. Marsh",
     host: "logistics@corp.example",
-    entrance: "西口",
+    entrance: "West",
     valid_on: ISODate("2026-09-02T07:30:00Z"),
     car: {
-      plate: "品川 300 あ 12-34",
-      model: "トヨタ ハイエース",
+      plate: "AB-1174-CD",
+      model: "Ford Transit",
       trailer: false,
       weight_kg: 3500
     },
     parking: "P2"
   },
   {
-    // 団体パス。ここではオブジェクトのリストです: 各参加者は自分のフィールドを持ち、
-    // リストの長さは任意です。
-    // そして最も重要なのは — このドキュメントには guest フィールドがまったく
-    // ありません: ゲストの代わりに組織と連絡担当者があります。形は他のものと
-    // 1 つのフィールドの違いではなく、本質的に異なります。この点は後でラボに
-    // 響いてきます: ドキュメント検証ルールはすべてから guest を要求することが
-    // できません。さもなければ正当な団体パスが通らなくなるからです。
-    type: "団体券",
-    organization: "市立第一高等学校",
-    contact: "高橋 由美",
+    // A group pass. Here there is a list of objects: each member has their own fields,
+    // and the length of the list is arbitrary.
+    // And most importantly — this document has no guest field at all: instead of a
+    // guest there is an organization and a contact person. The shape differs from the
+    // others not by one field but in essence. This will echo later in the lab: the
+    // document validation rule will not be able to require guest from everyone,
+    // otherwise a legitimate group pass would not pass.
+    type: "group",
+    organization: "City High School No. 1",
+    contact: "Olivia W. Grant",
     host: "hr@corp.example",
-    entrance: "北口",
+    entrance: "North",
     valid_on: ISODate("2026-09-03T10:00:00Z"),
-    escort: "渡辺 明",
+    escort: "Alan A. Foster",
     members: [
-      { name: "伊藤 修", age: 16 },
-      { name: "山本 真理", age: 15 },
-      { name: "中村 勇", age: 17 }
+      { name: "Peter Hale", age: 16 },
+      { name: "Mary Fenwick", age: 15 },
+      { name: "Isaac Hart", age: 17 }
     ]
   }
 ]);
 
-// countDocuments({}) — 条件に合致するドキュメントを数える。空の条件は「すべて」を
-// 意味します。print が必要なのはファイルに目に見える結果を持たせるためです:
-// insertMany 自体は発行された識別子のリストを返しますが、その中で実際に何件の
-// ドキュメントが入ったのかを見落としやすいのです。
-print("コレクション内のドキュメント数: " + db.passes.countDocuments({}));
+// countDocuments({}) — count the documents matching a condition; an empty condition
+// means "all". The print is needed so the file has a visible result: insertMany itself
+// replies with a list of issued identifiers, and in it you can easily miss how many
+// documents actually landed.
+print("documents in collection: " + db.passes.countDocuments({}));

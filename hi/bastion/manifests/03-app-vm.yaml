@@ -1,6 +1,6 @@
-# लागू करने से पहले tenant-workshopXX को अपने namespace से बदलें।
-# सभी फ़ाइलों में एक साथ करना आसान है: देखें README, नंबर प्रतिस्थापन वाला भाग।
-# और एक बात: नीचे url फ़ील्ड में convert.sh से presigned-लिंक डालें (चरण 2)।
+# Before applying, replace tenant-workshopXX with your own namespace.
+# Easier to do it across all files at once: see README, the section on substituting the number.
+# Also: in the url field below, insert the presigned link from convert.sh (step 2).
 #
 apiVersion: apps.cozystack.io/v1alpha1
 kind: VMDisk
@@ -10,7 +10,7 @@ metadata:
 spec:
   source:
     http:
-      url: "ВСТАВЬТЕ_PRESIGNED_URL"  # convert.sh से (Share: पंक्ति)
+      url: "PASTE_PRESIGNED_URL"  # from convert.sh (the Share: line)
   storage: 10Gi
   storageClass: replicated
 ---
@@ -25,7 +25,7 @@ spec:
   runStrategy: Always
   disks:
     - name: app-1
-# एप्लिकेशन तक बाहर से पहुँच डोमेन नाम app.<tenant>.workshop.aenix.io द्वारा होती है
-# (Ingress ऑपरेटर द्वारा बनाया जाता है; इस पथ पर port-forward की आवश्यकता नहीं है, देखें README)।
-# इस स्टैंड पर external LoadBalancer (Cilium + robotlb) VM के लिए काम नहीं करता,
-# इसलिए यहाँ external चालू नहीं करते।
+# External access to the application is by the domain name app.<tenant>.workshop.aenix.io
+# (the Ingress is created by the operator; port-forward is not needed on this path, see README).
+# external LoadBalancer on this stand (Cilium + robotlb) does not work for VMs,
+# so we do NOT enable external here.

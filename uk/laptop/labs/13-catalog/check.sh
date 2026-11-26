@@ -1,154 +1,156 @@
 #!/usr/bin/env bash
-# Перевірка лаби 13: чарт і опис застосунку готові до передавання адміну.
+# Check for lab 13: the chart and app definition are ready to hand off to the admin.
 #
-# Ця перевірка НАВМИСНО локальна. Застосувати ApplicationDefinition тенант не
-# може (об'єкт cluster-scoped), тому шукати його в кластері безглуздо:
-# відсутність об'єкта — не помилка учасника. Перевіряємо те, за що він відповідає:
-# чарт збирається, схема працює, визначення розібране й узгоджене з чартом.
+# This check is DELIBERATELY local. A tenant cannot apply an ApplicationDefinition
+# (the object is cluster-scoped), so looking for it in the cluster is pointless:
+# the object's absence is not the participant's fault. We check what they are
+# responsible for: the chart builds, the schema works, the definition parses and
+# agrees with the chart.
 #
-# Запуск із папки лаби:
+# Run from the lab folder:
 #   cd labs/13-catalog && ./check.sh
-# Кластер не обов'язковий: без KUBECONFIG дві перевірки будуть пропущені з попередженням,
-# а не з помилкою.
+# A cluster is not required: without KUBECONFIG two checks are skipped with a warning,
+# not an error.
 
 LAB_NAME="13-catalog"
-LAB_TITLE="Лаба 13 · Власний застосунок у каталозі Cozystack"
+LAB_TITLE="Lab 13 · Your own application in the Cozystack catalog"
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 CHART="$HERE/chart"
 APPDEF="$HERE/applicationdefinition.yaml"
 
-# --- інструменти -----------------------------------------------------------
-# Без helm перевіряти нічого, тому тут скрипт зупиняється одразу й не сипле
-# десятком однакових відмов далі за текстом.
+# --- tools -----------------------------------------------------------------
+# Without helm there is nothing to check, so the script stops right here and does not
+# spew a dozen identical failures further down.
 if ! command -v helm >/dev/null 2>&1; then
-  fail "на машині немає helm" \
-       "встановіть: brew install helm (macOS) або https://helm.sh/docs/intro/install/ — без нього лаба не перевіряється"
+  fail "helm is not installed on this machine" \
+       "install it: brew install helm (macOS) or https://helm.sh/docs/intro/install/ — without it the lab cannot be checked"
   finish
   exit $?
 fi
 HELM_VER="$(helm version --short 2>/dev/null)"
-ok "helm на місці (${HELM_VER})"
-evidence "Версія helm" "$HELM_VER"
+ok "helm is present (${HELM_VER})"
+evidence "helm version" "$HELM_VER"
 
-# --- чарт на місці ---------------------------------------------------------
-# Відрізняємо «чарт зламано» від «скрипт запущено не з тієї папки». Друга помилка трапляється
-# частіше за першу, і повідомлення про неї має бути окремим.
+# --- chart is present ------------------------------------------------------
+# Distinguish "the chart is broken" from "the script was run from the wrong folder".
+# The second mistake is more common than the first, and its message should be separate.
 if [ ! -f "$CHART/Chart.yaml" ]; then
-  fail "не знайдено чарт у ${CHART}" \
-       "запускайте скрипт із папки лаби: cd labs/13-catalog && ./check.sh"
+  fail "no chart found in ${CHART}" \
+       "run the script from the lab folder: cd labs/13-catalog && ./check.sh"
   finish
   exit $?
 fi
 
-# --- лінтер ----------------------------------------------------------------
-# helm lint читає чарт як текст: знаходить друкарські помилки в шаблонах, відсутні поля
-# Chart.yaml, посилання на неіснуючі значення. До кластера справа тут не доходить.
+# --- linter ----------------------------------------------------------------
+# helm lint reads the chart as text: it finds typos in templates, missing Chart.yaml
+# fields, references to nonexistent values. It never reaches the cluster here.
 LINT_OUT="$(helm lint "$CHART" 2>&1)"
 if printf '%s' "$LINT_OUT" | grep -q '0 chart(s) failed'; then
-  ok "чарт проходить helm lint"
+  ok "the chart passes helm lint"
   evidence "helm lint" "$LINT_OUT"
 else
-  fail "чарт не проходить helm lint" \
-       "прочитайте вивід нижче й полагодьте вказані файли: helm lint chart"
+  fail "the chart does not pass helm lint" \
+       "read the output below and fix the indicated files: helm lint chart"
   evidence "helm lint" "$LINT_OUT"
 fi
 
-# --- рендер ----------------------------------------------------------------
-# Порожній вивід і вивід із самих коментарів лінтер би пропустив, тому дивимось,
-# що серед відрендереного є Deployment, і перелічуємо, що взагалі вийшло.
-# Головне тут не «команда відпрацювала», а «вийшли справжні об'єкти».
+# --- render ----------------------------------------------------------------
+# Empty output and output made only of comments would slip past the linter, so we check
+# that the rendered output contains a Deployment, and list what actually came out.
+# The point here is not "the command ran" but "real objects were produced".
 RENDER="$(helm template main "$CHART" 2>&1)"
 if printf '%s' "$RENDER" | grep -q '^kind: Deployment'; then
   KINDS="$(printf '%s' "$RENDER" | grep '^kind:' | awk '{print $2}' | sort -u | tr '\n' ' ')"
-  ok "чарт рендериться, виходять об'єкти: ${KINDS}"
-  evidence "Що рендерить чарт" "$KINDS"
+  ok "the chart renders, producing objects: ${KINDS}"
+  evidence "What the chart renders" "$KINDS"
 else
-  fail "helm template не видав жодного Deployment" \
-       "дивіться помилку рендера: helm template main chart"
-  evidence "Вивід helm template" "$(printf '%s' "$RENDER" | head -30)"
+  fail "helm template did not produce a single Deployment" \
+       "look at the render error: helm template main chart"
+  evidence "helm template output" "$(printf '%s' "$RENDER" | head -30)"
 fi
 
-# --- чарт приймається справжнім кластером ----------------------------------
-# Єдина перевірка в усьому наборі лаб, яка звіряє маніфест зі справжньою схемою
-# кластера, а не з текстом.
+# --- the chart is accepted by a real cluster -------------------------------
+# The only check in the whole lab set that verifies the manifest against a real cluster
+# schema rather than against text.
 #
-# `helm lint` і `helm template` перевіряють шаблони, але НЕ схему Kubernetes: маніфест
-# з полем у невідповідному місці вони пропускають, а кластер відхиляє. Перевірено на власній
-# шкурі — securityContext, помилково вставлений у volumes, пройшов обидва й розвалився
-# лише на сервері. Перевірка потрібна там, де чарт застосовують.
+# `helm lint` and `helm template` check the templates, but NOT the Kubernetes schema: a
+# manifest with a field in the wrong place slips past them, while the cluster rejects it.
+# Learned the hard way — a securityContext mistakenly placed inside volumes passed both
+# and only fell apart on the server. The check is needed where the chart is applied.
 #
-# Чому lint і template її не замінюють:
-#   helm lint      дивиться на будову чарта: файли на місці, шаблони розбираються;
-#   helm template  підставляє значення й видає текст — але що це за поля й чи бувають
-#                  вони в такого об'єкта, він не знає й знати не може;
-#   apply --dry-run=server надсилає маніфест до apiserver, той проганяє його через схему
-#                  типу й через admission-контроль і відповідає, прийняв би чи ні, нічого
-#                  при цьому не створюючи. Звідси `unknown field` і відмова за політикою —
-#                  саме те, об що чарт спотикається у замовника.
-# Прапорець --dry-run=client такої перевірки не дає: він розбирає маніфест на вашій машині.
+# Why lint and template do not replace it:
+#   helm lint      looks at the chart's structure: files are present, templates parse;
+#   helm template  substitutes values and emits text — but what those fields are and whether
+#                  such an object can even have them, it does not and cannot know;
+#   apply --dry-run=server sends the manifest to the apiserver, which runs it through the
+#                  type schema and admission control and answers whether it would accept it,
+#                  creating nothing. Hence `unknown field` and a policy rejection —
+#                  exactly what the chart trips over at the customer's site.
+# The --dry-run=client flag does not give this check: it parses the manifest on your machine.
 if [ -n "${KUBECONFIG:-}" ] && kubectl version -o json >/dev/null 2>&1; then
   DRY="$(printf '%s' "$RENDER" | kubectl apply --dry-run=server -f - 2>&1)"
-  # Відмова у правах і відмова за схемою — різні речі, і плутати їх не можна. Під тенантним
-  # доступом (~/.kube/workshop) прав на Deployment і ConfigMap немає зовсім, тому сюди
-  # прилетить Forbidden — і це нічого не говорить про якість чарта. Перевірка по суті
-  # можлива лише доступом до кластера `lab`, де ви повноправний господар.
+  # A permission denial and a schema denial are different things, and must not be confused.
+  # Under tenant access (~/.kube/workshop) there are no rights on Deployment and ConfigMap
+  # at all, so a Forbidden will arrive here — and that says nothing about the chart's
+  # quality. A meaningful check is only possible with access to the `lab` cluster, where
+  # you are the full owner.
   if printf '%s' "$DRY" | grep -qiE 'forbidden|cannot create|is not allowed'; then
-    warn "серверна перевірка чарта пропущена: поточний доступ не дозволяє її виконати" \
-         "проженіть її доступом до свого кластера: KUBECONFIG=~/lab.kubeconfig ./check.sh"
+    warn "server-side chart check skipped: current access does not permit it" \
+         "run it with access to your own cluster: KUBECONFIG=~/lab.kubeconfig ./check.sh"
   elif printf '%s' "$DRY" | grep -qiE 'error|unknown field|invalid'; then
-    fail "кластер відхиляє відрендерений чарт" \
-         "дивіться: helm template main chart | kubectl apply --dry-run=server -f -"
-    evidence "Відмова сервера" "$(printf '%s' "$DRY" | grep -iE 'error|unknown field' | head -5)"
+    fail "the cluster rejects the rendered chart" \
+         "look: helm template main chart | kubectl apply --dry-run=server -f -"
+    evidence "Server rejection" "$(printf '%s' "$DRY" | grep -iE 'error|unknown field' | head -5)"
   else
-    ok "кластер приймає відрендерений чарт — поля та їхні місця правильні"
+    ok "the cluster accepts the rendered chart — the fields and their places are correct"
   fi
 else
-  warn "перевірка чарта на кластері пропущена: немає доступу" \
-       "задайте KUBECONFIG, щоб прогнати helm template через kubectl apply --dry-run=server"
+  warn "chart check against the cluster skipped: no access" \
+       "set KUBECONFIG to run helm template through kubectl apply --dry-run=server"
 fi
 
-# --- параметри справді доходять до маніфестів -------------------------------
-# Чарт може збиратися й рендеритися, а параметр при цьому нікуди не підставлятися —
-# наприклад, значення записали в шаблон числом. Тому кожен параметр перевіряємо ділом:
-# задаємо свідомо незвичне значення й шукаємо його в готовому маніфесті.
+# --- parameters actually reach the manifests -------------------------------
+# A chart may build and render while a parameter is substituted nowhere —
+# for example, the value was hard-coded into the template as a number. So we test each
+# parameter for real: set a deliberately unusual value and look for it in the finished manifest.
 R5="$(helm template main "$CHART" --set replicas=5 2>/dev/null | grep -c 'replicas: 5')"
 if [ "${R5:-0}" -ge 1 ]; then
-  ok "параметр replicas доходить до маніфесту (--set replicas=5 дає replicas: 5)"
+  ok "the replicas parameter reaches the manifest (--set replicas=5 gives replicas: 5)"
 else
-  fail "параметр replicas не доходить до маніфесту" \
-       "в templates/deployment.yaml має стояти replicas: {{ .Values.replicas }}"
+  fail "the replicas parameter does not reach the manifest" \
+       "templates/deployment.yaml should have replicas: {{ .Values.replicas }}"
 fi
 
 EXT="$(helm template main "$CHART" --set external=true 2>/dev/null | grep -c 'type: LoadBalancer')"
 if [ "${EXT:-0}" -ge 1 ]; then
-  ok "параметр external перемикає тип Service на LoadBalancer"
+  ok "the external parameter switches the Service type to LoadBalancer"
 else
-  warn "параметр external не перемикає тип Service" \
-       "не поломка чарта, але угода каталогу Cozystack: поле external у застосунків означає саме зовнішній доступ"
+  warn "the external parameter does not switch the Service type" \
+       "not a chart defect, but a Cozystack catalog convention: an application's external field means exactly external access"
 fi
 
-# --- схема справді захищає ------------------------------------------
-# Схема, яка нічого не відхиляє, марна. Перевіряємо, що вона відхиляє.
+# --- the schema actually protects ------------------------------------------
+# A schema that rejects nothing is useless. We check that it rejects.
 if helm template main "$CHART" --set replicas=abc >/dev/null 2>&1; then
-  fail "схема значень не відхиляє свідомо неправильне значення (replicas=abc пройшло)" \
-       "перевірте, що поряд із values.yaml лежить values.schema.json і в ньому replicas оголошений як integer"
+  fail "the values schema does not reject an obviously invalid value (replicas=abc passed)" \
+       "check that values.schema.json sits next to values.yaml and declares replicas as an integer"
 else
-  ok "схема значень відхиляє неправильний тип (replicas=abc не проходить)"
+  ok "the values schema rejects the wrong type (replicas=abc does not pass)"
 fi
 
-# --- ApplicationDefinition: обов'язкові поля ------------------------------
-# Застосувати визначення учасник не може, отже й відмови apiserver він не побачить.
-# Тому обов'язкові поля перераховуємо тут: без будь-якого з них адмін отримає відмову
-# вже у себе, а розбиратися доведеться авторові файлу.
+# --- ApplicationDefinition: required fields --------------------------------
+# The participant cannot apply the definition, so they will not see the apiserver's
+# rejection either. So we tally the required fields here: without any one of them the admin
+# gets a rejection on their own side, and the file's author is the one who has to sort it out.
 if [ ! -f "$APPDEF" ]; then
-  fail "не знайдено ${APPDEF}" \
-       "файл має лежати поряд із чартом; візьміть його з репозиторію лаб"
+  fail "not found: ${APPDEF}" \
+       "the file should sit next to the chart; take it from the labs repository"
 else
   MISSING=""
-  # Шукаємо ключі построково, без розбору YAML: PyYAML є не на кожній машині,
-  # а тягнути залежність заради перевірки одного файлу не варто.
+  # We look for keys line by line, without parsing YAML: PyYAML is not on every machine,
+  # and pulling in a dependency just to check one file is not worth it.
   check_key() {
     grep -Eq "$1" "$APPDEF" || MISSING="$MISSING $2"
   }
@@ -164,19 +166,19 @@ else
   check_key '^[[:space:]]{4}icon:[[:space:]]+\S+' 'dashboard.icon'
 
   if [ -z "$MISSING" ]; then
-    ok "в ApplicationDefinition на місці всі обов'язкові поля"
+    ok "all required fields are present in the ApplicationDefinition"
   else
-    fail "в ApplicationDefinition не вистачає полів:${MISSING}" \
-         "звіртеся з розбором у README — без будь-якого з них адмін отримає відмову при застосуванні"
+    fail "the ApplicationDefinition is missing fields:${MISSING}" \
+         "cross-check with the walkthrough in the README — without any one of them the admin gets a rejection on apply"
   fi
 
-  # --- схема у визначенні розбирається й збігається зі схемою чарта ---------
-  # Це дві різні копії того самого, і зв'язку між ними немає жодного.
-  # Розійшлися — форма в дашборді покаже не ті поля, що чекає чарт.
+  # --- the schema in the definition parses and matches the chart schema ----
+  # These are two separate copies of the same thing, with no link between them.
+  # If they drift apart, the dashboard form will show fields the chart does not expect.
   SCHEMA_LINE="$(awk '/openAPISchema:/{getline; sub(/^[[:space:]]+/,""); print; exit}' "$APPDEF")"
   if [ -z "$SCHEMA_LINE" ]; then
-    fail "в ApplicationDefinition порожній openAPISchema" \
-         "вставте туди вміст chart/values.schema.json одним рядком"
+    fail "the ApplicationDefinition has an empty openAPISchema" \
+         "put the contents of chart/values.schema.json there on a single line"
   else
     CMP="$(SCHEMA_LINE="$SCHEMA_LINE" python3 - "$CHART/values.schema.json" <<'PY' 2>&1
 import os, sys, json
@@ -195,34 +197,34 @@ if a == b:
 else:
     only_def = sorted(set(a) - set(b))
     only_chart = sorted(set(b) - set(a))
-    print("DIFF тільки у визначенні: %s | тільки в чарті: %s"
+    print("DIFF only in the definition: %s | only in the chart: %s"
           % (",".join(only_def) or "-", ",".join(only_chart) or "-"))
 PY
 )"
     case "$CMP" in
       SAME*)
-        ok "схема у визначенні розбирається й збігається зі схемою чарта (${CMP#SAME })"
-        evidence "Параметри застосунку" "${CMP#SAME }"
+        ok "the schema in the definition parses and matches the chart schema (${CMP#SAME })"
+        evidence "Application parameters" "${CMP#SAME }"
         ;;
       DIFF*)
-        fail "схема у визначенні розійшлася зі схемою чарта: ${CMP#DIFF }" \
-             "приведіть їх у відповідність: вміст openAPISchema — це chart/values.schema.json одним рядком"
+        fail "the schema in the definition has drifted from the chart schema: ${CMP#DIFF }" \
+             "bring them into agreement: the openAPISchema contents are chart/values.schema.json on a single line"
         ;;
       BADJSON*)
-        fail "openAPISchema не розбирається як JSON: ${CMP#BADJSON }" \
-             "схема має бути одним рядком коректного JSON під 'openAPISchema: |-'"
+        fail "openAPISchema does not parse as JSON: ${CMP#BADJSON }" \
+             "the schema must be a single line of valid JSON under 'openAPISchema: |-'"
         ;;
       *)
-        warn "не вдалося звірити схеми (${CMP})" \
-             "перевірте руками, що openAPISchema збігається з chart/values.schema.json"
+        warn "could not compare the schemas (${CMP})" \
+             "check by hand that openAPISchema matches chart/values.schema.json"
         ;;
     esac
   fi
 
-  # --- іконка ---------------------------------------------------------------
-  # Дашборд чекає SVG, укладений у base64, і нікуди за картинкою не ходить. Помилка тут
-  # тиха: маніфест застосується, а в каталозі на місці іконки буде порожньо. Тому рядок
-  # розкодовуємо й дивимось, що всередині справді SVG.
+  # --- icon -----------------------------------------------------------------
+  # The dashboard expects an SVG packed into base64, and does not go anywhere for the image.
+  # An error here is silent: the manifest applies, but in the catalog the icon spot is empty.
+  # So we decode the string and check that what is inside really is an SVG.
   ICON="$(grep -Eo '^[[:space:]]{4}icon:[[:space:]]+\S+' "$APPDEF" | head -1 | awk '{print $2}')"
   if [ -n "$ICON" ]; then
     ICON_HEAD="$(printf '%s' "$ICON" | python3 -c 'import sys,base64
@@ -232,45 +234,45 @@ except Exception:
     print("")' 2>/dev/null)"
     case "$ICON_HEAD" in
       *"<svg"*)
-        ok "іконка розкодовується з base64 і виявляється SVG"
-        evidence "Початок іконки" "$ICON_HEAD"
+        ok "the icon decodes from base64 and turns out to be an SVG"
+        evidence "Start of the icon" "$ICON_HEAD"
         ;;
       "")
-        fail "іконка не розкодовується з base64" \
-             "перезберіть рядок: base64 -i icon.svg | tr -d '\\n' (на Linux: base64 -w0 icon.svg)"
+        fail "the icon does not decode from base64" \
+             "rebuild the string: base64 -i icon.svg | tr -d '\\n' (on Linux: base64 -w0 icon.svg)"
         ;;
       *)
-        fail "іконка розкодовується, але це не SVG" \
-             "дашборд чекає саме SVG; растрову картинку він покаже як сміття"
+        fail "the icon decodes, but it is not an SVG" \
+             "the dashboard expects exactly an SVG; a raster image it will show as garbage"
         ;;
     esac
   fi
 fi
 
-# --- права: відмова тут очікувана --------------------------------------------
-# Це не перевірка учасника, а підтвердження будови платформи. Тому
-# відповідь `no` — успіх, а `yes` — привід здивуватися, а не радіти.
+# --- rights: a denial here is expected --------------------------------------
+# This is not a check of the participant but a confirmation of how the platform is built.
+# So an answer of `no` is a success, and `yes` is cause for surprise, not celebration.
 if [ -n "${KUBECONFIG:-}" ] && kubectl version -o json >/dev/null 2>&1; then
   CANI="$(kubectl auth can-i create applicationdefinitions 2>/dev/null)"
   case "$CANI" in
     no)
-      ok "підтверджено: застосовувати ApplicationDefinition вам не належить (can-i -> no)"
-      evidence "Права на ApplicationDefinition" \
+      ok "confirmed: you are not allowed to apply an ApplicationDefinition (can-i -> no)"
+      evidence "Rights on ApplicationDefinition" \
         "kubectl auth can-i create applicationdefinitions -> no
-Об'єкт cluster-scoped і змінює каталог для всіх тенантів, тому його застосовує адмін платформи."
+The object is cluster-scoped and changes the catalog for all tenants, so the platform admin applies it."
       ;;
     yes)
-      warn "у вас є права застосовувати ApplicationDefinition (can-i -> yes)" \
-           "отже, ви працюєте під адмінським обліковим записом, а не під тенантним; лаба розрахована на тенантний"
+      warn "you have rights to apply an ApplicationDefinition (can-i -> yes)" \
+           "that means you are working under an admin account, not a tenant one; the lab is meant for a tenant account"
       ;;
     *)
-      warn "не вдалося запитати кластер про права" \
-           "не заважає складанню лаби: перевірка локальна, кластер тут не потрібен"
+      warn "could not ask the cluster about rights" \
+           "does not block passing the lab: the check is local, no cluster is needed here"
       ;;
   esac
 else
-  warn "кластер не опитано (KUBECONFIG не задано або не відповідає)" \
-       "перевірка локальна, кластер тут не потрібен. Щоб побачити відмову у правах: export KUBECONFIG=~/.kube/workshop"
+  warn "the cluster was not queried (KUBECONFIG not set or not responding)" \
+       "the check is local, no cluster is needed here. To see the rights denial: export KUBECONFIG=~/.kube/workshop"
 fi
 
 finish

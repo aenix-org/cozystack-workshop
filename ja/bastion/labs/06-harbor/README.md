@@ -58,12 +58,12 @@
 コマンドのブロックごとに、それがどのクラスター向けかを明記してあります。自信がなければ：
 
 ```bash
-# echo は変数の値を表示する：kubectl が今どのアクセスファイルを使っているか。
-# 空なら、kubectl はあなたが思っているファイルではなくデフォルトの ~/.kube/config を使う。
+# echo prints the value of the variable: which access file kubectl is using right now.
+# Empty means kubectl will use the default file ~/.kube/config, not the one you think.
 echo $KUBECONFIG
 
-# get nodes =「クラスターのノードを表示せよ」。ここではリトマス試験紙になる：
-# その答えで、コマンドが2つのクラスターのどちらに送られたかがわかる。
+# get nodes = "show the cluster's nodes". Here it's a litmus test:
+# the answer tells you which of the two clusters the command went to.
 kubectl get nodes
 ```
 
@@ -77,7 +77,7 @@ kubectl get nodes
 から取られます。
 
 ```bash
-# このラボのコマンドはすべてラボのフォルダから実行する — そこへ移動する
+# every command in this lab is run from the lab folder — change into it
 cd labs/06-harbor
 ```
 
@@ -146,12 +146,12 @@ HarborはイメージのレイヤーをS3互換ストレージに保管し、そ
 アプリケーションごとに、プラットフォームはまさにその認証情報だけを許可する個別のルールを設定します：
 
 ```bash
-# get secret =「Secret オブジェクトを表示せよ」。シークレットの名前は、アプリケーション種別の
-# プレフィックスとその名前から組み立てられる：harbor- ＋ harbor。
-#   -n tenant-workshopXX  どの namespace を見るか — あなたのテナント
-#   -o jsonpath='...'     オブジェクト全体を表示するのではなく、1つのフィールドだけを取り出す
-#   base64 -d             デコードする：シークレット内の値は base64 で保管されている
-#   ; echo                改行を足す。さもないとパスワードがプロンプトとくっつく
+# get secret = "show the Secret object". The secret's name is assembled from the prefix
+# for the application type and its name: harbor- + harbor.
+#   -n tenant-workshopXX  which namespace to look in — your tenant
+#   -o jsonpath='...'     pull a single field out of the object rather than printing the whole thing
+#   base64 -d             decode: values inside secrets are stored in base64
+#   ; echo                add a newline, otherwise the password runs into the prompt
 kubectl -n tenant-workshopXX get secret harbor-harbor-credentials \
   -o jsonpath='{.data.admin-password}' | base64 -d; echo
 ```
@@ -166,9 +166,9 @@ bastion上、`~/.docker/config.json` ファイルに保存します。その後�
 尋ねずにこのレジストリへ行きます。
 
 ```bash
-# login =「このレジストリの認証情報を覚えておけ」。
-# 引数は url キーから取ったレジストリのアドレス。ここでの harbor-harbor.workshop03.example.org は例。
-# コマンドはユーザー名（admin）とパスワードを尋ねる。パスワードは入力しても表示されない。
+# login = "remember the credentials for this registry".
+# The argument is the registry address from the url key; harbor-harbor.workshop03.example.org here is an example.
+# The command will ask for a username (admin) and a password; the password isn't shown as you type.
 docker login harbor-harbor.workshop03.example.org
 ```
 
@@ -308,13 +308,13 @@ USER 10001
 ```bash
 cd labs/06-harbor
 
-# build =「Dockerfile からイメージを構築せよ」。
-#   --platform linux/amd64  どのプロセッサ向けに構築するか。クラスターのノードは x86 で、
-#                           bastion は ARM のことがある — その場合、フラグなしでは間違ったものができる
-#   -t <アドレス>/<プロジェクト>/<名前>:<タグ>  結果に付ける名前。名前の先頭にあるレジストリのアドレスが、
-#                           後で docker push が送る先になる
-#   app/                    最後の引数 — Dockerfile とソースのあるフォルダ。
-#                           その中身がまるごとビルダーに渡される
+# build = "build the image from the Dockerfile".
+#   --platform linux/amd64  which processor to build for; the cluster nodes are on x86,
+#                           and the bastion may be on ARM — then without the flag you get the wrong thing
+#   -t <address>/<project>/<name>:<tag>  what to name the result. The registry address at the start of the name
+#                           is where docker push will later send it
+#   app/                    the last argument — the folder with the Dockerfile and sources;
+#                           its entire contents are handed to the builder
 docker build --platform linux/amd64 -t harbor-harbor.workshop03.example.org/passes/passes-api:v1 app/
 ```
 
@@ -338,8 +338,8 @@ Successfully tagged harbor-harbor.workshop03.example.org/passes/passes-api:v1
 レジストリへ送ります。すでにレジストリにあるレイヤーは再び送られません。
 
 ```bash
-# push =「イメージをレジストリへ送れ」。送り先は、docker がイメージ名から取る：
-# 名前の最初の部分がレジストリのアドレスで、そこへ、docker login の認証情報を添えて送られる。
+# push = "send the image to the registry". Where to send it, docker takes from the image name:
+# the first part of the name is the registry address, and there it goes, with the credentials from docker login.
 docker push harbor-harbor.workshop03.example.org/passes/passes-api:v1
 ```
 
@@ -357,9 +357,9 @@ docker push harbor-harbor.workshop03.example.org/passes/passes-api:v1
 📍 **場所：** bastion上、`lab` クラスター。
 
 ```bash
-# KUBECONFIG は kubectl にどのアクセスファイルを使うか伝える。あなたの `lab` クラスターへ切り替える：
-# 以降、すべての kubectl コマンドはそこへ行く。
-# ターミナルのウィンドウを閉じるまで有効。
+# KUBECONFIG tells kubectl which access file to use. We switch to your `lab` cluster:
+# from here on all kubectl commands go to it.
+# It stays in effect until the terminal window is closed.
 export KUBECONFIG=~/lab.kubeconfig
 ```
 
@@ -368,11 +368,11 @@ export KUBECONFIG=~/lab.kubeconfig
 です。何も尋ねず、何も表示せずに、ファイルをその場で書き換えます。自分のシステム用の行を選んでください：
 
 ```bash
-# sed -i =「ファイルをその場で書き換える」
-#   's|何を|何に|g'  すべての出現を置換する。区切り文字に / ではなく | を使うのは、
-#                     アドレスにスラッシュが含まれ、そのままだとエスケープが必要になるため
-#   macOS の sed は -i の後に引数を必須とする。空のクォートは
-#   「バックアップを作らない」という意味。Linux ではそのような引数があってはならない。
+# sed -i = "edit the file in place"
+#   's|what|with what|g'  replace all occurrences; the separator | is used instead of / because
+#                     the address has slashes and they would have to be escaped
+#   The sed in macOS requires a mandatory argument after -i; the empty quotes
+#   mean "make no backup copy". On Linux there must be no such argument.
 
 # Linux
 sed -i    's|HARBOR-HOST|harbor-harbor.workshop03.example.org|g' passes-broken.yaml
@@ -383,13 +383,13 @@ sed -i '' 's|HARBOR-HOST|harbor-harbor.workshop03.example.org|g' passes-broken.y
 適用します：
 
 ```bash
-# apply =「クラスターをファイルに記述された状態にせよ」
+# apply = "bring the cluster to what's described in the file"
 kubectl apply -f passes-broken.yaml
 
-# get pods =「Pod を表示せよ」。
-#   -l app=passes-api  すべてではなく、このラベルの付いたものだけ
-#   -w                 終了せず、変化が現れるたびに表示する。
-#                      監視を止める — Ctrl+C
+# get pods = "show the Pods".
+#   -l app=passes-api  only the ones with this label, not everything
+#   -w                 don't exit, print changes as they appear;
+#                      stop watching — Ctrl+C
 kubectl get pods -l app=passes-api -w
 ```
 
@@ -404,9 +404,9 @@ passes-api-6c9d4f7b8-2xk4n    0/1     ImagePullBackOff   0          22s
 `Ctrl+C` で監視を止め、クラスターが何を言うか見てみましょう：
 
 ```bash
-# describe =「オブジェクトについて詳しく教えよ」。出力の一番最後にイベントログが来る：
-# クラスターが Pod に対して何をしようとし、それがどう終わったか。
-# tail -12 は最後の12行を残す — イベントはまさにそこにある。
+# describe = "tell me about the object in detail". At the very end of the output comes the event log:
+# what the cluster tried to do with the Pod and how it ended.
+# tail -12 keeps the last twelve lines — the events are right there.
 kubectl describe pod -l app=passes-api | tail -12
 ```
 
@@ -472,11 +472,11 @@ kubectl describe pod -l app=passes-api | tail -12
 ダウンロード時に `kubelet` が自分で読める種類のシークレットを作ります：
 
 ```bash
-# create secret docker-registry =「レジストリの認証情報を持つシークレットを作れ」
-#   harbor             クラスター内でのシークレットの名前。アプリケーションのマニフェストがこれを参照する
-#   --docker-server    これらの認証情報がどのレジストリ向けか — イメージ名にあるのと同じアドレス
-#   --docker-username  誰がログインするか
-#   --docker-password  パスワード。$、! やスペースが含まれる場合はシングルクォートが必要
+# create secret docker-registry = "create a secret with registry credentials"
+#   harbor             the secret's name inside the cluster; the application manifest will refer to it
+#   --docker-server    which registry these credentials are for — the same address as in the image name
+#   --docker-username  who's logging in
+#   --docker-password  the password; single quotes are needed if it has a $, ! or space
 kubectl create secret docker-registry harbor \
   --docker-server=harbor-harbor.workshop03.example.org \
   --docker-username=admin \
@@ -487,20 +487,20 @@ kubectl create secret docker-registry harbor \
 実務の環境では問題です。履歴に残さない方法：
 
 ```bash
-# read はキーボードで打たれたものを HARBOR_PASS 変数に入れる：
-#   -s  打った内容を画面に表示しない
-#   -r  バックスラッシュを特殊文字として扱わない
-# この行の後、画面には何も現れない：パスワードを貼り付けて Enter を押す。
+# read puts what's typed at the keyboard into the HARBOR_PASS variable:
+#   -s  don't show what's typed on the screen
+#   -r  don't treat a backslash as a special character
+# Nothing will appear on the screen after this line: paste the password and press Enter.
 read -rs HARBOR_PASS
 
-# ここからはパスワードが変数から差し込まれるので、シェルの履歴には
-# 変数名だけが残る。ダブルクォートは必須：それがないとスペースで値が壊れる。
+# From here the password is substituted from the variable, so only the variable name
+# goes into the shell history. The double quotes are mandatory: without them spaces would break the value.
 kubectl create secret docker-registry harbor \
   --docker-server=harbor-harbor.workshop03.example.org \
   --docker-username=admin \
   --docker-password="$HARBOR_PASS"
 
-# unset は変数を消し、パスワードがこのウィンドウの次のコマンドに渡らないようにする
+# unset erases the variable so the password doesn't reach the next commands in this window
 unset HARBOR_PASS
 ```
 
@@ -510,8 +510,8 @@ unset HARBOR_PASS
 どんな種類のシークレットができたか、クラスターに聞いてみましょう：
 
 ```bash
-#   -o jsonpath='{.type}'  オブジェクトの1つのフィールドを表示する — シークレットの型
-#   {"\n"}                 改行を足す。さもないと出力がプロンプトとくっつく
+#   -o jsonpath='{.type}'  print a single field of the object — the secret's type
+#   {"\n"}                 add a newline, otherwise the output runs into the prompt
 kubectl get secret harbor -o jsonpath='{.type}{"\n"}'
 ```
 
@@ -528,10 +528,10 @@ kubernetes.io/dockerconfigjson
 テキストとして書くための方法で、誰でもデコードできます）：
 
 ```bash
-# .data.\.dockerconfigjson — シークレット内のキー。キー名そのものがドットで始まるので、
-# エスケープする：さもないと jsonpath がそれをパスの区切りと取ってしまう。
-# base64 -d は値をテキストへデコードし戻す — あなたのbastion上の
-# ~/.docker/config.json ファイルと同じ形式が見られる。
+# .data.\.dockerconfigjson — the key inside the secret. The key name itself starts with a dot,
+# so it's escaped: otherwise jsonpath would take it for a path separator.
+# base64 -d decodes the value back into text — you'll see the same format
+# as in the file ~/.docker/config.json on your bastion.
 kubectl get secret harbor -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d
 ```
 
@@ -558,12 +558,12 @@ sed -i    's|HARBOR-HOST|harbor-harbor.workshop03.example.org|g' passes.yaml
 # macOS
 sed -i '' 's|HARBOR-HOST|harbor-harbor.workshop03.example.org|g' passes.yaml
 
-# delete -f = ファイルに記述されたオブジェクトだけをクラスターから取り除く
+# delete -f = remove from the cluster exactly the objects described in the file
 kubectl delete -f passes-broken.yaml
 kubectl apply -f passes.yaml
 
-# rollout status は新しいレプリカが準備完了になるまで待ち、それから自分で終わる。
-# たどり着けなければエラーを返すので、こういう行はスクリプトで役に立つ。
+# rollout status waits until the new replicas become ready, then finishes on its own.
+# If it doesn't get there, it returns an error, which is why such a line is handy in scripts.
 kubectl rollout status deployment/passes-api
 ```
 
@@ -590,19 +590,19 @@ deployment "passes-api" successfully rolled out
 ネットワークには手を触れない点が違います。
 
 ```bash
-# port-forward svc/passes-api = 特定の Pod ではなく、サービスへのトンネル
-#   8080:80 — 左の数字はあなたのbastion上のポート、右はクラスター内のサービスのポート
-# ウィンドウを閉じないこと：トンネルはコマンドが動いている間だけ生きる。
+# port-forward svc/passes-api = a tunnel to the service, not to a specific Pod
+#   8080:80 — the left number is the port on your bastion, the right one the service port in the cluster
+# Don't close the window: the tunnel lives as long as the command runs.
 kubectl port-forward svc/passes-api 8080:80
 ```
 
 別のターミナルのウィンドウで：
 
 ```bash
-# curl —「アドレスへ行って答えを表示せよ」。
-#   -s     進捗インジケータを表示しない
-#   ; echo 改行を足す：答えは1行で来るので、これがないと
-#          シェルのプロンプトとくっつく
+# curl — "go to the address and show the answer".
+#   -s     don't show the progress indicator
+#   ; echo add a newline: the answer comes as a single line, and without it
+#          it runs into the shell prompt
 curl -s http://localhost:8080/; echo
 ```
 
@@ -624,11 +624,11 @@ curl -s http://localhost:8080/; echo
 答えの中の `pod` フィールドは、答えたレプリカの名前です。それをレプリカの一覧と照らし合わせてください：
 
 ```bash
-# 新しいターミナルのウィンドウは KUBECONFIG 変数を何も知らない — ここでも設定する。
-# さもないと kubectl は間違ったクラスターへ行く
+# a new terminal window knows nothing about the KUBECONFIG variable — set it here too,
+# otherwise kubectl will go to the wrong cluster
 export KUBECONFIG=~/lab.kubeconfig
 
-# 同じラベルによる絞り込み：一覧には、答えの中で見た名前があるはず
+# the same selection by label: the list should contain the name you saw in the answer
 kubectl get pods -l app=passes-api
 ```
 
@@ -640,9 +640,9 @@ kubectl get pods -l app=passes-api
 負荷分散を本当に確かめるには、こうします — クラスターの中で生きる一時的な Pod から8回のリクエスト：
 
 ```bash
-# run は使い捨ての Pod を立て、--rm はあとで片づける。
-# -- の後はすべて Pod の中で実行される：内部名でサービスを8回叩き、
-# 答えたレプリカの名前の入った行を表示する。
+# run brings up a one-off Pod, --rm cleans it up afterwards.
+# Everything after -- runs inside the Pod: eight times we hit the service by its internal name
+# and print the line with the name of the replica that answered.
 kubectl run probe --rm -i --restart=Never --quiet --image=curlimages/curl:8.11.1 \
   -- sh -c 'for i in $(seq 1 8); do curl -s http://passes-api/ | grep -o "passes-api-[a-z0-9-]*"; done'
 ```
@@ -666,13 +666,13 @@ kubectl run probe --rm -i --restart=Never --quiet --image=curlimages/curl:8.11.1
 ```bash
 cd labs/06-harbor
 
-# どのクラスターでアプリケーションを確認するか — あなたの `lab`
+# which cluster to check the application in — your `lab`
 export KUBECONFIG=~/lab.kubeconfig
-# あなたのテナント番号：これからスクリプトは namespace 名 tenant-workshop03 を組み立てる
+# your tenant number: from it the script assembles the namespace name tenant-workshop03
 export COZY_TENANT=workshop03
-# 管理クラスターへのアクセスがどこにあるか — そこでスクリプトは Harbor 自体を見る。
-# 設定しないままでもよい：その場合スクリプトは ~/.kube/config を探し、見つからなければ
-# 管理クラスターでの確認をスキップして、その旨を伝える。
+# where the access to the management cluster lives — there the script will look at Harbor itself.
+# You can leave it unset: then the script looks for ~/.kube/config, and not finding it — skips
+# the checks on the management cluster and says so.
 export COZY_KUBECONFIG=~/.kube/config
 
 ./check.sh
@@ -693,9 +693,9 @@ Pod の名前を持つJSONを返すこと。
 すべてのラボを終えたら：
 
 ```bash
-# ファイルに記述されたオブジェクトを削除する：Deployment も Service も
+# delete the objects described in the file: both the Deployment and the Service
 kubectl delete -f passes.yaml
-# シークレットはファイルではなくコマンドで作成された — 名前で削除する
+# the secret was created by a command, not a file — delete it by name
 kubectl delete secret harbor
 ```
 

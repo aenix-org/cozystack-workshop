@@ -76,7 +76,7 @@ kubectl get vminstance -n tenant-workshopXX
 
 ```powershell
 New-Item -ItemType Directory -Force "$HOME\.kube" | Out-Null
-notepad "$HOME\.kube\workshop"    # kubeconfig를 붙여 넣으세요; 파일 형식 — "모든 파일"
+notepad "$HOME\.kube\workshop"    # paste the kubeconfig; file type — "All Files"
 [Environment]::SetEnvironmentVariable("KUBECONFIG", "$HOME\.kube\workshop", "User")
 $env:KUBECONFIG = "$HOME\.kube\workshop"
 kubectl get vminstance -n tenant-workshopXX
@@ -109,7 +109,7 @@ cd cozystack-migration-workshop/laptop
 # Linux
 find manifests scripts -type f -exec sed -i 's/tenant-workshopXX/tenant-workshop03/g' {} +
 
-# macOS — 같은 sed지만, -i 뒤에 빈 따옴표가 필요합니다
+# macOS — the same sed, but it requires empty quotes after -i
 find manifests scripts -type f -exec sed -i '' 's/tenant-workshopXX/tenant-workshop03/g' {} +
 ```
 
@@ -128,7 +128,7 @@ grep -rn tenant-workshopXX manifests scripts || echo "all clean, you can continu
 ```
 
 한 곳만 명령이 일부러 건드리지 않고 남겨 둡니다: `manifests/03-app-vm.yaml`의
-`url: "ВСТАВЬТЕ_PRESIGNED_URL"` 줄입니다 — 이 링크는 두 번째 단계 이후에 얻습니다.
+`url: "PASTE_PRESIGNED_URL"` 줄입니다 — 이 링크는 두 번째 단계 이후에 얻습니다.
 
 자세히: [chat/10](chat/10-clone-and-set-number.md) ·
 파일 맵 [chat/11](chat/11-file-map.md)
@@ -194,7 +194,7 @@ kubectl get vminstance convert -n tenant-workshopXX -w
 virtctl console --namespace=tenant-workshopXX vm-instance-convert
 ```
 
-내부에서: `nano convert.sh`로 `scripts/convert.sh`의 내용을 붙여 넣고, `ВСТАВЬТЕ_...` 자리에
+내부에서: `nano convert.sh`로 `scripts/convert.sh`의 내용을 붙여 넣고, `PASTE_...` 자리에
 자신의 `bucketName`, `accessKey`, `secretKey`를 넣은 뒤 `bash convert.sh`를 실행합니다.
 
 **저희 행사가 아니라 혼자서 워크숍을 진행하고 계신가요?** `convert.sh`의 `OVA_URL`은 워크숍 클라우드의 오브젝트 스토리지에 있는 데모 이미지를 가리킵니다. 행사 중에 이미지를 빠르게, 외부 트래픽 없이 내려받도록 그곳에 두지만, 워크숍이 끝나면 그 사본은 사라집니다. 링크를 공개 사본 `https://github.com/aenix-org/cozystack-workshop/releases/download/vmware-demo-ova/app-1.ova`(약 810 MB)이나 직접 준비한 OVA로 바꾸세요.
@@ -221,7 +221,7 @@ kubectl delete vminstance convert --namespace tenant-workshopXX
 kubectl delete vmdisk convert-tools --namespace tenant-workshopXX
 ```
 
-받은 링크를 `manifests/03-app-vm.yaml`의 `url: "ВСТАВЬТЕ_PRESIGNED_URL"` 자리에 넣은 뒤:
+받은 링크를 `manifests/03-app-vm.yaml`의 `url: "PASTE_PRESIGNED_URL"` 자리에 넣은 뒤:
 
 ```bash
 kubectl apply -f manifests/03-app-vm.yaml
@@ -309,13 +309,13 @@ curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/actuator/health
 `SCRAM authentication requires libpq version 10 or above`라고 응답합니다. 새 것을 설치합니다:
 
 ```bash
-# 1. PGDG 저장소 — PostgreSQL 패키지의 출처
+# 1. The PGDG repository — the source of PostgreSQL packages
 yum install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm
 
-# 2. libzstd: CentOS 7 저장소에 없으므로 EPEL 아카이브에서 가져옵니다
+# 2. libzstd: not in the CentOS 7 repositories, so we take it from the EPEL archive
 yum install -y https://archives.fedoraproject.org/pub/archive/epel/7/x86_64/Packages/l/libzstd-1.5.5-1.el7.x86_64.rpm
 
-# 3. 클라이언트 본체 — 살아 있는 pgdg15 저장소에서만
+# 3. The client itself — only from the live pgdg15 repository
 yum install -y --disablerepo='pgdg*' --enablerepo=pgdg15 postgresql15
 ```
 
@@ -335,7 +335,7 @@ psql --version
 스키마를 가져와서 적용합니다:
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/laptop/scripts/orders-schema.sql
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/laptop/scripts/orders-schema.sql
 
 PGPASSWORD='Orders2019!' psql \
   -h postgres-db-rw.tenant-workshopXX.svc.cozy.local -U orders -d orders \
@@ -387,13 +387,13 @@ curl -s http://localhost:8080/api/orders
 > 접두사가 없으면 `target must contain type and name separated by '/'`라고 응답합니다.
 
 ```bash
-# app-VM에 로그인 (root / cozydemo)
+# log into the app-VM (root / cozydemo)
 virtctl console --namespace=tenant-workshopXX vm-instance-app-1
 
-# conversion-VM에 로그인 (ubuntu / ubuntu)
+# log into the conversion-VM (ubuntu / ubuntu)
 virtctl console --namespace=tenant-workshopXX vm-instance-convert
 
-# 애플리케이션의 포트를 노트북으로 포워딩
+# forward the application's port to the laptop
 virtctl port-forward --namespace=tenant-workshopXX vmi/vm-instance-app-1 8080:8080
 ```
 

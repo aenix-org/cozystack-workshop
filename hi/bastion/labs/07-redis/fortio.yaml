@@ -1,17 +1,17 @@
 ---
-# लैब 7 · वेब UI वाला लोड जनरेटर।
-# वही जो स्केलिंग वाली लैब में था: लोड को ब्राउज़र में एक बटन से चलाया जाता है,
-# और लेटेंसी हिस्टोग्राम वहीं दिखता है। अगर यह आपके सेटअप में पहले से डिप्लॉय है — तो इस
-# फ़ाइल को अप्लाई करने की ज़रूरत नहीं, kubectl «unchanged» जवाब देगा।
+# Lab 7 · load generator with a web UI.
+# The same one as in the scaling lab: load is launched with a button in the browser,
+# and the latency histogram is visible right there. If it is already deployed in your
+# setup, you do not need to apply this file — kubectl will answer "unchanged".
 #
-# कहाँ अप्लाई होता है: आपका `lab` क्लस्टर (export KUBECONFIG=~/lab.kubeconfig)।
-# कमांड: kubectl apply -f fortio.yaml
+# Where it is applied: your `lab` cluster (export KUBECONFIG=~/lab.kubeconfig).
+# Command: kubectl apply -f fortio.yaml
 #
-# `---` से अलग किए गए दो ऑब्जेक्ट: Deployment (खुद जनरेटर) और Service (वह नाम, जिससे
-# उस तक पहुँचा जाता है)। apiVersion, kind और metadata.name पर आगे टिप्पणी नहीं की गई है।
+# Two objects separated by `---`: Deployment (the generator itself) and Service (the name
+# used to reach it). apiVersion, kind and metadata.name are not commented on further below.
 #
-# इमेज सार्वजनिक Docker Hub से खींची जाती है, आपके Harbor से नहीं: Fortio «गेस्ट पास»
-# सेवा का हिस्सा नहीं है, बल्कि एक मापक उपकरण है जो क्लस्टर में अस्थायी रूप से रहता है।
+# The image is pulled from the public Docker Hub, not from your Harbor: Fortio is not part
+# of the "Propusk" service but a measuring instrument that lives in the cluster temporarily.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -19,10 +19,10 @@ metadata:
   labels:
     app: fortio
 spec:
-  # एक ही कॉपी। लोड जनरेटर को स्केल करने की ज़रूरत नहीं — ज़रूरत यह है कि वह अकेले
-  # ईमानदारी से लेटेंसी गिने। दो कॉपियाँ दो असंगठित हिस्टोग्राम देतीं।
+  # A single copy. The load generator does not need to be scaled — what is needed is for it
+  # alone to count latencies honestly. Two copies would give two unmerged histograms.
   replicas: 1
-  # वह लेबल जिससे Deployment अपने पॉड को पहचानता है। नीचे template में दिए लेबल से मेल खाता है।
+  # The label by which the Deployment recognizes its pod. Matches the label in the template below.
   selector:
     matchLabels:
       app: fortio
@@ -31,8 +31,8 @@ spec:
       labels:
         app: fortio
     spec:
-      # वही सुरक्षा आवश्यकताएँ जो बाकी सबकी हैं: प्रक्रिया root के रूप में नहीं चलती,
-      # और सिस्टम कॉल seccomp प्रोफ़ाइल द्वारा सीमित किए गए हैं।
+      # The same security requirements as everything else: the process does not run as root,
+      # and system calls are restricted by a seccomp profile.
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
@@ -44,13 +44,13 @@ spec:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # यहाँ `latest` टैग वर्कशॉप के लिए एक सरलीकरण है, और यह उस बात के विपरीत है जो
-          # निजी-रजिस्ट्री वाली लैब सिखाती है: इस टैग वाली इमेज दो अप्लाई के बीच चुपचाप बदल
-          # सकती है, और कल का मापन अपुनरुत्पादनीय हो जाएगा। एक प्रशिक्षण स्टैंड पर लोड
-          # जनरेटर के लिए यह स्वीकार्य है, प्रोडक्शन सिस्टम के लिए नहीं।
+          # The `latest` tag here is a simplification for the workshop, and it contradicts what
+          # the private-registry lab teaches: the image under this tag can silently change
+          # between two applies, and yesterday's measurement will become unreproducible. For a
+          # load generator on a training stand this is acceptable, for a production system it is not.
           image: fortio/fortio:latest
-          # `server` वह मोड है जिसमें Fortio वेब इंटरफ़ेस चालू करता है और तब तक इंतज़ार करता है
-          # जब तक आप बटन न दबाएँ। इस आर्गुमेंट के बिना इमेज एक बार वाली कमांड चलाकर बाहर निकल जाती है।
+          # `server` is the mode in which Fortio brings up the web interface and waits until you
+          # press a button. Without this argument the image runs a one-off command and exits.
           args: ["server"]
           ports:
             - containerPort: 8080
@@ -60,15 +60,15 @@ spec:
               cpu: 100m
               memory: 64Mi
             limits:
-              # जनरेटर को कुछ CPU हेडरूम चाहिए, वरना वह अपनी ही
-              # सीमा से टकराएगा और आप एप्लिकेशन के बजाय Fortio पर लोड डाल रहे होंगे।
+              # The generator needs some CPU headroom, otherwise it will hit
+              # its own limit and you will be loading Fortio rather than the application.
               cpu: "1"
               memory: 256Mi
 ---
-# वेब इंटरफ़ेस खोलने के लिए Service ज़रूरी है: जनरेटर तक नाम से पोर्ट फ़ॉरवर्डिंग के ज़रिए
-# पहुँचा जाता है — kubectl port-forward svc/fortio 8081:8080 — और localhost:8081 पर
-# एक्सेस किया जाता है। सेवा पर बिना Service के भी भार डाला जा सकता है, कमांड
-# kubectl exec deploy/fortio से, लेकिन ब्राउज़र में हिस्टोग्राम केवल यही रास्ता देता है।
+# The Service is needed to open the web interface: the generator is reached by name through
+# port forwarding — kubectl port-forward svc/fortio 8081:8080 — and accessed at
+# localhost:8081. You can hammer the service without a Service too, with the command
+# kubectl exec deploy/fortio, but only this path gives you the histogram in the browser.
 apiVersion: v1
 kind: Service
 metadata:
@@ -76,8 +76,8 @@ metadata:
 spec:
   selector:
     app: fortio
-  # यहाँ Service का नंबर और कंटेनर पोर्ट एक समान हैं — लैब की बाकी सेवाओं
-  # के विपरीत, जहाँ बाहर 80 और अंदर 8080 है। अंतर केवल सुविधा का है।
+  # Here the Service number and the container port coincide — unlike the other
+  # services in the lab, where it is 80 outside and 8080 inside. The difference is only convenience.
   ports:
     - port: 8080
       targetPort: http

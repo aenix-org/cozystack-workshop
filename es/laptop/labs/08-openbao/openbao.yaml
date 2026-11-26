@@ -1,41 +1,41 @@
-# Lab 8 · pedido de un almacén de secretos OpenBao.
-# Lo mismo que pedirías con el ratón en el panel — solo que como texto.
-# Se aplica NO al clúster de laboratorio, sino a un tenant en el clúster de gestión:
+# Lab 8 · ordering an OpenBao secrets store.
+# The same thing you would order with the mouse in the dashboard — only as text.
+# Applied NOT to the lab cluster, but to a tenant on the management cluster:
 #   kubectl --kubeconfig="$HOME/.kube/workshop" apply -f openbao.yaml
 #
-# ANTES DE APLICAR: reemplaza tenant-workshopXX por tu propio namespace. XX es un marcador,
-# no parte del nombre; recibiste tu propio número junto con la contraseña. Si va a parar
-# al tenant de otra persona, obtendrás un acceso denegado, y ese es el mejor resultado posible.
+# BEFORE APPLYING: replace tenant-workshopXX with your own namespace. XX is a placeholder,
+# not part of the name; you received your own number together with the password. If it goes
+# into someone else's tenant, you get an access denied — and that is the best possible outcome.
 #
-# kind: OpenBAO no es un objeto integrado de Kubernetes, sino un tipo que añade
-# Cozystack. Describes lo que necesitas, y la propia plataforma despliega los pods, discos
-# y servicios y luego los mantiene actualizados por su cuenta. Se parece más a pedir un servicio
-# de un catálogo que a instalar software en una máquina virtual que te entregaron.
+# kind: OpenBAO is not a built-in Kubernetes object, but a type added by
+# Cozystack. You describe what you need, and the platform itself deploys the pods, disks,
+# and services and then keeps them updated on its own. It is closer to ordering a service from
+# a catalog than to installing software on a VM you were handed.
 apiVersion: apps.cozystack.io/v1alpha1
 kind: OpenBAO
 metadata:
-  # El nombre afecta a más que la tarjeta en el panel: la dirección interna del almacén
-  # se construye a partir de él — openbao-secrets.<namespace>.svc.cozy.local. Si lo renombras,
-  # corrige la dirección en secrets-demo.yaml y en la variable BAO_APP para check.sh.
+  # The name affects more than just the card in the dashboard: the store's internal address
+  # is built from it — openbao-secrets.<namespace>.svc.cozy.local. If you rename it,
+  # fix the address in secrets-demo.yaml and in the BAO_APP variable for check.sh.
   name: secrets
   namespace: tenant-workshopXX
 spec:
-  # Una copia. En producción se usan tres, lo que da replicación Raft: el chart la habilita
-  # por sí mismo en cuanto replicas > 1. Cambiar de una a otra requiere
-  # migrar los datos, así que la decisión se toma antes, no después.
+  # One copy. In production three are used, which gives Raft replication: the chart enables
+  # it itself as soon as replicas > 1. Switching back and forth requires
+  # migrating the data, so the decision is made before, not after.
   replicas: 1
-  # Disco para los datos del almacén. Dos gigabytes es de sobra: los secretos pesan bytes,
-  # el espacio se va en el historial de versiones y el registro de auditoría. No puedes reducir el volumen tras
-  # su creación, pero normalmente sí puedes ampliarlo, así que no tiene sentido escatimar aquí.
+  # Disk for the store's data. Two gigabytes is plenty: secrets weigh bytes,
+  # the space goes to version history and the audit log. You cannot shrink the volume after
+  # creation, but you can usually grow it, so there is no point being stingy here.
   size: 2Gi
-  # La clase de almacenamiento replicated significa que los datos se guardan en varias copias en
-  # nodos diferentes. El fallo de un nodo no se lleva consigo todas tus contraseñas — y restaurar
-  # un almacén de secretos desde una copia de seguridad es un asunto aparte desagradable.
+  # The replicated storage class means the data is kept in several copies on
+  # different nodes. A node failure does not carry away all your passwords — and restoring
+  # a secrets store from a backup is a separately unpleasant affair.
   storageClass: replicated
-  # Un conjunto listo de «cuánta CPU y memoria». La plataforma los ofrece como una lista,
-  # para no obligar a cada uno a calcular las requests y los limits a mano.
+  # A ready-made "how much CPU and memory" set. The platform offers them as a list,
+  # so as not to force everyone to compute requests and limits by hand.
   resourcesPreset: t1.small
-  # La interfaz web se levanta dentro del clúster. No la exponemos hacia fuera:
-  # external: true colgaría un LoadBalancer, y en el laboratorio no lo necesitamos.
+  # The web interface comes up inside the cluster. We do not expose it outward:
+  # external: true would attach a LoadBalancer, and we don't need it in the lab.
   ui: true
   external: false

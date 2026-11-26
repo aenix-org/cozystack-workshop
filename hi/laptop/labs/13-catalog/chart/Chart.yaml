@@ -1,25 +1,25 @@
-# लैब 13. «पास» चार्ट का पासपोर्ट।
+# Lab 13. Passport of the "Passes" chart.
 #
-# चार्ट एक फ़ोल्डर है: templates/ में मैनिफ़ेस्ट टेम्पलेट, values.yaml में डिफ़ॉल्ट वैल्यू
-# और values.schema.json में पैरामीटर स्कीमा। इसे लैब फ़ोल्डर से
-# `helm install <रिलीज़-का-नाम> chart` कमांड से डिप्लॉय किया जाता है, और Cozystack कैटलॉग में — स्वयं
-# प्लेटफ़ॉर्म द्वारा, जब कोई डैशबोर्ड के माध्यम से किसी एप्लिकेशन का ऑर्डर देता है।
+# A chart is a folder: manifest templates in templates/, default values in values.yaml
+# and the parameter schema in values.schema.json. It is deployed with the command
+# `helm install <release-name> chart` from the lab folder, and in the Cozystack catalog — by the
+# platform itself, when someone orders an application through the dashboard.
 #
-# Chart.yaml पैकेज का कवर है: इससे Helm को पता चलता है कि पैकेज का नाम क्या है और इसका वर्शन क्या है।
+# Chart.yaml is the package cover: from it Helm learns what the package is called and what version it is.
 apiVersion: v2
 name: guest-pass
 description: Internal guest pass service — order a pass for a visitor
 type: application
 
-# आगे दो वर्शन हैं, और Helm में इन्हें बाकी सब चीज़ों से ज़्यादा अक्सर आपस में गड्डमड्ड किया जाता है। ये अलग-अलग चीज़ें हैं।
+# Next come two versions, and they are confused more often than anything else in Helm. These are different things.
 #
-# version — पैकेजिंग का वर्शन। यह तब बदलता है जब आप टेम्पलेट, वैल्यू या स्कीमा में बदलाव करते हैं,
-# भले ही अंदर का एप्लिकेशन वही रहे। अपग्रेड करते समय Helm इसी की तुलना करता है
-# रिलीज़ की, और इसी से रिपॉज़िटरी में अपलोड किए गए पैकेज एक-दूसरे से अलग पहचाने जाते हैं। इसे बढ़ाए बिना
-# प्लेटफ़ॉर्म यह मानता है कि पैकेज नहीं बदला, और नया वर्शन नज़रअंदाज़ हो सकता है।
+# version — the packaging version. It changes when you edit the templates, values or schema,
+# even if the application inside stayed the same. This is exactly what Helm compares when upgrading a
+# release, and it is what distinguishes packages uploaded to the repository. Without bumping it the
+# platform considers that the package has not changed, and the new version may go unnoticed.
 version: 0.1.0
-# appVersion — पैकेज के अंदर मौजूद ख़ुद एप्लिकेशन का वर्शन, यहाँ यह nginx है। यह अपनी
-# ज़िंदगी जीता है: एप्लिकेशन बिना टेम्पलेट में एक भी बदलाव किए दस बार अपडेट हो सकता है, और इसके उलट —
-# आपने टेम्पलेट फिर से लिखे, पर एप्लिकेशन वही है। यह ऑब्जेक्ट के नामों में नहीं आता, यह दिखता है
-# `helm list` के आउटपुट में और कैटलॉग कार्ड में।
+# appVersion — the version of the application itself inside the package, here it is nginx. It lives its own
+# life: the application may be updated ten times without a single edit to the templates, and vice versa —
+# you rewrote the templates, but the application is the same. It does not appear in object names, it is shown
+# in the output of `helm list` and in the catalog card.
 appVersion: "1.0"

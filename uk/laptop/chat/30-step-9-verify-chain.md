@@ -42,14 +42,14 @@ kubectl port-forward -n tenant-workshopXX <pod-name-from-output> 8080:8080
 
 В іншому вікні термінала:
 ```bash
-# здоров'я
+# health
 curl -s http://localhost:8080/actuator/health
 
-# створюємо замовлення
+# create an order
 curl -s -X POST http://localhost:8080/api/orders \
   -H 'Content-Type: application/json' -d '{"item":"test"}'
 
-# дивимося, що воно записалося
+# see that it was recorded
 curl -s http://localhost:8080/api/orders
 ```
 

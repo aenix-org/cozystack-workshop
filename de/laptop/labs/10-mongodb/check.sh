@@ -1,98 +1,98 @@
 #!/usr/bin/env bash
-# Prüfung von Lab 10: In MongoDB liegen Ausweise verschiedener Form und man sucht nach ihnen.
+# Check for lab 10: MongoDB holds passes of different shapes and they are searched by.
 #
-# Wir prüfen nicht «der Dienst wurde erstellt», sondern das Wesentliche: Die Sammlung enthält Dokumente aller vier
-# Formen, die Suche nach einem verschachtelten Feld und innerhalb einer Liste funktioniert, auf ein seltenes Feld
-# ist ein dünn besetzter Index gebaut, der Schema-Validator ist eingeschaltet, und Dokumente ohne Typ
-# sind keine mehr übrig.
+# We check not "the service was created" but the essence: the collection has documents of all four
+# shapes, search by a nested field and inside a list works, a sparse index is built
+# on a rare field, the schema validator is enabled, and no documents without a type
+# remain.
 #
-# Aufruf (in jedem neuen Terminalfenster werden die Variablen erneut gesetzt):
+# Run (in each new terminal window the variables are set again):
 #   export KUBECONFIG=~/lab.kubeconfig
-#   export COZY_TENANT=workshopXX       # eigene Nummer statt XX
-#   export MONGO_PASSWORD='Passwort des Benutzers passapp'
+#   export COZY_TENANT=workshopXX       # your number instead of XX
+#   export MONGO_PASSWORD='password of the passapp user'
 #   cd labs/10-mongodb && ./check.sh
 #
-# Das Passwort wird nicht ausgegeben und landet nicht im Bericht.
-# Das Skript startet Wegwerf-Pods und läuft daher etwa eine Minute.
+# The password is not printed and does not end up in the report.
+# The script spins up throwaway pods, so it takes about a minute.
 
-# Name und Titel werden von der gemeinsamen Bibliothek benötigt: Sie signiert damit das Bericht-Artefakt.
-# In lib.sh liegen ok/fail/warn/evidence/finish und die Umgebungsprüfungen unten — damit
-# fünfzehn Prüfskripte gleich ausgeben und nicht jedes auf seine eigene Weise.
+# The name and title are needed by the shared library: it signs the report artifact with them.
+# lib.sh holds ok/fail/warn/evidence/finish and the environment checks below — so that
+# fifteen check scripts print the same way instead of each in its own manner.
 LAB_NAME="10-mongodb"
-LAB_TITLE="Lab 10 · Dokumentenspeicher"
+LAB_TITLE="Lab 10 · Document store"
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
-# Beide Prüfungen stoppen das Skript mit einer klaren Meldung, wenn die Cluster-Zugriffsdatei
-# oder die Tenant-Nummer nicht gesetzt ist. Ohne sie würden sich weiter unten kubectl-Fehler häufen.
+# Both checks stop the script with a clear message if the cluster access file
+# or the tenant number is not set. Without them kubectl errors would pile up further down.
 need_kubeconfig
 need_tenant
 
-# Der Teilnehmer setzt COZY_TENANT als `workshop07`, während der Namespace
-# `tenant-workshop07` heißt. Wir akzeptieren beide Schreibweisen.
+# The participant sets COZY_TENANT as `workshop07`, while the namespace is called
+# `tenant-workshop07`. We accept both spellings.
 NS="$COZY_TENANT"
 case "$NS" in
   tenant-*) ;;
   *) NS="tenant-$NS" ;;
 esac
 
-# Die Standardnamen sind dieselben wie im Lab. Die Schreibweise ${X:-Wert} bedeutet «nimm
-# die Umgebungsvariable, und falls sie fehlt, setze den Wert ein»: hast du die Anwendung
-# anders benannt — starte als MONGO_APP=name ./check.sh, das Skript muss nicht geändert werden.
-# Die Adresse ist intern, aus dem Cluster selbst; rs0 im Namen ist das Replikat-Set, in dem
-# unsere einzige Kopie lebt.
+# The default names are the same as in the lab. The form ${X:-value} means "take
+# the environment variable, and if it is missing, substitute the value": if you named the app
+# differently — run it as MONGO_APP=name ./check.sh, no need to edit the script.
+# The address is internal, from the cluster itself; rs0 in the name is the replica set in which
+# our single copy lives.
 MONGO_APP="${MONGO_APP:-passes}"
 MONGO_USER="${MONGO_USER:-passapp}"
 MONGO_DB="${MONGO_DB:-passes}"
 MONGO_COLL="${MONGO_COLL:-passes}"
 MONGO_HOST="mongodb-${MONGO_APP}-rs0.${NS}.svc.cozy.local:27017"
 
-evidence "MongoDB-Adresse" "$MONGO_HOST"
+evidence "MongoDB address" "$MONGO_HOST"
 
-# --- 1. gibt es überhaupt Verbindung zum Port -------------------------------
-# MongoDB antwortet auf ihrem Port auf eine HTTP-Anfrage mit einem klaren Satz darüber, dass
-# man hierher mit einem Treiber kommt, nicht mit einem Browser. Das genügt, um
-# «Name wird nicht aufgelöst / Port geschlossen» von «Verbindung besteht, falsche Zugangsdaten» zu unterscheiden.
+# --- 1. is there connectivity to the port at all ---------------------------
+# MongoDB on its port answers an HTTP request with a clear phrase about the fact that
+# you reach it with a driver, not a browser. That is enough to tell
+# "name does not resolve / port closed" from "there is connectivity, wrong credentials".
 PROBE="$(in_cluster_curl "http://${MONGO_HOST}/")"
 if printf '%s' "$PROBE" | grep -qi 'mongodb'; then
-  ok "MongoDB antwortet unter der internen Adresse des Tenants"
+  ok "MongoDB responds at the tenant's internal address"
 else
-  fail "keine Verbindung zu MongoDB unter der Adresse ${MONGO_HOST}" \
-       "prüfe die Tenant-Nummer in COZY_TENANT und den Anwendungsnamen (Standard 'passes'; sonst MONGO_APP=name ./check.sh); im Dashboard muss die Anwendung in einem bereiten Zustand sein"
+  fail "no connectivity to MongoDB at address ${MONGO_HOST}" \
+       "check the tenant number in COZY_TENANT and the app name (default 'passes'; otherwise MONGO_APP=name ./check.sh); in the dashboard the app must be in a ready state"
   finish
   exit $?
 fi
 
-# Alles Weitere erfordert die Anmeldung an der Datenbank. Ohne Passwort rät das Skript nicht und schweigt nicht,
-# sondern sagt ehrlich, dass der Datenbankinhalt nicht geprüft wurde, und schließt den Bericht ab: sonst
-# würde der Teilnehmer meinen, die Prüfung sei bestanden.
+# Everything below requires logging into the database. Without a password the script does not guess and does not stay silent,
+# but honestly says that the database contents were not checked, and finishes the report: otherwise
+# the participant would decide that the check had passed.
 if [ -z "${MONGO_PASSWORD:-}" ]; then
-  fail "die Variable MONGO_PASSWORD ist nicht gesetzt, der Datenbankinhalt wurde nicht geprüft" \
-       "export MONGO_PASSWORD='Passwort des Benutzers ${MONGO_USER}' und starte das Skript erneut"
+  fail "the MONGO_PASSWORD variable is not set, the database contents were not checked" \
+       "export MONGO_PASSWORD='password of the ${MONGO_USER} user' and run the script again"
   finish
   exit $?
 fi
 
-# Das Passwort wird prozent-kodiert: die Zeichen @ : / ? # % darin würden sonst die Verbindungs-
-# zeichenkette zerstören, und der Mensch bekäme einen unklaren Parse-Fehler statt «falsches Passwort».
+# The password is percent-encoded: the characters @ : / ? # % in it would otherwise break the connection
+# string, and the person would get an unclear parse error instead of "wrong password".
 _pct() { printf %s "$1" | sed -e 's|%|%25|g' -e 's|@|%40|g' -e 's|:|%3A|g' \
                               -e 's|/|%2F|g' -e 's|?|%3F|g' -e 's|#|%23|g'; }
 MONGO_URI="mongodb://${MONGO_USER}:$(_pct "$MONGO_PASSWORD")@${MONGO_HOST}/${MONGO_DB}?authSource=admin&directConnection=true"
 
-# ⚠️ Die Verbindungszeichenkette enthält das Passwort und wird als Pod-Argument übergeben. Das ist ein bewusster
-# Kompromiss: siehe `in_cluster_with_secrets` in check/lib.sh — ein sicherer Weg existiert, aber
-# er ist ohne Überkomplizierung nicht mit einem mehrzeiligen --eval vereinbar. Der Pod lebt Sekunden und
-# räumt hinter sich auf; das Passwort landet nicht im Bericht. In Produktivskripten mach das nicht.
+# ⚠️ The connection string contains the password and is passed as a pod argument. This is a deliberate
+# tradeoff: see `in_cluster_with_secrets` in check/lib.sh — a safe path exists, but
+# it is incompatible with a multi-line --eval without overcomplication. The pod lives seconds and
+# cleans up after itself; the password does not end up in the report. Do not do this in production scripts.
 #
-# Alle Prüfungen in einem Durchgang: Jeder Aufruf startet einen Pod, und zehn Pods hintereinander
-# würden die Prüfung ohne Grund in eine mehrminütige Warterei verwandeln.
-# Nach außen wird eine einzige JSON-Zeile ausgegeben, danach zerlegt python sie.
-# `--overrides` mit securityContext: Ohne ihn würde der Pod in einem Cluster mit dem Profil
-# `restricted` nicht erstellt, und das Lab würde aus einem Grund scheitern, der den Teilnehmer nichts angeht.
-# `--command --` bleibt: kubectl fügt es mit dem Override zusammen, in dem nur die
-# Sicherheitsfelder gesetzt sind.
-# Das Programm für mongosh. Doppelte Anführungszeichen darin sind sicher: Der Text geht nach außen
-# durch python, das ihn selbst in Anführungszeichen setzt, und die Datenbank- und Sammlungsnamen werden
-# über die Marker unten eingesetzt.
+# All checks in one pass: each call spins up a pod, and ten pods in a row
+# would turn the check into a multi-minute wait for no reason.
+# A single line of JSON is emitted outward, and python parses it afterward.
+# `--overrides` with securityContext: without it the pod would not be created in a cluster with the
+# `restricted` profile, and the lab would fail for a reason unrelated to the participant.
+# `--command --` stays: kubectl merges it with the override, where only the
+# security fields are set.
+# The program for mongosh. Double quotes inside it are safe: the text goes outward
+# through python, which quotes it itself, and the database and collection names are substituted
+# by the markers below.
 MONGO_EVAL=$(cat <<'JSEOF'
 
 var out = {};
@@ -126,10 +126,10 @@ JSEOF
 MONGO_EVAL="${MONGO_EVAL//__DB__/$MONGO_DB}"
 MONGO_EVAL="${MONGO_EVAL//__COLL__/$MONGO_COLL}"
 
-# Der Container-Befehl wird INS Override gelegt, nicht außen in `--command --` belassen.
-# kubectl wendet das Override als JSON-Merge-Patch an, und darin wird das Array containers
-# vollständig ersetzt: der außen gesetzte `--command` würde den Pod nicht erreichen, und statt mongosh würde
-# der Standardprozess des Images starten — also die Datenbank selbst. Genauso ist es in check/lib.sh gemacht.
+# The container command is put INSIDE the override, not left outside in `--command --`.
+# kubectl applies the override as a JSON merge patch, and in it the containers array is replaced
+# entirely: the `--command` set outside would not reach the pod, and instead of mongosh the
+# image's default process would start — that is, the database itself. This is done the same way in check/lib.sh.
 MONGO_SC="$(python3 - "$MONGO_URI" "$MONGO_EVAL" <<'PYEOF'
 import json, sys
 uri, script = sys.argv[1], sys.argv[2]
@@ -147,8 +147,8 @@ SUMMARY="$(kubectl run "mongo-check" --rm -i --restart=Never --quiet \
   --pod-running-timeout=90s --overrides="$MONGO_SC" \
   --image=mongo:8.0 </dev/null 2>/dev/null | tr -d '\r' | grep '^{' | tail -1)"
 
-# Ein Feld aus der JSON-Zeile herausholen, die mongosh ausgegeben hat. Listen werden mit
-# Komma zusammengefügt, damit man sie dem Teilnehmer so wie sie sind zeigen kann.
+# Pull a field out of the JSON string that mongosh printed. Lists are joined with a
+# comma, so they can be shown to the participant as-is.
 mget() {
   printf '%s' "$SUMMARY" | python3 -c '
 import sys, json
@@ -163,8 +163,8 @@ print(v if not isinstance(v, list) else ", ".join(str(x) for x in v))
 ' "$1" 2>/dev/null
 }
 
-# Dasselbe, aber für Zahlen: Jeder unerwartete Wert wird zu 0, sonst würde der Vergleich
-# unten mit einem Arithmetikfehler abbrechen statt mit einem klaren FAIL.
+# The same, but for numbers: any unexpected value turns into 0, otherwise the comparison
+# below would fail with an arithmetic error instead of a clear FAIL.
 num() {
   local v
   v="$(mget "$1")"
@@ -174,108 +174,108 @@ num() {
   esac
 }
 
-# Wenn es überhaupt keine Antwort gibt oder mongosh einen Fehler meldete — gibt es nichts mehr zu prüfen.
-# Eine Ablehnung der Authentifizierung wird von anderen Fehlern getrennt: Sie hat ihre eigene häufige Ursache —
-# ein vergessenes authSource=admin, und der Hinweis sollte genau darauf führen.
+# If there is no answer at all or mongosh reported an error — there is nothing more to check.
+# An authentication refusal is separated from other errors: it has its own common cause —
+# a forgotten authSource=admin, and the hint should point exactly to it.
 if [ -z "$SUMMARY" ] || [ "$(mget ok)" != "1" ]; then
   ERR="$(mget error)"
   case "$ERR" in
     *[Aa]uthentication*)
-      fail "MongoDB hat die Zugangsdaten des Benutzers ${MONGO_USER} nicht akzeptiert" \
-           "prüfe das Passwort und dass die Verbindungszeichenkette authSource=admin enthält: der Benutzer ist in der Datenbank admin angelegt, die Rechte aber in ${MONGO_DB} vergeben" ;;
+      fail "MongoDB did not accept the credentials of the ${MONGO_USER} user" \
+           "check the password and that the connection string has authSource=admin: the user is created in the admin database, while the privileges are granted in ${MONGO_DB}" ;;
     *)
-      fail "die Abfrage an die Datenbank ${MONGO_DB} konnte nicht ausgeführt werden${ERR:+: $ERR}" \
-           "prüfe manuell: kubectl exec -it mongo-workbench -- sh -c 'mongosh \"\$MONGO_URI\"'" ;;
+      fail "failed to run the query against the ${MONGO_DB} database${ERR:+: $ERR}" \
+           "check manually: kubectl exec -it mongo-workbench -- sh -c 'mongosh \"\$MONGO_URI\"'" ;;
   esac
   finish
   exit $?
 fi
 
-ok "die Verbindung zur Datenbank ${MONGO_DB} als Benutzer ${MONGO_USER} funktioniert"
+ok "connection to the ${MONGO_DB} database as the ${MONGO_USER} user works"
 
-# --- 2. Dokumente sind vorhanden --------------------------------------------
+# --- 2. documents exist -----------------------------------------------------
 TOTAL="$(num total)"
 if [ "$TOTAL" -ge 4 ]; then
-  ok "Dokumente in der Sammlung ${MONGO_COLL}: ${TOTAL}"
+  ok "documents in the ${MONGO_COLL} collection: ${TOTAL}"
 else
-  fail "die Sammlung ${MONGO_COLL} hat nur ${TOTAL} Dokumente, erwartet wurden mindestens vier" \
-       "lade die Ausweise: mo < passes.js (die Aufschlüsselung der Datei steht in der README)"
+  fail "the ${MONGO_COLL} collection has only ${TOTAL} documents, at least four were expected" \
+       "load the passes: mo < passes.js (the file breakdown is in the README)"
 fi
 
-# --- 3. die Formen sind tatsächlich verschieden -----------------------------
+# --- 3. the shapes really are different -------------------------------------
 TYPES="$(num types)"
 if [ "$TYPES" -ge 4 ]; then
-  ok "die Sammlung hat ${TYPES} verschiedene Ausweistypen"
+  ok "the collection has ${TYPES} different pass types"
 else
-  fail "nur ${TYPES} verschiedene Ausweistypen, erwartet wurden vier" \
-       "prüfe, dass passes.js vollständig geladen wurde: db.passes.distinct('type')"
+  fail "only ${TYPES} different pass types, four were expected" \
+       "check that passes.js loaded in full: db.passes.distinct('type')"
 fi
 
 WITH_CAR="$(num withCar)"
 if [ "$WITH_CAR" -ge 1 ]; then
-  ok "es gibt Dokumente mit einem verschachtelten Objekt (car.plate): ${WITH_CAR}"
+  ok "there are documents with a nested object (car.plate): ${WITH_CAR}"
 else
-  fail "kein einziges Dokument mit einem verschachtelten car-Objekt" \
-       "der Auto-Ausweis wurde nicht geladen; wiederhole mo < passes.js"
+  fail "not a single document with a nested car object" \
+       "the car pass did not load; repeat mo < passes.js"
 fi
 
 WITH_ARRAY="$(num withArray)"
 if [ "$WITH_ARRAY" -ge 2 ]; then
-  ok "es gibt Dokumente mit Listen (entrances und members): ${WITH_ARRAY}"
+  ok "there are documents with lists (entrances and members): ${WITH_ARRAY}"
 else
-  fail "Dokumente mit Listen ${WITH_ARRAY}, erwartet wurden mindestens zwei" \
-       "der Wochen- und der Gruppen-Ausweis wurden nicht geladen; wiederhole mo < passes.js"
+  fail "documents with lists ${WITH_ARRAY}, at least two were expected" \
+       "the weekly and group passes did not load; repeat mo < passes.js"
 fi
 
 NESTED="$(num nested)"
 if [ "$NESTED" -ge 1 ]; then
-  ok "die Suche in eine Objektliste hinein (members.name) findet Dokumente"
+  ok "search inside a list of objects (members.name) finds documents"
 else
-  fail "die Suche nach members.name fand nichts" \
-       "der Gruppen-Ausweis mit einer Teilnehmerliste wurde nicht geladen; wiederhole mo < passes.js"
+  fail "search by members.name found nothing" \
+       "the group pass with a member list did not load; repeat mo < passes.js"
 fi
 
-evidence "Zusammensetzung der Sammlung" "Dokumente: ${TOTAL}
-verschiedene Ausweistypen: ${TYPES}
-mit verschachteltem car-Objekt: ${WITH_CAR}
-mit Listen: ${WITH_ARRAY}"
+evidence "Collection composition" "documents: ${TOTAL}
+different pass types: ${TYPES}
+with a nested car object: ${WITH_CAR}
+with lists: ${WITH_ARRAY}"
 
-# --- 4. Index auf ein seltenes Feld -----------------------------------------
+# --- 4. index on a rare field ----------------------------------------------
 SPARSE="$(mget sparse)"
 IDX="$(mget indexes)"
 if [ -n "$SPARSE" ]; then
-  ok "ein dünn besetzter (oder partieller) Index ist gebaut: ${SPARSE}"
-  evidence "Indizes der Sammlung" "alle: ${IDX}
-dünn besetzt: ${SPARSE}"
+  ok "a sparse (or partial) index is built: ${SPARSE}"
+  evidence "Collection indexes" "all: ${IDX}
+sparse: ${SPARSE}"
 else
-  fail "es gibt keinen dünn besetzten Index — die Suche nach dem Kennzeichen läuft als vollständiger Scan" \
-       "erstelle ihn: db.${MONGO_COLL}.createIndex({ 'car.plate': 1 }, { name: 'car_plate', sparse: true })"
-  evidence "Indizes der Sammlung" "alle: ${IDX}"
+  fail "there is no sparse index — the search by car plate is a full scan" \
+       "create it: db.${MONGO_COLL}.createIndex({ 'car.plate': 1 }, { name: 'car_plate', sparse: true })"
+  evidence "Collection indexes" "all: ${IDX}"
 fi
 
-# --- 5. Schema-Validator ist eingeschaltet ----------------------------------
+# --- 5. schema validator is enabled ----------------------------------------
 VALIDATOR="$(num validator)"
 ACTION="$(mget validationAction)"
 if [ "$VALIDATOR" = "1" ]; then
-  ok "der Schema-Validator ist eingeschaltet (Aktion bei Verstoß: ${ACTION:-Standard})"
+  ok "the schema validator is enabled (action on violation: ${ACTION:-default})"
   if [ "$ACTION" = "warn" ]; then
-    warn "der Validator warnt nur, akzeptiert die Dokumente aber" \
-         "eine Produktivsammlung braucht validationAction: error"
+    warn "the validator only warns but accepts documents" \
+         "a production collection needs validationAction: error"
   fi
 else
-  fail "der Schema-Validator ist nicht eingeschaltet — ein Tippfehler im Feldnamen würde stillschweigend durchgehen" \
-       "schalte ihn ein: mo < validator.js (siehe die Durchsprache des vorhersehbaren Fehlschlags in der README)"
+  fail "the schema validator is not enabled — a typo in a field name would pass silently" \
+       "enable it: mo < validator.js (see the walk-through of the predictable failure in the README)"
 fi
 
-# --- 6. beschädigte Dokumente entfernt --------------------------------------
+# --- 6. corrupted documents removed ----------------------------------------
 TYPELESS="$(num typeless)"
 if [ "$TYPELESS" -eq 0 ]; then
-  ok "es sind keine Dokumente ohne Feld type mehr übrig"
+  ok "no documents without a type field remain"
 else
-  fail "die Sammlung hat ${TYPELESS} Dokumente ohne Feld type — die Sicherheit wird sie nicht sehen" \
-       "finde und entferne sie: db.${MONGO_COLL}.deleteMany({ type: { \$exists: false } })"
+  fail "the collection has ${TYPELESS} documents without a type field — security will not see them" \
+       "find and remove them: db.${MONGO_COLL}.deleteMany({ type: { \$exists: false } })"
 fi
 
-# finish gibt das Fazit aus und legt das Bericht-Artefakt in einer Datei ab; der Rückgabecode ist ungleich null,
-# wenn mindestens eine Prüfung fehlgeschlagen ist.
+# finish prints the summary and stores the report artifact in a file; the return code is non-zero
+# if at least one check failed.
 finish

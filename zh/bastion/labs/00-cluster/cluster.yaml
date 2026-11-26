@@ -1,9 +1,9 @@
-# 用于实验 1-14 的教学 Kubernetes 集群。
-# 应用前请将 tenant-workshopXX 替换为你自己的 namespace。
+# Training Kubernetes cluster for labs 1-14.
+# Before applying, replace tenant-workshopXX with your own namespace.
 #
-# 在管理集群上应用 —— 使用随租户一起下发的那份访问权限。
-# 这个集群自身的 kubeconfig 还不存在：它只会在
-# 集群启动之后才出现。
+# Applied on the MANAGEMENT cluster — using the access that was issued together
+# with the tenant. The kubeconfig of this cluster itself does not exist yet: it will
+# appear only after the cluster comes up.
 #
 #   kubectl apply -f cluster.yaml
 #
@@ -16,18 +16,18 @@ spec:
   version: v1.35
   storageClass: replicated
   controlPlane:
-    # 控制平面只保留一个副本：这是教学环境，节省资源
-    # 比容错更重要。
+    # A single copy of the control plane: a training stand, saving resources
+    # matters more than fault tolerance.
     replicas: 1
   addons:
     monitoringAgents:
-      # 立即启用。指标采集无法事后补开：在勾选之前
-      # 发生的一切都会丢失。实验 14 依赖这些数据。
+      # Enable right away. Metrics collection cannot be enabled retroactively: everything
+      # that happened before the checkbox was set is lost. Lab 14 relies on this data.
       enabled: true
   nodeGroups:
     md0:
-      # 当副本开始空间不足时，该组能够自行添加节点。
-      # 在扩缩容那节实验里不会到这一步：那里增长的是副本，而不是节点。
+      # The group can add nodes on its own if the copies start running out of space.
+      # In the scaling lab it won't get that far: there the copies grow, not the nodes.
       minReplicas: 1
       maxReplicas: 3
       instanceType: u1.medium

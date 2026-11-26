@@ -37,16 +37,16 @@ Die Befehle in den Labs sind für die Kommandozeile von Linux und macOS geschrie
 Die Lösung ist **WSL** — ein Linux-Subsystem innerhalb von Windows. Es installiert sich mit einem einzigen Befehl in einem als Administrator gestarteten PowerShell:
 
 ```powershell
-# installiert das Linux-Subsystem in Windows: den Kernel, den Dienst und die
-# standardmäßige Ubuntu-Distribution. Nach der Installation fordert Windows Sie zum Neustart auf.
+# installs the Linux subsystem inside Windows: the kernel, the service and the default
+# Ubuntu distribution. After installation Windows will ask you to reboot.
 wsl --install
 ```
 
 Nach dem Neustart haben Sie eine Ubuntu-Konsole — und von da an arbeiten Sie darin wie alle anderen. Innerhalb von WSL brauchen Sie ein eigenes `kubectl` — den Befehl, mit dem Sie sich an den Cluster wenden:
 
 ```bash
-# snap ist der Paketmanager von Ubuntu. --classic installiert das Paket ohne Isolierung:
-# im isolierten Modus sieht kubectl die Zugangsdatei in Ihrem Home-Verzeichnis nicht.
+# snap is Ubuntu's package manager. --classic installs the package without isolation:
+# in isolated mode kubectl won't see the access file in your home folder.
 sudo snap install kubectl --classic
 ```
 
@@ -59,7 +59,7 @@ Windows-Laufwerke sind aus WSL unter dem Pfad `/mnt/c/...` sichtbar, sodass mit 
 Alle Dateien gehören Ihnen bereits — Sie haben sie zusammen mit dem Repository geholt. Es gibt nichts neu zu erstellen oder abzutippen: Überall, wo unten `kubectl apply -f name.yaml` steht, wird die Datei von hier genommen.
 
 ```bash
-# der Pfad wird vom Repository-Wurzelverzeichnis gezählt — es holen Sie im nächsten Schritt
+# the path is counted from the repository root — you fetch it in the next step
 cd labs/00-cluster
 ```
 
@@ -75,8 +75,8 @@ cd labs/00-cluster
 Im Repository liegen die Manifeste — Dateien, die beschreiben, was im Cluster zu erstellen ist — und die Prüfskripte. Sie brauchen sie ab diesem Lab:
 
 ```bash
-# clone = das gesamte Repository herunterladen, samt seiner Änderungshistorie.
-# Daneben erscheint ein Ordner cozystack-migration-workshop, in den wir hineinwechseln.
+# clone = download the entire repository, together with its change history.
+# A folder cozystack-migration-workshop appears alongside; we move into it.
 git clone https://github.com/aenix-org/cozystack-migration-workshop.git
 cd cozystack-migration-workshop
 ```
@@ -92,8 +92,8 @@ Alles, was Sie bei der Plattform bestellen, lebt auf dem **Management-Cluster** 
 Dieser Pfad wird in jedem Lab verwendet — speichern Sie die Datei an einen anderen Ort, müssen Sie von hier an jedes Mal Ihren eigenen einsetzen.
 
 ```bash
-# Prüfen, dass die Datei lesbar ist und der Cluster antwortet.
-# --kubeconfig sagt kubectl, welche Zugangsdatei in diesem Befehl zu verwenden ist.
+# Check that the file is readable and the cluster answers.
+# --kubeconfig tells kubectl which access file to use in this command.
 kubectl --kubeconfig ~/.kube/workshop get kubernetes.apps.cozystack.io -n tenant-workshopXX
 ```
 
@@ -162,19 +162,19 @@ spec:
 ⚠️ Die Befehle unten laufen **auf dem Management-Cluster** — mit dem Zugang, den Sie zusammen mit dem Tenant erhalten haben. Eine Zugangsdatei für den `lab`-Cluster selbst gibt es noch nicht: Sie erscheint erst, nachdem der Cluster hochgekommen ist.
 
 ```bash
-# in den Lab-Ordner wechseln — von hier an werden alle Dateien von hier genommen
+# move into the lab folder — from here on all files are taken from here
 cd labs/00-cluster
-# vor dem Anwenden setzen Sie in der Datei Ihre eigene Tenant-Nummer anstelle von XX ein.
-# apply = "bring den Cluster auf das, was in der Datei beschrieben ist". Den Cluster bringt der Befehl
-# nicht selbst hoch — er übergibt den Auftrag an die Plattform, die entscheidet, was in
-# welcher Reihenfolge erstellt wird.
-#   -f   die Beschreibung aus der Datei nehmen
+# before applying, substitute your own tenant number in the file in place of XX.
+# apply = "bring the cluster to what's described in the file". The command doesn't bring
+# the cluster up itself — it hands the order to the platform, which decides what to
+# create and in what order.
+#   -f   take the description from the file
 kubectl apply -f cluster.yaml
-# get = "zeig, was da ist". kubernetes.apps.cozystack.io ist der vollständige Name des Objekt-
-# typs, genau der, der in der Datei beschrieben ist (kind: Kubernetes), lab ist der Name Ihres Auftrags.
-#   -n   in welchem Namespace gesucht wird; ohne das Flag schaut kubectl im Standard-Namespace nach
-#   -w   Änderungen beobachten und ausgeben. Zum Beenden — Ctrl+C, die Installation wird dadurch nicht unterbrochen
-# Warten, bis in der Spalte READY True erscheint.
+# get = "show what's there". kubernetes.apps.cozystack.io is the full name of the object
+# type, the very one described in the file (kind: Kubernetes), lab is the name of your order.
+#   -n   which namespace to look in; without the flag kubectl looks in the default namespace
+#   -w   watch and print changes. To exit — Ctrl+C, the installation won't be interrupted by it
+# Wait until True appears in the READY column.
 kubectl -n tenant-workshopXX get kubernetes.apps.cozystack.io lab -w
 ```
 
@@ -187,9 +187,9 @@ Der Status wechselt zu `Ready`, meist innerhalb von fünf bis zehn Minuten.
 ⚠️ **Wenn mehr als zwanzig Minuten vergangen sind und sich der Status nicht ändert — die Ursache muss nicht Ihr Cluster sein.** Die Installation aller Anwendungen auf der Plattform wird von einer gemeinsamen Warteschlange gesteuert, und steht darin die lange Operation von jemandem, wartet Ihr Cluster, bis er an der Reihe ist. Um zu sehen, ob er in Arbeit genommen wurde:
 
 ```bash
-# Den Auftrag selbst ansehen und das, was die Plattform darüber schreibt.
-# Der Abschnitt status.conditions am Ende der Ausgabe ist ihr Bericht: ob er in
-# Arbeit genommen wurde, was blockiert, worauf er wartet.
+# Look at the order itself and at what the platform writes about it.
+# The status.conditions section at the end of the output is its report: whether it's been
+# picked up for work, what's blocking, what it's waiting for.
 kubectl --kubeconfig ~/.kube/workshop -n tenant-workshopXX \
   get kubernetes.apps.cozystack.io lab -o yaml
 ```
@@ -197,7 +197,7 @@ kubectl --kubeconfig ~/.kube/workshop -n tenant-workshopXX \
 Wenn auch dort nichts Klares steht — sehen Sie sich die Events des Tenants an. Das ist ein Protokoll dessen, was die Plattform mit Ihren Objekten getan hat:
 
 ```bash
-# events = ein Protokoll der Vorfälle. Wir sortieren nach Zeit, damit das Frischeste unten steht.
+# events = a log of incidents. We sort by time so the freshest is at the bottom.
 kubectl --kubeconfig ~/.kube/workshop -n tenant-workshopXX \
   get events --sort-by=.lastTimestamp | tail -20
 ```
@@ -227,12 +227,12 @@ Daraus folgt etwas Wichtiges: **Kubernetes ersetzt hier die Virtualisierung nich
 **Der Hauptweg — per Befehl.** Cozystack richtet auf Ihrem Cluster eine separate Zugriffsregel ein, die erlaubt, genau diesen Secret zu lesen und nichts weiter. Der Befehl läuft **auf dem Management-Cluster**, mit dem Zugang, den Sie zusammen mit dem Tenant erhalten haben, und das Ergebnis wird in eine Datei auf dem Laptop gelegt:
 
 ```bash
-# get secret = den Secret anzeigen; -o go-template — ihn nicht ganz ausgeben,
-# sondern ein Feld herausziehen und als Text ausgeben:
-#   index .data "admin.conf"   den Schlüssel admin.conf aus dem Secret nehmen
-#   base64decode               der Inhalt von Secrets wird base64-kodiert gespeichert,
-#                              diese Funktion gibt den ursprünglichen Text zurück
-#   > ~/lab.kubeconfig         die Ausgabe in eine Datei statt auf den Bildschirm schreiben
+# get secret = show the Secret; -o go-template — don't print it whole,
+# but pull one field out of it and output it as text:
+#   index .data "admin.conf"   take the admin.conf key from the Secret
+#   base64decode               the contents of Secrets are stored base64-encoded,
+#                              this function returns the original text
+#   > ~/lab.kubeconfig         write the output to a file instead of the screen
 kubectl -n tenant-workshopXX get secret kubernetes-lab-admin-kubeconfig \
   -o go-template='{{ printf "%s\n" (index .data "admin.conf" | base64decode) }}' > ~/lab.kubeconfig
 ```
@@ -248,18 +248,18 @@ kubectl -n tenant-workshopXX get secret kubernetes-lab-admin-kubeconfig \
 macOS und Linux:
 
 ```bash
-# KUBECONFIG ist die Variable, aus der kubectl erfährt, welche Zugangsdatei zu nehmen ist.
-# export macht sie für alle Befehle sichtbar, die weiter in diesem Terminalfenster laufen.
+# KUBECONFIG is the variable from which kubectl learns which access file to take.
+# export makes it visible to all commands run further in this terminal window.
 export KUBECONFIG=~/lab.kubeconfig
-# nodes sind die Nodes des Clusters, genau die virtuellen Maschinen, auf denen Ihre Anwendungen laufen werden.
-# Die Antwort beweist zugleich, dass die Zugangsdatei funktioniert.
+# nodes are the cluster's nodes, the very virtual machines your applications will run on.
+# The answer also proves the access file works.
 kubectl get nodes
 ```
 
 Windows PowerShell — nur falls sich WSL nicht installieren ließ:
 
 ```powershell
-# in PowerShell werden Umgebungsvariablen über $env: gesetzt und leben, bis das Fenster geschlossen wird
+# in PowerShell environment variables are set via $env: and live until the window closes
 $env:KUBECONFIG="$HOME\lab.kubeconfig"
 kubectl get nodes
 ```
@@ -280,10 +280,10 @@ kubernetes-lab-md0-xxxxx    Ready    <none>   3m    v1.35.6
 📍 **Wo:** auf Ihrem Laptop, im selben Terminalfenster, in dem Sie mit `kubectl` gearbeitet haben.
 
 ```bash
-# das Skript läuft aus dem Lab-Ordner: es sucht die Dateien neben sich
+# the script runs from the lab folder: it looks for files next to itself
 cd labs/00-cluster
-# ./ vor dem Namen bedeutet "führe die Datei genau von hier aus"; ohne das sucht die Shell
-# den Befehl check.sh in den Systemordnern und findet ihn nicht
+# ./ before the name means "run the file right from here"; without it the shell
+# will look for the check.sh command among the system folders and won't find it
 ./check.sh
 ```
 

@@ -1,27 +1,30 @@
 ---
-# 实验 5 · Git 中的基础设施。用于「Passes」（通行证）服务的命名空间。
+# Lab 5 · Infrastructure in Git. Namespace for the "Passes" service.
 #
-# 不要手动把这个文件应用到集群。你要把它放进你在 GitHub 上的仓库，放在 apps/ 目录里，
-# 然后由 Flux 按计划自动把它搬进 `lab` 集群：
+# You do not apply this file to the cluster by hand. You put it into your repository on
+# GitHub, in the apps/ folder, and Flux moves it into the `lab` cluster itself, on schedule:
 #     cp app/*.yaml ~/passes-gitops/apps/
 #     cd ~/passes-gitops && git add apps && git commit -m "add passes service v1" && git push
 #
-# 如何阅读任意清单：apiVersion — 描述模式的版本（集群靠它知道如何解析该对象），
-# kind — 我们要创建什么，metadata.name — 之后据以查找该对象的名字。这三个字段在每个对象里
-# 都有，下面不再单独说明。
+# How to read any manifest: apiVersion — the version of the description schema (the cluster
+# uses it to know how to parse the object), kind — what we are creating, metadata.name — the
+# name by which the object is later found. These three fields are present in every object and
+# are not explained separately below.
 #
-# 命名空间（namespace）是单个集群内部的逻辑隔断：拥有自己的名字作用域、自己的权限、自己的配额。
-# 在 vSphere 中最接近的东西是 vCenter 树中的文件夹或资源池（resource pool）。
+# A namespace is a logical partition inside a single cluster: its own name scope, its own
+# permissions, its own quotas. The closest thing in vSphere is a folder in the vCenter tree
+# or a resource pool.
 #
-# 为什么它和应用一起放在 Git 里，而不是手动创建：当服务从仓库中移除时，Flux 也会一并删掉命名空间。
-# 不会留下一个空隔断，让人半年后想不起来它当初是为什么建的。
+# Why it lives in Git together with the application rather than being created by hand: when
+# the service leaves the repository, Flux will remove the namespace too. No empty partition
+# will be left behind that in six months nobody remembers why it was set up.
 apiVersion: v1
 kind: Namespace
 metadata:
   name: passes
-  # 这个标签不影响服务的运行方式 —— 它的作用是让一条命令就能找到与「Passes」相关的一切：
-  # kubectl get all -A -l app.kubernetes.io/part-of=passes。
-  # part-of 这个名字取自 Kubernetes 通用的标签集合，不是我们杜撰的：
-  # 外部工具（监控、导出）恰恰就找这个。
+  # The label does not affect how the service runs — it is needed so that a single command
+  # can find everything related to "Passes": kubectl get all -A -l app.kubernetes.io/part-of=passes.
+  # The part-of name is taken from the common Kubernetes set of labels, not invented by us:
+  # external tools (monitoring, exports) look for exactly this one.
   labels:
     app.kubernetes.io/part-of: passes

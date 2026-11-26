@@ -33,8 +33,8 @@ virtctl console --namespace=tenant-workshopXX vm-instance-app-1
 
 **Доступ в вашу машину:**
 ```
-логин:  root
-пароль: cozydemo
+login:    root
+password: cozydemo
 ```
 
 Выйти из консоли — `Ctrl+]`.

@@ -1,51 +1,51 @@
 ---
-# लैब 11. मोबाइल एप्लिकेशन «गेस्ट पास» के सोर्स — यही बिल्ड को इनपुट के रूप में दिया जाता है।
+# Lab 11. Sources of the "Propusk" mobile application — what is fed to the build as input.
 #
-# यह आपके प्रशिक्षण क्लस्टर `lab` पर लागू किया जाता है, न कि प्रबंधन क्लस्टर के टेनेंट में:
+# Applied on your training cluster `lab`, not in a tenant on the management cluster:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl apply -f propusk-src.yaml
-# यहाँ tenant-workshopXX जैसे कोई प्लेसहोल्डर नहीं हैं — अपना नंबर कहीं भी डालने की ज़रूरत नहीं।
-# Namespace भी निर्दिष्ट नहीं है: ऑब्जेक्ट उसी में जाएगा जो आपके kubeconfig में लिखा है।
+# There are no placeholders like tenant-workshopXX here — you don't need to substitute your number anywhere.
+# The namespace is not specified either: the object lands in the one set in your kubeconfig.
 #
-# एप्लिकेशन जानबूझकर बहुत छोटा है: एक activity, स्क्रीन पर टेक्स्ट की एक पंक्ति।
-# लैब का मतलब Android नहीं है, बल्कि यह है कि बिल्ड क्लस्टर तक जाता है।
+# The application is deliberately tiny: one activity, one line of text on the screen.
+# The point of the lab is not Android, but the fact that a build travels to the cluster.
 #
-# ये फ़ाइलें क्या हैं, अगर आपने कभी मोबाइल एप्लिकेशन नहीं बनाए हैं।
-# Android प्रोजेक्ट कोड वाली एक फ़ाइल नहीं है, बल्कि तीन प्रकार की फ़ाइलों का पेड़ है:
-#   *.gradle.kts  बिल्ड का विवरण: लाइब्रेरी कहाँ से लें, किससे कंपाइल करें, किन
-#                 Android संस्करणों के लिए बनाएँ। भूमिका के हिसाब से यह makefile है, बस Kotlin भाषा में;
-#   *.kt          स्वयं एप्लिकेशन का कोड;
-#   *.xml         रिसोर्स: टेक्स्ट और इसका विवरण कि आइकन पर टैप करने पर कौन-सी स्क्रीन
-#                 खुले।
-# Gradle बिल्डर इस पेड़ को पढ़ता है और APK बनाता है — फ़ोन के लिए एक इंस्टॉलर फ़ाइल,
-# भूमिका के हिसाब से वही जो Windows के लिए .msi है। आपको Android SDK खुद इंस्टॉल करके हाथ से
-# बनाने की ज़रूरत नहीं: यह काम android-build.yaml का Job करेगा, और यहाँ केवल उसका इनपुट पड़ा है।
+# WHAT THESE FILES ARE, if you've never built mobile applications.
+# An Android project is not a single file with code, but a tree of three kinds of files:
+#   *.gradle.kts  the build description: where to get libraries, what to compile with, for which
+#                 Android versions to build. By its role it's a makefile, only in the Kotlin language;
+#   *.kt          the actual application code;
+#   *.xml         resources: texts and the description of which screen to open when the icon
+#                 is tapped.
+# The Gradle builder reads this tree and produces an APK — a single installer file for the phone,
+# by its role the same as an .msi for Windows. You don't need to install the Android SDK yourself and
+# build by hand: a Job from android-build.yaml takes care of that, and here lies only its input.
 #
-# सोर्स ConfigMap में पड़े हैं, इमेज में नहीं, ठीक उसी कारण से जिसकी वजह
-# से पहले एप्लिकेशन वाली लैब में nginx का पेज ConfigMap में पड़ा था:
-# ताकि उन्हें बदलने के लिए कुछ भी दोबारा न बनाना पड़े। ConfigMap क्लस्टर का ऑब्जेक्ट है, जिसके
-# अंदर टेक्स्ट फ़ाइलें पड़ी होती हैं; कंटेनर के शुरू होने पर क्लस्टर उन्हें
-# उसके अंदर डिस्क की सामान्य फ़ाइलों की तरह रख देता है।
+# The sources live in a ConfigMap, not in an image, for exactly the same reason
+# that in the lab with the first application the nginx page lived in a ConfigMap:
+# so you can change them without rebuilding anything. A ConfigMap is a cluster object, inside
+# which text files live; when the container starts, the cluster places them
+# inside it as ordinary files on disk.
 #
-# `data` के अंदर की keys फ़ाइलों के नाम हैं, और `|` के बाद के इंडेंट से नीचे जो कुछ है, वह
-# फ़ाइल की हूबहू सामग्री है, YAML नहीं। ऐसे ब्लॉक के अंदर रखी टिप्पणी
-# स्वयं फ़ाइल की एक पंक्ति बन जाती, इसलिए नीचे के सभी स्पष्टीकरण बाहर,
-# key से पहले हैं।
+# The keys inside `data` are file names, and everything below the indent after `|` is
+# the verbatim content of the file, not YAML. A comment placed inside such a
+# block would become a line of the file itself, so all explanations below stand outside,
+# before the key.
 #
-# छह keys का सपाट नक्शा डायरेक्टरी पेड़ में यहाँ नहीं, बल्कि माउंट के समय खुलता है:
-# «key -> path» का मिलान android-build.yaml में, volumes.items ब्लॉक में
-# तय किया गया है। ConfigMap की key में स्लैश नहीं हो सकता — इसीलिए सपाट नाम
-# app-build.gradle.kts, जो प्रोजेक्ट में app/build.gradle.kts बन जाता है।
+# The flat map of six keys unfolds into a directory tree not here, but at
+# mount time: the "key -> path" correspondence is set in android-build.yaml, in the
+# volumes.items block. A ConfigMap key cannot contain a slash — hence the flat name
+# app-build.gradle.kts, which in the project becomes app/build.gradle.kts.
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: propusk-src
 data:
-  # प्रोजेक्ट की शीर्ष-स्तरीय फ़ाइल: बताती है कि Gradle प्लगइन और लाइब्रेरी कहाँ से लेता है और कौन-से
-  # मॉड्यूल प्रोजेक्ट का हिस्सा हैं (यहाँ एक है — app)। तीनों रिपॉज़िटरी सार्वजनिक हैं, इंटरनेट पर:
-  # बिल्ड कंटेनर खाली शुरू होता है और वहाँ से सब कुछ खींचता है, इसीलिए बिल्ड में इतना समय लगता है।
-  # यही वह जगह है जिसे आप सबसे पहले ठीक करेंगे जब सूचना सुरक्षा बाहरी पहुँच बंद कर देगी — यहाँ
-  # एक आंतरिक प्रॉक्सी-रिपॉज़िटरी लिखी जाएगी, ठीक वैसे ही जैसे Docker Hub को Harbor से बदला गया था।
+  # The project's top-level file: lists where Gradle pulls plugins and libraries from and which
+  # modules are part of the project (here there is one — app). All three repositories are public, on the internet:
+  # the build container starts empty and pulls everything from there, hence the build's duration.
+  # This is also the first place you'll fix when infosec closes off outbound access — an
+  # internal proxy repository will be written in here, exactly as Docker Hub was swapped for Harbor.
   settings.gradle.kts: |
     pluginManagement {
       repositories {
@@ -63,26 +63,26 @@ data:
     rootProject.name = "propusk"
     include(":app")
 
-  # रूट बिल्ड फ़ाइल: दो प्लगइन के संस्करण तय करती है — Android बिल्डर और Kotlin
-  # कंपाइलर। `apply false` का मतलब है «संस्करण घोषित करो, पर रूट प्रोजेक्ट में उसे चालू मत करो»:
-  # उन्हें app मॉड्यूल चालू करेगा। संस्करण जानबूझकर कील की तरह ठोंके गए हैं। जो बिल्ड
-  # «नवीनतम» खींचता है, वह एक महीने बाद आज से अलग तरह से बनता है, और उसे सुलझाना आपको ही पड़ेगा।
+  # The root build file: pins the versions of two plugins — the Android builder and the Kotlin
+  # compiler. `apply false` means "declare the version, but don't enable it in the root project":
+  # the app module will enable them. The versions are nailed down deliberately. A build that pulls
+  # "the latest", a month later builds differently than today, and you'll be the one to figure it out.
   build.gradle.kts: |
     plugins {
       id("com.android.application") version "8.5.2" apply false
       id("org.jetbrains.kotlin.android") version "1.9.24" apply false
     }
 
-  # स्वयं एप्लिकेशन मॉड्यूल का विवरण। यहाँ तीन संख्याएँ हैं, जिन पर निर्भर करता है कि बिल्ड क्या
-  # डाउनलोड करेगा और एप्लिकेशन कहाँ चलेगा भी:
-  #   compileSdk 34   Android SDK का वह संस्करण जिससे हम कंपाइल करते हैं। यही SDK इंस्टॉल चरण
-  #                   डाउनलोड करता है — लगभग डेढ़ गीगाबाइट, बिल्ड का सबसे लंबा चरण;
-  #   minSdk 24       सबसे पुराना Android जिस पर एप्लिकेशन चलेगा (यह Android 7 है)।
-  #                   बढ़ाएँगे — पुराने फ़ोन कट जाएँगे, घटाएँगे — संगतता
-  #                   लाइब्रेरी ढोनी पड़ेंगी;
-  #   jvmTarget 17    Kotlin, Java बाइटकोड में कंपाइल होता है, और यह संख्या बिल्ड इमेज में
-  #                   JDK संस्करण से मेल खानी चाहिए (android-build.yaml में gradle:8.9-jdk17)।
-  #                   अगर वे अलग हुए — बिल्ड बाइटकोड संस्करण की असंगति पर गिर जाएगा।
+  # Description of the application module itself. Here are three numbers on which both what the build
+  # downloads and where the application will even run depend:
+  #   compileSdk 34   the Android SDK version we compile with. This is what the SDK install step
+  #                   downloads — about one and a half gigabytes, the longest build step;
+  #   minSdk 24       the oldest Android on which the application will run (this is Android 7).
+  #                   Raise it — you cut off old phones, lower it — you'll have to drag in
+  #                   compatibility libraries;
+  #   jvmTarget 17    Kotlin compiles to Java bytecode, and this number must match
+  #                   the JDK version in the build image (gradle:8.9-jdk17 in android-build.yaml).
+  #                   If they diverge — the build fails on a bytecode version mismatch.
   app-build.gradle.kts: |
     plugins {
       id("com.android.application")
@@ -117,9 +117,9 @@ data:
       }
     }
 
-  # फ़ोन के लिए एप्लिकेशन का पासपोर्ट: इसमें कौन-सी स्क्रीनें हैं और आइकन पर टैप करने पर
-  # कौन-सी खुलती है। ठीक इसी के लिए MAIN और LAUNCHER वाला intent-filter ब्लॉक है —
-  # उसके बिना एप्लिकेशन इंस्टॉल तो होगा, पर मेन्यू में उसका आइकन नहीं दिखेगा।
+  # The application's passport for the phone: which screens it has and which one opens
+  # when the icon is tapped. That's exactly what the intent-filter block with MAIN and LAUNCHER is for —
+  # without it the application will install, but no icon will appear in the menu.
   AndroidManifest.xml: |
     <?xml version="1.0" encoding="utf-8"?>
     <manifest xmlns:android="http://schemas.android.com/apk/res/android">
@@ -135,12 +135,12 @@ data:
       </application>
     </manifest>
 
-  # एप्लिकेशन की एकमात्र स्क्रीन — और प्रोजेक्ट में जो भी कोड है वह पूरा।
-  # संगतता लाइब्रेरी नहीं, बल्कि सादा android.app.Activity लिया गया है: प्रोजेक्ट की शून्य बाहरी
-  # निर्भरताएँ हैं, और इससे हर बिल्ड पर डाउनलोड के कुछ मिनट बचते हैं।
-  # R.string.greeting — strings.xml के एक टेक्स्ट का संदर्भ। R क्लास सोर्स में नहीं पड़ा, उसे
-  # बिल्ड जनरेट करता है। इसलिए त्रुटि «unresolved reference: R» का मतलब है रिसोर्स जनरेशन चरण का
-  # गिरना, कोड में टाइपो नहीं।
+  # The application's only screen — and all the code the project has at all.
+  # Bare android.app.Activity is used, not a compatibility library: the project has zero external
+  # dependencies, and this saves a couple of minutes of downloading on every build.
+  # R.string.greeting — a reference to a text from strings.xml. The R class is not in the sources, it's
+  # generated by the build. So the error "unresolved reference: R" means a failed resource
+  # generation step, not a typo in the code.
   MainActivity.kt: |
     package io.aenix.propusk
 
@@ -159,11 +159,11 @@ data:
       }
     }
 
-  # कोड से बाहर निकाले गए टेक्स्ट: इस तरह उन्हें प्रोग्रामर को छुए बिना संपादित और अनुवादित किया जाता है।
-  # app_name फ़ोन पर आइकन के नीचे दिखता है, greeting — स्वयं स्क्रीन पर।
+  # Texts extracted from the code: this way they are edited and translated without touching the programmer.
+  # app_name is visible under the icon on the phone, greeting — on the screen itself.
   strings.xml: |
     <?xml version="1.0" encoding="utf-8"?>
     <resources>
-      <string name="app_name">गेस्ट पास</string>
-      <string name="greeting">अतिथि के लिए पास का अनुरोध करें</string>
+      <string name="app_name">Guest Pass</string>
+      <string name="greeting">Request a guest pass</string>
     </resources>

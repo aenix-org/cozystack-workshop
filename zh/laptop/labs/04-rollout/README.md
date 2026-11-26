@@ -30,7 +30,7 @@
 所有文件都已经在你手上——它们是和仓库一起拿到的。没有什么要创建或重新敲：下文凡是写着 `kubectl apply -f name.yaml` 的地方，文件都取自这里。
 
 ```bash
-# 从这里开始，所有命令都在这个文件夹里运行：`kubectl apply -f` 中的路径都从它算起。
+# From here on, all commands are run from this folder: paths in `kubectl apply -f` are counted from it.
 cd labs/04-rollout
 ```
 
@@ -51,28 +51,28 @@ cd labs/04-rollout
 **做三个副本**，好让替换能一个一个看清楚。这里的一个副本就是一个 Pod：集群里最小的运行单元，是应用容器连同它的运行环境，是最接近单台虚拟机的东西。只有一个副本时滚动发布也能无停机完成，但你只会看到「原来有一个 Pod，现在换成另一个」，而看不到集群替换它们的先后顺序。
 
 ```bash
-# KUBECONFIG——里面装着集群的地址和登入它所需的凭据的文件。只要这个
-# 变量还设着，每条 kubectl 命令都会发往实验集群 `lab`，而不是发出命令的那个集群。
+# KUBECONFIG — the file with the cluster's address and the credentials to log into it. While the
+# variable is set, every kubectl command goes to the `lab` cluster, not the one it was issued from.
 export KUBECONFIG=~/lab.kubeconfig
 
-# hpa——在扩缩容那个实验里建起来的自动扩缩容器。我们把它删掉，
-# 这样副本数量就只按我们的命令来改变。
-#   --ignore-not-found  如果它已经不在集群里了，不要当成错误
+# hpa — the autoscaler set up in the scaling lab. We delete it
+# so the number of copies changes only on our command.
+#   --ignore-not-found  don't treat it as an error if it's no longer in the cluster
 kubectl delete hpa rickroll --ignore-not-found
 
-# scale = 「保持这么多副本」。这个数字进入应用的描述，
-# 之后集群自己把缺的补齐。
+# scale = "keep this many copies". The number goes into the application's description,
+# and the cluster then brings up the missing ones itself.
 kubectl scale deployment rickroll --replicas=3
 
-# rollout status = 「等到请求的变成实际的」。这条命令会占住窗口，
-# 直到三个副本全部就绪，然后才把提示符还给你。
+# rollout status = "wait until the requested becomes actual". The command keeps the window
+# busy until all three copies are ready, and only then returns the prompt.
 kubectl rollout status deployment/rickroll
 ```
 
 确认 Fortio 负载生成器还在：
 
 ```bash
-# get = 「把有的东西显示出来」。回复 `Error from server (NotFound)` 表示它不在。
+# get = "show what's there". The reply `Error from server (NotFound)` means it isn't there.
 kubectl get deployment fortio
 ```
 
@@ -95,10 +95,10 @@ metadata:
 data:
   index.html: |
     ...
-    <div class="tag">版本 2</div>
+    <div class="tag">VERSION 2</div>
     <h1>We're No Strangers To Love</h1>
     ...
-    <div class="pod">为您服务的 Pod<b>__POD__</b></div>
+    <div class="pod">served by pod<b>__POD__</b></div>
 ```
 
 里面就一个页面：不同的标题、不同的配色、一枚醒目的「版本 2」标记。差异是故意做得扎眼的——你会盯着浏览器看，而不是盯着 diff。
@@ -122,8 +122,8 @@ data:
 应用它。集群里会出现第二个 ConfigMap；它不会碰到运行中的应用，因为暂时还没有任何东西引用它：
 
 ```bash
-# apply = 「把集群变成文件里所描述的样子」。
-#   -f name.yaml   从哪里取描述；文件就在这同一个文件夹里
+# apply = "bring the cluster to what's described in the file".
+#   -f name.yaml   where to take the description from; the file is in this same folder
 kubectl apply -f rickroll-page-v2.yaml
 ```
 
@@ -132,10 +132,10 @@ kubectl apply -f rickroll-page-v2.yaml
 现在打开应用，确认**什么都没有变**：
 
 ```bash
-# port-forward = 从笔记本电脑通向集群内部的一条临时隧道。
-#   svc/rickroll  通向哪里：通向 Service，也就是把请求分摊到各副本
-#   8080:80       左边是笔记本电脑上的端口，右边是集群内服务的端口
-# 隧道开着的时候窗口就被占住；按 Ctrl+C 关闭。
+# port-forward = a temporary tunnel from the laptop into the cluster.
+#   svc/rickroll  where it leads: into the Service, that is, with requests spread across the copies
+#   8080:80       on the left the port on the laptop, on the right the service's port inside the cluster
+# While the tunnel is open the window is busy; it closes on Ctrl+C.
 kubectl port-forward svc/rickroll 8080:80
 ```
 
@@ -148,9 +148,9 @@ kubectl port-forward svc/rickroll 8080:80
 在切换版本之前，先看看替换将遵循的规则。它们就在应用的描述本身里：
 
 ```bash
-# -o jsonpath=... ——不打印表格，而是给出路径来打印对象的某一个字段。
-#   {.spec.strategy}  集群据以替换副本的那一组规则
-#   {"\n"}            末尾一个换行，否则输出会和提示符粘在一起
+# -o jsonpath=... — instead of a table, print a single field of the object by giving the path to it.
+#   {.spec.strategy}  the block of rules by which the cluster replaces copies
+#   {"\n"}            a newline at the end, otherwise the output runs into the prompt
 kubectl get deployment rickroll -o jsonpath='{.spec.strategy}{"\n"}'
 ```
 
@@ -192,10 +192,10 @@ kubectl get deployment rickroll -o jsonpath='{.spec.strategy}{"\n"}'
 📍 **窗口 1** ——到 Fortio 的隧道：
 
 ```bash
-# 新的终端窗口不记得上一个窗口的变量——我们再设一次 KUBECONFIG。
+# A new terminal window doesn't remember the previous one's variables — we set KUBECONFIG again.
 export KUBECONFIG=~/lab.kubeconfig
-# 到负载生成器的隧道：笔记本电脑上的 8081 端口 → fortio 服务的 8080 端口。
-# 左边选 8081，是为了不和 8080 上通向应用本身的隧道相撞。
+# A tunnel to the load generator: port 8081 on the laptop → port 8080 of the fortio service.
+# 8081 was chosen on the left so as not to collide with the tunnel to the application itself on 8080.
 kubectl port-forward svc/fortio 8081:8080
 ```
 
@@ -213,13 +213,13 @@ kubectl port-forward svc/fortio 8081:8080
 如果表单没弄成，同样的负载也可以用命令给出：
 
 ```bash
-# exec = 在一个已经运行的 Pod 内部执行命令。负载不是由你的笔记本电脑产生的，
-# 而是由 Fortio 自己从集群内部产生的，所以这件事不需要隧道。
-#   deploy/fortio  在 fortio 应用的任意一个副本里
-#   --             右边的一切都是给容器的命令，而不是给 kubectl 的
-#   -qps 300       每秒三百个请求
-#   -c 20          二十个并发连接
-#   -t 180s        把负载保持三分钟
+# exec = run a command inside an already-running Pod. The load is generated not by your laptop,
+# but by Fortio itself from inside the cluster, so no tunnel is needed for this.
+#   deploy/fortio  in any copy of the fortio application
+#   --             everything to the right is a command for the container, not for kubectl
+#   -qps 300       three hundred requests per second
+#   -c 20          twenty simultaneous connections
+#   -t 180s        hold the load for three minutes
 kubectl exec deploy/fortio -- fortio load -qps 300 -c 20 -t 180s http://rickroll/
 ```
 
@@ -227,9 +227,9 @@ kubectl exec deploy/fortio -- fortio load -qps 300 -c 20 -t 180s http://rickroll
 
 ```bash
 export KUBECONFIG=~/lab.kubeconfig
-# -l app=rickroll ——只显示带这个标签的 Pod，别的不会进入输出。
-# -w = 「盯着并追加」：窗口保持被占用，每当某个副本的状态发生变化，
-# 就打印新的一行。退出——Ctrl+C。
+# -l app=rickroll — show only Pods with this label; others won't get into the output.
+# -w = "watch and append": the window stays busy and prints a new line every time
+# the state of some copy changes. Exit — Ctrl+C.
 kubectl get pods -l app=rickroll -w
 ```
 
@@ -238,18 +238,18 @@ kubectl get pods -l app=rickroll -w
 📍 **窗口 3** ——一个空闲窗口。第一个握着到 Fortio 的隧道，第二个忙着盯 Pod，所以我们在第三个里执行 patch。在它里面得再设一次访问：
 
 ```bash
-# 新的终端窗口不记得上一个窗口的变量——我们再设一次 KUBECONFIG。
+# A new terminal window doesn't remember the previous one's variables — we set KUBECONFIG again.
 export KUBECONFIG=~/lab.kubeconfig
 ```
 
 现在我们要在应用的描述里改动恰好一个字段：名为 `page` 的卷——那个被放进容器内部的文件夹——必须从 ConfigMap `rickroll-page-v2` 取它的内容。没有「更新应用」这条命令，将来也不会有：只有一条关于应该是什么样子的新记录。集群会自己发现它与实际状态之间的差异，并开始替换副本。
 
 ```bash
-# patch = 精确地改动对象里的一个字段，而不重写整个对象。
-#   --type=json  修改的格式：「操作 + 路径 + 值」
-#   op: replace  替换这个路径上的东西
-#   path         对象内部字段的地址；volumes/0 ——列表里的第一个卷（见下）
-#   value        新的 ConfigMap 名字，卷会从它那里取页面
+# patch = change a field in an object pinpoint-style, without rewriting the whole object.
+#   --type=json  the edit format: "operation + path + value"
+#   op: replace  replace what sits at this path
+#   path         the address of the field inside the object; volumes/0 — the first volume in the list (see below)
+#   value        the new ConfigMap name from which the volume will take the page
 kubectl patch deployment rickroll --type=json \
   -p='[{"op":"replace","path":"/spec/template/spec/volumes/0/configMap/name","value":"rickroll-page-v2"}]'
 ```
@@ -270,9 +270,9 @@ deployment.apps/rickroll patched
 **更安全**——用普通的合并 patch 做同样的事。Kubernetes 里的列表可以按某个键来合并，而 `volumes` 的这个键是 `name`：
 
 ```bash
-# 不带 --type=json 时这是一个合并 patch：你以对象在清单里的同一形态描述它的一小块，
-# 集群再把它和已有的东西合并。volumes 列表按 `name` 键合并，
-# 所以这里寻址的是 `page` 卷，而不是「第几号那个卷」。
+# Without --type=json this is a merge patch: you describe a piece of the object in the same form
+# it has in the manifest, and the cluster merges it with what's already there. The volumes list merges
+# by the `name` key, so here the `page` volume is addressed, not "the volume at such-and-such index".
 kubectl patch deployment rickroll -p \
   '{"spec":{"template":{"spec":{"volumes":[{"name":"page","configMap":{"name":"rickroll-page-v2"}}]}}}}'
 ```
@@ -288,9 +288,9 @@ kubectl patch deployment rickroll -p \
 看着替换进行：
 
 ```bash
-# rollout status 逐行打印替换的进度，等所有副本都更新完毕后结束。
-# 如果滚动发布没有收敛，命令会返回一个非零退出码——用它在脚本里
-# 把它停下很方便。
+# rollout status prints the progress of the replacement line by line and finishes when all copies are updated.
+# If the rollout doesn't converge, the command returns a non-zero exit code — convenient for
+# stopping it in scripts.
 kubectl rollout status deployment/rickroll
 ```
 
@@ -305,8 +305,8 @@ deployment "rickroll" successfully rolled out
 留意名字的尾巴：新副本连中间那一段也变了——那是另一个 ReplicaSet。Deployment 没有去改造旧的那个，而是在旁边建了第二个，把副本从一个往另一个里倒。旧的哪儿也没去，它有零个副本，正在一旁候着：
 
 ```bash
-# rs——ReplicaSet 的简写，是描述某一个版本的一组副本。
-# DESIRED——这一组里请求了多少副本，READY——其中有多少已准备好应答。
+# rs — shorthand for ReplicaSet, a set of copies of one version of the description.
+# DESIRED — how many copies are requested in this set, READY — how many of them are ready to answer.
 kubectl get rs -l app=rickroll
 ```
 
@@ -323,7 +323,7 @@ rickroll-7c5d4f9b21   3         3         3       40s
 打开一条到应用的隧道：
 
 ```bash
-# 和实验开头一样的隧道：笔记本电脑上的 8080 端口 → rickroll 服务的 80 端口。
+# The same tunnel as at the start of the lab: port 8080 on the laptop → port 80 of the rickroll service.
 kubectl port-forward svc/rickroll 8080:80
 ```
 
@@ -349,8 +349,8 @@ All done 54000 calls (plus 0 warmup) 0.412 ms avg, 300.0 qps
 在 Fortio 里再启动一次负载（同样的参数），趁它运行的时候看看变更历史：
 
 ```bash
-# history = 描述的已保存修订清单。每一行都是一个可以用一条命令
-# 回到的状态。CHANGE-CAUSE——一个可选的备注，说明为什么改。
+# history = the list of saved revisions of the description. Each line is a state you can
+# return to with a single command. CHANGE-CAUSE — an optional note on why it was changed.
 kubectl rollout history deployment/rickroll
 ```
 
@@ -365,11 +365,11 @@ REVISION  CHANGE-CAUSE
 回滚：
 
 ```bash
-# undo 不带额外参数 = 回到上一个修订。这不是「把时间倒回去」，
-# 而是一次普通的旧描述滚动发布：副本按同样的 maxSurge 和 maxUnavailable
-# 规则逐个替换。
+# undo with no extra parameters = return to the previous revision. This isn't "rewinding
+# time", it's an ordinary rollout of the old description: copies are replaced one at a time, by the same
+# maxSurge and maxUnavailable rules.
 kubectl rollout undo deployment/rickroll
-# 我们等到副本的构成与描述收敛一致。
+# We wait until the makeup of the copies converges with the description.
 kubectl rollout status deployment/rickroll
 ```
 
@@ -390,14 +390,14 @@ kubectl rollout status deployment/rickroll
 设想一个平常的早晨：一位同事在准备页面的第三个版本，赶时间，把名字打错了。可清单本身是有效的——集群没有义务知道那个对象并不存在。我们来精确复现这一幕：
 
 ```bash
-# 和切换到第二个版本时同样的 patch，但 ConfigMap 名字里有个错误：
-# 集群里没有 `rickroll-page-v3` 这个对象。引用是否存在在接收时并不检查，
-# 所以命令会成功完成。
+# The same patch as when switching to the second version, but with a mistake in the ConfigMap name:
+# there is no object `rickroll-page-v3` in the cluster. The reference's existence isn't checked on acceptance,
+# so the command will finish successfully.
 kubectl patch deployment rickroll --type=json \
   -p='[{"op":"replace","path":"/spec/template/spec/volumes/0/configMap/name","value":"rickroll-page-v3"}]'
 
-# --timeout=90s ——别无止境地等：没等到就绪的副本，命令过了一分半就
-# 放弃并返回一个错误。滚动发布本身哪儿也不会去，会一直挂着。
+# --timeout=90s — don't wait forever: not having gotten ready copies, the command gives up after a
+# minute and a half and returns an error. The rollout itself won't go anywhere and will stay hanging.
 kubectl rollout status deployment/rickroll --timeout=90s
 ```
 
@@ -411,8 +411,8 @@ error: timed out waiting for the condition
 看看副本的构成：三个先前的在工作，新的那个卡在启动上。
 
 ```bash
-# READY 这一列数的是 Pod 内部已就绪的容器：1/1 ——就绪，0/1 ——没就绪。
-# STATUS 说明启动究竟卡在了哪里。
+# The READY column counts the ready containers inside the Pod: 1/1 — ready, 0/1 — not.
+# STATUS says exactly where the startup stalled.
 kubectl get pods -l app=rickroll
 ```
 
@@ -434,10 +434,10 @@ rickroll-8b6a1e5c39-wr4tz   0/1     ContainerCreating   0          90s
 **副本为什么没起来。** 我们从来没创建过名为 `rickroll-page-v3` 的 ConfigMap——它不在集群里。直接问集群：
 
 ```bash
-# events——集群的事件日志，最接近 vCenter 里 Tasks & Events 标签页的东西。
-#   --field-selector reason=FailedMount  只保留关于卷挂载失败的记录
-#   --sort-by=.lastTimestamp             按时间排序，最新的落在最下面
-#   | tail -3                            显示最后三行，其余丢掉
+# events — the cluster's log of occurrences, the nearest analogue of the Tasks & Events tab in vCenter.
+#   --field-selector reason=FailedMount  keep only the records about a failed volume mount
+#   --sort-by=.lastTimestamp             sort by time, the freshest end up at the bottom
+#   | tail -3                            show the last three lines, discard the rest
 kubectl get events --field-selector reason=FailedMount --sort-by=.lastTimestamp | tail -3
 ```
 
@@ -451,8 +451,8 @@ Warning  FailedMount  kubelet  MountVolume.SetUp failed for volume "page":
 **现在来看第二个问题，也是这一步专为它而设的问题。** 就在卡住的滚动发布正中打开应用：
 
 ```bash
-# 还是那条隧道。流量只会打到通过了就绪检查的那些副本上，
-# 也就是三个旧的：卡住的那个没能进入均衡。
+# The same tunnel. Traffic will go only to the copies that passed the readiness check,
+# that is, to the three old ones: the stuck one didn't make it into balancing.
 kubectl port-forward svc/rickroll 8080:80
 ```
 
@@ -475,9 +475,9 @@ kubectl port-forward svc/rickroll 8080:80
 脱身：
 
 ```bash
-# 我们退回上一个修订——那个 ConfigMap 名字写对了的。
+# We return the previous revision — the one where the ConfigMap name is written correctly.
 kubectl rollout undo deployment/rickroll
-# 我们等到卡住的副本消失，副本的构成与描述收敛一致。
+# We wait until the stuck copy disappears and the makeup of the copies converges with the description.
 kubectl rollout status deployment/rickroll
 ```
 
@@ -488,7 +488,7 @@ kubectl rollout status deployment/rickroll
 📍 **在哪做：** 在笔记本电脑上，就在你刚才操作 `kubectl` 的那个终端窗口里。
 
 ```bash
-# 这个脚本不会改变集群里的任何东西：它只读取状态并打印一份报告。
+# The script changes nothing in the cluster: it only reads the state and prints a report.
 ./check.sh
 ```
 
@@ -501,15 +501,15 @@ kubectl rollout status deployment/rickroll
 `rickroll` 应用后面还会用到——我们不删它。把它退回一个副本：
 
 ```bash
-# 两个多余的副本会把节点的内存腾出来——后面的实验里不会再有负载了。
+# Two extra copies will free up the node's memory — there won't be any load in the labs ahead.
 kubectl scale deployment rickroll --replicas=1
 ```
 
 负载生成器不再需要了：
 
 ```bash
-# delete -f = 删除文件里所列的那些对象，除此之外一概不删。
-# 路径指向隔壁文件夹，因为文件就在扩缩容那个实验所在的地方。
+# delete -f = delete exactly the objects listed in the file, and nothing besides them.
+# The path leads to the neighboring folder, because the file is where the scaling lab is.
 kubectl delete -f ../03-scale/fortio.yaml
 ```
 

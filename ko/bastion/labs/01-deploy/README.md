@@ -35,7 +35,7 @@
 것은 없습니다. 아래에서 `kubectl apply -f name.yaml`이라고 쓰인 곳의 파일은 모두 여기서 가져옵니다.
 
 ```bash
-# 이 경로는 랩 0에서 받아 온 리포지터리의 루트를 기준으로 합니다
+# the path is relative to the root of the repository you pulled in lab 0
 cd labs/01-deploy
 ```
 
@@ -63,10 +63,10 @@ Cozystack 대시보드는 당신이 **플랫폼에 주문하는 것**을 보여�
 연결해 봅시다:
 
 ```bash
-# KUBECONFIG — kubectl이 어떤 접근 파일을 쓸지 알아내기 위해 읽는 변수입니다.
-# 여기서는 테넌트가 아니라 lab 클러스터에 대한 접근입니다: 파일이 다르고, 클러스터가 다릅니다.
+# KUBECONFIG — the variable kubectl reads to learn which access file to use.
+# Here that's access to the lab cluster, not to the tenant: different files, different clusters.
 export KUBECONFIG=~/lab.kubeconfig
-# get nodes = "노드를 보여줘". 그 응답은 kubectl이 올바른 곳과 통신하고 있음을 확인해 줍니다.
+# get nodes = "show the nodes". The answer confirms kubectl is talking to the right place.
 kubectl get nodes
 ```
 
@@ -127,7 +127,7 @@ metadata:
   name: rickroll-page-v1
 data:
   index.html: |
-    ...<div class="pod">요청을 처리한 Pod<b>__POD__</b></div>...
+    ...<div class="pod">served by pod<b>__POD__</b></div>...
 ```
 
 nginx가 치환할 바로 그 `__POD__`입니다. 이름의 `-v1`은 우연이 아닙니다. 버전 롤아웃에 관한 랩에서
@@ -239,9 +239,9 @@ Service와 Pod 사이의 연결은 주소 목록이 아니라 **조건**입니�
 이제 적용해 봅시다:
 
 ```bash
-# apply = "파일에 기술된 상태로 클러스터를 만들어라". 네 개의 객체가 모두 하나의 명령으로 생성됩니다;
-# 파일 안의 순서는 클러스터가 스스로 알아냅니다.
-#   -f   파일에서 기술을 가져온다
+# apply = "bring the cluster to what's described in the file". All four objects are created
+# with a single command; the cluster works out the order within the file on its own.
+#   -f   take the description from a file
 kubectl apply -f rickroll.yaml
 ```
 
@@ -257,8 +257,8 @@ service/rickroll created
 복제본이 기동될 때까지 기다리세요:
 
 ```bash
-# rollout status는 Deployment가 일을 끝까지 마칠 때까지 기다립니다: 필요한 수의 복제본이
-# 실행 중이고 요청을 받을 준비가 될 때까지요. 그렇게 되면 명령은 스스로 종료됩니다.
+# rollout status waits until the Deployment sees the job through: the required number of copies
+# is running and ready to accept requests. The command finishes on its own when that happens.
 kubectl rollout status deployment/rickroll
 ```
 
@@ -274,8 +274,8 @@ kubectl rollout status deployment/rickroll
 어떤 모습인지 물어봅시다:
 
 ```bash
-# get deployment rickroll = 타입과 이름으로 하나의 객체를 보여준다.
-#   -o yaml   손으로 쓸 수 있었을 바로 그 형태로, 전체를 출력한다
+# get deployment rickroll = show a single object by type and name.
+#   -o yaml   print it in full, in the same form you could write it by hand
 kubectl get deployment rickroll -o yaml
 ```
 
@@ -309,10 +309,10 @@ spec:
 명령은 bastion에서 안쪽으로 터널을 놓습니다.
 
 ```bash
-# port-forward = bastion에서 클러스터 안으로 놓는 터널로, 명령이 실행되는 동안 살아 있습니다.
-#   svc/rickroll   rickroll이라는 이름의 Service로 터널을 놓으면, 그것이 다시
-#                  요청을 살아 있는 애플리케이션 복제본으로 라우팅합니다
-#   8080:80        왼쪽 숫자는 bastion의 포트, 오른쪽은 클러스터 안 Service의 포트입니다
+# port-forward = a tunnel from the bastion into the cluster, alive as long as the command runs.
+#   svc/rickroll   run the tunnel to the Service named rickroll, which in turn routes
+#                  the request to a live copy of the application
+#   8080:80        the left number is the port on the bastion, the right is the Service port in the cluster
 kubectl port-forward svc/rickroll 8080:80
 ```
 
@@ -330,9 +330,9 @@ export KUBECONFIG=~/lab.kubeconfig
 ```
 
 ```bash
-# get pods = "실행 중인 복제본을 보여줘".
-#   -l app=rickroll   모든 Pod가 아니라 레이블 app=rickroll이 붙은 것만 보여준다 —
-#                     Service가 Pod를 찾는 데 쓰는 바로 그 레이블입니다
+# get pods = "show the running copies".
+#   -l app=rickroll   show not all Pods, but only those with the label app=rickroll —
+#                     the very one the Service uses to find them
 kubectl get pods -l app=rickroll
 ```
 
@@ -345,8 +345,8 @@ kubectl get pods -l app=rickroll
 📍 **어디서:** bastion에서, `kubectl`로 작업하던 바로 그 터미널 창에서.
 
 ```bash
-# 랩 폴더에서 실행하세요: 스크립트는 자기 옆에서 파일을 찾습니다.
-# 이름 앞의 ./ 는 "바로 여기서 파일을 실행하라"는 뜻이며, 시스템 폴더에서 찾으라는 게 아닙니다
+# run it from the lab folder: the script looks for its files next to itself.
+# the ./ before the name means "run the file from right here", not look for it in system folders
 ./check.sh
 ```
 

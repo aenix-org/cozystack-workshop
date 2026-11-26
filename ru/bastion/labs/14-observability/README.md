@@ -74,10 +74,10 @@
 ## Что лежит в папке лабы
 
 Все файлы уже у вас — вы забрали их вместе с репозиторием. Создавать и печатать заново
-ничего не нужно: там, где ниже написано `kubectl apply -f имя.yaml`, файл берётся отсюда.
+ничего не нужно: там, где ниже написано `kubectl apply -f name.yaml`, файл берётся отсюда.
 
 ```bash
-# переходим в папку этой лабы: все относительные пути ниже отсчитываются от неё
+# switch to this lab's folder: all the relative paths below are counted from here
 cd labs/14-observability
 ```
 
@@ -94,14 +94,14 @@ cd labs/14-observability
 `Monitoring agents`. Проверьте, включено ли оно:
 
 ```bash
-# KUBECONFIG — переменная, из которой kubectl узнаёт адрес кластера и то, под кем
-# логиниться. Файл ~/lab.kubeconfig вы сохранили, когда создавали кластер `lab`.
-# Задавать её нужно заново в каждом новом окне терминала.
+# KUBECONFIG — the variable kubectl reads to learn the cluster's address and who to
+# log in as. You saved the file ~/lab.kubeconfig when you created the `lab` cluster.
+# It has to be set again in every new terminal window.
 export KUBECONFIG=~/lab.kubeconfig
 
-# get pods = «покажи, какие поды есть».
-#   -n cozy-monitoring   искать не по всему кластеру, а в этом namespace: именно туда
-#                        дополнение кладёт свои сборщики.
+# get pods = "show me which pods exist".
+#   -n cozy-monitoring   look not across the whole cluster, but in this namespace: that's
+#                        exactly where the add-on puts its collectors.
 kubectl get pods -n cozy-monitoring
 ```
 
@@ -131,16 +131,16 @@ metrics-server-7d4b8c9f5-x2klm    1/1     Running   0          3d
 автомасштабирование, а уборка лабы 4 — генератор нагрузки, поэтому вернуть нужно оба:
 
 ```bash
-export KUBECONFIG=~/lab.kubeconfig          # тот же файл доступа, что и выше
+export KUBECONFIG=~/lab.kubeconfig          # the same access file as above
 
-# apply = «приведи кластер к тому, что описано в файле». Оба файла лежат в папке
-# соседней лабы, поэтому путь начинается с `../` — печатать их заново не нужно.
-kubectl apply -f ../03-scale/hpa.yaml       # правило автомасштабирования для rickroll
-kubectl apply -f ../03-scale/fortio.yaml    # генератор нагрузки
+# apply = "bring the cluster to what's described in the file". Both files live in the
+# neighboring lab's folder, so the path starts with `../` — no need to type them again.
+kubectl apply -f ../03-scale/hpa.yaml       # the autoscaling rule for rickroll
+kubectl apply -f ../03-scale/fortio.yaml    # the load generator
 
-# rollout status = «держи терминал и скажи, когда выкатка закончится».
-# deployment/fortio — тип объекта и его имя. Команда вернёт приглашение
-# со строкой `successfully rolled out`, когда генератор поднимется.
+# rollout status = "hold the terminal and tell me when the rollout is done".
+# deployment/fortio — the object type and its name. The command returns the prompt
+# with the line `successfully rolled out` once the generator comes up.
 kubectl rollout status deployment/fortio
 ```
 
@@ -150,11 +150,11 @@ kubectl rollout status deployment/fortio
 ступенька автомасштабирования не появится:
 
 ```bash
-# port-forward = прорыть туннель с виртуалки внутрь кластера. Пока команда работает,
-# обращение на localhost:8081 попадает в генератор нагрузки.
-#   svc/fortio    цель: сервис (не под) с именем fortio
-#   8081:8080     слева порт на вашем виртуалке, справа порт внутри сервиса
-# Окно не закрывайте: туннель живёт ровно столько, сколько работает команда.
+# port-forward = dig a tunnel from the bastion into the cluster. While the command runs,
+# a request to localhost:8081 lands in the load generator.
+#   svc/fortio    the target: the service (not the pod) named fortio
+#   8081:8080     on the left, the port on your bastion; on the right, the port inside the service
+# Don't close the window: the tunnel lives exactly as long as the command runs.
 kubectl port-forward svc/fortio 8081:8080
 ```
 
@@ -186,11 +186,11 @@ kubectl port-forward svc/fortio 8081:8080
 Посмотреть, по какому адресу сборщик отправляет собранное:
 
 ```bash
-# get vmagent = «покажи объект-сборщик». Вместо обычной таблицы просим одно поле
-# из его описания — синтаксис -o jsonpath работает с любым объектом кластера:
-#   .items[0]                  первый (и единственный здесь) найденный сборщик
-#   .spec.remoteWrite[0].url   адрес, по которому он отдаёт метрики
-#   {"\n"}                     перевод строки, иначе вывод слипнется с приглашением
+# get vmagent = "show me the collector object". Instead of the usual table we ask for a single
+# field from its description — the -o jsonpath syntax works with any cluster object:
+#   .items[0]                  the first (and here only) collector found
+#   .spec.remoteWrite[0].url   the address it hands the metrics to
+#   {"\n"}                     a newline, otherwise the output runs into the prompt
 kubectl get vmagent -n cozy-monitoring \
   -o jsonpath='{.items[0].spec.remoteWrite[0].url}{"\n"}'
 ```
@@ -211,7 +211,7 @@ http://vminsert-shortterm.tenant-workshopXX.svc.cozy.local:8480/insert/0/prometh
 Адрес — поддомен `grafana` вашего тенантного хоста:
 
 ```
-https://grafana.<хост вашего тенанта>
+https://grafana.<your tenant host>
 ```
 
 Точный адрес записан в дашборде: ваш тенант → приложение `Monitoring` → вкладка
@@ -326,13 +326,13 @@ count by (pod) ( ... )
 </details>
 
 ```promql
-# count by (pod) — разложить найденные ряды по метке pod и посчитать, сколько рядов
-# в каждой группе. Сами числа не важны: нужен список имён подов, который получится.
+# count by (pod) — break the matched series out by the pod label and count how many series
+# are in each group. The numbers themselves don't matter: what we want is the list of pod names that results.
 count by (pod) (
-  # имя метрики — счётчик процессорного времени контейнеров
+  # the metric name — the container CPU-time counter
   container_cpu_usage_seconds_total{
-    cluster="kubernetes-lab",   # ваш кластер: здесь имя релиза, а не имя приложения lab
-    namespace="default"         # namespace внутри кластера lab, где развёрнут rickroll
+    cluster="kubernetes-lab",   # your cluster: the release name here, not the app name lab
+    namespace="default"         # the namespace inside the lab cluster where rickroll is deployed
   }
 )
 ```
@@ -394,14 +394,14 @@ sum by (pod) ( ... )
 </details>
 
 ```promql
-# rate(...[2m]) — скорость роста счётчика в секунду, усреднённая по окну в 2 минуты.
-# Для процессорного времени читается как «сколько ядер потреблялось»:
-# 0.24 — двадцать четыре процента одного ядра, то есть 240m.
-sum by (pod) (     # сложить контейнеры пода: одна линия на под, а не на каждый контейнер
+# rate(...[2m]) — the counter's growth rate per second, averaged over a 2-minute window.
+# For CPU time it reads as "how many cores were being consumed":
+# 0.24 — twenty-four percent of one core, that is 240m.
+sum by (pod) (     # sum the pod's containers: one line per pod, not per container
   rate(container_cpu_usage_seconds_total{
     cluster="kubernetes-lab", namespace="default",
-    pod=~"rickroll-.*",  # =~ сравнение по регулярному выражению: хвост имени пода случаен
-    container!=""        # выбросить ряды-итоги по поду целиком, иначе всё удвоится
+    pod=~"rickroll-.*",  # =~ comparison by regular expression: the pod name's tail is random
+    container!=""        # drop the whole-pod total series, otherwise everything doubles
   }[2m])
 )
 ```
@@ -438,9 +438,9 @@ sum by (pod) (     # сложить контейнеры пода: одна ли
 Полезно рядом:
 
 ```promql
-# сколько копий rickroll создано всего
+# how many rickroll copies have been created in total
 kube_deployment_status_replicas{cluster="kubernetes-lab", deployment="rickroll"}
-# сколько из них прошли проверку готовности и уже принимают трафик
+# how many of them have passed the readiness check and are already taking traffic
 kube_deployment_status_replicas_available{cluster="kubernetes-lab", deployment="rickroll"}
 ```
 
@@ -450,19 +450,19 @@ kube_deployment_status_replicas_available{cluster="kubernetes-lab", deployment="
 </details>
 
 ```promql
-# ..._status_current_replicas — сколько копий rickroll запущено прямо сейчас.
-# Число берётся не из приложения, а из объекта HPA, прочитанного kube-state-metrics.
+# ..._status_current_replicas — how many rickroll copies are running right now.
+# The number comes not from the application but from the HPA object, read by kube-state-metrics.
 kube_horizontalpodautoscaler_status_current_replicas{
-  cluster="kubernetes-lab",             # только ваш учебный кластер
-  horizontalpodautoscaler="rickroll"    # имя объекта автомасштабирования из лабы 3
+  cluster="kubernetes-lab",             # only your lab cluster
+  horizontalpodautoscaler="rickroll"    # the name of the autoscaling object from lab 3
 }
 ```
 
 и рядом, вторым запросом:
 
 ```promql
-# ..._status_desired_replicas — сколько копий автомасштабирование хочет иметь сейчас,
-# исходя из загрузки. Отставание current от desired и есть время создания подов.
+# ..._status_desired_replicas — how many copies autoscaling wants to have now,
+# based on the load. current lagging behind desired is exactly the pod creation time.
 kube_horizontalpodautoscaler_status_desired_replicas{
   cluster="kubernetes-lab",
   horizontalpodautoscaler="rickroll"
@@ -489,7 +489,7 @@ kube_horizontalpodautoscaler_status_desired_replicas{
 частей, разделённых знаком деления: сверху фактическое потребление, снизу заявка.
 
 ```promql
-# Верхняя часть — фактическое потребление процессора подом. Тот же запрос, что выше.
+# The top part — the pod's actual CPU consumption. The same query as above.
 sum by (pod) (
   rate(container_cpu_usage_seconds_total{
     cluster="kubernetes-lab", namespace="default",
@@ -497,13 +497,13 @@ sum by (pod) (
   }[2m])
 )
 /
-# Нижняя часть — сколько под запросил. Результат деления — доля от заявки: 1 означает
-# «потребляет ровно столько, сколько запросил», 0.5 — половину запрошенного.
+# The bottom part — how much the pod requested. The result of the division is the fraction of the request: 1 means
+# "consuming exactly as much as it requested", 0.5 — half of what was requested.
 sum by (pod) (
   kube_pod_container_resource_requests{
     cluster="kubernetes-lab", namespace="default",
     pod=~"rickroll-.*",
-    resource="cpu"     # у метрики есть ряды и по памяти — оставляем только процессор
+    resource="cpu"     # the metric also has memory series — we keep only CPU
   }
 )
 ```
@@ -529,9 +529,9 @@ sum by (pod) (
 **Кто в кластере потребляет больше всего процессора, топ-10:**
 
 ```promql
-# topk(10, ...) — оставить только десять рядов с самыми большими значениями.
-# Группировка by (namespace, pod) добавляет в ответ namespace: видно, чей это под.
-# Окно [5m] шире, чем на прошлых шагах: нужна не форма всплеска, а средний уровень.
+# topk(10, ...) — keep only the ten series with the largest values.
+# Grouping by (namespace, pod) adds the namespace to the answer: you can see whose pod it is.
+# The [5m] window is wider than in the previous steps: we want not the shape of the spike, but the average level.
 topk(10,
   sum by (namespace, pod) (
     rate(container_cpu_usage_seconds_total{cluster="kubernetes-lab", container!=""}[5m])
@@ -542,8 +542,8 @@ topk(10,
 **Память по подам (не счётчик, поэтому без `rate`):**
 
 ```promql
-# container_memory_working_set_bytes — не счётчик, а мгновенное значение: столько байт
-# занято в этот момент. rate() здесь дал бы бессмыслицу — «байты в секунду».
+# container_memory_working_set_bytes — not a counter but an instantaneous value: this many bytes
+# are occupied at this moment. rate() here would give nonsense — "bytes per second".
 sum by (pod) (
   container_memory_working_set_bytes{
     cluster="kubernetes-lab", namespace="default", container!=""
@@ -559,9 +559,9 @@ sum by (pod) (
 **Сколько ресурсов зарезервировано против того, сколько реально используется:**
 
 ```promql
-# sum без by — сложить всё в одно число: сколько процессора зарезервировано под все
-# поды кластера. Это заявка, а не потребление: зарезервированное и простаивающее тоже
-# попадает в сумму.
+# sum without by — add everything into a single number: how much CPU is reserved for all
+# the cluster's pods. This is the request, not the consumption: what's reserved and sitting idle
+# goes into the sum too.
 sum(kube_pod_container_resource_requests{cluster="kubernetes-lab", resource="cpu"})
 ```
 
@@ -572,8 +572,8 @@ reservation в vSphere, только здесь его видно графико
 Если делали лабу 11, посмотрите заодно на сборку Android — она хорошо видна:
 
 ```promql
-# Тот же rate, но фильтр по подам сборки. sum без by (pod) — одна линия на всю сборку,
-# сколько бы подов она ни подняла.
+# The same rate, but a filter on the build pods. sum without by (pod) — one line for the whole build,
+# however many pods it brings up.
 sum(rate(container_cpu_usage_seconds_total{
   cluster="kubernetes-lab", pod=~"propusk-build-.*", container!=""
 }[2m]))
@@ -610,15 +610,15 @@ kubernetes_namespace_name:default AND kubernetes_pod_name:rickroll*
 📍 **Где:** на виртуалке, в том же окне терминала, где вы работали с `kubectl`.
 
 ```bash
-export KUBECONFIG=~/lab.kubeconfig          # доступ в учебный кластер `lab`
+export KUBECONFIG=~/lab.kubeconfig          # access to the lab cluster `lab`
 
-# Две переменные ниже дают скрипту доступ ещё и в тенант. С ними он дополнительно
-# проверит, что метрики туда доехали, и напечатает адрес вашей Grafana. Без них
-# проверка пройдёт, но отчёт будет короче.
-export COZY_TENANT=workshopXX               # ваш номер вместо XX
-export COZY_KUBECONFIG=~/.kube/config     # файл доступа в тенант
+# The two variables below give the script access to the tenant as well. With them it will
+# additionally check that the metrics made it there, and print the address of your Grafana. Without them
+# the check will pass, but the report will be shorter.
+export COZY_TENANT=workshopXX               # your number instead of XX
+export COZY_KUBECONFIG=~/.kube/config     # the tenant access file
 
-./check.sh                                  # ./ = «запусти файл из текущей папки»
+./check.sh                                  # ./ = "run the file from the current folder"
 ```
 
 ⚠️ **На Windows скрипт запускается из WSL**, а не из PowerShell — как его поставить,

@@ -1,76 +1,76 @@
-# 实验 6 · 你自己的私有镜像仓库。«通行证» 服务镜像的构建配方。
+# Lab 6 · Your own private image registry. Build recipe for the «Guest Pass» service image.
 #
-# 什么是 Dockerfile：一份把源码变成镜像的分步配方 ——
-# 一个随时可运行的文件系统快照，外加在其中运行什么的说明。
-# vSphere 里最接近的东西是构建黄金 VM 模板，只不过这里用文本描述且
-# 可重复：同一份配方在任何机器上都产出同样的结果。
+# What a Dockerfile is: a step-by-step recipe that turns sources into an image —
+# a ready-to-run filesystem snapshot together with instructions on what to run inside it.
+# The closest thing in vSphere is building a golden VM template, only described as text and
+# repeatable: the same recipe yields the same result on any machine.
 #
-# 在你的虚拟机上、从实验目录构建（最后一个参数是包含本文件
-# 和源码的目录）：
+# Built on your VM, from the lab folder (the last argument is the folder with this
+# file and the sources):
 #     docker build --platform linux/amd64 -t HARBOR-HOST/passes/passes-api:v1 app/
 #     docker push HARBOR-HOST/passes/passes-api:v1
-# 把 HARBOR-HOST 替换成你自己 Harbor 的地址：镜像名的第一部分就是
-# 仓库地址，docker push 正是据此知道要把它发到哪里。
+# Replace HARBOR-HOST with the address of your own Harbor: the first part of the image name is the
+# registry address, and that is how docker push knows where to send it.
 #
-# 注意：在使用 Apple Silicon 处理器的 Mac 上以及任何 ARM 虚拟机上，--platform linux/amd64 是必需的。
-# 不加它你会得到一个 ARM 镜像：它会无错构建、无错推送到
-# 仓库，然后在集群中（其节点是 x86）以 “exec format error” 失败。
+# ATTENTION: --platform linux/amd64 is mandatory on a Mac with an Apple Silicon processor and on any
+# ARM VM. Without it you get an ARM image: it builds without errors, pushes to
+# the registry without errors, and then in the cluster (whose nodes are x86) fails with "exec format error".
 #
-# 配方的每一行都创建一个层 —— 文件系统的一个不可变切片。层
-# 会被缓存和复用：正因如此文件是一个一个地复制、而不是整个
-# 目录一次性复制 —— 修改 main.go 不会强制重新下载依赖。
+# Each line of the recipe creates a layer — an immutable slice of the filesystem. Layers
+# are cached and reused: that is why files are copied one at a time rather than the whole
+# folder at once — editing main.go does not force re-downloading the dependencies.
 #
-# 两个阶段。第一个是构建阶段：它需要整个 Go 编译器，约 350 MB。
-# 第二个是发往集群的东西：只有编译好的二进制文件会被带过去。
-# 最终镜像约为 10 MB 而不是 350，而且其内部没有编译器、
-# 没有源码、也没有包管理器 —— 也就是说，对于最终还是设法
-# 进入容器的人来说，没有什么可利用的东西。
+# TWO STAGES. The first is the build stage: it needs the entire Go compiler, about 350 MB.
+# The second is what ships to the cluster: only the finished binary is carried over.
+# The resulting image ends up around 10 MB instead of 350, and inside it there is no compiler,
+# no sources, and no package manager — that is, nothing to use for anyone who does
+# get into the container after all.
 
-# --- 阶段 1：构建 -----------------------------------------------------------------
-# FROM —— 我们从哪个现成镜像开始。这里是带 Go 编译器的官方镜像，
-# 基于 Alpine（一个极小的 Linux，只有几兆字节）。版本被固定：若用
-# latest 标签，同一份配方在半年后会构建出不同的东西。
-# AS build —— 阶段名，第二阶段将据此取用其结果。
+# --- Stage 1: build -----------------------------------------------------------------
+# FROM — which ready-made image we start from. Here it is the official image with the Go compiler
+# on top of Alpine (a minimal Linux, a few megabytes). The version is pinned: with the
+# latest tag the same recipe would build something different half a year later.
+# AS build — the stage name, by which the second stage will pick up the result.
 FROM golang:1.23-alpine AS build
-# 镜像内部的工作目录：后续命令都相对于它执行。
-# 如果目录不存在，它会被创建。
+# Working folder inside the image: subsequent commands run relative to it.
+# If the folder does not exist, it is created.
 WORKDIR /src
-# go.mod —— 模块描述：名称和 Go 版本。应用没有任何外部依赖，
-# 所以没有什么要从互联网下载的，构建在没有外网访问的地方也能完成。
+# go.mod — the module description: name and Go version. The application has no external dependencies,
+# so there is nothing to download from the internet, and the build works where there is no outbound access.
 COPY go.mod ./
-# 源码本身。单独一行复制，这样修改代码不会让上一层的
-# 缓存失效。
+# The source itself. Copied on a separate line so that editing the code does not invalidate the cache
+# of the previous layer.
 COPY main.go ./
-# RUN 在构建时（而非运行时）执行一条命令，并把结果保存为一个层。
-#   CGO_ENABLED=0  静态构建，不绑定系统库。没有这一项
-#                  二进制文件会需要 glibc，而最终镜像里不会有它，
-#                  容器会在启动时失败而不是在构建时
-#   -trimpath      从二进制文件中剥除构建机器的路径：构建变得
-#                  可复现，你家目录的名字也不会泄露出去
-#   -ldflags="-s -w"  丢弃调试表 —— 文件明显变小
-#   -o /out/...    把结果放到哪里；第二阶段从那里取用它
+# RUN executes a command at build time (not at run time) and saves the result as a layer.
+#   CGO_ENABLED=0  build statically, without binding to system libraries. Without this
+#                  the binary would need glibc, which will not be in the final image,
+#                  and the container would fail at startup rather than at build time
+#   -trimpath      strip build-machine paths from the binary: the build becomes
+#                  reproducible, and the name of your home folder does not leak out
+#   -ldflags="-s -w"  drop the debug tables — the file becomes noticeably smaller
+#   -o /out/...    where to put the result; the second stage picks it up from there
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/passes-api .
 
-# --- 阶段 2：发往集群的东西 -----------------------------------------------
-# 第二个 FROM 从一张白纸重新开始镜像：第一阶段积累的一切
-# 都留在那里，不会进入最终镜像。
+# --- Stage 2: what ships to the cluster -----------------------------------------------
+# The second FROM starts the image over, from a clean slate: everything built up in the first stage
+# stays there and does not make it into the final image.
 FROM alpine:3.21
-# 建立应用将以其身份运行的用户：它绝不应以 root 运行。
-# 在正确配置的集群里，Pod 根本不会被允许以 root 运行，而这不是
-# 吹毛求疵，而是一项标准的安全要求。
-#   -D          不设密码、不问任何问题地创建
-#   -u 10001    数字标识符；集群检查的正是这个数字，而非名字
+# Create the user the application will run as: it must not run as root.
+# In a properly configured cluster a pod would not be allowed to run as root at all, and this is not
+# nitpicking but a standard security requirement.
+#   -D          create without a password, asking no questions
+#   -u 10001    numeric identifier; the cluster checks exactly the number, not the name
 RUN adduser -D -u 10001 app
-# 从第一阶段带过来的唯一东西就是编译好的二进制文件。--from=build
-# 指向阶段名。/usr/local/bin 是任何 Linux 的 PATH 中都存在的目录。
+# The only thing carried over from the first stage is the finished binary. --from=build
+# points to the stage name. /usr/local/bin is a folder that exists in the PATH of any Linux.
 COPY --from=build /out/passes-api /usr/local/bin/passes-api
-# 从这一点起，容器中的进程以用户 10001 运行，而不是 root。
-# 顺序很重要：上面几行是以 root 执行的，否则 adduser 不会成功。
+# From this point on the process in the container runs as user 10001, not as root.
+# Order matters: the lines above ran as root, otherwise adduser would not have worked.
 USER 10001
-# 端口声明 —— 供人和工具参考的记录。它并不开放端口
-# 也不配置任何东西：对它的访问在清单（passes.yaml）中描述。
+# Port declaration — a reference note for humans and tools. It does not open the port
+# and configures nothing: access to it is described in the manifest (passes.yaml).
 EXPOSE 8080
-# 容器启动时运行什么。用列表形式而非字符串：这样命令
-# 会被直接运行，没有中间的 shell，来自集群的停止信号
-# 也能到达应用本身，而不是到达生出它的那个 shell。
+# What to run when the container starts. In list form rather than a string: this way the command
+# is run directly, without an intermediate shell, and the stop signal from the cluster
+# reaches the application itself, not the shell that spawned it.
 ENTRYPOINT ["/usr/local/bin/passes-api"]

@@ -27,7 +27,7 @@
 **변환 머신**에는 네트워크가 있으므로 파일을 스스로 내려받습니다. 저장소는
 공개되어 있어 키가 필요 없습니다:
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/laptop/scripts/convert.sh
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/laptop/scripts/convert.sh
 ```
 
 **여러분의 app-VM에는 처음엔 네트워크가 아예 없습니다** — 바로 그 고장 난 상태를 우리가

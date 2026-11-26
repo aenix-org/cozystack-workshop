@@ -61,7 +61,7 @@
 所有文件你都已经有了——它们是随仓库一起拿到的。不需要再创建或重新敲任何东西：下面凡是写着 `kubectl apply -f name.yaml` 的地方，文件都取自这里。
 
 ```bash
-# 切换到本实验的文件夹：下面所有相对路径都从这里算起
+# switch to this lab's folder: all the relative paths below are counted from here
 cd labs/14-observability
 ```
 
@@ -77,14 +77,14 @@ cd labs/14-observability
 实验集群 `lab` 不会自己把指标对外暴露，而是通过 `Monitoring agents` 这个附加组件（add-on）。检查它是否已启用：
 
 ```bash
-# KUBECONFIG —— kubectl 读取它来得知集群的地址以及以谁的身份登录。
-# 文件 ~/lab.kubeconfig 是你创建实验集群 `lab` 时保存下来的。
-# 每开一个新的终端窗口都得重新设置一次。
+# KUBECONFIG — the variable kubectl reads to learn the cluster's address and who to
+# log in as. You saved the file ~/lab.kubeconfig when you created the `lab` cluster.
+# It has to be set again in every new terminal window.
 export KUBECONFIG=~/lab.kubeconfig
 
-# get pods = 「让我看看有哪些 pod」。
-#   -n cozy-monitoring   不在整个集群里找，而是在这个 namespace 里找：附加组件
-#                        正是把它的采集器放到了这里。
+# get pods = "show me which pods exist".
+#   -n cozy-monitoring   look not across the whole cluster, but in this namespace: that's
+#                        exactly where the add-on puts its collectors.
 kubectl get pods -n cozy-monitoring
 ```
 
@@ -106,27 +106,27 @@ metrics-server-7d4b8c9f5-x2klm    1/1     Running   0          3d
 那就只好把尖峰重新制造一遍。请注意，实验 3 的清理删掉了自动扩缩容，实验 4 的清理删掉了负载生成器，所以两个都得恢复回来：
 
 ```bash
-export KUBECONFIG=~/lab.kubeconfig          # 与上面同一个访问文件
+export KUBECONFIG=~/lab.kubeconfig          # the same access file as above
 
-# apply = 「把集群变成文件里所描述的样子」。这两个文件都在相邻实验的文件夹里，
-# 所以路径以 `../` 开头 —— 不用再重新敲一遍。
-kubectl apply -f ../03-scale/hpa.yaml       # rickroll 的自动扩缩容规则
-kubectl apply -f ../03-scale/fortio.yaml    # 负载生成器
+# apply = "bring the cluster to what's described in the file". Both files live in the
+# neighboring lab's folder, so the path starts with `../` — no need to type them again.
+kubectl apply -f ../03-scale/hpa.yaml       # the autoscaling rule for rickroll
+kubectl apply -f ../03-scale/fortio.yaml    # the load generator
 
-# rollout status = 「占住终端，等滚动发布完成了再告诉我」。
-# deployment/fortio —— 对象类型和它的名字。当生成器起来后，命令会返回提示符，
-# 并带上一行 `successfully rolled out`。
+# rollout status = "hold the terminal and tell me when the rollout is done".
+# deployment/fortio — the object type and its name. The command returns the prompt
+# with the line `successfully rolled out` once the generator comes up.
 kubectl rollout status deployment/fortio
 ```
 
 一直等到 `kubectl get hpa rickroll` 里 `<unknown>` 变成一个百分比为止；`hpa` 是 `HorizontalPodAutoscaler` 的缩写，也就是那个自动扩缩容对象。这要花上几分钟。然后转发生成器的端口，施加与实验 3 相同的负载，否则自动扩缩容的那道台阶不会出现：
 
 ```bash
-# port-forward = 从笔记本电脑挖一条隧道通进集群。命令运行期间，
-# 对 localhost:8081 的请求会落到负载生成器上。
-#   svc/fortio    目标：名为 fortio 的 service（不是 pod）
-#   8081:8080     左边是你笔记本电脑上的端口，右边是 service 内部的端口
-# 别关这个窗口：隧道存活的时间正好等于命令运行的时间。
+# port-forward = dig a tunnel from the laptop into the cluster. While the command runs,
+# a request to localhost:8081 lands in the load generator.
+#   svc/fortio    the target: the service (not the pod) named fortio
+#   8081:8080     on the left, the port on your laptop; on the right, the port inside the service
+# Don't close the window: the tunnel lives exactly as long as the command runs.
 kubectl port-forward svc/fortio 8081:8080
 ```
 
@@ -152,11 +152,11 @@ kubectl port-forward svc/fortio 8081:8080
 要看采集器把数据发往哪个地址：
 
 ```bash
-# get vmagent = 「让我看看采集器这个对象」。我们不要常规的表格，而是只要它描述里的
-# 一个字段 —— -o jsonpath 这个语法对任何集群对象都管用：
-#   .items[0]                  找到的第一个（这里也是唯一一个）采集器
-#   .spec.remoteWrite[0].url   它把指标交出去的那个地址
-#   {"\n"}                     一个换行符，否则输出会和提示符黏在一起
+# get vmagent = "show me the collector object". Instead of the usual table we ask for a single
+# field from its description — the -o jsonpath syntax works with any cluster object:
+#   .items[0]                  the first (and here only) collector found
+#   .spec.remoteWrite[0].url   the address it hands the metrics to
+#   {"\n"}                     a newline, otherwise the output runs into the prompt
 kubectl get vmagent -n cozy-monitoring \
   -o jsonpath='{.items[0].spec.remoteWrite[0].url}{"\n"}'
 ```
@@ -176,7 +176,7 @@ http://vminsert-shortterm.tenant-workshopXX.svc.cozy.local:8480/insert/0/prometh
 地址是你租户主机的 `grafana` 子域名：
 
 ```
-https://grafana.<你的租户主机>
+https://grafana.<your tenant host>
 ```
 
 确切地址记在控制台（dashboard）里：你的租户 → `Monitoring` 应用 → `Ingress` 选项卡。Ingress 是把一个 service 以某个域名对外发布的规则；最接近的对应物是负载均衡器上的一条记录，只不过它是在同一个集群里描述的。地址完整地写在那里，连主机名一起。
@@ -252,13 +252,13 @@ count by (pod) ( ... )
 </details>
 
 ```promql
-# count by (pod) —— 把匹配到的序列按 pod 标签拆开，数一数每组里有多少条序列。
-# 数字本身不重要：我们要的是由此得到的那份 pod 名字列表。
+# count by (pod) — break the matched series out by the pod label and count how many series
+# are in each group. The numbers themselves don't matter: what we want is the list of pod names that results.
 count by (pod) (
-  # 指标名字 —— 容器 CPU 时间的计数器
+  # the metric name — the container CPU-time counter
   container_cpu_usage_seconds_total{
-    cluster="kubernetes-lab",   # 你的集群：这里是 release 的名字，而不是应用名 lab
-    namespace="default"         # 实验集群 lab 内部部署了 rickroll 的那个 namespace
+    cluster="kubernetes-lab",   # your cluster: the release name here, not the app name lab
+    namespace="default"         # the namespace inside the lab cluster where rickroll is deployed
   }
 )
 ```
@@ -303,14 +303,14 @@ sum by (pod) ( ... )
 </details>
 
 ```promql
-# rate(...[2m]) —— 计数器每秒的增长速率，在 2 分钟的窗口内做平均。
-# 对 CPU 时间来说，它读作「消耗了多少个核」：
-# 0.24 —— 一个核的百分之二十四，也就是 240m。
-sum by (pod) (     # 把 pod 的各个容器加起来：每个 pod 一条线，而不是每个容器一条
+# rate(...[2m]) — the counter's growth rate per second, averaged over a 2-minute window.
+# For CPU time it reads as "how many cores were being consumed":
+# 0.24 — twenty-four percent of one core, that is 240m.
+sum by (pod) (     # sum the pod's containers: one line per pod, not per container
   rate(container_cpu_usage_seconds_total{
     cluster="kubernetes-lab", namespace="default",
-    pod=~"rickroll-.*",  # =~ 按正则表达式比较：pod 名字的尾巴是随机的
-    container!=""        # 丢掉整个 pod 的汇总序列，否则一切都会翻倍
+    pod=~"rickroll-.*",  # =~ comparison by regular expression: the pod name's tail is random
+    container!=""        # drop the whole-pod total series, otherwise everything doubles
   }[2m])
 )
 ```
@@ -335,9 +335,9 @@ sum by (pod) (     # 把 pod 的各个容器加起来：每个 pod 一条线，�
 放在旁边一起看很有用：
 
 ```promql
-# rickroll 一共创建了多少份副本
+# how many rickroll copies have been created in total
 kube_deployment_status_replicas{cluster="kubernetes-lab", deployment="rickroll"}
-# 其中有多少份通过了就绪检查、已经在接流量
+# how many of them have passed the readiness check and are already taking traffic
 kube_deployment_status_replicas_available{cluster="kubernetes-lab", deployment="rickroll"}
 ```
 
@@ -346,19 +346,19 @@ kube_deployment_status_replicas_available{cluster="kubernetes-lab", deployment="
 </details>
 
 ```promql
-# ..._status_current_replicas —— rickroll 此刻跑着多少份副本。
-# 这个数字不来自应用，而来自 HPA 对象，由 kube-state-metrics 读取。
+# ..._status_current_replicas — how many rickroll copies are running right now.
+# The number comes not from the application but from the HPA object, read by kube-state-metrics.
 kube_horizontalpodautoscaler_status_current_replicas{
-  cluster="kubernetes-lab",             # 只要你的实验集群 lab
-  horizontalpodautoscaler="rickroll"    # 实验 3 里那个自动扩缩容对象的名字
+  cluster="kubernetes-lab",             # only your lab cluster
+  horizontalpodautoscaler="rickroll"    # the name of the autoscaling object from lab 3
 }
 ```
 
 再在旁边作为第二个查询：
 
 ```promql
-# ..._status_desired_replicas —— 自动扩缩容根据负载，此刻想要几份副本。
-# current 落后于 desired，正是创建 pod 所花的时间。
+# ..._status_desired_replicas — how many copies autoscaling wants to have now,
+# based on the load. current lagging behind desired is exactly the pod creation time.
 kube_horizontalpodautoscaler_status_desired_replicas{
   cluster="kubernetes-lab",
   horizontalpodautoscaler="rickroll"
@@ -376,7 +376,7 @@ kube_horizontalpodautoscaler_status_desired_replicas{
 我们来看看决策所依据的那个量。这个查询由用除号隔开的两部分组成：上面是实际消耗，下面是申请。
 
 ```promql
-# 上半部分 —— pod 实际的 CPU 消耗。跟上面那个查询一样。
+# The top part — the pod's actual CPU consumption. The same query as above.
 sum by (pod) (
   rate(container_cpu_usage_seconds_total{
     cluster="kubernetes-lab", namespace="default",
@@ -384,13 +384,13 @@ sum by (pod) (
   }[2m])
 )
 /
-# 下半部分 —— pod 申请了多少。相除的结果就是相对于申请的比例：1 表示
-# 「消耗的正好等于申请的」，0.5 —— 申请的一半。
+# The bottom part — how much the pod requested. The result of the division is the fraction of the request: 1 means
+# "consuming exactly as much as it requested", 0.5 — half of what was requested.
 sum by (pod) (
   kube_pod_container_resource_requests{
     cluster="kubernetes-lab", namespace="default",
     pod=~"rickroll-.*",
-    resource="cpu"     # 这条指标也有内存的序列 —— 我们只保留 CPU
+    resource="cpu"     # the metric also has memory series — we keep only CPU
   }
 )
 ```
@@ -408,9 +408,9 @@ sum by (pod) (
 **集群里谁消耗 CPU 最多，前 10 名：**
 
 ```promql
-# topk(10, ...) —— 只保留值最大的那十条序列。
-# 按 (namespace, pod) 分组会把 namespace 加进答案里：能看出这是谁的 pod。
-# [5m] 窗口比前几步的宽：我们要的不是尖峰的形状，而是平均水平。
+# topk(10, ...) — keep only the ten series with the largest values.
+# Grouping by (namespace, pod) adds the namespace to the answer: you can see whose pod it is.
+# The [5m] window is wider than in the previous steps: we want not the shape of the spike, but the average level.
 topk(10,
   sum by (namespace, pod) (
     rate(container_cpu_usage_seconds_total{cluster="kubernetes-lab", container!=""}[5m])
@@ -421,8 +421,8 @@ topk(10,
 **按 Pod 看内存（不是计数器，所以不用 `rate`）：**
 
 ```promql
-# container_memory_working_set_bytes —— 不是计数器，而是一个瞬时值：此刻占用了这么多字节。
-# rate() 在这里会算出没有意义的东西 —— 「每秒多少字节」。
+# container_memory_working_set_bytes — not a counter but an instantaneous value: this many bytes
+# are occupied at this moment. rate() here would give nonsense — "bytes per second".
 sum by (pod) (
   container_memory_working_set_bytes{
     cluster="kubernetes-lab", namespace="default", container!=""
@@ -435,8 +435,9 @@ sum by (pod) (
 **预留了多少资源，相对于实际用了多少：**
 
 ```promql
-# sum 不带 by —— 把一切加成一个数：整个集群的所有 pod 一共预留了多少 CPU。
-# 这是申请，而不是消耗：预留了却在空转的那部分也会算进总和里。
+# sum without by — add everything into a single number: how much CPU is reserved for all
+# the cluster's pods. This is the request, not the consumption: what's reserved and sitting idle
+# goes into the sum too.
 sum(kube_pod_container_resource_requests{cluster="kubernetes-lab", resource="cpu"})
 ```
 
@@ -445,8 +446,8 @@ sum(kube_pod_container_resource_requests{cluster="kubernetes-lab", resource="cpu
 如果你做过实验 11，顺便看看 Android 构建——它非常显眼：
 
 ```promql
-# 同样的 rate，但过滤到构建的那些 pod。sum 不带 by (pod) —— 整个构建一条线，
-# 不管它起了多少个 pod。
+# The same rate, but a filter on the build pods. sum without by (pod) — one line for the whole build,
+# however many pods it brings up.
 sum(rate(container_cpu_usage_seconds_total{
   cluster="kubernetes-lab", pod=~"propusk-build-.*", container!=""
 }[2m]))
@@ -473,14 +474,15 @@ kubernetes_namespace_name:default AND kubernetes_pod_name:rickroll*
 📍 **在哪里做：**在笔记本电脑上，就是你刚才操作 `kubectl` 的那个终端窗口里。
 
 ```bash
-export KUBECONFIG=~/lab.kubeconfig          # 访问实验集群 `lab`
+export KUBECONFIG=~/lab.kubeconfig          # access to the lab cluster `lab`
 
-# 下面这两个变量让脚本还能访问租户。有了它们，脚本会额外检查指标是否真的到了那里，
-# 并打印出你 Grafana 的地址。没有它们，检查也能通过，但报告会短一些。
-export COZY_TENANT=workshopXX               # 用你的编号替换 XX
-export COZY_KUBECONFIG=~/.kube/workshop     # 访问租户的文件
+# The two variables below give the script access to the tenant as well. With them it will
+# additionally check that the metrics made it there, and print the address of your Grafana. Without them
+# the check will pass, but the report will be shorter.
+export COZY_TENANT=workshopXX               # your number instead of XX
+export COZY_KUBECONFIG=~/.kube/workshop     # the tenant access file
 
-./check.sh                                  # ./ = 「从当前文件夹里运行这个文件」
+./check.sh                                  # ./ = "run the file from the current folder"
 ```
 
 ⚠️ **在 Windows 上，脚本要从 WSL 里运行**，而不是从 PowerShell——怎么装它，写在实验 0 的开头。不用 WSL 也能完成这个实验，只是不会有报告这个产物。

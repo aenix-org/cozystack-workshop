@@ -1,59 +1,59 @@
--- लैब 9 · पास लॉग तालिका: हर टर्नस्टाइल टैप के लिए एक पंक्ति।
+-- Lab 9 · pass log table: one row per turnstile tap.
 --
--- यह कहाँ चलता है: वीएम पर, लैब क्लस्टर में, README से छोटी `ch` कमांड के
--- जरिए — यह SQL को एक सामान्य POST अनुरोध के मुख्य भाग के रूप में ClickHouse को भेजती है:
+-- Where it runs: on the VM, in the lab cluster, via the short `ch` command
+-- from the README — it sends SQL to ClickHouse as the body of a plain POST request:
 --     cd labs/09-clickhouse && ch < 01-schema.sql
--- CREATE TABLE का उत्तर खाली होता है — सफलता ऐसी ही दिखती है।
+-- The response for CREATE TABLE is empty — that is what success looks like.
 --
--- यहाँ कोई CREATE DATABASE या CREATE USER नहीं है: डेटाबेस और उपयोगकर्ता को सेवा ने खुद
--- सेटअप किया जब इसे ऑर्डर किया गया (डैशबोर्ड या इसी फ़ोल्डर में clickhouse.yaml फ़ाइल)।
+-- There is no CREATE DATABASE or CREATE USER here: the database and user were set up
+-- by the service itself when it was ordered (the dashboard or the clickhouse.yaml file in this same folder).
 
--- IF NOT EXISTS — यदि तालिका पहले से मौजूद है तो शिकायत न करें। फ़ाइल दो बार लागू की जा सकती है।
+-- IF NOT EXISTS — don't complain if the table already exists. The file can be applied twice.
 CREATE TABLE IF NOT EXISTS passes
 (
-    -- पास नंबर। UInt64 और UInt16 — 8 और 2 बाइट के अचिह्नित पूर्णांक।
-    -- ClickHouse में टाइप का आकार सोच-समझकर चुना जाता है: एक अरब पंक्तियों पर हर अतिरिक्त
-    -- बाइट एक कॉलम में डिस्क पर एक अतिरिक्त गीगाबाइट में बदल जाता है।
+    -- Pass number. UInt64 and UInt16 — unsigned integers of 8 and 2 bytes.
+    -- In ClickHouse the size of a type is chosen deliberately: over a billion rows every extra
+    -- byte in a column turns into an extra gigabyte on disk.
     pass_id      UInt64,
-    -- जब व्यक्ति टर्नस्टाइल से गुज़रा। पूरी रिपोर्ट इसी कॉलम के इर्द-गिर्द बनी है।
+    -- When the person passed through the turnstile. The whole report is built around this column.
     created_at   DateTime,
-    -- अतिथि का नाम। लगभग हर पंक्ति का अपना होता है, इसलिए सामान्य String।
+    -- Guest name. Almost every row has its own, so a plain String.
     guest_name   String,
-    -- नीचे की तीन कॉलम LowCardinality(String) हैं: एक स्ट्रिंग जिसमें कम भिन्न
-    -- मान होते हैं (पाँच विभाग, तीन प्रवेश-द्वार, चार पास प्रकार)। ClickHouse
-    -- ऐसे कॉलम के लिए एक शब्दकोश रखता है और डिस्क पर वही शब्द दस लाख बार
-    -- दोहराने के बजाय संख्याएँ लिखता है।
-    -- नियम: कुछ हज़ार भिन्न मानों तक — LowCardinality, उससे अधिक —
-    -- सामान्य String। guest_name को इस तरह लपेटना न लपेटने से बुरा होगा:
-    -- दस लाख अद्वितीय नामों का शब्दकोश डेटा से ही बड़ा हो जाएगा।
+    -- The three columns below are LowCardinality(String): a string that has few distinct
+    -- values (five departments, three entrances, four pass types). ClickHouse
+    -- keeps a dictionary for such a column and writes numbers to disk instead of the same
+    -- words repeated a million times.
+    -- Rule: up to a few thousand distinct values — LowCardinality, more than that —
+    -- a plain String. Wrapping guest_name this way would be worse than not wrapping it:
+    -- a dictionary of a million unique names would end up larger than the data itself.
     host_dept    LowCardinality(String),
     entrance     LowCardinality(String),
     pass_type    LowCardinality(String),
-    -- अतिथि अंदर कितने मिनट रहा। दो बाइट काफ़ी से अधिक हैं।
+    -- How many minutes the guest stayed inside. Two bytes are more than enough.
     duration_min UInt16
 )
--- तालिका इंजन — ClickHouse डिस्क पर डेटा को कैसे संग्रहीत करता है। परिचित डेटाबेस में
--- ऐसा कोई विकल्प नहीं होता; यहाँ है, और यह तालिका बनाते समय किया जाता है।
--- MergeTree: हर इंसर्ट डिस्क पर एक नया हिस्सा रखता है, और हिस्से पृष्ठभूमि में
--- बड़े हिस्सों में विलीन होते हैं। इसलिए व्यावहारिक नियम — कई पंक्तियों के बैच में इंसर्ट करें।
--- दस लाख एकल-पंक्ति इंसर्ट दस लाख हिस्से बना देंगे और सर्वर को गिरा देंगे।
+-- The table engine — how ClickHouse stores the data on disk. In familiar databases
+-- there is no such choice; here there is, and it is made when the table is created.
+-- MergeTree: each insert lays a new part on disk, and parts merge in the background
+-- into larger ones. Hence the practical rule — insert in batches of many rows.
+-- A million single-row inserts would create a million parts and bring the server down.
 ENGINE = MergeTree
--- फ़ाइल की सबसे महत्वपूर्ण पंक्ति, और इसे तालिका में कोई डेटा आने से पहले चुना जाता है।
--- ORDER BY वह क्रम तय करता है जिसमें पंक्तियाँ भौतिक रूप से डिस्क पर पड़ी रहती हैं, और यह
--- एकमात्र वास्तविक इंडेक्स के रूप में भी काम करता है: ClickHouse हर कुछ हज़ार पंक्तियों पर
--- निशान संग्रहीत करता है और उनसे समझ लेता है कि फ़ाइल के कौन-से हिस्से पूरी तरह छोड़े जा सकते हैं।
+-- The most important line of the file, and it is chosen before any data enters the table.
+-- ORDER BY sets the order in which rows physically lie on disk, and it also
+-- serves as the only real index: ClickHouse stores marks every
+-- few thousand rows and from them figures out which parts of the file can be skipped entirely.
 --
--- परिणाम: «मार्च में कितने पास हुए» फ़ाइल के एक हिस्से को पढ़ने में बदल जाता है,
--- जबकि «नंबर 424242 वाला पास खोजो» पूरे pass_id कॉलम को पढ़ने में बदल जाता है,
--- क्योंकि pass_id सॉर्ट कुंजी में नहीं है। यह कोई कमी नहीं, यह डिज़ाइन है।
+-- Consequence: "how many passes were there in March" turns into reading one stretch of
+-- the file, while "find the pass with number 424242" turns into reading the whole pass_id column,
+-- because pass_id is not in the sort key. This is not a shortcoming, it is by design.
 --
--- परिचित दुनिया से: वही निर्णय जो कागज़ी अभिलेखागार में होता है — पासों को
--- तारीख या उपनाम के अनुसार फ़ाइल करना। तारीख के अनुसार फ़ाइल करो और मार्च का फ़ोल्डर
--- तुरंत मिल जाता है, जबकि कोई एक खास इवानोव खोजने में स्कैन करना पड़ता है। और कोई भी
--- बाद में दस लाख कागज़ों को दोबारा फ़ाइल नहीं करेगा।
+-- From the familiar world: the same decision as in a paper archive — filing
+-- passes by date or by surname. File them by date and the March folder is
+-- retrieved instantly, while one particular Ivanov is found by scanning through. And nobody
+-- is going to re-file a million sheets of paper after the fact.
 --
--- फ़ाइल में जानबूझकर कोई PARTITION BY नहीं है। पार्टीशन हिस्सों का एक अलग समूह है (आमतौर पर
--- एक महीने का) जिसे एक ही कमांड से हटाया जा सकता है; यह «दो साल रखो और उससे अधिक नहीं»
--- नियम के लिए सुविधाजनक है। आठ महीने के प्रशिक्षण डेटा पर पार्टीशन बिना किसी लाभ के अतिरिक्त
--- हिस्से देंगे, और अनावश्यक पठन को यहाँ सॉर्ट कुंजी काट देती है।
+-- There is deliberately no PARTITION BY in the file. A partition is a separate set of parts (usually
+-- one month) that can be dropped with a single command; this is handy for the rule
+-- "keep two years and no more". Over eight months of training data partitions would give
+-- extra parts with no benefit, and cutting out unnecessary reads is something the sort key handles here.
 ORDER BY (created_at, entrance)

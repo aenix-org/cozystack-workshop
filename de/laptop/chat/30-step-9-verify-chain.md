@@ -43,14 +43,14 @@ kubectl port-forward -n tenant-workshopXX <pod-name-from-output> 8080:8080
 
 In einem anderen Terminalfenster:
 ```bash
-# Gesundheit
+# health
 curl -s http://localhost:8080/actuator/health
 
-# eine Bestellung anlegen
+# create an order
 curl -s -X POST http://localhost:8080/api/orders \
   -H 'Content-Type: application/json' -d '{"item":"test"}'
 
-# prüfen, dass sie gespeichert wurde
+# see that it was recorded
 curl -s http://localhost:8080/api/orders
 ```
 

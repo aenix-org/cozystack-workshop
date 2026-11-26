@@ -32,12 +32,12 @@
 сейчас: о своих правах кластер можно спросить, ничего при этом не создавая.
 
 ```bash
-# KUBECONFIG — переменная, из которой kubectl берёт адрес кластера и данные для входа.
-# Здесь это тенантный доступ, тот же файл, что и в остальных лабах.
+# KUBECONFIG — the variable kubectl reads to find the cluster's address and your credentials.
+# Here it is the tenant access, the same file as in every other lab.
 export KUBECONFIG=~/.kube/config
-# auth can-i = «а мне это можно?». Кластер отвечает yes или no и ничего не меняет:
-#   create                   какое действие проверяем
-#   applicationdefinitions   над каким типом объектов
+# auth can-i = "am I allowed to?". The cluster answers yes or no and changes nothing:
+#   create                   which action we are checking
+#   applicationdefinitions   on which type of object
 kubectl auth can-i create applicationdefinitions
 ```
 
@@ -71,7 +71,7 @@ no
 ## Что лежит в папке лабы
 
 Все файлы уже у вас — вы забрали их вместе с репозиторием. Создавать и печатать заново
-ничего не нужно: там, где ниже написано `kubectl apply -f имя.yaml`, файл берётся отсюда.
+ничего не нужно: там, где ниже написано `kubectl apply -f name.yaml`, файл берётся отсюда.
 
 ```bash
 cd labs/13-catalog
@@ -92,13 +92,13 @@ nginx со страницей, — потому что лаба не про пр
 
 ```
 chart/
-├── Chart.yaml            имя, версия, описание
-├── values.yaml           параметры и значения по умолчанию
-├── values.schema.json    какие значения считать допустимыми
+├── Chart.yaml            name, version, description
+├── values.yaml           parameters and default values
+├── values.schema.json    which values to consider valid
 └── templates/
-    ├── configmap.yaml    страница и конфиг nginx
-    ├── deployment.yaml   само приложение
-    └── service.yaml      адрес
+    ├── configmap.yaml    the page and the nginx config
+    ├── deployment.yaml   the application itself
+    └── service.yaml      the address
 ```
 
 <details>
@@ -154,10 +154,10 @@ README чарта. Один источник правды: поменяли ко
 подсуньте в числовой параметр строку.
 
 ```bash
-# template = «собери манифесты из чарта и напечатай их», кластер при этом не трогается:
-#   gp                    имя релиза, под которым чарт как бы разворачивается
-#   chart                 папка с чартом
-#   --set replicas=abc    переопределить один параметр прямо в командной строке
+# template = "assemble the manifests from the chart and print them", the cluster is not touched:
+#   gp                    the release name the chart is notionally deployed under
+#   chart                 the folder with the chart
+#   --set replicas=abc    override a single parameter right on the command line
 helm template gp chart --set replicas=abc
 ```
 
@@ -229,9 +229,9 @@ Kubernetes **не перезапускает поды, когда меняетс
 
 ```bash
 cd labs/13-catalog
-# lint = «проверь пакет на ошибки оформления и обязательные поля»
-#   chart   путь к папке с чартом; внутри неё Helm ждёт Chart.yaml, values.yaml
-#           и папку templates/
+# lint = "check the package for formatting errors and required fields"
+#   chart   path to the chart folder; inside it Helm expects Chart.yaml, values.yaml
+#           and the templates/ folder
 helm lint chart
 ```
 
@@ -252,8 +252,8 @@ helm lint chart
 берёт значения из `values.yaml`, подставляет их в текст и печатает результат.
 
 ```bash
-# main — имя релиза, то есть этого конкретного разворачивания чарта. Оно попадает
-# в имена создаваемых объектов, поэтому две установки рядом не столкнутся именами.
+# main — the release name, that is, of this specific deployment of the chart. It goes
+# into the names of the objects created, so two installations side by side will not clash.
 helm template main chart
 ```
 
@@ -264,10 +264,10 @@ helm template main chart
 значениями и оставляем в выводе только ту строку, которая должна была измениться.
 
 ```bash
-# --set replicas=5 переопределяет значение из values.yaml на время одного запуска.
-# | grep 'replicas:' — из всего вывода оставить только строки с этим словом.
+# --set replicas=5 overrides the value from values.yaml for the duration of one run.
+# | grep 'replicas:' — from the whole output keep only the lines with this word.
 helm template main chart --set replicas=5 | grep 'replicas:'
-# то же для булева параметра: от external зависит, какой тип Service попадёт в манифест
+# the same for the boolean parameter: external decides which Service type ends up in the manifest
 helm template main chart --set external=true | grep 'type:'
 ```
 
@@ -320,11 +320,11 @@ cluster-scoped природа объекта. Он один на кластер,
 заработают у любого тенанта, как только админ применит определение:
 
 ```bash
-# get = «покажи, что есть». guestpasses — то самое имя из поля plural ниже:
-#   -n tenant-workshopXX   в каком namespace смотреть; XX замените на свой номер
+# get = "show me what's there". guestpasses is that very name from the plural field below:
+#   -n tenant-workshopXX   which namespace to look in; replace XX with your own number
 kubectl get guestpasses -n tenant-workshopXX
-# describe = «покажи всё про один объект»: параметры, состояние, последние события.
-# main здесь — имя конкретного заказанного приложения, а не имя типа.
+# describe = "show me everything about one object": parameters, state, recent events.
+# main here is the name of a specific ordered application, not the name of the type.
 kubectl describe guestpass main -n tenant-workshopXX
 ```
 
@@ -417,9 +417,9 @@ Flux. Без неё релиз некому будет обслуживать, �
 `icon` нужна одна сплошная — поэтому переводы строк убираются отдельным шагом.
 
 ```bash
-# base64 = перевести двоичный файл в строку из букв, цифр и знаков + / =
-#   -i icon.svg   что кодировать (написание ключа для macOS и BSD)
-# tr -d '\n' = выбросить из вывода все переводы строк, склеив его в одну
+# base64 = turn a binary file into a string of letters, digits and the signs + / =
+#   -i icon.svg   what to encode (the flag spelling for macOS and BSD)
+# tr -d '\n' = drop every line break from the output, gluing it into one
 base64 -i icon.svg | tr -d '\n'
 ```
 
@@ -448,9 +448,9 @@ base64 -i icon.svg | tr -d '\n'
 именно не хватило.
 
 ```bash
-# тенантный доступ — тот же, с которым вы работали весь воркшоп
+# tenant access — the same one you have worked with throughout the workshop
 export KUBECONFIG=~/.kube/config
-# apply = «приведи кластер к тому, что написано в файле»; -f — читать из файла
+# apply = "bring the cluster into line with what's written in the file"; -f — read from a file
 kubectl apply -f applicationdefinition.yaml
 ```
 
@@ -498,10 +498,10 @@ vSphere: свои VM в своём пуле вы создавали сами, а
 отправляя.
 
 ```bash
-# auth can-i = «а мне это можно?». Ответ yes или no, кластер при этом не меняется.
+# auth can-i = "am I allowed to?". The answer is yes or no, and the cluster is not changed.
 kubectl auth can-i create applicationdefinitions
-# --dry-run=client = «разбери файл и покажи, что получилось бы, но в кластер не ходи».
-# client значит, что вся проверка идёт на виртуалке и кластер о ней даже не узнает.
+# --dry-run=client = "parse the file and show what would come out, but do not go to the cluster".
+# client means the whole check runs on the bastion and the cluster never even hears about it.
 kubectl apply -f applicationdefinition.yaml --dry-run=client
 ```
 
@@ -572,7 +572,7 @@ spec:
 раскодируется в SVG — и, главное, что схема в определении совпадает со схемой в чарте.
 
 ```bash
-# ./ перед именем означает «файл из текущей папки», то есть из labs/13-catalog
+# ./ before the name means "the file from the current folder", that is, from labs/13-catalog
 ./check.sh
 ```
 

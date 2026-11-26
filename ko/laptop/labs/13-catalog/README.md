@@ -32,12 +32,12 @@
 있습니다.
 
 ```bash
-# KUBECONFIG — kubectl이 클러스터 주소와 로그인 정보를 읽어 오는 변수입니다.
-# 여기서는 테넌트 접근 권한이며, 다른 모든 랩에서 쓰던 것과 같은 파일입니다.
+# KUBECONFIG — the variable kubectl reads to find the cluster's address and your credentials.
+# Here it is the tenant access, the same file as in every other lab.
 export KUBECONFIG=~/.kube/workshop
-# auth can-i = "나에게 이게 허용됩니까?". 클러스터는 yes 또는 no로 답하고 아무것도 바꾸지 않습니다:
-#   create                   어떤 동작을 확인하는지
-#   applicationdefinitions   어떤 유형의 객체에 대해
+# auth can-i = "am I allowed to?". The cluster answers yes or no and changes nothing:
+#   create                   which action we are checking
+#   applicationdefinitions   on which type of object
 kubectl auth can-i create applicationdefinitions
 ```
 
@@ -92,13 +92,13 @@ cd labs/13-catalog
 
 ```
 chart/
-├── Chart.yaml            이름, 버전, 설명
-├── values.yaml           파라미터와 기본값
-├── values.schema.json    어떤 값을 유효하다고 볼지
+├── Chart.yaml            name, version, description
+├── values.yaml           parameters and default values
+├── values.schema.json    which values to consider valid
 └── templates/
-    ├── configmap.yaml    페이지와 nginx 설정
-    ├── deployment.yaml   애플리케이션 자체
-    └── service.yaml      주소
+    ├── configmap.yaml    the page and the nginx config
+    ├── deployment.yaml   the application itself
+    └── service.yaml      the address
 ```
 
 <details>
@@ -152,10 +152,10 @@ external: false
 파라미터에 문자열을 슬쩍 넣어 보는 것입니다.
 
 ```bash
-# template = "차트에서 매니페스트를 조립해 출력해라", 클러스터는 건드리지 않습니다:
-#   gp                    차트가 명목상 배포되는 릴리스 이름
-#   chart                 차트가 든 폴더
-#   --set replicas=abc    명령줄에서 바로 파라미터 하나를 덮어쓰기
+# template = "assemble the manifests from the chart and print them", the cluster is not touched:
+#   gp                    the release name the chart is notionally deployed under
+#   chart                 the folder with the chart
+#   --set replicas=abc    override a single parameter right on the command line
 helm template gp chart --set replicas=abc
 ```
 
@@ -224,9 +224,9 @@ Kubernetes는 **ConfigMap이 바뀌어도 Pod을 재시작하지 않습니다**.
 
 ```bash
 cd labs/13-catalog
-# lint = "패키지의 형식 오류와 필수 필드를 검사해라"
-#   chart   차트 폴더로 가는 경로; 그 안에서 Helm은 Chart.yaml, values.yaml
-#           그리고 templates/ 폴더를 기대합니다
+# lint = "check the package for formatting errors and required fields"
+#   chart   path to the chart folder; inside it Helm expects Chart.yaml, values.yaml
+#           and the templates/ folder
 helm lint chart
 ```
 
@@ -247,8 +247,8 @@ helm lint chart
 끼워 넣고 결과를 출력합니다.
 
 ```bash
-# main — 릴리스 이름, 즉 이 특정한 차트 배포의 이름입니다. 이 이름은 생성되는 객체의
-# 이름에 들어가므로, 나란히 놓인 두 설치가 이름으로 충돌하지 않습니다.
+# main — the release name, that is, of this specific deployment of the chart. It goes
+# into the names of the objects created, so two installations side by side will not clash.
 helm template main chart
 ```
 
@@ -259,10 +259,10 @@ helm template main chart
 바뀌어야 할 그 줄만 남깁니다.
 
 ```bash
-# --set replicas=5 는 실행 한 번 동안 values.yaml의 값을 덮어씁니다.
-# | grep 'replicas:' — 전체 출력에서 이 단어가 든 줄만 남깁니다.
+# --set replicas=5 overrides the value from values.yaml for the duration of one run.
+# | grep 'replicas:' — from the whole output keep only the lines with this word.
 helm template main chart --set replicas=5 | grep 'replicas:'
-# 불리언 파라미터도 마찬가지: external이 매니페스트에 어떤 Service 타입이 들어갈지를 결정합니다
+# the same for the boolean parameter: external decides which Service type ends up in the manifest
 helm template main chart --set external=true | grep 'type:'
 ```
 
@@ -314,11 +314,11 @@ metadata:
 동작합니다:
 
 ```bash
-# get = "무엇이 있는지 보여줘". guestpasses는 아래 plural 필드에 있는 바로 그 이름입니다:
-#   -n tenant-workshopXX   어느 namespace에서 볼지; XX는 자신의 번호로 바꾸십시오
+# get = "show me what's there". guestpasses is that very name from the plural field below:
+#   -n tenant-workshopXX   which namespace to look in; replace XX with your own number
 kubectl get guestpasses -n tenant-workshopXX
-# describe = "객체 하나에 관한 모든 것을 보여줘": 파라미터, 상태, 최근 이벤트.
-# 여기서 main은 유형의 이름이 아니라 주문된 특정 애플리케이션의 이름입니다.
+# describe = "show me everything about one object": parameters, state, recent events.
+# main here is the name of a specific ordered application, not the name of the type.
 kubectl describe guestpass main -n tenant-workshopXX
 ```
 
@@ -409,9 +409,9 @@ Cozystack의 서비스 레이블입니다. 이것을 기준으로 테넌트들�
 필요합니다 — 그래서 줄바꿈은 별도의 단계에서 제거합니다.
 
 ```bash
-# base64 = 이진 파일을 글자, 숫자, 그리고 + / = 기호로 이루어진 문자열로 바꾸기
-#   -i icon.svg   무엇을 인코딩할지 (macOS와 BSD용 플래그 표기)
-# tr -d '\n' = 출력에서 모든 줄바꿈을 없애 한 줄로 이어 붙이기
+# base64 = turn a binary file into a string of letters, digits and the signs + / =
+#   -i icon.svg   what to encode (the flag spelling for macOS and BSD)
+# tr -d '\n' = drop every line break from the output, gluing it into one
 base64 -i icon.svg | tr -d '\n'
 ```
 
@@ -438,9 +438,9 @@ Linux에서는 같은 명령의 플래그가 다릅니다: `base64 -w0 icon.svg`
 아니라 클러스터에게서 오며, 거부 텍스트에는 정확히 무엇이 부족했는지가 적혀 있습니다.
 
 ```bash
-# 테넌트 접근 권한 — 워크숍 내내 다뤄 온 바로 그것입니다
+# tenant access — the same one you have worked with throughout the workshop
 export KUBECONFIG=~/.kube/workshop
-# apply = "파일에 쓰인 대로 클러스터를 맞춰라"; -f — 파일에서 읽기
+# apply = "bring the cluster into line with what's written in the file"; -f — read from a file
 kubectl apply -f applicationdefinition.yaml
 ```
 
@@ -486,10 +486,10 @@ cluster scope**.
 `kubectl`이 파일을 어디로도 보내지 않은 채 통째로 파싱하게 합니다.
 
 ```bash
-# auth can-i = "나에게 이게 허용됩니까?". 답은 yes 또는 no이고, 클러스터는 바뀌지 않습니다.
+# auth can-i = "am I allowed to?". The answer is yes or no, and the cluster is not changed.
 kubectl auth can-i create applicationdefinitions
-# --dry-run=client = "파일을 파싱해서 무엇이 나올지 보여주되, 클러스터로는 가지 마라".
-# client는 모든 검사가 노트북에서 이뤄지고 클러스터는 그에 대해 알지도 못한다는 뜻입니다.
+# --dry-run=client = "parse the file and show what would come out, but do not go to the cluster".
+# client means the whole check runs on the laptop and the cluster never even hears about it.
 kubectl apply -f applicationdefinition.yaml --dry-run=client
 ```
 
@@ -558,7 +558,7 @@ spec:
 검사합니다.
 
 ```bash
-# 이름 앞의 ./ 는 "현재 폴더의 파일", 즉 labs/13-catalog의 파일을 뜻합니다
+# ./ before the name means "the file from the current folder", that is, from labs/13-catalog
 ./check.sh
 ```
 

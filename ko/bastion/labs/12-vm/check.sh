@@ -1,125 +1,125 @@
 #!/usr/bin/env bash
-# 랩 12 검증: 마이그레이션한 가상머신이 플랫폼의 ingress와 도메인을 통해 외부로
-# 게시되었는지 — 컨테이너 애플리케이션과 완전히 동일한 방식으로.
+# Check for lab 12: the migrated virtual machine is published externally through the
+# platform's ingress and domain — exactly like the containerized application.
 #
-# "객체가 생성되었는지"가 아니라 실제 동작을 본질적으로 확인한다:
-#   1) 테넌트 도메인 이름으로 HTTP 200이 오고 그것이 직원 명부 페이지인지,
-#   2) 가상머신 자체가 실행 중인지(Ready),
-#   3) 머신을 게시하는 Ingress가 자리에 있는지.
-# 첫 번째 항목이 핵심이다: 그것이 바로 명부가 외부에서 보인다는 증거다.
+# We verify not "objects created", but real, substantive operation:
+#   1) the tenant's domain name returns HTTP 200 and it is the directory page,
+#   2) the virtual machine itself is running (Ready),
+#   3) the Ingress that publishes the machine is in place.
+# The first item is the main one: it is the proof that the directory is visible externally.
 #
-# VM에서, 이 랩 폴더에서 실행한다. 테넌트 접근과 테넌트 번호가 필요하다:
+# Runs on the VM, from this lab's folder. Requires tenant access and the tenant number:
 #     export KUBECONFIG=~/.kube/config
 #     export COZY_TENANT=workshopXX
 #     cd labs/12-vm && ./check.sh
-# 도메인 검증은 테넌트 접근 없이도 동작한다 — curl만 있으면 충분하다. 테넌트
-# 접근이 없어도 스크립트는 실패하지 않는다: 테넌트 측 검증은 건너뛰고 그렇다고 알린다.
+# The domain check works even without tenant access — curl is enough for it. Without tenant
+# access the script does not fail: it skips the tenant-side checks and says so.
 #
-# 스크립트는 아무것도 바꾸지 않는다 — 읽고 HTTP 요청만 보낸다. 정리 전에 실행하라:
-# 머신을 삭제한 뒤에는 검증할 것이 없다.
+# The script changes nothing — it only reads and sends HTTP requests. Run it before cleanup:
+# once the machine is deleted there is nothing left to check.
 
-# 이 두 변수는 lib.sh가 가져간다 — 보고서 헤더와, 스크립트가 자신 옆에 쓰는
-# report-<랩>-<날짜>.md 파일 이름에 들어간다.
+# These two variables are picked up by lib.sh — they go into the report header and into the
+# name of the report-<lab>-<date>.md file that the script writes next to itself.
 LAB_NAME="12-vm"
-LAB_TITLE="랩 12 · 컨테이너 옆의 가상머신"
-# 공용 검증 라이브러리: ok / fail / warn / evidence / finish 가 여기서 온다.
-# 경로는 스크립트 자체가 있는 위치를 기준으로 계산되므로, 어느 디렉터리에서
-# 실행해도 동일하게 동작한다.
+LAB_TITLE="Lab 12 · A virtual machine next to containers"
+# Shared check library: ok / fail / warn / evidence / finish come from here.
+# The path is resolved relative to where the script itself lives, so running from any
+# directory works the same way.
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
-# 테넌트 번호는 필수다: namespace 이름도, 명부가 게시된 도메인 이름도 그것에서
-# 만들어진다. 그것이 없으면 검증할 것이 없다.
+# The tenant number is required: both the namespace name and the domain name under which the
+# directory is published are built from it. Without it there is nothing to check.
 need_tenant
 
-# 우리가 검증하는 이름들. VM 은 머신 주문(ORDER)의 이름, 즉 VMInstance 객체의
-# 이름이다; `kubectl get vminstance` 는 그것으로 조회한다. 실제로 실행 중인
-# 인스턴스는 이름이 다르다: 플랫폼이 주문을 `vm-instance` 차트로 배포하고, 차트
-# 이름이 릴리스 이름에 붙어서 vm-instance-spravochnik 가 된다.
+# The names we check. VM is the name of the machine ORDER, i.e. the VMInstance object;
+# `kubectl get vminstance` is queried by it. The actually running instance is named
+# differently: the platform deploys the order with the `vm-instance` chart, the chart name
+# is glued to the release name, and you get vm-instance-spravochnik.
 VM=spravochnik
 NS="tenant-${COZY_TENANT}"
-# 진행자가 미리 Ingress를 통해 명부를 게시한 도메인. 브라우저에서 여는 것과
-# 같은 주소다.
+# The domain on which the host published the directory in advance through Ingress. The same
+# address you open in the browser.
 HOST="spravochnik.${COZY_TENANT}.workshop.aenix.io"
 URL="http://${HOST}"
 
-# 테넌트 접근은 필수가 아니다: 도메인은 평범한 curl로 검증한다. KUBECONFIG가
-# 설정되어 있고 테넌트가 응답하면 — 머신 상태와 Ingress 검증을 추가한다.
+# Tenant access is not mandatory: the domain is checked with a plain curl. If KUBECONFIG is
+# set and the tenant responds — we add checks for the machine state and Ingress.
 TENANT_OK=0
 if [ -n "${KUBECONFIG:-}" ] && kubectl -n "$NS" get vminstance >/dev/null 2>&1; then
   TENANT_OK=1
 fi
 
-# --- 핵심: 명부가 도메인으로 외부에서 보인다 -------------------------------
-# 응답 코드와 본문을 따로 가져온다: 코드는 "아직 ingress 뒤에 아무도 없음"(503)을
-# "엉뚱한 곳을 가리킴"(404), "도메인이 아예 없음"(000)과 구분하고, 본문은
-# 응답하는 것이 무작위 스텁이 아니라 바로 명부임을 확인해 준다.
+# --- the main thing: the directory is visible externally by domain ---------
+# We take the response code and the body separately: the code distinguishes "nobody behind
+# ingress yet" (503) from "points to the wrong place" (404) and "no domain at all" (000),
+# while the body confirms that it is the directory answering, not a random stub.
 CODE="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$URL" 2>/dev/null)"
 BODY="$(curl -s --max-time 10 "$URL" 2>/dev/null)"
 
 case "$CODE" in
   200)
     case "$BODY" in
-      *"직원 명부"*)
-        ok "명부 게시됨: ${URL} 가 200으로 응답하고 명부 페이지를 제공한다"
-        evidence "도메인 응답" "요청: ${URL}
-응답 코드: ${CODE}
+      *"Staff directory"*)
+        ok "directory published: ${URL} responds 200 and serves the directory page"
+        evidence "Domain response" "request: ${URL}
+response code: ${CODE}
 $(printf '%s' "$BODY" | head -3)"
         ;;
       *)
-        fail "${URL} 가 200을 반환하지만 명부 페이지가 아니다" \
-             "도메인 뒤에서 다른 무언가가 응답하고 있다; 머신 내부 8080 포트에서 바로 명부가 수신 대기하는지 확인하라"
+        fail "${URL} returns 200, but this is not the directory page" \
+             "something else is answering behind the domain; check that the directory is what listens on port 8080 inside the machine"
         ;;
     esac
     ;;
   503)
-    fail "도메인 ${URL} 가 503으로 응답한다 — 아직 Ingress 뒤에 응답할 대상이 없다" \
-         "머신이 아직 부팅 중이거나 8080의 명부 서비스가 올라오지 않았다; vminstance가 Ready가 될 때까지 기다렸다가 머신 콘솔을 살펴보라"
+    fail "domain ${URL} responds 503 — there is no one behind the Ingress to answer yet" \
+         "the machine is still booting or the directory service on 8080 has not come up; wait for the vminstance to be Ready and look at the machine console"
     ;;
   000)
-    fail "도메인 ${URL} 가 전혀 응답하지 않는다" \
-         "네트워크를 확인하라; 이 호스트의 Ingress는 진행자가 만든다 — 도메인이 아예 없으면 진행자에게 문의하라"
+    fail "domain ${URL} does not respond at all" \
+         "check the network; the Ingress with this host is created by the host — if there is no domain at all, ask them"
     ;;
   *)
-    fail "도메인 ${URL} 가 200이 아니라 ${CODE} 로 응답한다" \
-         "404는 Ingress가 엉뚱한 서비스를 가리킨다는 뜻이고; 5xx는 백엔드가 응답할 준비가 안 되었다는 뜻이다"
+    fail "domain ${URL} responds ${CODE}, not 200" \
+         "404 means the Ingress points to the wrong service; 5xx means the backend is not ready to answer"
     ;;
 esac
 
-# --- 테넌트 측: 머신 자체와 그 게시 ----------------------------------------
+# --- tenant side: the machine itself and its publication -------------------
 if [ "$TENANT_OK" -eq 0 ]; then
-  warn "테넌트 측 검증을 건너뜀: KUBECONFIG로 테넌트에 접근할 수 없다" \
-       "테넌트 접근을 지정하라: export KUBECONFIG=~/.kube/config"
+  warn "tenant-side checks skipped: tenant not reachable via KUBECONFIG" \
+       "provide tenant access: export KUBECONFIG=~/.kube/config"
 else
-  # "객체가 있는지"가 아니라 Ready 조건을 묻는다: 머신 주문은 1초 만에 생성되지만
-  # 게스트는 3~5분에 걸쳐 올라오고, 그 동안 내내 머신은 존재하지만 명부는 아직
-  # 응답하지 않는다.
+  # We ask not "does the object exist", but the Ready condition: the machine order is created
+  # in a second, but the guest comes up in three to five minutes, and all that time the
+  # machine exists but the directory does not answer yet.
   if ! kubectl -n "$NS" get vminstance "$VM" >/dev/null 2>&1; then
-    fail "테넌트 ${NS} 에 가상머신 ${VM} 이 없다" \
-         "대시보드에서 VM Disk와 VM Instance를 만들거나 staff-directory-vm.yaml을 적용하라"
+    fail "there is no virtual machine ${VM} in tenant ${NS}" \
+         "create a VM Disk and VM Instance in the dashboard or apply staff-directory-vm.yaml"
   else
     VM_READY="$(kubectl -n "$NS" get vminstance "$VM" \
       -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)"
     if [ "$VM_READY" = "True" ]; then
-      ok "가상머신 ${VM} 이 실행 중이다"
+      ok "virtual machine ${VM} is running"
     elif [ -n "$VM_READY" ]; then
-      fail "가상머신 ${VM} 이 있지만 준비되지 않았다 (Ready=${VM_READY})" \
-           "대시보드에서 머신 카드를 살펴보라; 첫 전원 켜기는 3~5분이 걸린다"
+      fail "virtual machine ${VM} exists, but is not ready (Ready=${VM_READY})" \
+           "look at the machine card in the dashboard; the first power-on takes 3-5 minutes"
     else
-      warn "가상머신 ${VM} 이 존재하지만 상태를 읽을 수 없었다" \
-           "대시보드에서 직접 눈으로 확인하라: 전원이 켜져 있어야 한다"
+      warn "virtual machine ${VM} exists, but its state could not be read" \
+           "look at it in the dashboard: it should be powered on"
     fi
-    evidence "테넌트 가상머신" "$(kubectl -n "$NS" get vminstance 2>/dev/null)"
+    evidence "Tenant virtual machines" "$(kubectl -n "$NS" get vminstance 2>/dev/null)"
   fi
 
-  # Ingress는 참가자가 아니라 진행자가 만든다. 도메인이 이미 200으로 응답한다면 —
-  # 자리에 있는 것이다; 503/404일 때 게시가 아예 있는지 바로 보이도록 별도로
-  # 확인한다.
+  # The Ingress is created by the host, not the participant. If the domain already responds
+  # 200 — it is in place; we check it separately so that on 503/404 it is immediately clear
+  # whether there is any publication at all.
   if kubectl -n "$NS" get ingress spravochnik >/dev/null 2>&1; then
-    ok "Ingress spravochnik 가 자리에 있다 — 명부가 테넌트에 게시되었다"
-    evidence "테넌트 Ingress" "$(kubectl -n "$NS" get ingress spravochnik 2>/dev/null)"
+    ok "Ingress spravochnik is in place — the directory is published in the tenant"
+    evidence "Tenant Ingress" "$(kubectl -n "$NS" get ingress spravochnik 2>/dev/null)"
   else
-    warn "테넌트 ${NS} 에서 Ingress spravochnik 을 찾을 수 없다" \
-         "그것은 진행자가 만든다; 도메인이 이미 200으로 응답한다면 걱정할 것이 없고, 그렇지 않으면 진행자에게 문의하라"
+    warn "Ingress spravochnik not found in tenant ${NS}" \
+         "it is created by the host; if the domain already responds 200 there is nothing to worry about, otherwise contact the host"
   fi
 fi
 

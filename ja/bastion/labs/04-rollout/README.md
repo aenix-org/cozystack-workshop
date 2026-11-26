@@ -30,7 +30,7 @@
 ファイルはすべてすでに揃っています。リポジトリと一緒に受け取っています。作ったり打ち直したりするものは何もありません。以下で `kubectl apply -f name.yaml` と出てきたら、そのファイルはここから取られます。
 
 ```bash
-# ここから先、すべてのコマンドはこのフォルダーから実行します。`kubectl apply -f` のパスはここを基準に数えます。
+# From here on, all commands are run from this folder: paths in `kubectl apply -f` are counted from it.
 cd labs/04-rollout
 ```
 
@@ -51,28 +51,28 @@ cd labs/04-rollout
 **コピーを 3 つにします**。そうすれば入れ替えが一つずつ見えます。ここでいうコピーとは Pod です。クラスター内の最小の実行単位で、アプリケーションのコンテナとその環境を合わせたもの、単一の VM にもっとも近い対応物です。コピーが 1 つでもロールアウトはダウンタイムなしに通りますが、見えるのは「Pod が 1 つあった、今は別の 1 つがある」だけで、クラスターがどの順番でコピーを入れ替えるかは見えません。
 
 ```bash
-# KUBECONFIG — クラスターのアドレスとログイン用の認証情報が入ったファイル。この変数が
-# セットされている間、すべての kubectl コマンドは、それが発行された元のクラスターではなく `lab` クラスターへ向かう。
+# KUBECONFIG — the file with the cluster's address and the credentials to log into it. While the
+# variable is set, every kubectl command goes to the `lab` cluster, not the one it was issued from.
 export KUBECONFIG=~/lab.kubeconfig
 
-# hpa — スケーリングのラボで設定したオートスケーラー。コピー数が
-# 我々の指示だけで変わるように、これを削除する。
-#   --ignore-not-found  クラスターにもう無くてもエラー扱いしない
+# hpa — the autoscaler set up in the scaling lab. We delete it
+# so the number of copies changes only on our command.
+#   --ignore-not-found  don't treat it as an error if it's no longer in the cluster
 kubectl delete hpa rickroll --ignore-not-found
 
-# scale = 「コピーをこれだけ保て」。この数はアプリケーションの記述に入り、
-# あとはクラスターが自分で足りない分を立ち上げる。
+# scale = "keep this many copies". The number goes into the application's description,
+# and the cluster then brings up the missing ones itself.
 kubectl scale deployment rickroll --replicas=3
 
-# rollout status = 「要求した状態が実際の状態になるまで待つ」。このコマンドは 3 つのコピーが
-# すべて準備できるまでウィンドウを占有し、そのときになって初めてプロンプトを返す。
+# rollout status = "wait until the requested becomes actual". The command keeps the window
+# busy until all three copies are ready, and only then returns the prompt.
 kubectl rollout status deployment/rickroll
 ```
 
 Fortio 負荷生成器が所定の場所にあることを確認します:
 
 ```bash
-# get = 「そこに何があるか見せろ」。返答 `Error from server (NotFound)` は、無いという意味。
+# get = "show what's there". The reply `Error from server (NotFound)` means it isn't there.
 kubectl get deployment fortio
 ```
 
@@ -95,10 +95,10 @@ metadata:
 data:
   index.html: |
     ...
-    <div class="tag">バージョン2</div>
+    <div class="tag">VERSION 2</div>
     <h1>We're No Strangers To Love</h1>
     ...
-    <div class="pod">対応したPod<b>__POD__</b></div>
+    <div class="pod">served by pod<b>__POD__</b></div>
 ```
 
 中身は 1 枚のページです。見出しが違い、配色が違い、目立つ「バージョン2」バッジがあります。違いはわざと目立つように作ってあります。あなたが見るのは diff ではなくブラウザだからです。
@@ -122,8 +122,8 @@ data:
 適用します。クラスターに 2 つ目の ConfigMap が現れますが、まだ誰も参照していないので、稼働中のアプリケーションには触れません:
 
 ```bash
-# apply = 「クラスターをファイルに記述された状態に持っていく」。
-#   -f name.yaml   記述をどこから取るか。ファイルはこの同じフォルダーにある
+# apply = "bring the cluster to what's described in the file".
+#   -f name.yaml   where to take the description from; the file is in this same folder
 kubectl apply -f rickroll-page-v2.yaml
 ```
 
@@ -132,10 +132,10 @@ kubectl apply -f rickroll-page-v2.yaml
 ここでアプリケーションを開き、**何も変わっていない**ことを確認します:
 
 ```bash
-# port-forward = bastion からクラスターへの一時的なトンネル。
-#   svc/rickroll  どこへつなぐか。Service へ、つまりリクエストがコピー間に分散される先へ
-#   8080:80       左が bastion 側のポート、右がクラスター内のサービスのポート
-# トンネルが開いている間はウィンドウが占有される。Ctrl+C で閉じる。
+# port-forward = a temporary tunnel from the bastion into the cluster.
+#   svc/rickroll  where it leads: into the Service, that is, with requests spread across the copies
+#   8080:80       on the left the port on the bastion, on the right the service's port inside the cluster
+# While the tunnel is open the window is busy; it closes on Ctrl+C.
 kubectl port-forward svc/rickroll 8080:80
 ```
 
@@ -148,9 +148,9 @@ kubectl port-forward svc/rickroll 8080:80
 バージョンを切り替える前に、入れ替えが従うルールを見ておきましょう。ルールはアプリケーションの記述そのものの中にあります:
 
 ```bash
-# -o jsonpath=... — 表の代わりに、パスを指定してオブジェクトの単一フィールドを出力する。
-#   {.spec.strategy}  クラスターがコピーを入れ替えるルールのブロック
-#   {"\n"}            末尾の改行。これがないと出力がプロンプトに続いてしまう
+# -o jsonpath=... — instead of a table, print a single field of the object by giving the path to it.
+#   {.spec.strategy}  the block of rules by which the cluster replaces copies
+#   {"\n"}            a newline at the end, otherwise the output runs into the prompt
 kubectl get deployment rickroll -o jsonpath='{.spec.strategy}{"\n"}'
 ```
 
@@ -192,10 +192,10 @@ kubectl get deployment rickroll -o jsonpath='{.spec.strategy}{"\n"}'
 📍 **ウィンドウ 1** — Fortio へのトンネル:
 
 ```bash
-# 新しいターミナルウィンドウは前のウィンドウの変数を覚えていない。KUBECONFIG を改めてセットする。
+# A new terminal window doesn't remember the previous one's variables — we set KUBECONFIG again.
 export KUBECONFIG=~/lab.kubeconfig
-# 負荷生成器へのトンネル: bastion の 8081 番ポート → fortio サービスの 8080 番ポート。
-# 左側に 8081 を選んだのは、8080 番でアプリケーション自体へのトンネルと衝突しないため。
+# A tunnel to the load generator: port 8081 on the bastion → port 8080 of the fortio service.
+# 8081 was chosen on the left so as not to collide with the tunnel to the application itself on 8080.
 kubectl port-forward svc/fortio 8081:8080
 ```
 
@@ -213,13 +213,13 @@ kubectl port-forward svc/fortio 8081:8080
 同じ負荷はコマンドでも生成できます。フォームがうまくいかなかった場合に:
 
 ```bash
-# exec = すでに稼働中の Pod の中でコマンドを実行する。負荷を生成するのはあなたの bastion ではなく、
-# クラスター内部の Fortio 自身なので、これにはトンネルは要らない。
-#   deploy/fortio  fortio アプリケーションのいずれかのコピーで
-#   --             これより右はすべて kubectl ではなくコンテナへのコマンド
-#   -qps 300       毎秒 300 リクエスト
-#   -c 20          同時 20 接続
-#   -t 180s        負荷を 3 分間保つ
+# exec = run a command inside an already-running Pod. The load is generated not by your bastion,
+# but by Fortio itself from inside the cluster, so no tunnel is needed for this.
+#   deploy/fortio  in any copy of the fortio application
+#   --             everything to the right is a command for the container, not for kubectl
+#   -qps 300       three hundred requests per second
+#   -c 20          twenty simultaneous connections
+#   -t 180s        hold the load for three minutes
 kubectl exec deploy/fortio -- fortio load -qps 300 -c 20 -t 180s http://rickroll/
 ```
 
@@ -227,9 +227,9 @@ kubectl exec deploy/fortio -- fortio load -qps 300 -c 20 -t 180s http://rickroll
 
 ```bash
 export KUBECONFIG=~/lab.kubeconfig
-# -l app=rickroll — このラベルを持つ Pod だけを表示する。他は出力に入らない。
-# -w = 「見守って追記する」: ウィンドウは占有され、どれかのコピーの状態が変わるたびに
-# 新しい行を出力する。終了は Ctrl+C。
+# -l app=rickroll — show only Pods with this label; others won't get into the output.
+# -w = "watch and append": the window stays busy and prints a new line every time
+# the state of some copy changes. Exit — Ctrl+C.
 kubectl get pods -l app=rickroll -w
 ```
 
@@ -238,18 +238,18 @@ kubectl get pods -l app=rickroll -w
 📍 **ウィンドウ 3** — 空いているウィンドウ。1 枚目は Fortio へのトンネルを保持し、2 枚目は Pod の見守りで占有されているので、3 枚目で patch を実行します。ここでもアクセスを改めて設定する必要があります:
 
 ```bash
-# 新しいターミナルウィンドウは前のウィンドウの変数を覚えていない。KUBECONFIG を改めてセットする。
+# A new terminal window doesn't remember the previous one's variables — we set KUBECONFIG again.
 export KUBECONFIG=~/lab.kubeconfig
 ```
 
 ここでアプリケーションの記述のうち、ちょうど 1 つのフィールドを変えます。`page` という名前のボリューム、つまりコンテナの中に置かれるフォルダーが、その中身を ConfigMap `rickroll-page-v2` から取るようにするのです。「アプリケーションを更新する」というコマンドは存在しませんし、これからも存在しません。あるのは、あるべき状態の新しい記録だけです。クラスターは実際の状態との食い違いを自分で見つけ、コピーの入れ替えを始めます。
 
 ```bash
-# patch = オブジェクト全体を書き直さず、フィールドをピンポイントで変える。
-#   --type=json  編集の形式: 「操作 + パス + 値」
-#   op: replace  このパスにあるものを置き換える
-#   path         オブジェクト内のフィールドのアドレス。volumes/0 はリストの最初のボリューム（下記参照）
-#   value        ボリュームがページを取る先の、新しい ConfigMap 名
+# patch = change a field in an object pinpoint-style, without rewriting the whole object.
+#   --type=json  the edit format: "operation + path + value"
+#   op: replace  replace what sits at this path
+#   path         the address of the field inside the object; volumes/0 — the first volume in the list (see below)
+#   value        the new ConfigMap name from which the volume will take the page
 kubectl patch deployment rickroll --type=json \
   -p='[{"op":"replace","path":"/spec/template/spec/volumes/0/configMap/name","value":"rickroll-page-v2"}]'
 ```
@@ -270,9 +270,9 @@ JSON Patch を採ったのは、仕組みを純粋な形で見せるからです
 **より安全** — 同じことを普通の merge patch で。Kubernetes のリストはキーでマージでき、`volumes` にとってそのキーは `name` です:
 
 ```bash
-# --type=json を付けなければ、これは merge patch: オブジェクトの一部を、マニフェストにあるのと同じ形で
-# 記述すると、クラスターがそれをすでにあるものとマージする。volumes リストは `name` キーで
-# マージされるので、ここでは「これこれのインデックスのボリューム」ではなく `page` ボリュームが指定される。
+# Without --type=json this is a merge patch: you describe a piece of the object in the same form
+# it has in the manifest, and the cluster merges it with what's already there. The volumes list merges
+# by the `name` key, so here the `page` volume is addressed, not "the volume at such-and-such index".
 kubectl patch deployment rickroll -p \
   '{"spec":{"template":{"spec":{"volumes":[{"name":"page","configMap":{"name":"rickroll-page-v2"}}]}}}}'
 ```
@@ -288,9 +288,9 @@ kubectl patch deployment rickroll -p \
 入れ替えが進むのを見ます:
 
 ```bash
-# rollout status は入れ替えの進捗を 1 行ずつ出力し、すべてのコピーが更新されると終了する。
-# ロールアウトが収束しなければ、コマンドは非ゼロの終了コードを返す。スクリプトで
-# 止めるのに便利。
+# rollout status prints the progress of the replacement line by line and finishes when all copies are updated.
+# If the rollout doesn't converge, the command returns a non-zero exit code — convenient for
+# stopping it in scripts.
 kubectl rollout status deployment/rickroll
 ```
 
@@ -305,8 +305,8 @@ deployment "rickroll" successfully rolled out
 名前の末尾に注目してください。新しいコピーは中間の部分も変わっています。それが別の ReplicaSet です。Deployment は古いものを作り直したのではなく、その隣に 2 つ目を作り、一方からもう一方へコピーを注ぎ込んでいるのです。古いものはどこにも消えておらず、コピー数ゼロで出番を待っています:
 
 ```bash
-# rs — ReplicaSet の略。記述の一つのバージョンのコピーの集合。
-# DESIRED — この集合で要求されているコピー数、READY — そのうち応答できる準備ができている数。
+# rs — shorthand for ReplicaSet, a set of copies of one version of the description.
+# DESIRED — how many copies are requested in this set, READY — how many of them are ready to answer.
 kubectl get rs -l app=rickroll
 ```
 
@@ -323,7 +323,7 @@ rickroll-7c5d4f9b21   3         3         3       40s
 アプリケーションへのトンネルを開きます:
 
 ```bash
-# ラボの最初と同じトンネル: bastion の 8080 番ポート → rickroll サービスの 80 番ポート。
+# The same tunnel as at the start of the lab: port 8080 on the bastion → port 80 of the rickroll service.
 kubectl port-forward svc/rickroll 8080:80
 ```
 
@@ -349,8 +349,8 @@ All done 54000 calls (plus 0 warmup) 0.412 ms avg, 300.0 qps
 Fortio で負荷をもう一度（同じパラメーターで）開始し、それが走っている間に変更履歴を見ます:
 
 ```bash
-# history = 記述の保存されたリビジョンの一覧。各行は、1 つのコマンドで戻れる状態。
-# CHANGE-CAUSE — なぜ変えたかについての任意のメモ。
+# history = the list of saved revisions of the description. Each line is a state you can
+# return to with a single command. CHANGE-CAUSE — an optional note on why it was changed.
 kubectl rollout history deployment/rickroll
 ```
 
@@ -365,11 +365,11 @@ REVISION  CHANGE-CAUSE
 ロールバック:
 
 ```bash
-# undo をパラメーターなしで実行 = 前のリビジョンに戻る。これは「時間を巻き戻す」のではなく、
-# 古い記述の普通のロールアウト: コピーは一つずつ、同じ maxSurge と maxUnavailable の
-# ルールで入れ替わる。
+# undo with no extra parameters = return to the previous revision. This isn't "rewinding
+# time", it's an ordinary rollout of the old description: copies are replaced one at a time, by the same
+# maxSurge and maxUnavailable rules.
 kubectl rollout undo deployment/rickroll
-# コピーの顔ぶれが記述に収束するまで待つ。
+# We wait until the makeup of the copies converges with the description.
 kubectl rollout status deployment/rickroll
 ```
 
@@ -390,14 +390,14 @@ kubectl rollout status deployment/rickroll
 ありふれた朝を思い浮かべてください。同僚がページの第 3 バージョンを用意していて、急いでいて、名前を打ち間違える。とはいえマニフェスト自体は妥当です。そんなオブジェクトが存在しないことをクラスターが知っている義務はありません。まさにこれを再現してみましょう:
 
 ```bash
-# 第 2 バージョンへ切り替えたときと同じ patch だが、ConfigMap 名を間違えている:
-# クラスターにオブジェクト `rickroll-page-v3` は存在しない。参照の存在は受理時にはチェックされないので、
-# コマンドは正常に終わる。
+# The same patch as when switching to the second version, but with a mistake in the ConfigMap name:
+# there is no object `rickroll-page-v3` in the cluster. The reference's existence isn't checked on acceptance,
+# so the command will finish successfully.
 kubectl patch deployment rickroll --type=json \
   -p='[{"op":"replace","path":"/spec/template/spec/volumes/0/configMap/name","value":"rickroll-page-v3"}]'
 
-# --timeout=90s — 永遠には待たない: 準備できたコピーを得られないまま、コマンドは 1 分半で
-# あきらめてエラーを返す。ロールアウト自体はどこへも進まず、ぶら下がったままになる。
+# --timeout=90s — don't wait forever: not having gotten ready copies, the command gives up after a
+# minute and a half and returns an error. The rollout itself won't go anywhere and will stay hanging.
 kubectl rollout status deployment/rickroll --timeout=90s
 ```
 
@@ -411,8 +411,8 @@ error: timed out waiting for the condition
 コピーの顔ぶれを見てください。前の 3 つは動いており、新しいものは起動で止まっています。
 
 ```bash
-# READY 列は Pod 内の準備できたコンテナを数える: 1/1 は準備完了、0/1 は未完了。
-# STATUS は起動がどこで止まったかをまさに言う。
+# The READY column counts the ready containers inside the Pod: 1/1 — ready, 0/1 — not.
+# STATUS says exactly where the startup stalled.
 kubectl get pods -l app=rickroll
 ```
 
@@ -434,10 +434,10 @@ rickroll-8b6a1e5c39-wr4tz   0/1     ContainerCreating   0          90s
 **なぜコピーが立ち上がらなかったか。** `rickroll-page-v3` という名前の ConfigMap は一度も作っていません。クラスターにはありません。クラスターに直接尋ねます:
 
 ```bash
-# events — クラスターの出来事のログ。vCenter の Tasks & Events タブにもっとも近い対応物。
-#   --field-selector reason=FailedMount  ボリュームのマウント失敗に関する記録だけを残す
-#   --sort-by=.lastTimestamp             時刻で並べ替え、いちばん新しいものが下に来る
-#   | tail -3                            最後の 3 行を表示し、残りは捨てる
+# events — the cluster's log of occurrences, the nearest analogue of the Tasks & Events tab in vCenter.
+#   --field-selector reason=FailedMount  keep only the records about a failed volume mount
+#   --sort-by=.lastTimestamp             sort by time, the freshest end up at the bottom
+#   | tail -3                            show the last three lines, discard the rest
 kubectl get events --field-selector reason=FailedMount --sort-by=.lastTimestamp | tail -3
 ```
 
@@ -451,8 +451,8 @@ Warning  FailedMount  kubelet  MountVolume.SetUp failed for volume "page":
 **さて 2 つ目の問い、このステップがそのために作られた問いです。** 止まったロールアウトのただ中でアプリケーションを開きます:
 
 ```bash
-# 同じトンネル。トラフィックは readiness チェックを通ったコピー、
-# つまり古い 3 つだけへ向かう: 止まっているものはバランシングに入れなかった。
+# The same tunnel. Traffic will go only to the copies that passed the readiness check,
+# that is, to the three old ones: the stuck one didn't make it into balancing.
 kubectl port-forward svc/rickroll 8080:80
 ```
 
@@ -475,9 +475,9 @@ kubectl port-forward svc/rickroll 8080:80
 抜け出します:
 
 ```bash
-# ConfigMap 名が正しく書かれている、前のリビジョンを戻す。
+# We return the previous revision — the one where the ConfigMap name is written correctly.
 kubectl rollout undo deployment/rickroll
-# 止まったコピーが消え、コピーの顔ぶれが記述に収束するまで待つ。
+# We wait until the stuck copy disappears and the makeup of the copies converges with the description.
 kubectl rollout status deployment/rickroll
 ```
 
@@ -488,7 +488,7 @@ kubectl rollout status deployment/rickroll
 📍 **場所:** bastion 上、`kubectl` で作業したのと同じターミナルウィンドウで。
 
 ```bash
-# このスクリプトはクラスターの中を何も変えない: 状態を読んでレポートを出力するだけ。
+# The script changes nothing in the cluster: it only reads the state and prints a report.
 ./check.sh
 ```
 
@@ -501,15 +501,15 @@ kubectl rollout status deployment/rickroll
 `rickroll` アプリケーションは後で必要になります。削除しません。コピーを 1 つに戻します:
 
 ```bash
-# 余分な 2 つのコピーはノードのメモリを解放する。この先のラボには負荷はない。
+# Two extra copies will free up the node's memory — there won't be any load in the labs ahead.
 kubectl scale deployment rickroll --replicas=1
 ```
 
 負荷生成器はもう要りません:
 
 ```bash
-# delete -f = ファイルに列挙されたオブジェクトを、それ以外は何も触らずに削除する。
-# パスは隣のフォルダーへ通じている。ファイルはスケーリングのラボがある場所にあるから。
+# delete -f = delete exactly the objects listed in the file, and nothing besides them.
+# The path leads to the neighboring folder, because the file is where the scaling lab is.
 kubectl delete -f ../03-scale/fortio.yaml
 ```
 

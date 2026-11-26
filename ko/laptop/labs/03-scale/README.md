@@ -30,7 +30,7 @@
 파일은 모두 이미 갖고 있습니다 — 리포지터리와 함께 받았습니다. 새로 만들거나 다시 입력할 것은 없습니다. 아래에서 `kubectl apply -f name.yaml`이 보이는 곳마다, 그 파일은 여기서 가져오는 것입니다.
 
 ```bash
-# 이 랩의 모든 명령은 이 폴더에서 실행합니다 — 그렇지 않으면 명령 안의 파일 이름을 찾지 못합니다.
+# Every command in this lab is run from this folder — otherwise the file names in them won't be found.
 cd labs/03-scale
 ```
 
@@ -47,19 +47,19 @@ cd labs/03-scale
 이 랩 전체는 복제본 수가 눈에 띄게 늘어나는 것에 달려 있습니다. 그러니 하나에서 시작해야 합니다 — 그렇지 않으면 늘어난 것을 비교할 대상이 없습니다. 지금 몇 개의 복제본이 돌고 있는지 봅시다.
 
 ```bash
-# KUBECONFIG는 클러스터의 주소와 로그인 정보가 담긴 파일의 경로입니다.
-# 이 변수가 설정되기 전까지 kubectl은 노트북 자체에서 클러스터를 찾고 발견하지 못합니다.
+# KUBECONFIG is the path to the file with the cluster's address and login details.
+# Until the variable is set, kubectl looks for the cluster on the laptop itself and doesn't find it.
 export KUBECONFIG=~/lab.kubeconfig
 
-# READY 열은 "준비됨 / 요청됨"으로 읽습니다: 1/1은 복제본 하나가 요청되어 돌고 있다는 뜻입니다.
+# The READY column reads as "ready / requested": 1/1 means one replica requested and running.
 kubectl get deployment rickroll
 ```
 
 `1/1`이라고 나와야 합니다. 그보다 많으면 하나로 되돌리세요. 그렇지 않으면 늘어나는 것이 그만큼 잘 보이지 않습니다:
 
 ```bash
-# scale은 애플리케이션 레코드에서 정확히 한 필드 — 복제본 수 — 만 바꿉니다.
-# 여분의 복제본은 클러스터가 몇 초 안에 스스로 정리합니다.
+# scale changes exactly one field in the application's record — the replica count.
+# The cluster will retire the extra replicas on its own, within seconds.
 kubectl scale deployment rickroll --replicas=1
 ```
 
@@ -68,10 +68,11 @@ kubectl scale deployment rickroll --replicas=1
 오토스케일링을 설정하기 전에, 그것이 무엇을 기준으로 퍼센트를 계산할지 이해해야 합니다.
 
 ```bash
-# 클러스터의 오브젝트에는 필드가 수백 개 있고, 테이블에는 보이지 않습니다. jsonpath는 응답에서
-# 정확히 한 지점만 뽑아냅니다. 경로는 위에서 아래로 읽습니다: spec.template은 복제본을 만드는
-# 템플릿, containers[0]은 그 안의 첫 번째 컨테이너, resources는 CPU와 메모리에 대한 요청과
-# 상한입니다. 꼬리의 {"\n"}은 줄바꿈으로, 응답이 다음 명령 프롬프트와 붙지 않게 합니다.
+# An object in the cluster has hundreds of fields; the table doesn't show them. jsonpath extracts
+# exactly one spot from the response. Read the path top to bottom: spec.template is the template
+# from which replicas are created, containers[0] is the first container in it, resources is its
+# request and ceiling for CPU and memory. The tail {"\n"} is a newline, so the response
+# doesn't run into the next command prompt.
 kubectl get deployment rickroll \
   -o jsonpath='{.spec.template.spec.containers[0].resources}{"\n"}'
 ```
@@ -146,7 +147,7 @@ spec:
 여기서 "평균"이라는 단어가 핵심이며, 모든 산수가 이것에 달려 있습니다. HPA는 이렇게 계산합니다:
 
 ```
-필요한 복제본 = ceil( 현재 복제본 × 현재 부하 ÷ 목표 부하 )
+replicas needed = ceil( current replicas × current load ÷ target load )
 ```
 
 복제본 하나가 부하 645%이고 목표가 50%면 `ceil(1 × 645 / 50) = 13`이 됩니다. 열셋은 여섯보다 크므로 HPA는 `maxReplicas`에 닿습니다.
@@ -183,8 +184,8 @@ spec:
 적용하세요:
 
 ```bash
-# apply = "파일에 기술된 대로 클러스터를 만들어라." HPA 오브젝트는 즉시 나타나지만,
-# 곧바로 계산을 시작하지는 않습니다 — 바로 그 지점에서 다음 단계에 걸려 넘어집니다.
+# apply = "bring the cluster to what's described in the file." The HPA object will appear at once,
+# but it won't start computing right away — that's what we'll trip over in the next step.
 kubectl apply -f hpa.yaml
 ```
 
@@ -193,9 +194,9 @@ kubectl apply -f hpa.yaml
 무엇을 얻었는지 봅시다:
 
 ```bash
-# hpa는 horizontalpodautoscaler의 약자이며, kubectl은 두 표기를 모두 이해합니다.
-# TARGETS 열은 "현재 부하 / 목표"로 읽고, REPLICAS는 지금
-# 요청된 복제본이 몇 개인지입니다.
+# hpa is shorthand for horizontalpodautoscaler; kubectl understands both spellings.
+# The TARGETS column reads as "current load / target," REPLICAS is how many
+# replicas are requested right now.
 kubectl get hpa rickroll
 ```
 
@@ -222,7 +223,7 @@ rickroll   Deployment/rickroll   cpu: <unknown>/50%   1         6         1     
 시간이 부족한 것입니다. 1분 30초에서 2분 기다렸다가 다시 보세요:
 
 ```bash
-# 위와 같은 명령. 같은 TARGETS 열을 봅니다.
+# The same command as above. We're looking at the same TARGETS column.
 kubectl get hpa rickroll
 ```
 
@@ -236,9 +237,9 @@ rickroll   Deployment/rickroll   cpu: 0%/50%     1         6         1          
 메트릭이 흐르고 있는지는 직접 확인할 수 있습니다:
 
 ```bash
-# top = "이 Pod들이 지금 리소스를 얼마나 먹고 있는가." 숫자는 오토스케일링을 먹이는
-# 바로 그 metrics-server에서 나옵니다: top이 답한다면 데이터 원천은 살아 있고,
-# 그저 시간 문제일 뿐입니다.
+# top = "how many resources these Pods are eating right now." The numbers come from
+# the same metrics-server that feeds autoscaling: if top answers, then the
+# data source is alive and it's only a matter of time.
 kubectl top pods -l app=rickroll
 ```
 
@@ -252,9 +253,9 @@ rickroll-6f4b9c8d57-p9wqt   1m           4Mi
 `metrics-server`는 클러스터와 함께 스스로 설치됩니다 — 따로 켤 필요가 없습니다. 그것은 `cozy-monitoring` 네임스페이스에 살며, 이렇게 확인할 수 있습니다:
 
 ```bash
-# -n = 어느 네임스페이스에서 볼지. 네임스페이스는 클러스터의 한 구획이며,
-# kubectl은 기본적으로 default를 보므로 거기서는 시스템 Pod가 보이지 않습니다.
-# deploy는 deployment의 약자입니다.
+# -n = which namespace to look in. A namespace is a section of the cluster;
+# by default kubectl looks in default and doesn't see the system Pods there.
+# deploy is shorthand for deployment.
 kubectl -n cozy-monitoring get deploy metrics-server
 ```
 
@@ -263,8 +264,8 @@ kubectl -n cozy-monitoring get deploy metrics-server
 정확한 원인은 다음이 알려 줍니다:
 
 ```bash
-# describe = 오브젝트의 전체 카드: 모든 필드, 이벤트, 조건.
-# 몇 개의 테이블 열만 출력하는 get과 다릅니다.
+# describe = the object's full card: all fields, events, and conditions,
+# unlike get, which prints a few table columns.
 kubectl describe hpa rickroll
 ```
 
@@ -340,12 +341,12 @@ spec:
 적용하고 기다립니다:
 
 ```bash
-# 파일에는 오브젝트가 한꺼번에 둘 있습니다: 생성기가 든 Deployment와, 그 웹 인터페이스를 위한
-# 안정된 주소인 Service.
+# There are two objects at once in the file: the Deployment with the generator and a Service — a
+# stable address for its web interface.
 kubectl apply -f fortio.yaml
 
-# rollout status는 복제본이 준비될 때까지 터미널을 붙잡고 진행 상황을 출력합니다.
-# 여기서 일부러 기다립니다: 생성기가 올라오기 전에는 부하를 걸 대상이 없습니다.
+# rollout status holds the terminal and prints progress until the replica is ready.
+# We wait here on purpose: until the generator is up, there's nothing to drive load with.
 kubectl rollout status deployment/fortio
 ```
 
@@ -356,10 +357,10 @@ kubectl rollout status deployment/fortio
 ```bash
 export KUBECONFIG=~/lab.kubeconfig
 
-# port-forward는 당신의 노트북에서 클러스터 안으로 터널을 놓습니다.
-#   svc/fortio    연결 대상: fortio라는 이름의 Service
-#   8081:8080     "이쪽 포트 : 클러스터 안 포트"로 읽습니다 — localhost:8081로의
-#                 요청이 이 Service의 포트 8080으로 갑니다
+# port-forward runs a tunnel from your laptop into the cluster.
+#   svc/fortio    what we connect to: the Service named fortio
+#   8081:8080     reads as "port on your side : port in the cluster" — a request
+#                 to localhost:8081 goes to port 8080 of this Service
 kubectl port-forward svc/fortio 8081:8080
 ```
 
@@ -378,16 +379,16 @@ kubectl port-forward svc/fortio 8081:8080
 ```bash
 export KUBECONFIG=~/lab.kubeconfig
 
-# rickroll의 복제본을 지켜봅니다: 새 줄 하나하나가 그중 하나의 상태 변화입니다.
-# 명령은 끝나지 않습니다. 나가려면 Ctrl+C — 이는 복제본 자체에는 아무 영향이 없습니다.
+# We watch rickroll's replicas: each new line is a state change of one of them.
+# The command doesn't finish; to exit, Ctrl+C — this has no effect on the replicas themselves.
 kubectl get pods -l app=rickroll -w
 ```
 
 세 번째 창이 있으면 이것도 거기에 두세요 — 그러면 의사 결정 과정 자체를 볼 수 있습니다:
 
 ```bash
-# 같은 지켜보기이되, 오토스케일링의 결정을 봅니다: TARGETS는 부하가 어떻게
-# 바뀌는지, REPLICAS는 그에 응해 복제본을 몇 개 요청했는지 보여줍니다.
+# The same watching, but of the autoscaling decisions: TARGETS shows how the load
+# changes, REPLICAS shows how many replicas it requested in response.
 kubectl get hpa rickroll -w
 ```
 
@@ -409,13 +410,13 @@ kubectl get hpa rickroll -w
 ⚠️ **당신의 Fortio 버전에서 필드 이름이 다르게 되어 있으면**(예를 들어 연결 수가 `Threads`로 표기되어 있으면) 의미로 판단하세요: URL, 요청 빈도, 지속 시간, 병렬성. 같은 부하는 브라우저를 거치지 않고 명령으로도 걸 수 있습니다:
 
 ```bash
-# exec는 당신의 노트북이 아니라, 이미 돌고 있는 Pod 안에서 명령을 실행합니다.
-#   deploy/fortio   이 애플리케이션의 Pod 안에서; 정확히 어느 Pod인지는 kubectl이 스스로 고름
-#   --              이 구분자 뒤의 모든 것은 Pod를 위한 명령
-#   -qps 1200       초당 천이백 요청
-#   -c 80           병렬 연결 여든 개
-#   -t 90s          부하를 1분 30초 동안 유지
-# 마지막 인자는 대상입니다: 우리 애플리케이션의 Service 이름.
+# exec runs a command inside an already-running Pod, not on your laptop.
+#   deploy/fortio   in a Pod of this application; which Pod exactly — kubectl picks itself
+#   --              everything after this separator is the command for the Pod
+#   -qps 1200       twelve hundred requests per second
+#   -c 80           eighty parallel connections
+#   -t 90s          hold the load for a minute and a half
+# The last argument is the target: the Service name of our application.
 kubectl exec deploy/fortio -- fortio load -qps 1200 -c 80 -t 90s http://rickroll/
 ```
 
@@ -438,7 +439,7 @@ rickroll-6f4b9c8d57-t8zxc   1/1     Running             3s
 📍 **HPA를 봅시다** — 그것이 무엇을 보고 무엇을 결정했는지:
 
 ```bash
-# TARGETS는 목표 대비 현재 평균 부하, REPLICAS는 요청된 복제본 수입니다.
+# TARGETS is the current average load against the target, REPLICAS is how many replicas are requested.
 kubectl get hpa rickroll
 ```
 
@@ -458,8 +459,8 @@ rickroll   Deployment/rickroll   cpu: 645%/50%   1         6         6          
 HPA의 산수를 직접 확인해 보세요:
 
 ```bash
-# 각 복제본의 소비량을 따로. CPU(cores)는 밀리cpu로 출력됩니다:
-# 100m은 코어의 100분의 1, 1000m은 코어 하나 전체입니다.
+# The consumption of each replica separately. CPU(cores) is printed in millicpu:
+# 100m is a hundredth of a core, 1000m is a whole core.
 kubectl top pods -l app=rickroll
 ```
 
@@ -496,8 +497,8 @@ rickroll-6f4b9c8d57-mn4kd   1/1     Terminating   4m
 ⚠️ **Windows에서는 스크립트를 PowerShell이 아니라 WSL에서** 실행합니다 — 그것을 어떻게 설치하는지는 랩 0 시작 부분에 적혀 있습니다. WSL이 없어도 랩은 완료할 수 있지만, 보고서 아티팩트는 없습니다.
 
 ```bash
-# ./는 시스템 PATH의 명령이 아니라 "현재 폴더의 파일"을 뜻합니다.
-# 스크립트는 클러스터에서 아무것도 바꾸지 않습니다: 읽고 보고서를 출력할 뿐입니다.
+# ./ means "a file from the current folder," not a command from the system PATH.
+# The script changes nothing in the cluster: it only reads and prints a report.
 ./check.sh
 ```
 
@@ -506,15 +507,15 @@ rickroll-6f4b9c8d57-mn4kd   1/1     Terminating   4m
 **HPA를 삭제합니다.** 랩 4에서는 부하 아래에서 새 버전을 롤아웃하는데, 같은 시간에 복제본 수를 바꾸는 여분의 메커니즘은 그림을 흐릴 뿐입니다:
 
 ```bash
-# delete -f = "이 파일에 기술된 것을 클러스터에서 제거하라." 애플리케이션은 남습니다:
-# 파일에 기술된 것은 HPA뿐입니다. 삭제 후 복제본 수는 현재 값에서 얼어붙습니다.
+# delete -f = "remove from the cluster what's described in this file." The application stays:
+# only the HPA is described in the file. After deletion the replica count freezes at the current value.
 kubectl delete -f hpa.yaml
 ```
 
 **Fortio는 남겨 둡니다** — 랩 4에서 부하 원천으로 필요합니다. 랩 4를 계획하고 있지 않다면, 그것도 제거하세요:
 
 ```bash
-# 파일의 두 오브젝트를 모두 제거합니다 — 생성기의 Deployment와 그 Service.
+# Removes both objects from the file — the generator's Deployment and its Service.
 kubectl delete -f fortio.yaml
 ```
 

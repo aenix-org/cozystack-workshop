@@ -23,8 +23,8 @@ brew install git
 
 **Linux**——取决于发行版家族：
 ```bash
-sudo apt-get update && sudo apt-get install -y git    # Debian、Ubuntu
-sudo dnf install -y git                               # Fedora、RHEL、CentOS Stream
+sudo apt-get update && sudo apt-get install -y git    # Debian, Ubuntu
+sudo dnf install -y git                               # Fedora, RHEL, CentOS Stream
 ```
 
 **Windows**（PowerShell）：

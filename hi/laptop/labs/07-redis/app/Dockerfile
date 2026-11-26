@@ -1,59 +1,59 @@
-# लैब 7 · सर्विस «गेस्ट पास» की इमेज बनाने की रेसिपी, वर्शन v2.
+# Lab 7 · build recipe for the «Guest Pass» service image, version v2.
 #
-# Dockerfile — यह चरणों की एक सूची है जिनसे सोर्स कोड से एक इमेज बनती है: फ़ाइल सिस्टम का
-# एक अपरिवर्तनीय स्नैपशॉट, साथ में एक स्टार्टअप कमांड। आपके लिए सबसे परिचित तुलना है
-# वर्चुअल मशीन का टेम्पलेट, पर वह माउस से नहीं, बल्कि इसी टेक्स्ट से बनती है, रहती है
-# एक रजिस्ट्री में और एक टैग से वर्शन की जाती है।
+# A Dockerfile is a list of steps that turn sources into an image: an immutable
+# snapshot of a filesystem together with a startup command. The closest familiar analogy is
+# a virtual machine template, except it is built not with a mouse but with this very text, it lives
+# in a registry and is versioned by a tag.
 #
-# इसे लैपटॉप पर बनाया जाता है, क्लस्टर में नहीं (README में बिल्ड वाला चरण देखें):
-#   docker build --platform linux/amd64 -t <आपका-harbor>/passes/passes-api:v2 app/
-#   docker push  <आपका-harbor>/passes/passes-api:v2
+# It is built on the laptop, not in the cluster (see the build step in the README):
+#   docker build --platform linux/amd64 -t <your-harbor>/passes/passes-api:v2 app/
+#   docker push  <your-harbor>/passes/passes-api:v2
 #
-# --platform linux/amd64 Apple Silicon वाले Mac पर अनिवार्य है: इसके बिना इमेज
-# ARM के लिए बनेगी, बिना किसी शिकायत के पुश हो जाएगी, और क्लस्टर में «exec format error» के साथ क्रैश होगी।
+# --platform linux/amd64 is mandatory on a Mac with Apple Silicon: without it the image will be built
+# for ARM, will push without a single complaint, and will crash in the cluster with «exec format error».
 #
-# दो-चरणीय बिल्ड।
+# A two-stage build.
 #
-# पहला चरण — बिल्ड चरण: यहाँ पूरा Go कंपाइलर चाहिए, और वह लगभग 350 MB है।
-# दूसरा चरण — जो क्लस्टर में जाएगा: वहाँ केवल तैयार बाइनरी पहुँचती है।
-# इस तरह अंतिम इमेज 350 के बजाय लगभग 10 MB की बनती है, और उसके अंदर न तो
-# कंपाइलर है, न सोर्स, न पैकेज मैनेजर — यानी जो कंटेनर में घुस ही गया हो
-# उसके इस्तेमाल के लिए कुछ भी नहीं है।
+# The first stage is the build stage: it needs the whole Go compiler, and that is about 350 MB.
+# The second stage is what will go to the cluster: only the finished binary lands there.
+# This way the final image ends up around 10 MB instead of 350, and inside it there is neither
+# a compiler, nor sources, nor a package manager — meaning there is nothing for
+# whoever did get into the container to make use of.
 
-# FROM — हम किस पहले से बनी इमेज से शुरू करते हैं। यहाँ हम Alpine पर आधारित Go कंपाइलर
-# वाली आधिकारिक इमेज लेते हैं। AS build इस चरण को एक नाम देता है ताकि दूसरा चरण उसमें से
-# परिणाम निकाल सके। वर्शन पिन किया गया है (1.23), latest नहीं: वरना उसी सोर्स का कल का बिल्ड
-# अलग बाइनरी दे सकता है।
+# FROM — which prebuilt image we start from. Here we take the official image with the Go
+# compiler based on Alpine. AS build gives this stage a name so that the second stage can take the
+# result out of it. The version is pinned (1.23), not latest: otherwise tomorrow's build of the same
+# source may produce a different binary.
 FROM golang:1.23-alpine AS build
-# WORKDIR — इमेज के अंदर की वर्किंग डायरेक्टरी। आगे के सभी कमांड इसी में चलते हैं।
+# WORKDIR — the working directory inside the image. All the following commands run in it.
 WORKDIR /src
-# COPY लैपटॉप की फ़ाइलें इमेज के अंदर रखता है। दो लाइनों में, एक में नहीं: go.mod कम-कम
-# बदलता है, main.go — अक्सर, और docker हर चरण को अलग से कैश करता है। सिर्फ़ main.go छुआ —
-# go.mod वाला चरण कैश से आ जाएगा।
+# COPY puts files from the laptop inside the image. In two lines, not one: go.mod changes
+# rarely, main.go — often, and docker caches each step separately. Touched only main.go —
+# the go.mod step is taken from the cache.
 COPY go.mod ./
 COPY main.go ./
-# RUN — बिल्ड के दौरान ही एक कमांड चलाना; उसका परिणाम इमेज में रह जाता है।
-# CGO_ENABLED=0 — स्टैटिक रूप से बनाना, सिस्टम लाइब्रेरियों से बंधे बिना।
-# इसके बिना बाइनरी को glibc की ज़रूरत होगी, जो अंतिम इमेज में नहीं होगी।
-# -trimpath बाइनरी से आपके लैपटॉप के पथ हटाता है, -ldflags="-s -w" डिबग जानकारी
-# हटा देता है — इमेज छोटी होती है, और आपके फ़ोल्डरों के नाम लॉग में नहीं जाते।
+# RUN — run a command right during the build; its result stays in the image.
+# CGO_ENABLED=0 — build statically, without binding to system libraries.
+# Without this the binary would require glibc, which won't be in the final image.
+# -trimpath removes paths from your laptop out of the binary, -ldflags="-s -w" drops
+# debug information — the image is smaller, and your folder names don't leak into the log.
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/passes-api .
 
-# दूसरा FROM इमेज को साफ़ शुरुआत से नए सिरे से शुरू करता है। build चरण में जो कुछ भी था,
-# इस जगह वह फेंक दिया जाता है, और अंतिम इमेज में केवल वही पहुँचेगा जिसे हम अगले
-# COPY --from=build कमांड से स्पष्ट रूप से कॉपी करते हैं।
+# The second FROM starts the image over, from a clean slate. Everything that was in the build stage
+# is discarded at this point, and only what we explicitly copy with the next
+# COPY --from=build command will land in the final image.
 FROM alpine:3.21
-# एप्लिकेशन root के रूप में नहीं चलता। सही से सेट किए गए क्लस्टर में root वाला पॉड
-# बिलकुल नहीं आने दिया जाएगा, और यह नुक्ताचीनी नहीं बल्कि एक मानक सुरक्षा आवश्यकता है।
+# The application runs not as root. In a properly configured cluster a pod running as root
+# won't be admitted at all, and this is not nitpicking but a standard security requirement.
 RUN adduser -D -u 10001 app
-# जो एकमात्र चीज़ बिल्ड चरण से आती है, वह एक ही फ़ाइल है: तैयार बाइनरी।
+# The only thing that moves over from the build stage is a single file: the finished binary.
 COPY --from=build /out/passes-api /usr/local/bin/passes-api
-# USER — प्रोसेस को किस उपयोगकर्ता के रूप में चलाना है। नाम नहीं, एक नंबर दिया गया है: kubernetes
-# मैनिफ़ेस्ट में ठीक वही नंबर जाँचता है (runAsNonRoot uid देखता है), और उन्हें मेल खाना चाहिए।
+# USER — which user to run the process as. A number is given, not a name: kubernetes checks
+# exactly the number in the manifest (runAsNonRoot looks at the uid), and they must match.
 USER 10001
-# EXPOSE — एक नोट कि «अंदर यह पोर्ट सुना जाता है»। यह कुछ नहीं खोलता और कुछ फ़ॉरवर्ड नहीं करता,
-# यह उसके लिए दस्तावेज़ है जो मैनिफ़ेस्ट लिखेगा।
+# EXPOSE — a note that «this port is listened on inside». It opens nothing and forwards nothing,
+# this is documentation for whoever will write the manifest.
 EXPOSE 8080
-# ENTRYPOINT — कंटेनर शुरू होने पर क्या चलता है। यहाँ एक ही प्रोसेस है और वही
-# मुख्य है: वह खत्म होगा — कंटेनर खत्म होगा, और क्लस्टर एक नई कॉपी उठाएगा।
+# ENTRYPOINT — what runs when the container starts. There is a single process here and it is
+# the main one: when it ends the container ends, and the cluster brings up a new copy.
 ENTRYPOINT ["/usr/local/bin/passes-api"]

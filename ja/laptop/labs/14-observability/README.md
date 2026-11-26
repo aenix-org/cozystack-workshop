@@ -77,7 +77,7 @@ CPUとメモリを消費し、ストレージは増え続けます。大きな�
 ファイルはここから取られます。
 
 ```bash
-# このラボのフォルダに移動する: 以下の相対パスはすべてここを起点に数える
+# switch to this lab's folder: all the relative paths below are counted from here
 cd labs/14-observability
 ```
 
@@ -94,14 +94,14 @@ cd labs/14-observability
 これが有効かどうかを確認します。
 
 ```bash
-# KUBECONFIG — クラスターのアドレスと、誰としてログインするかを kubectl が読み取る変数。
-# ファイル ~/lab.kubeconfig は `lab` クラスターを作ったときに保存したものです。
-# 新しいターミナルウィンドウごとに、改めて設定する必要があります。
+# KUBECONFIG — the variable kubectl reads to learn the cluster's address and who to
+# log in as. You saved the file ~/lab.kubeconfig when you created the `lab` cluster.
+# It has to be set again in every new terminal window.
 export KUBECONFIG=~/lab.kubeconfig
 
-# get pods = 「どんな pod があるか見せて」。
-#   -n cozy-monitoring   クラスター全体ではなく、この namespace だけを見る: アドオンが
-#                        収集器を置くのは、まさにここです。
+# get pods = "show me which pods exist".
+#   -n cozy-monitoring   look not across the whole cluster, but in this namespace: that's
+#                        exactly where the add-on puts its collectors.
 kubectl get pods -n cozy-monitoring
 ```
 
@@ -131,16 +131,16 @@ metrics-server-7d4b8c9f5-x2klm    1/1     Running   0          3d
 ラボ4の後片付けで負荷生成器が消えていますので、両方を戻す必要があることに注意してください。
 
 ```bash
-export KUBECONFIG=~/lab.kubeconfig          # 上と同じアクセスファイル
+export KUBECONFIG=~/lab.kubeconfig          # the same access file as above
 
-# apply = 「ファイルに書かれた状態にクラスターを合わせて」。どちらのファイルも隣の
-# ラボのフォルダにあるので、パスは `../` で始まります ── 改めて打ち込む必要はありません。
-kubectl apply -f ../03-scale/hpa.yaml       # rickroll 向けのオートスケーリング規則
-kubectl apply -f ../03-scale/fortio.yaml    # 負荷生成器
+# apply = "bring the cluster to what's described in the file". Both files live in the
+# neighboring lab's folder, so the path starts with `../` — no need to type them again.
+kubectl apply -f ../03-scale/hpa.yaml       # the autoscaling rule for rickroll
+kubectl apply -f ../03-scale/fortio.yaml    # the load generator
 
-# rollout status = 「ターミナルを掴んだまま、ロールアウトが終わったら教えて」。
-# deployment/fortio — オブジェクトの種類とその名前。生成器が立ち上がると、コマンドは
-# `successfully rolled out` の行とともにプロンプトを返します。
+# rollout status = "hold the terminal and tell me when the rollout is done".
+# deployment/fortio — the object type and its name. The command returns the prompt
+# with the line `successfully rolled out` once the generator comes up.
 kubectl rollout status deployment/fortio
 ```
 
@@ -150,11 +150,11 @@ kubectl rollout status deployment/fortio
 オートスケーリングの段差が現れません。
 
 ```bash
-# port-forward = ノートPC からクラスター内部へトンネルを掘る。コマンドが動いている間、
-# localhost:8081 へのリクエストは負荷生成器に届きます。
-#   svc/fortio    ターゲット: fortio という名前のサービス（pod ではない）
-#   8081:8080     左があなたのノートPC側のポート、右がサービス内部のポート
-# ウィンドウは閉じないこと: トンネルはコマンドが動いている間だけ生きています。
+# port-forward = dig a tunnel from the laptop into the cluster. While the command runs,
+# a request to localhost:8081 lands in the load generator.
+#   svc/fortio    the target: the service (not the pod) named fortio
+#   8081:8080     on the left, the port on your laptop; on the right, the port inside the service
+# Don't close the window: the tunnel lives exactly as long as the command runs.
 kubectl port-forward svc/fortio 8081:8080
 ```
 
@@ -186,11 +186,11 @@ kubectl port-forward svc/fortio 8081:8080
 収集器がデータをどのアドレスへ送っているかを見るには:
 
 ```bash
-# get vmagent = 「収集器オブジェクトを見せて」。いつものテーブルの代わりに、その記述から
-# 1つのフィールドだけを求めます ── -o jsonpath の構文はどんなクラスターオブジェクトにも使えます:
-#   .items[0]                  見つかった最初の（そしてここでは唯一の）収集器
-#   .spec.remoteWrite[0].url   メトリクスを渡す先のアドレス
-#   {"\n"}                     改行、そうしないと出力がプロンプトにくっついてしまう
+# get vmagent = "show me the collector object". Instead of the usual table we ask for a single
+# field from its description — the -o jsonpath syntax works with any cluster object:
+#   .items[0]                  the first (and here only) collector found
+#   .spec.remoteWrite[0].url   the address it hands the metrics to
+#   {"\n"}                     a newline, otherwise the output runs into the prompt
 kubectl get vmagent -n cozy-monitoring \
   -o jsonpath='{.items[0].spec.remoteWrite[0].url}{"\n"}'
 ```
@@ -211,7 +211,7 @@ http://vminsert-shortterm.tenant-workshopXX.svc.cozy.local:8480/insert/0/prometh
 アドレスはあなたのテナントホストの `grafana` サブドメインです。
 
 ```
-https://grafana.<あなたのテナントホスト>
+https://grafana.<your tenant host>
 ```
 
 正確なアドレスはダッシュボードに記されています。あなたのテナント → `Monitoring` アプリ →
@@ -323,13 +323,13 @@ count by (pod) ( ... )
 </details>
 
 ```promql
-# count by (pod) — マッチした系列を pod ラベルで分け、各グループに系列がいくつ
-# あるかを数える。数値そのものは重要ではない: 欲しいのは、結果として出てくる pod 名のリスト。
+# count by (pod) — break the matched series out by the pod label and count how many series
+# are in each group. The numbers themselves don't matter: what we want is the list of pod names that results.
 count by (pod) (
-  # メトリクスの名前 — コンテナ CPU 時間のカウンター
+  # the metric name — the container CPU-time counter
   container_cpu_usage_seconds_total{
-    cluster="kubernetes-lab",   # あなたのクラスター: ここはリリース名、アプリ名 lab ではない
-    namespace="default"         # rickroll がデプロイされている lab クラスター内部の namespace
+    cluster="kubernetes-lab",   # your cluster: the release name here, not the app name lab
+    namespace="default"         # the namespace inside the lab cluster where rickroll is deployed
   }
 )
 ```
@@ -388,14 +388,14 @@ sum by (pod) ( ... )
 </details>
 
 ```promql
-# rate(...[2m]) — カウンターの 1 秒あたりの増加速度、2 分間の窓で平均したもの。
-# CPU 時間については「何コアが消費されていたか」と読める:
-# 0.24 — 1 コアの 24 パーセント、つまり 240m。
-sum by (pod) (     # pod のコンテナを合計: コンテナごとではなく pod ごとに 1 本の線
+# rate(...[2m]) — the counter's growth rate per second, averaged over a 2-minute window.
+# For CPU time it reads as "how many cores were being consumed":
+# 0.24 — twenty-four percent of one core, that is 240m.
+sum by (pod) (     # sum the pod's containers: one line per pod, not per container
   rate(container_cpu_usage_seconds_total{
     cluster="kubernetes-lab", namespace="default",
-    pod=~"rickroll-.*",  # =~ 正規表現による比較: pod 名の末尾はランダム
-    container!=""        # pod 全体の合計系列を捨てる、さもないとすべてが 2 倍になる
+    pod=~"rickroll-.*",  # =~ comparison by regular expression: the pod name's tail is random
+    container!=""        # drop the whole-pod total series, otherwise everything doubles
   }[2m])
 )
 ```
@@ -433,9 +433,9 @@ sum by (pod) (     # pod のコンテナを合計: コンテナごとではな�
 隣に置くと役立つもの:
 
 ```promql
-# rickroll のコピーが全部でいくつ作られたか
+# how many rickroll copies have been created in total
 kube_deployment_status_replicas{cluster="kubernetes-lab", deployment="rickroll"}
-# そのうちいくつが readiness チェックを通過し、すでにトラフィックを受けているか
+# how many of them have passed the readiness check and are already taking traffic
 kube_deployment_status_replicas_available{cluster="kubernetes-lab", deployment="rickroll"}
 ```
 
@@ -445,19 +445,19 @@ kube_deployment_status_replicas_available{cluster="kubernetes-lab", deployment="
 </details>
 
 ```promql
-# ..._status_current_replicas — rickroll のコピーが今この瞬間にいくつ動いているか。
-# 数値はアプリからではなく、kube-state-metrics が読んだ HPA オブジェクトから来る。
+# ..._status_current_replicas — how many rickroll copies are running right now.
+# The number comes not from the application but from the HPA object, read by kube-state-metrics.
 kube_horizontalpodautoscaler_status_current_replicas{
-  cluster="kubernetes-lab",             # あなたの lab クラスターだけ
-  horizontalpodautoscaler="rickroll"    # ラボ 3 のオートスケーリングオブジェクトの名前
+  cluster="kubernetes-lab",             # only your lab cluster
+  horizontalpodautoscaler="rickroll"    # the name of the autoscaling object from lab 3
 }
 ```
 
 そしてその隣に、2つ目のクエリとして:
 
 ```promql
-# ..._status_desired_replicas — 負荷に基づいて、オートスケーリングが今いくつのコピーを
-# 持ちたがっているか。current が desired に遅れているのが、まさに pod の作成時間。
+# ..._status_desired_replicas — how many copies autoscaling wants to have now,
+# based on the load. current lagging behind desired is exactly the pod creation time.
 kube_horizontalpodautoscaler_status_desired_replicas{
   cluster="kubernetes-lab",
   horizontalpodautoscaler="rickroll"
@@ -483,7 +483,7 @@ kube_horizontalpodautoscaler_status_desired_replicas{
 成ります: 上に実際の消費、下に要求です。
 
 ```promql
-# 上の部分 — pod の実際の CPU 消費。上と同じクエリ。
+# The top part — the pod's actual CPU consumption. The same query as above.
 sum by (pod) (
   rate(container_cpu_usage_seconds_total{
     cluster="kubernetes-lab", namespace="default",
@@ -491,13 +491,13 @@ sum by (pod) (
   }[2m])
 )
 /
-# 下の部分 — pod がどれだけ要求したか。割り算の結果は要求に対する割合: 1 は
-# 「要求したのとちょうど同じだけ消費している」、0.5 は要求の半分を意味する。
+# The bottom part — how much the pod requested. The result of the division is the fraction of the request: 1 means
+# "consuming exactly as much as it requested", 0.5 — half of what was requested.
 sum by (pod) (
   kube_pod_container_resource_requests{
     cluster="kubernetes-lab", namespace="default",
     pod=~"rickroll-.*",
-    resource="cpu"     # このメトリクスにはメモリの系列もある — CPU だけを残す
+    resource="cpu"     # the metric also has memory series — we keep only CPU
   }
 )
 ```
@@ -522,9 +522,9 @@ sum by (pod) (
 **クラスターで最もCPUを消費しているのは誰か、トップ10:**
 
 ```promql
-# topk(10, ...) — 値が最も大きい 10 系列だけを残す。
-# by (namespace, pod) でグループ化すると答えに namespace が加わる: 誰の pod か分かる。
-# 窓 [5m] は前のステップより広い: 欲しいのは急増の形ではなく、平均的な水準だから。
+# topk(10, ...) — keep only the ten series with the largest values.
+# Grouping by (namespace, pod) adds the namespace to the answer: you can see whose pod it is.
+# The [5m] window is wider than in the previous steps: we want not the shape of the spike, but the average level.
 topk(10,
   sum by (namespace, pod) (
     rate(container_cpu_usage_seconds_total{cluster="kubernetes-lab", container!=""}[5m])
@@ -535,8 +535,8 @@ topk(10,
 **Pod ごとのメモリ（カウンターではないので `rate` なし）:**
 
 ```promql
-# container_memory_working_set_bytes — カウンターではなく瞬時値: この瞬間にこれだけの
-# バイトが占有されている。ここで rate() を使えばナンセンス — 「1 秒あたりのバイト」— になる。
+# container_memory_working_set_bytes — not a counter but an instantaneous value: this many bytes
+# are occupied at this moment. rate() here would give nonsense — "bytes per second".
 sum by (pod) (
   container_memory_working_set_bytes{
     cluster="kubernetes-lab", namespace="default", container!=""
@@ -552,8 +552,9 @@ sum by (pod) (
 **どれだけリソースが予約されているか対どれだけ実際に使われているか:**
 
 ```promql
-# sum by なし — すべてを 1 つの数値に合計する: クラスターの全 pod のためにどれだけの CPU が
-# 予約されているか。これは消費ではなく request: 予約されて遊んでいる分も合計に入る。
+# sum without by — add everything into a single number: how much CPU is reserved for all
+# the cluster's pods. This is the request, not the consumption: what's reserved and sitting idle
+# goes into the sum too.
 sum(kube_pod_container_resource_requests{cluster="kubernetes-lab", resource="cpu"})
 ```
 
@@ -564,8 +565,8 @@ sum(kube_pod_container_resource_requests{cluster="kubernetes-lab", resource="cpu
 ラボ11をやっていれば、ついでに Android のビルドを見てみてください ── はっきり見えます。
 
 ```promql
-# 同じ rate だが、ビルドの pod でフィルタ。sum without by (pod) — ビルドがいくつの pod を
-# 立ち上げようと、ビルド全体で 1 本の線。
+# The same rate, but a filter on the build pods. sum without by (pod) — one line for the whole build,
+# however many pods it brings up.
 sum(rate(container_cpu_usage_seconds_total{
   cluster="kubernetes-lab", pod=~"propusk-build-.*", container!=""
 }[2m]))
@@ -601,15 +602,15 @@ kubernetes_namespace_name:default AND kubernetes_pod_name:rickroll*
 📍 **どこで:** ノートPC 上、`kubectl` で作業していたのと同じターミナルウィンドウで。
 
 ```bash
-export KUBECONFIG=~/lab.kubeconfig          # lab クラスター `lab` へのアクセス
+export KUBECONFIG=~/lab.kubeconfig          # access to the lab cluster `lab`
 
-# 下の 2 つの変数は、スクリプトにテナントへのアクセスも与えます。これがあると、メトリクスが
-# そこへ到達したことを追加で確認し、あなたの Grafana のアドレスを表示します。なければ
-# チェックは通りますが、レポートは短くなります。
-export COZY_TENANT=workshopXX               # XX の代わりにあなたの番号
-export COZY_KUBECONFIG=~/.kube/workshop     # テナントへのアクセスファイル
+# The two variables below give the script access to the tenant as well. With them it will
+# additionally check that the metrics made it there, and print the address of your Grafana. Without them
+# the check will pass, but the report will be shorter.
+export COZY_TENANT=workshopXX               # your number instead of XX
+export COZY_KUBECONFIG=~/.kube/workshop     # the tenant access file
 
-./check.sh                                  # ./ = 「現在のフォルダからファイルを実行する」
+./check.sh                                  # ./ = "run the file from the current folder"
 ```
 
 ⚠️ **Windows ではスクリプトは PowerShell からではなく WSL から実行します** ── その設定方法は

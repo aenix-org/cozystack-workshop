@@ -1,39 +1,39 @@
 ---
-# लैब 4. पेज का दूसरा संस्करण — वही जिसे हम लोड के तहत रोलआउट करते हैं।
-# इसमें साफ़ अंतर दिखना चाहिए: प्रतिभागी ब्राउज़र देख रहा है, diff नहीं।
+# Lab 4. The second version of the page — the one we roll out under load.
+# It should differ noticeably: the participant is looking at the browser, not at a diff.
 #
-# एक ऑब्जेक्ट। इसे आपके `lab` प्रशिक्षण क्लस्टर पर लागू किया जाता है, प्रबंधन
-# क्लस्टर के टेनेंट पर नहीं:
+# One object. Applied to your `lab` training cluster, not to the tenant
+# on the management cluster:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl apply -f rickroll-page-v2.yaml
-# यहाँ tenant-workshopXX जैसे कोई प्लेसहोल्डर नहीं हैं — आपको कहीं भी अपना नंबर डालने की ज़रूरत नहीं।
+# There are no placeholders like tenant-workshopXX here — you don't need to substitute your number anywhere.
 #
-# यहाँ लोग सबसे ज़्यादा जिस बात पर अटकते हैं: यह apply अपने आप कुछ भी रोलआउट नहीं करता।
-# यह क्लस्टर में पहले वाले के बगल में एक और सेटिंग्स फ़ाइल रख देता है। जब तक Deployment का `page`
-# वॉल्यूम rickroll-page-v1 की ओर इशारा करता है, उपयोगकर्ता पहला संस्करण देखते हैं।
-# रोलआउट लैब का अगला चरण बनता है — वॉल्यूम को इस ConfigMap पर स्विच करना।
-# इसीलिए दो ऑब्जेक्ट वाली पूरी संरचना है: पहला संस्करण क्लस्टर में
-# अछूता रहता है, और रोलबैक उसे स्मृति से पुनर्निर्मित करने के बजाय पूरा का पूरा वापस ले आता है।
+# The main thing people stumble over here: this apply by itself rolls out nothing.
+# It puts one more settings file into the cluster next to the first. As long as the `page`
+# volume of the Deployment references rickroll-page-v1, users see the first version.
+# The rollout becomes the next step of the lab — switching the volume to this ConfigMap.
+# Hence the whole construction with two objects: the first version stays in the cluster
+# untouched, and the rollback returns it as a whole rather than reconstructing it from memory.
 #
-# इसके बजाय अगर हम ConfigMap rickroll-page-v1 को उसी जगह संपादित करते, तो रोलबैक करने के लिए
-# कहीं जगह न होती, और पॉड्स को प्रतियाँ बदले बिना और रिवीज़न इतिहास में रिकॉर्ड
-# दर्ज हुए बिना नई सामग्री मिल जाती — यानी उस सब के बिना जिसके लिए यह लैब बनाई गई है।
+# Had we instead edited the ConfigMap rickroll-page-v1 in place, there would be
+# nowhere to roll back to, and the pods would get new content without replacing copies and without a record
+# in the revision history — that is, without everything the lab is made for.
 #
-# ऑब्जेक्ट का नाम बदला नहीं जा सकता: README का पैच rickroll-page-v2 की ओर इशारा करता है,
-# और check.sh की जाँच भी वैसा ही करती है।
+# The object name must not be changed: the patch from the README references rickroll-page-v2,
+# as does the check in check.sh.
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: rickroll-page-v2
 data:
-  # `|` के बाद इंडेंटेशन के नीचे जो कुछ भी है, वह index.html फ़ाइल की अक्षरशः सामग्री है
-  # जो कंटेनर के अंदर जाएगी। यह अब YAML नहीं है: यहाँ कोई टिप्पणी नहीं है
-  # और हो भी नहीं सकती — हैश चिह्न पेज पर सामान्य टेक्स्ट की तरह आ जाता।
+  # Everything below the indentation after `|` is the verbatim content of the index.html file
+  # that will end up inside the container. This is no longer YAML: there are no comments here
+  # and there can be none — a hash would land on the page as ordinary text.
   #
-  # मार्कअप में दो चीज़ें check.sh के लिए मायने रखती हैं: लेबल «संस्करण 2» —
-  # इसी से जाँच दूसरे संस्करण को पहले से अलग पहचानती है, और प्लेसहोल्डर __POD__ — इसे
-  # ConfigMap rickroll-conf (लैब 1) के नियम के अनुसार nginx पॉड के नाम से बदला जाता है।
-  # इनमें से किसी एक को हटा देंगे तो लैब की जाँच पास नहीं होगी, भले ही रोलआउट सफल हो जाए।
+  # Two things in the markup matter to check.sh: the label «VERSION 2» —
+  # by it the check tells the second version from the first, and the placeholder __POD__ — it is
+  # replaced with the nginx pod name by the rule from the ConfigMap rickroll-conf (lab 1).
+  # Remove either of them and the lab check will not pass, even though the rollout will succeed.
   index.html: |
     <!doctype html>
     <html lang="ru">
@@ -56,9 +56,9 @@ data:
       .pod b{display:block;margin-top:.4em;color:#00ffa3;font-size:1.35em;word-break:break-all}
       .hint{margin-top:3em;color:#3f5561;font-size:14px}
     </style>
-    <div class="tag">संस्करण 2</div>
+    <div class="tag">VERSION 2</div>
     <h1>We're No Strangers To Love</h1>
     <p class="lyr">You know the rules &middot; And so do I</p>
-    <div class="pod">सेवा प्रदान करने वाला Pod<b>__POD__</b></div>
-    <p class="hint">अपडेट लोड के तहत रोलआउट हुआ। Fortio में देखें: शून्य त्रुटियाँ।</p>
+    <div class="pod">served by pod<b>__POD__</b></div>
+    <p class="hint">The update rolled out under load. Check Fortio: zero errors.</p>
     </html>

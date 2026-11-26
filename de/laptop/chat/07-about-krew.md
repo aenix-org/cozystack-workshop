@@ -29,9 +29,9 @@ tar zxvf "krew-${OS}_${ARCH}.tar.gz" &&
 Fügen Sie krew dann Ihrem PATH hinzu — die Zeile muss in Ihr Profil geschrieben werden, sonst geht sie
 beim nächsten Start des Terminals verloren:
 ```bash
-echo 'export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"' >> ~/.zshrc   # für zsh, unter macOS der Standard
-echo 'export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"' >> ~/.bashrc  # für bash, meist Linux
-source ~/.zshrc    # oder source ~/.bashrc
+echo 'export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"' >> ~/.zshrc   # for zsh, the default on macOS
+echo 'export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"' >> ~/.bashrc  # for bash, usually Linux
+source ~/.zshrc    # or source ~/.bashrc
 ```
 
 **Windows** (PowerShell)

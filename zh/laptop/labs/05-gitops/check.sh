@@ -1,42 +1,43 @@
 #!/usr/bin/env bash
-# 实验 5 检查：集群状态从 Git 而来，并由持续调和保持不变。
+# Check for lab 5: the cluster state arrives from Git and is held in place by reconciliation.
 #
-# 在你的 `lab` 集群上运行，从实验目录、由你本人执行：
+# Runs against your `lab` cluster, from the lab folder, by you:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     ./check.sh
-# 它不改动任何东西——只查看并打印报告：检查了什么、通过了什么、
-# 没通过什么，以及附上的证据。
+# It changes nothing — it only looks and prints a report: what was checked, what passed,
+# what did not, and the attached evidence.
 #
-# 我们检查的不是「Flux 已安装」，而是「机制是否运转」：源被读取、已应用的内容
-# 归属于 Flux、服务能响应、调和没有被关闭。已安装但被暂停的 Flux，
-# 是通过实验却错过其要义的最常见方式。
+# We check not "Flux is installed" but "the mechanism works": the source is read, what is
+# applied belongs to Flux, the service responds, reconciliation is not turned off. An installed
+# but suspended Flux is the most common way to pass the lab while missing its point.
 
 LAB_NAME="05-gitops"
-LAB_TITLE="实验 5 · 基础设施存于 Git"
-# 所有实验共用的框架：ok / fail / warn / evidence / finish 以及环境检查都来自它。
-# 路径是相对于本文件的位置解析的，因此脚本可以从任意目录运行。
+LAB_TITLE="Lab 5 · Infrastructure in Git"
+# The shared harness for all labs: it provides ok / fail / warn / evidence / finish and
+# the environment checks. The path is resolved from the location of this file, so the script
+# can be run from any folder.
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
-# 没有集群访问文件就无从检查——立即退出并给出清晰的原因。
+# Without a cluster access file there is nothing to check — exit right away with a clear reason.
 need_kubeconfig
 
-# 本实验创建的名称。集中放在一处：如果参与者给对象起了不同的名字，
-# 在这里修改即可，而不必满脚本地找名字。
+# The names that the lab creates. Gathered in one place: if the participant named the objects
+# differently, fix them here instead of hunting for names across the whole script.
 NS_APP="passes"
 GITREPO="passes"
 KUSTOMIZATION="passes"
 
-# 读取对象的某个字段，若对象或 CRD 不存在也不报错退出。
+# Read a field of an object without failing if the object or the CRD is missing.
 kget() { kubectl get "$@" 2>/dev/null; }
 
-# --- Flux 服务 -----------------------------------------------------------
-# 我们检查的不是「Pod 存在」，而是「至少有一个副本处于 Ready」：Pod 可能因节点上
-# 内存不足而卡在 Pending，却仍然出现在 get pods 的输出里。
-# 两个服务都是必需的，并分工协作：source-controller 下载仓库，
-# kustomize-controller 应用下载到的内容。没有第二个，任何东西都到不了集群。
+# --- Flux services ---------------------------------------------------------
+# We check not "the pods exist" but "at least one replica is Ready": a pod can hang in
+# Pending with no memory on the node and still show up in the get pods output.
+# Both services are required and split the work: source-controller downloads the repository,
+# kustomize-controller applies what was downloaded. Without the second one nothing reaches the cluster.
 if ! kget namespace flux-system >/dev/null; then
-  fail "集群中没有 flux-system 命名空间" \
-       "Flux 未安装：flux install --components=source-controller,kustomize-controller"
+  fail "the cluster has no flux-system namespace" \
+       "Flux is not installed: flux install --components=source-controller,kustomize-controller"
 else
   FLUX_BAD=""
   for d in source-controller kustomize-controller; do
@@ -44,24 +45,24 @@ else
     [ "${READY:-0}" -ge 1 ] 2>/dev/null || FLUX_BAD="$FLUX_BAD $d"
   done
   if [ -z "$FLUX_BAD" ]; then
-    ok "Flux 服务正在运行：source-controller 和 kustomize-controller"
-    evidence "Flux Pod" "$(kget pods -n flux-system -o wide)"
+    ok "Flux services are running: source-controller and kustomize-controller"
+    evidence "Flux pods" "$(kget pods -n flux-system -o wide)"
   else
-    fail "Flux 服务未运行：${FLUX_BAD}" \
-         "查看 kubectl get pods -n flux-system；在小节点上它们可能内存不足"
+    fail "Flux services are not running:${FLUX_BAD}" \
+         "see kubectl get pods -n flux-system; on a small node they may be short on memory"
   fi
 fi
 
-# --- 源：GitRepository ------------------------------------------------
-# 三种不同的结局，绝不能混淆：对象根本不存在；对象存在但里面仍是占位地址；
-# 对象存在且地址是真实的，但 Flux 无法读取仓库。每种情况的建议都不同，
-# 所以分支也不同。
+# --- source: GitRepository ------------------------------------------------
+# Three different outcomes, and they must not be confused: the object does not exist at all;
+# the object exists but still holds the placeholder address; the object exists with a real
+# address, but Flux could not read the repository. The advice differs in each case, so the branches differ.
 #
-# 成功的标志取自 status.conditions——那是 Flux 在尝试访问 Git 之后对自身状态的
-# 汇报，而不是我们凭对象是否存在所作的猜测。
+# We take the success signal from status.conditions — that is what Flux reports about itself
+# after trying to reach Git, not our guess based on the object's presence.
 if ! kubectl api-resources --api-group=source.toolkit.fluxcd.io 2>/dev/null | grep -q gitrepositories; then
-  fail "集群中没有 GitRepository 类型" \
-       "Flux 未安装，或安装时缺少 source-controller"
+  fail "the cluster has no GitRepository type" \
+       "Flux is not installed, or installed without source-controller"
 else
   GR_URL="$(kget gitrepository "$GITREPO" -n flux-system -o jsonpath='{.spec.url}')"
   GR_READY="$(kget gitrepository "$GITREPO" -n flux-system \
@@ -71,29 +72,30 @@ else
   GR_REV="$(kget gitrepository "$GITREPO" -n flux-system -o jsonpath='{.status.artifact.revision}')"
 
   if [ -z "$GR_URL" ]; then
-    fail "在 flux-system 中未找到名为 ${GITREPO} 的 GitRepository" \
-         "应用 flux/gitrepository.yaml，并替换为你自己仓库的地址"
-  elif printf '%s' "$GR_URL" | grep -q 'ЗАМЕНИТЕ-МЕНЯ'; then
-    fail "GitRepository 里仍是占位地址" \
-         "打开 flux/gitrepository.yaml，填入你自己在 GitHub 上仓库的地址"
+    fail "no GitRepository named ${GITREPO} found in flux-system" \
+         "apply flux/gitrepository.yaml, substituting your own repository address"
+  elif printf '%s' "$GR_URL" | grep -q 'REPLACE-ME'; then
+    fail "the GitRepository still holds the placeholder address" \
+         "open flux/gitrepository.yaml and enter the address of your own GitHub repository"
   elif [ "$GR_READY" = "True" ]; then
-    ok "Flux 正在读取你的仓库：${GR_URL}"
-    evidence "Git 中的源" "url: ${GR_URL}
-revision: ${GR_REV:-未知}"
+    ok "Flux reads your repository: ${GR_URL}"
+    evidence "Source in Git" "url: ${GR_URL}
+revision: ${GR_REV:-unknown}"
   else
-    fail "Flux 无法读取仓库 ${GR_URL}" \
-         "查看 flux get sources git；最常见的原因是地址拼写错误、私有仓库或分支不对"
-    evidence "源错误" "${GR_MSG:-无消息}"
+    fail "Flux cannot read the repository ${GR_URL}" \
+         "see flux get sources git; most often it is a typo in the address, a private repository, or a different branch"
+    evidence "Source error" "${GR_MSG:-no message}"
   fi
 fi
 
-# --- 应用：Kustomization ----------------------------------------------
-# 这里检查的不是「是否应用」这一事实，而是机制的三个属性，缺了它们实验就失去意义：
-# 已应用的修订与 Git 一致、调和没有被暂停、并且启用了对从仓库中消失内容的清理。
+# --- application: Kustomization ----------------------------------------------
+# Here we check not the fact of application, but three properties of the mechanism without
+# which the lab loses its meaning: the applied revision matches Git, reconciliation is not
+# suspended, and pruning of what disappeared from the repository is enabled.
 KS_READY=""
 if ! kubectl api-resources --api-group=kustomize.toolkit.fluxcd.io 2>/dev/null | grep -q kustomizations; then
-  fail "集群中没有 Kustomization 类型" \
-       "Flux 安装时缺少 kustomize-controller——请带上两个组件重新安装"
+  fail "the cluster has no Kustomization type" \
+       "Flux is installed without kustomize-controller — reinstall with both components"
 else
   KS_READY="$(kget kustomization "$KUSTOMIZATION" -n flux-system \
     -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')"
@@ -105,113 +107,114 @@ else
   KS_INTERVAL="$(kget kustomization "$KUSTOMIZATION" -n flux-system -o jsonpath='{.spec.interval}')"
 
   if [ -z "$KS_REV" ] && [ -z "$KS_READY" ]; then
-    fail "在 flux-system 中未找到名为 ${KUSTOMIZATION} 的 Kustomization" \
-         "应用 flux/kustomization.yaml"
+    fail "no Kustomization named ${KUSTOMIZATION} found in flux-system" \
+         "apply flux/kustomization.yaml"
   elif [ "$KS_READY" = "True" ]; then
-    ok "Flux 已应用来自 Git 的状态，修订 ${KS_REV}"
-    evidence "已应用的修订" "$KS_REV"
+    ok "Flux applied the state from Git, revision ${KS_REV}"
+    evidence "Applied revision" "$KS_REV"
   else
-    fail "Flux 无法应用来自 Git 的状态" \
-         "查看 flux get kustomizations 以及 kubectl describe kustomization ${KUSTOMIZATION} -n flux-system"
-    evidence "应用错误" "${KS_MSG:-无消息}"
+    fail "Flux could not apply the state from Git" \
+         "see flux get kustomizations and kubectl describe kustomization ${KUSTOMIZATION} -n flux-system"
+    evidence "Apply error" "${KS_MSG:-no message}"
   fi
 
-  # 被暂停的 Flux 看起来已安装，却什么也不做。这是「通过」实验却得不到它
-  # 任何一点好处的主要方式。
+  # A suspended Flux looks installed and does nothing. This is the main way to "pass"
+  # the lab without gaining a single one of its benefits.
   if [ "$KS_SUSPEND" = "true" ]; then
-    fail "调和已被暂停（suspend: true）——Flux 没有在盯着集群" \
-         "重新开启：flux resume kustomization ${KUSTOMIZATION}"
+    fail "reconciliation is suspended (suspend: true) — Flux is not watching the cluster" \
+         "turn it back on: flux resume kustomization ${KUSTOMIZATION}"
   else
-    ok "调和处于活动状态：与 Git 的偏差会自行被纠正，间隔 ${KS_INTERVAL:-默认}"
+    ok "reconciliation is active: drift from Git will be corrected on its own, interval ${KS_INTERVAL:-default}"
   fi
 
-  # 这是 warn，不是 fail：没有 prune，集群仍由 Git 管理，实验算通过。
-  # 但描述会变得片面——删除文件并不会在集群里删除任何东西。
+  # This is a warn, not a fail: without prune the cluster is still managed from Git, the lab is passed.
+  # But the description becomes one-sided — deleting a file deletes nothing in the cluster.
   if [ "$KS_PRUNE" = "true" ]; then
-    ok "已启用对从 Git 中消失内容的清理（prune）"
+    ok "pruning of what disappeared from Git is enabled (prune)"
   else
-    warn "prune 已关闭——从仓库中移除的内容会继续在集群里运行" \
-         "在 flux/kustomization.yaml 中设置 prune: true，否则 Git 只描述了状态的一半"
+    warn "prune is off — what was removed from the repository keeps running in the cluster" \
+         "set prune: true in flux/kustomization.yaml, otherwise Git describes only half of the state"
   fi
 fi
 
-# --- 集群中的对象归属于 Flux，而非手工应用 ---------
-# 这是本实验的关键检查，它关乎来源，而非是否存在。两种情况下应用都在集群里：
-# 无论是 Flux 引入的，还是参与者用 kubectl apply 手工应用了同样的文件。
-# 从外部看无法区分——Deployment 是一模一样的。
-# 归属标签才能分辨它们：只有 kustomize-controller 在应用仓库内容时才会打上它。
-# 手工应用的对象不会获得该标签。
+# --- the objects in the cluster belong to Flux, not applied by hand ---------
+# This is the key check of the lab, and it is about origin, not presence. The application
+# is in the cluster in both cases: whether Flux brought it in, or the participant applied
+# the same files by hand via kubectl apply. Externally they are indistinguishable — the Deployment is identical.
+# The owner label tells them apart: only kustomize-controller sets it, when it applies
+# the contents of the repository. An object applied by hand will not get that label.
 OWNER="$(kget deployment passes -n "$NS_APP" \
   -o jsonpath='{.metadata.labels.kustomize\.toolkit\.fluxcd\.io/name}')"
 if [ -z "$(kget deployment passes -n "$NS_APP" -o name)" ]; then
-  fail "命名空间 ${NS_APP} 中没有 passes 应用" \
-       "把 app/*.yaml 放进你仓库的 apps 目录，push，然后等待调和"
+  fail "namespace ${NS_APP} has no passes application" \
+       "put app/*.yaml into the apps folder of your repository, push, and wait for reconciliation"
 elif [ "$OWNER" = "$KUSTOMIZATION" ]; then
-  ok "集群中的应用归属于 Flux，而非手工应用"
+  ok "the application in the cluster belongs to Flux, not applied by hand"
 else
-  fail "passes 应用存在，但不是 Flux 创建的" \
-       "移除它（kubectl delete ns ${NS_APP}），让 Flux 从 Git 重新部署它"
+  fail "the passes application exists, but Flux did not create it" \
+       "remove it (kubectl delete ns ${NS_APP}) and let Flux deploy it from Git anew"
 fi
 
-# --- 应用确实能响应 --------------------------------------
-# 集群中的对象和一个正常工作的服务是两回事：Deployment 可能已创建，
-# 而 Pod 却在不断崩溃重启。所以我们进入集群内部，按服务的内部名称请求它——
-# 走的正是相邻应用访问它时所走的路径。
+# --- the application actually responds --------------------------------------
+# An object in the cluster and a working service are different things: a Deployment may be
+# created while the pods crash in a loop. So we go inside the cluster and request the service
+# by its internal name — the same path a neighboring application would use to reach it.
 PODS="$(kget pods -n "$NS_APP" -l app=passes --no-headers)"
 PODS_READY="$(printf '%s' "$PODS" | awk '$3=="Running"' | grep -c .)"
 BODY="$(in_cluster_curl "http://passes.${NS_APP}.svc.cluster.local/")"
 
-if printf '%s' "$BODY" | grep -q '通行证'; then
-  ok "«通行证» 服务在集群内部通过 HTTP 响应（运行中的副本数：${PODS_READY}）"
+if printf '%s' "$BODY" | grep -q 'Guest Pass'; then
+  ok "the «Guest Pass» service responds over HTTP inside the cluster (running replicas: ${PODS_READY})"
 else
-  fail "«通行证» 服务在 passes.${NS_APP}.svc.cluster.local 上没有响应" \
-       "查看 kubectl get pods -n ${NS_APP} 以及 kubectl logs -n ${NS_APP} deploy/passes"
+  fail "the «Guest Pass» service does not respond at passes.${NS_APP}.svc.cluster.local" \
+       "see kubectl get pods -n ${NS_APP} and kubectl logs -n ${NS_APP} deploy/passes"
 fi
 
-# 页面上的 Pod 名称必须与真正运行的副本一致：这样才能表明响应正来自
-# 我们在集群里看到的那个 Pod，而不是缓存的回答，也不是恰好占用了同名的
-# 别的服务。不一致是 warn，不是 fail：副本可能在两次请求之间被重建了，
-# 这不是参与者的过错。
+# The pod name on the page must match a really running replica: this shows that the response
+# comes from exactly the pod we see in the cluster, and not a cached answer or some other
+# service that happened to take the same name. A mismatch is a warn, not a fail: a replica
+# could have been recreated between the two requests, and that is not the participant's fault.
 SERVED_POD="$(printf '%s' "$BODY" | grep -o 'passes-[a-z0-9]*-[a-z0-9]*' | head -1)"
 if [ -n "$SERVED_POD" ] && printf '%s' "$PODS" | grep -q "$SERVED_POD"; then
-  ok "页面由真实存在的 Pod ${SERVED_POD} 提供"
-  evidence "服务副本" "$(kget pods -n "$NS_APP" -o wide)"
+  ok "the page was served by a really existing pod ${SERVED_POD}"
+  evidence "Service replicas" "$(kget pods -n "$NS_APP" -o wide)"
 elif [ -n "$SERVED_POD" ]; then
-  warn "响应中的 Pod ${SERVED_POD} 未在运行中的 Pod 里找到" \
-       "很可能副本在两次请求之间被重建了——请再运行一次检查"
+  warn "the pod ${SERVED_POD} from the response was not found among the running ones" \
+       "most likely the replica was recreated between the two requests — run the check again"
 fi
 
-# --- 你本地仓库克隆中的变更历史 ----------------------------
-# 可选部分：在被告知之前，脚本并不知道克隆在哪里。
-# 这里检查的是回滚的方式。用 kubectl rollout undo 集群也会回到上一个版本，
-# 但 Git 对此一无所知，紧接着的下一次调和就会把坏的变更又带回来。所以我们
-# 在历史里查找 revert——回滚要做在真相所在之处。并且我们核对集群里已应用的
-# 修订与你的 HEAD 是否一致：提交后忘了 push 是常事，而从外面看这就像「Flux 卡住了」。
+# --- the change history in your clone of the repository ----------------------------
+# An optional part: the script does not know where the clone lives until it is told.
+# What is checked here is the way of rolling back. With kubectl rollout undo the cluster also
+# returns to the previous version, but Git will not know about it, and the very next reconciliation
+# will bring the bad change back. So we look for a revert in the history — the rollback is made
+# where the truth lives. And we verify that the revision applied in the cluster matches your HEAD:
+# committing and forgetting to push is common, and from the outside it looks like "Flux is stuck".
 REPO="${LAB_REPO:-}"
 if [ -z "$REPO" ]; then
-  warn "未检查仓库历史：未设置 LAB_REPO 变量" \
-       "要连它一起检查：export LAB_REPO=~/passes-gitops && ./check.sh"
+  warn "the repository history was not checked: the LAB_REPO variable is not set" \
+       "to check it too: export LAB_REPO=~/passes-gitops && ./check.sh"
 elif [ ! -d "$REPO/.git" ]; then
-  warn "${REPO} 中没有仓库克隆" \
-       "请指定你执行 git clone 的那个目录"
+  warn "there is no clone of the repository in ${REPO}" \
+       "specify the folder into which you did git clone"
 else
   HEAD_SHA="$(git -C "$REPO" rev-parse HEAD 2>/dev/null | cut -c1-7)"
   LOG="$(git -C "$REPO" log --oneline -20 2>/dev/null)"
 
   if printf '%s' "$LOG" | grep -qi '^[0-9a-f]* *revert'; then
-    ok "历史中有一次通过 git revert 的回滚——坏的变更在真相所在之处被撤销了"
-    evidence "变更历史" "$LOG"
+    ok "the history has a rollback via git revert — the bad change was undone where the truth lives"
+    evidence "Change history" "$LOG"
   else
-    fail "最近的提交里没有一次 revert" \
-         "用 git revert --no-edit HEAD 回滚坏的变更并 push，而不要用 kubectl rollout undo"
+    fail "there is no single revert in the recent commits" \
+         "roll back the bad change with git revert --no-edit HEAD and push, not with kubectl rollout undo"
   fi
 
-  # 集群里已应用的内容必须与分支上最新的提交一致。
+  # What is applied in the cluster must match the latest commit in the branch.
   if [ -n "$HEAD_SHA" ] && printf '%s' "${KS_REV:-}" | grep -q "$HEAD_SHA"; then
-    ok "集群中运行的正是你分支里的内容（提交 ${HEAD_SHA}）"
+    ok "the cluster runs exactly what is in your branch (commit ${HEAD_SHA})"
   elif [ -n "$HEAD_SHA" ]; then
-    warn "集群中的提交（${KS_REV:-未知}）与本地 HEAD（${HEAD_SHA}）不同" \
-         "检查本地提交是否已 push（git push），并等待调和间隔"
+    warn "the commit in the cluster (${KS_REV:-unknown}) differs from the local HEAD (${HEAD_SHA})" \
+         "check that the local commits are pushed (git push), and wait for the reconciliation interval"
   fi
 fi
 

@@ -1,32 +1,33 @@
 ---
-# ラボ6 · 自分専用のプライベートイメージレジストリ。このファイルは意図的に不完全です。
+# Lab 6 · Your own private image registry. THIS FILE IS DELIBERATELY INCOMPLETE.
 #
-# これは動きませんが、それが狙いです。あなた自身の目で失敗を確認し、クラスターに何が
-# 足りなかったのかを自分で理解する必要があります。ここで足りないのはただ一つ——イメージを
-# 取りに行くとき、閉じたレジストリに対してクラスターが自分を名乗るためのものです。レジストリは
-# 誰にでもイメージを渡すわけではなく、この記述の中にはクラスターがその権利を証明するのに
-# 役立つものが何もありません。どの行がこれを直すのか——それはラボを進める中で解き明かします。
-# 動く版は隣の passes.yaml にありますが、考え抜く前に開いても意味はありません。
+# It won't work, and that's by design: you should see the failure with your own eyes and
+# figure out for yourself what the cluster was missing. What's missing here is one thing —
+# the thing the cluster calls itself to a closed registry when it comes for an image. The
+# registry doesn't hand out images to just anyone, and there's nothing in this manifest
+# that would help the cluster prove its right to them. Which exact line fixes this — you'll
+# work out over the course of the lab; the working version sits next to it, in passes.yaml,
+# and there's no point opening it before you've reasoned it through.
 #
-# ここには Deployment だけがあり、Service はありません。サービスに恒久的な名前はまだ不要です——
-# イメージがダウンロードされない以上、応答するポッドにはどのみち到達しないからです。
+# Here there's only a Deployment, no Service: a permanent name for the service isn't needed
+# yet — we won't reach a responding pod anyway, since the image doesn't download.
 #
-# あなたの `lab` クラスター上、デフォルトの名前空間に適用します:
+# Applied on your `lab` cluster, in the default namespace:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl apply -f passes-broken.yaml
 #     kubectl get pods -l app=passes-api -w
 #
-# 注意: HARBOR-HOST はプレースホルダーであり、動作するアドレスではありません。自分の Harbor の
-# アドレスを差し込んでください。さもないと、このファイルが書かれた目的のエラーとは別のエラーが
-# 出ます(プレースホルダーのある行は2つあります):
+# ATTENTION: HARBOR-HOST is a placeholder, not a working address. Substitute the address of
+# your own Harbor, otherwise you'll get a different error than the one the file was written for
+# (there are two lines with the placeholder):
 #   sed -i    's|HARBOR-HOST|harbor.workshop03.example.org|g' passes-broken.yaml   # Linux
 #   sed -i '' 's|HARBOR-HOST|harbor.workshop03.example.org|g' passes-broken.yaml   # macOS
 #
-# 以下のオブジェクトで: apiVersion — 記述スキーマのバージョン、kind — 何を作るか、
-# metadata.name — オブジェクトの名前。これ以降で個別には説明しません。
+# In the object below: apiVersion — the version of the description schema, kind — what we're
+# creating, metadata.name — the object's name. Not explained separately further down.
 #
-# Deployment は「コンテナを実行せよ」ではなく「これこれのコンテナのコピーを、これだけの数だけ
-# 動かし続けよ」です。コピーが消えれば、クラスターは何も聞かずに新しいものを作ります。
+# A Deployment is not "run a container" but "keep so many copies of such-and-such a container
+# running". A copy disappears — the cluster creates a new one without asking.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -34,23 +35,23 @@ metadata:
   labels:
     app: passes-api
 spec:
-  # コピーは1つ: 失敗を掘り下げるには1つで十分ですし、ログや
-  # kubectl describe の出力もノイズが少なくなります。
+  # One copy: to work through the failure one is enough, and the logs and the output of
+  # kubectl describe will have less noise.
   replicas: 1
-  # 「私のコピーとは app: passes-api ラベルの付いたポッドである」という条件。下のポッドのテンプレート内の
-  # ラベルはこれと一致していなければならず、さもないとクラスターはマニフェストを拒否します。
+  # The condition "my copies are pods with the label app: passes-api". The label in the pod
+  # template below must match this one, otherwise the cluster will reject the manifest.
   selector:
     matchLabels:
       app: passes-api
-  # コピーを打ち出すための型。この中にあるものすべてが一つのポッドを記述します。
+  # The template copies are stamped from. Everything inside describes a single pod.
   template:
     metadata:
       labels:
         app: passes-api
     spec:
-      # ポッド全体へのセキュリティ制約: root で実行しない、非特権ユーザー 10001 で動かす、
-      # システムコールの集合を標準プロファイルに制限する。イメージも同じ前提で
-      # ビルドされています(app/Dockerfile の USER 行を参照)。
+      # Security restrictions for the whole pod: don't run as root, work under the
+      # unprivileged user 10001, limit the set of system calls to the standard profile.
+      # The image is built for the same (see app/Dockerfile, the USER line).
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
@@ -58,25 +59,27 @@ spec:
           type: RuntimeDefault
       containers:
         - name: api
-          # コンテナレベルの権限: 自分で特権を上乗せせず、カーネルの特別な権限をすべて
-          # 手放す。アプリケーションに必要なのはネットワークポート1つで、残りは余計です。
+          # Rights at the container level: don't gain extra privileges and drop all special
+          # kernel capabilities. The application needs one network port, the rest is excess.
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # イメージ名の最初の部分がレジストリのアドレスです。だからこそ自分のレジストリへの
-          # 移行はマニフェストを変えます: イメージ名が別のものになるのです。アドレスがなければ、
-          # クラスターは Docker Hub にイメージを取りに行きます——つまり、情報セキュリティが禁じた先へ。
+          # The first part of the image name is the registry address. This is exactly why
+          # moving to your own registry changes the manifests: the image name becomes
+          # different. Without the address, the cluster would go for the image to Docker Hub —
+          # that is, to where the security team forbade.
           image: HARBOR-HOST/passes/passes-api:v1
-          # アプリケーションのポート。`http` という名前はこの先でレディネスプローブに使われるので、
-          # ポート番号は2箇所ではなく1箇所で指定されています。
+          # The application's port. The name `http` is used further down by the readiness
+          # probe, so the port number is set in one place, not two.
           ports:
             - containerPort: 8080
               name: http
-          # 環境変数。アプリケーションはこれらから自分が何者で、どこから来たのかを知ります。
-          # まさにそれを応答に出力します(app/main.go の identity 構造体を参照)。
-          # APP_VERSION と IMAGE_REGISTRY はテキストで指定されています——これらは私たち自身が書きます。
-          # 続く3つはコピーの起動時にクラスター自身が埋めるもので、アプリケーションには知りようがありません。
+          # Environment variables from which the application learns who it is and where it
+          # came from. Exactly these it prints in its response (see app/main.go, the identity
+          # struct). APP_VERSION and IMAGE_REGISTRY are set as text — those we write ourselves;
+          # the next three are filled in by the cluster itself when the copy starts, the
+          # application has no way to know them.
           env:
             - name: APP_VERSION
               value: "v1"
@@ -94,10 +97,10 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
-          # requests — コピーのために予約するもの: この数値をもとにスケジューラがノードを選びます。
-          # limits — 上限: メモリが上限を超えるとコンテナは kill され、CPU は
-          # スロットリングされます。16Mi で足りるのは、アプリケーションが依存関係のない
-          # Go 製だからです。20m は CPU コアの2万分の1です。
+          # requests — what to reserve for a copy: by these numbers the scheduler picks a
+          # node. limits — the ceiling: for memory above the ceiling the container is killed,
+          # for CPU it's throttled. 16Mi is enough because the application is in Go with no
+          # dependencies. 20m is twenty thousandths of a CPU core.
           resources:
             requests:
               cpu: 20m
@@ -105,9 +108,9 @@ spec:
             limits:
               cpu: 300m
               memory: 64Mi
-          # レディネスプローブ: アプリケーションが /healthz に応答するまで、トラフィックはコピーへ
-          # 流れません。今日はそこまで到達しません——これは既に起動したプロセスを確認するものであり、
-          # 私たちの場合はより早い段階、イメージのダウンロードで詰まるからです。
+          # Readiness probe: until the application answers on /healthz, traffic won't go to
+          # the copy. Today it won't get that far — it checks an already-running process, and
+          # for us an earlier step, downloading the image, will get stuck.
           readinessProbe:
             httpGet:
               path: /healthz

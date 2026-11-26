@@ -1,39 +1,39 @@
 ---
-# Lab 4. Die zweite Version der Seite — die wir unter Last ausrollen.
-# Sie sollte sich deutlich unterscheiden: Der Teilnehmer schaut auf den Browser, nicht in ein Diff.
+# Lab 4. The second version of the page — the one we roll out under load.
+# It should differ noticeably: the participant is looking at the browser, not at a diff.
 #
-# Ein Objekt. Wird auf Ihrem `lab`-Trainingscluster angewendet, nicht im Tenant
-# auf dem Management-Cluster:
+# One object. Applied to your `lab` training cluster, not to the tenant
+# on the management cluster:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl apply -f rickroll-page-v2.yaml
-# Platzhalter wie tenant-workshopXX gibt es hier nicht — Sie müssen Ihre Nummer nirgends einsetzen.
+# There are no placeholders like tenant-workshopXX here — you don't need to substitute your number anywhere.
 #
-# Der Hauptpunkt, über den man hier stolpert: Dieses apply rollt für sich genommen nichts aus.
-# Es legt eine weitere Konfigurationsdatei neben der ersten in den Cluster. Solange das Volume `page`
-# des Deployments auf rickroll-page-v1 verweist, sehen die Nutzer die erste Version.
-# Zum Rollout wird erst der nächste Schritt der Lab — das Umschalten des Volumes auf diese ConfigMap.
-# Daher die ganze Konstruktion mit zwei Objekten: Die erste Version bleibt im Cluster
-# unangetastet, und der Rollback stellt sie als Ganzes wieder her, statt sie aus dem Gedächtnis zu rekonstruieren.
+# The main thing people stumble over here: this apply by itself rolls out nothing.
+# It puts one more settings file into the cluster next to the first. As long as the `page`
+# volume of the Deployment references rickroll-page-v1, users see the first version.
+# The rollout becomes the next step of the lab — switching the volume to this ConfigMap.
+# Hence the whole construction with two objects: the first version stays in the cluster
+# untouched, and the rollback returns it as a whole rather than reconstructing it from memory.
 #
-# Hätten wir stattdessen die ConfigMap rickroll-page-v1 an Ort und Stelle bearbeitet, gäbe es
-# nirgendwohin zurückzurollen, und die Pods bekämen neuen Inhalt ohne Ersetzen von Kopien und ohne Eintrag
-# in der Revisionshistorie — also ohne alles, wofür die Lab überhaupt gemacht ist.
+# Had we instead edited the ConfigMap rickroll-page-v1 in place, there would be
+# nowhere to roll back to, and the pods would get new content without replacing copies and without a record
+# in the revision history — that is, without everything the lab is made for.
 #
-# Der Objektname darf nicht geändert werden: Der Patch aus der README verweist auf rickroll-page-v2,
-# ebenso die Prüfung in check.sh.
+# The object name must not be changed: the patch from the README references rickroll-page-v2,
+# as does the check in check.sh.
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: rickroll-page-v2
 data:
-  # Alles unterhalb der Einrückung nach `|` ist der wortwörtliche Inhalt der Datei index.html,
-  # die im Container landet. Das ist kein YAML mehr: Kommentare gibt es hier nicht
-  # und kann es nicht geben — eine Raute würde als gewöhnlicher Text auf der Seite landen.
+  # Everything below the indentation after `|` is the verbatim content of the index.html file
+  # that will end up inside the container. This is no longer YAML: there are no comments here
+  # and there can be none — a hash would land on the page as ordinary text.
   #
-  # Zwei Dinge im Markup sind für check.sh wichtig: die Beschriftung «VERSION 2» —
-  # daran unterscheidet die Prüfung die zweite Version von der ersten, und der Platzhalter __POD__ — er wird
-  # durch den Namen des nginx-Pods gemäß der Regel aus der ConfigMap rickroll-conf (Lab 1) ersetzt.
-  # Entfernen Sie eines von beiden, besteht die Lab-Prüfung nicht, obwohl der Rollout erfolgreich ist.
+  # Two things in the markup matter to check.sh: the label «VERSION 2» —
+  # by it the check tells the second version from the first, and the placeholder __POD__ — it is
+  # replaced with the nginx pod name by the rule from the ConfigMap rickroll-conf (lab 1).
+  # Remove either of them and the lab check will not pass, even though the rollout will succeed.
   index.html: |
     <!doctype html>
     <html lang="ru">
@@ -59,6 +59,6 @@ data:
     <div class="tag">VERSION 2</div>
     <h1>We're No Strangers To Love</h1>
     <p class="lyr">You know the rules &middot; And so do I</p>
-    <div class="pod">bedient von Pod<b>__POD__</b></div>
-    <p class="hint">Das Update wurde unter Last ausgerollt. Schauen Sie in Fortio: null Fehler.</p>
+    <div class="pod">served by pod<b>__POD__</b></div>
+    <p class="hint">The update rolled out under load. Check Fortio: zero errors.</p>
     </html>

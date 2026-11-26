@@ -1,75 +1,75 @@
 ---
-# लैब 3. CPU लोड के अनुसार रेप्लिका बढ़ाना।
-# लक्ष्य requests.cpu (20m) का 50%, यानी थ्रेशोल्ड प्रति पॉड 10m है।
-# जानबूझकर कम रखा गया: लोड को सेकंडों में ट्रिगर होना चाहिए,
-# हमारे पास लैब के लिए आधा घंटा है, आधा दिन नहीं।
+# Lab 3. Scaling replicas by CPU load.
+# Target is 50% of requests.cpu (20m), i.e. the threshold is 10m per pod.
+# Chosen deliberately low: the load must trigger within seconds,
+# we have half an hour for the lab, not half a day.
 #
-# एक ही ऑब्जेक्ट। आपके प्रशिक्षण क्लस्टर `lab` पर लागू होता है, न कि प्रबंधन
-# क्लस्टर पर टेनेंट में:
+# A single object. Applied on your training cluster `lab`, not in the tenant
+# on the management cluster:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl apply -f hpa.yaml
-# यहाँ tenant-workshopXX जैसे कोई प्लेसहोल्डर नहीं हैं — अपना नंबर कहीं भी डालने की ज़रूरत नहीं।
+# There are no placeholders like tenant-workshopXX here — no need to substitute your number anywhere.
 #
-# दो शर्तें जिनके बिना ऑब्जेक्ट तो बन जाएगा पर काम नहीं करेगा:
-#   1. rickroll कंटेनर पर requests.cpu सेट हो — वरना प्रतिशत किससे गिनें कुछ नहीं रहता,
-#      और `kubectl get hpa` के TARGETS कॉलम में हमेशा के लिए <unknown> रह जाएगा।
-#   2. क्लस्टर में metrics-server चल रहा हो — पॉड्स की वर्तमान खपत का स्रोत।
-# इस फ़ोल्डर में check.sh दोनों शर्तों की जाँच करता है।
+# Two conditions without which the object will be created but won't work:
+#   1. The rickroll container has requests.cpu set — otherwise there is nothing to compute the percentage from,
+#      and the TARGETS column of `kubectl get hpa` will forever stay <unknown>.
+#   2. metrics-server is running in the cluster — the source of pods' current consumption.
+# check.sh in this folder verifies both conditions.
 #
-# जब तक HPA मौजूद है, Deployment का replicas फ़ील्ड उसी का होता है। कॉपियों की संख्या
-# `kubectl scale` से हाथ से बदली जा सकती है, पर HPA अगले कुछ सेकंडों में अपना मान वापस कर देगा।
-# इसीलिए लैब 4 में रोलआउट से पहले इस ऑब्जेक्ट को हटा दिया जाता है: एक फ़ील्ड पर दो तंत्र —
-# यह न समझ पाने का पक्का तरीका है कि हुआ क्या।
+# As long as the HPA exists, the Deployment's replicas field belongs to it. You can change the number
+# of copies by hand via `kubectl scale`, but the HPA will restore its own value within seconds.
+# That is why in lab 4, before the rollout, this object is deleted: two mechanisms on one field —
+# a guaranteed way to not understand what happened.
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  # HPA का नाम एप्लिकेशन के नाम से मेल खाना ज़रूरी नहीं — यहाँ मेल सुविधा के लिए है।
-  # किसे प्रबंधित करना है यह नीचे scaleTargetRef तय करता है, न कि यह नाम।
+  # The HPA name doesn't have to match the application name — the match here is for convenience.
+  # What to manage is determined by scaleTargetRef below, not by this name.
   name: rickroll
 spec:
-  # किस पर नज़र रखनी है और किसका replicas फ़ील्ड बदलना है। तीन फ़ील्ड एक साथ, क्योंकि बिना
-  # टाइप के नाम अस्पष्ट होता है: एक Deployment और एक StatefulSet का नाम एक जैसा हो सकता है।
+  # Whom to watch and whose replicas field to change. Three fields together, because a name
+  # without a type is ambiguous: a Deployment and a StatefulSet can be named the same.
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
     name: rickroll
-  # वह गलियारा जिससे HPA किसी भी लोड पर बाहर नहीं जाएगा। निचली सीमा वही एक कॉपी है
-  # जिससे लैब शुरू हुई थी। ऊपरी छह है: प्रशिक्षण नोड पर limits.cpu 300m के साथ इतनी ही
-  # समाती हैं और पॉड सूची में आँख से भी साफ़ दिखती हैं।
-  # maxReplicas: 1 रखेंगे तो ऑब्जेक्ट बन जाएगा और कुछ नहीं करेगा।
+  # The corridor the HPA won't leave under any load. The lower bound is the same
+  # single copy the lab started with. The upper is six: that many fit
+  # on a training node at limits.cpu 300m and are still noticeable to the eye in the pod list.
+  # Set maxReplicas: 1 and the object will be created and do nothing.
   minReplicas: 1
   maxReplicas: 6
-  # निर्णय किस आधार पर लेना है। मेट्रिक कई हो सकती हैं, तब HPA उसे लेता है जो
-  # ज़्यादा कॉपियों की माँग करती है। यहाँ एक ही है — CPU।
+  # What to base the decision on. There can be several metrics, then the HPA takes the one
+  # that requires the larger number of copies. Here there is one — the CPU.
   metrics:
     - type: Resource
       resource:
         name: cpu
-        # Utilization — कंटेनर के requests.cpu का हिस्सा, न कि नोड की क्षमता का।
-        # इससे एक अनपेक्षित नतीजा: मान आराम से 600% हो सकता है, और यह
-        # कोई गलती नहीं: पॉड ने जितना आरक्षित किया उससे छह गुना ज़्यादा खा रहा है।
-        # विकल्प है AverageValue, जहाँ थ्रेशोल्ड सीधे मिलिकोर में दिया जाता है।
+        # Utilization is the fraction of the container's requests.cpu, not of the node's capacity.
+        # Hence a non-intuitive consequence: the value can calmly be 600%, and that is
+        # not an error: the pod eats six times more than it reserved.
+        # An alternative is AverageValue, where the threshold is set in millicores directly.
         target:
           type: Utilization
           averageUtilization: 50
-  # कितनी फुर्ती से प्रतिक्रिया देनी है। यह ब्लॉक वैकल्पिक है: इसके बिना डिफ़ॉल्ट मान
-  # लिए जाते हैं, जो प्रोडक्शन संचालन के लिए बने हैं, न कि प्रदर्शन के लिए।
+  # How briskly to react. The block is optional: without it the default values are used,
+  # designed for production operation, not for a demonstration.
   behavior:
     scaleUp:
-      # डिफ़ॉल्ट रूप से Kubernetes स्थिरीकरण की प्रतीक्षा करता है और धीरे बढ़ता है।
-      # लैब में यह ऐसा लगता है जैसे «कुछ नहीं हो रहा», इसलिए हम इसे तेज़ करते हैं।
+      # By default Kubernetes waits for stabilization and grows slowly.
+      # In a lab this looks like "nothing is happening", so we speed it up.
       stabilizationWindowSeconds: 0
-      # हर पंद्रह सेकंड में दो से ज़्यादा नई कॉपियाँ नहीं। यह कदम अनुभव से चुना गया:
-      # वृद्धि वृद्धि जैसी दिखे, न कि एक से सीधे छह तक की तात्कालिक छलांग जैसी,
-      # जिसमें प्रतिभागी के देखने को कुछ नहीं होता।
+      # No more than two new copies every fifteen seconds. The step was chosen empirically:
+      # growth is seen as growth, and not as an instant jump from one straight to six,
+      # in which the participant has nothing to observe.
       policies:
         - type: Pods
           value: 2
           periodSeconds: 15
     scaleDown:
-      # और नीचे की ओर इसके उलट — तात्कालिक नहीं, वरना पॉड्स उससे पहले ही गायब हो जाएँगे
-      # जितने में प्रतिभागी उन्हें देख पाए।
-      # डिफ़ॉल्ट पाँच के बजाय एक मिनट: लैब आधा घंटा चलती है, सिकुड़ने की प्रतीक्षा में
-      # पाँच मिनट बिताने को कुछ नहीं। काम करते क्लस्टर में लंबा विंडो ठीक काम आता है —
-      # यह असमान लोड पर होने वाले झूलों को शांत करता है।
+      # And downward, on the contrary — not instantly, otherwise the pods will disappear
+      # before the participant manages to observe them.
+      # A minute instead of the default five: the lab runs for half an hour, there's nothing
+      # to fill five of them with while waiting for the scale-down. In a production cluster a long window is actually useful —
+      # it dampens the swings on uneven load.
       stabilizationWindowSeconds: 60

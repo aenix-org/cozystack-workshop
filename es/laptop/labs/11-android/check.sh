@@ -1,40 +1,40 @@
 #!/usr/bin/env bash
-# Verificación del lab 11: la compilación de Android llegó hasta el final y el APK, hasta el bucket.
+# Check for lab 11: the Android build ran to completion, and the APK reached the bucket.
 #
-# No comprobamos «Job creado», sino tres afirmaciones distintas, y no son equivalentes entre sí:
-#   1) el Job terminó con éxito,
-#   2) dentro de él realmente se compiló un APK (BUILD SUCCESSFUL),
-#   3) el archivo realmente llegó al almacenamiento de objetos (el marcador APK-UPLOADED).
-# Un Job puede terminar con éxito y no compilar nada — si alguien modificó el script.
+# We check not "Job created", but three different claims, and they are not equal to each other:
+#   1) the Job finished successfully,
+#   2) an APK was actually built inside it (BUILD SUCCESSFUL),
+#   3) the file actually reached object storage (the APK-UPLOADED marker).
+# A Job can finish successfully and build nothing — if someone edited the script.
 #
-# Se ejecuta en el portátil, desde la carpeta de este lab, con acceso al clúster de formación `lab`
-# (no al tenant en el clúster de gestión — la compilación se ejecuta en el clúster):
+# Runs on the laptop, from this lab's folder, using access to the training cluster `lab`
+# (not the tenant on the management cluster — the build runs in the cluster):
 #     export KUBECONFIG=~/lab.kubeconfig
 #     cd labs/11-android && ./check.sh
 #
-# El script no cambia nada en el clúster — solo lee y envía peticiones HTTP.
-# Ejecútalo antes de la limpieza: al eliminar el Job se eliminan también sus logs, y sin los logs
-# no queda nada con qué confirmar dos de las tres afirmaciones anteriores.
+# The script changes nothing in the cluster — it only reads and sends HTTP requests.
+# Run it before cleanup: deleting the Job also deletes its logs, and without the logs
+# there is nothing left to confirm two of the three claims above.
 
-# lib.sh recoge estas dos variables — van a la cabecera del informe y al nombre del
-# archivo report-<lab>-<fecha>.md, que el script coloca junto a sí mismo.
+# These two variables are picked up by lib.sh — they go into the report header and into the
+# file name report-<lab>-<date>.md, which the script places next to itself.
 LAB_NAME="11-android"
-LAB_TITLE="Lab 11 · Compilación de una app móvil en el clúster"
-# Biblioteca común de verificaciones: de aquí vienen ok / fail / warn / evidence / finish,
-# la petición desde dentro del clúster y la escritura del informe. La ruta se calcula desde donde
-# está el propio script, así que ejecutar desde cualquier directorio funciona igual.
+LAB_TITLE="Lab 11 · Building a mobile app in the cluster"
+# Shared checks library: from here come ok / fail / warn / evidence / finish,
+# the in-cluster request and writing the report. The path is resolved from where the
+# script itself lives, so running from any directory works the same way.
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
-# Nos detenemos de inmediato si KUBECONFIG no está definido. Sin él kubectl busca un clúster
-# en el propio portátil, no lo encuentra y hace fallar todas las verificaciones seguidas con el mismo error,
-# del cual no se ve la causa real.
+# Stop right away if KUBECONFIG is not set. Without it kubectl looks for a cluster
+# on the laptop itself, doesn't find one, and fails every check in a row with the same error,
+# from which the real cause is not visible.
 need_kubeconfig
 
 JOB=propusk-build
 SECRET=bucket-creds
 
-# El valor de una clave del secreto. base64 -d no es igual en todas partes (BSD frente a GNU),
-# así que decodificamos con python — ya lo necesita la biblioteca de verificaciones.
+# The value of a secret key. base64 -d is not the same everywhere (BSD vs GNU),
+# so we decode with python — it is already needed by the checks library.
 secret_val() {
   kubectl get secret "$SECRET" -o jsonpath="{.data.$1}" 2>/dev/null \
     | python3 -c 'import sys,base64
@@ -42,71 +42,71 @@ d=sys.stdin.read().strip()
 print(base64.b64decode(d).decode("utf-8", "replace") if d else "")' 2>/dev/null
 }
 
-# --- secreto con acceso al bucket -----------------------------------------
-# No comprobamos la existencia del secreto, sino que sus cuatro campos estén rellenos.
-# El secreto se crea a mano, con cuatro --from-literal seguidos, y el problema más frecuente es
-# un valor vacío u omitido: el objeto se crea con éxito, pero la compilación falla
-# en el último paso, cuando la compilación ya ha pasado. Es más barato saberlo ahora.
+# --- secret with access to the bucket -------------------------------------
+# We check not the existence of the secret, but that all four fields in it are filled in.
+# The secret is created by hand, with four --from-literal in a row, and the most common trouble is
+# an empty or missing value: the object is created successfully, but the build fails
+# at the last step, once the build has already gone through. Cheaper to find out now.
 if kubectl get secret "$SECRET" >/dev/null 2>&1; then
   MISSING=""
   for k in endpoint bucketName accessKey secretKey; do
     [ -z "$(secret_val "$k")" ] && MISSING="$MISSING $k"
   done
   if [ -z "$MISSING" ]; then
-    ok "el secreto ${SECRET} está en su sitio, las cuatro claves están rellenas"
-    # Los valores de las claves no van al informe — solo los nombres de los campos.
-    evidence "Campos del secreto ${SECRET}" "endpoint: $(secret_val endpoint)
+    ok "secret ${SECRET} is in place, all four keys are filled in"
+    # The key values do not go into the report — only the field names.
+    evidence "Fields of secret ${SECRET}" "endpoint: $(secret_val endpoint)
 bucketName: $(secret_val bucketName)
-accessKey: <oculto>
-secretKey: <oculto>"
+accessKey: <hidden>
+secretKey: <hidden>"
   else
-    fail "en el secreto ${SECRET} no están rellenos los campos:${MISSING}" \
-         "vuelve a crear el secreto con el comando del README, los valores se toman en el panel: Bucket -> builds -> Secrets"
+    fail "in secret ${SECRET} the following fields are not filled in:${MISSING}" \
+         "recreate the secret with the command from the README, the values are taken in the dashboard: Bucket -> builds -> Secrets"
   fi
 else
-  fail "no hay secreto ${SECRET} en el clúster" \
-       "crea el secreto: kubectl create secret generic ${SECRET} --from-literal=endpoint=... (cuatro campos)"
+  fail "there is no secret ${SECRET} in the cluster" \
+       "create the secret: kubectl create secret generic ${SECRET} --from-literal=endpoint=... (four fields)"
 fi
 
-# --- ¿es accesible el almacenamiento desde dentro del clúster? --------------
-# La causa más frecuente de «el Job falló en el quinto paso» no son las claves, sino que
-# al almacenamiento no se llega desde el clúster. Lo comprobamos aparte de la compilación.
-# La petición sale de un pod, no del portátil: el portátil tiene su propia red y sus propias rutas,
-# y una respuesta exitosa desde él no diría nada sobre si la compilación llegará hasta allí.
+# --- is storage reachable from inside the cluster --------------------------
+# The most common cause of "the Job failed at step five" is not the keys, but that
+# storage cannot be reached from the cluster. We check this separately from the build.
+# The request goes from a pod, not from the laptop: the laptop has its own network and routes,
+# and a successful response from it would say nothing about whether the build can reach there.
 EP="$(secret_val endpoint)"
 if [ -n "$EP" ]; then
-  # Sin -k a propósito: la compilación va al almacenamiento con verificación de certificado, y la comprobación
-  # debe fallar en el mismo sitio donde fallaría el Job, no dar verde con un certificado caducado.
+  # No -k on purpose: the build talks to storage with certificate verification, and the check
+  # must fail in the same place the Job would fail, not report green on an expired cert.
 CODE="$(in_cluster_curl "https://${EP}/" "-o /dev/null -w %{http_code}")"
   case "$CODE" in
     2*|3*|4*)
-      ok "el almacenamiento ${EP} responde desde dentro del clúster (HTTP ${CODE})"
-      evidence "Respuesta del almacenamiento" "GET https://${EP}/ -> HTTP ${CODE}
-Los códigos 403 y 404 aquí son normales: una petición anónima a la raíz de S3 debe ser rechazada."
+      ok "storage ${EP} responds from inside the cluster (HTTP ${CODE})"
+      evidence "Storage response" "GET https://${EP}/ -> HTTP ${CODE}
+Codes 403 and 404 are normal here: an anonymous request to the S3 root should be rejected."
       ;;
     5*)
-      warn "el almacenamiento ${EP} responde con error HTTP ${CODE}" \
-           "la compilación puede pasar, pero la subida del APK no; avisa al instructor"
+      warn "storage ${EP} responds with error HTTP ${CODE}" \
+           "the build may pass, but the APK upload won't; tell the instructor"
       ;;
     *)
-      fail "el almacenamiento ${EP} no responde desde dentro del clúster" \
-           "revisa el campo endpoint del secreto: debe ir SIN https:// y sin barra al final"
+      fail "storage ${EP} does not respond from inside the cluster" \
+           "check the endpoint field in the secret: it must be WITHOUT https:// and without a trailing slash"
       ;;
   esac
 else
-  warn "no compruebo la disponibilidad del almacenamiento" \
-       "primero hace falta el secreto ${SECRET} con el campo endpoint"
+  warn "not checking storage availability" \
+       "first you need the secret ${SECRET} with the endpoint field"
 fi
 
-# --- el propio Job ---------------------------------------------------------
-# Miramos .status.succeeded, no el hecho de que el Job exista: el objeto se crea
-# al instante y siempre con éxito, mientras que el éxito de la tarea significa que el pod terminó con código 0.
-# El estado del pod se examina aparte, porque «todavía en curso» y «colgado en Pending» para
-# una persona son noticias distintas: lo primero significa esperar, lo segundo que esperar es inútil
-# y hay que ampliar el nodo.
+# --- the Job itself --------------------------------------------------------
+# We look at .status.succeeded, not at the fact the Job exists: the object is created
+# instantly and always successfully, while the task's success means the pod finished with code 0.
+# The pod's state is examined separately, because "still running" and "stuck in Pending" are
+# different news for a human: the first means wait, the second means waiting is pointless
+# and the node needs to be scaled up.
 if ! kubectl get job "$JOB" >/dev/null 2>&1; then
-  fail "no hay Job ${JOB} en el clúster" \
-       "lanza la compilación: kubectl apply -f android-build.yaml"
+  fail "there is no Job ${JOB} in the cluster" \
+       "start the build: kubectl apply -f android-build.yaml"
 else
   SUCCEEDED="$(kubectl get job "$JOB" -o jsonpath='{.status.succeeded}' 2>/dev/null)"
   FAILED="$(kubectl get job "$JOB" -o jsonpath='{.status.failed}' 2>/dev/null)"
@@ -115,57 +115,57 @@ else
     -o jsonpath='{.items[-1:].status.phase}' 2>/dev/null)"
 
   if [ "${SUCCEEDED:-0}" -ge 1 ] 2>/dev/null; then
-    ok "el Job ${JOB} terminó con éxito"
+    ok "Job ${JOB} finished successfully"
     evidence "Job" "$(kubectl get job "$JOB" -o wide 2>/dev/null)
-terminado: ${DURATION:-desconocido}"
+finished: ${DURATION:-unknown}"
   elif [ "$POD_PHASE" = "Pending" ]; then
-    fail "el pod de compilación está colgado en Pending — no arrancó y no arrancará por sí solo" \
-         "mira la causa: kubectl describe pod -l job-name=${JOB} | grep -A5 Events; si hay Insufficient memory amplía el nodo a u1.large — cómo hacerlo está escrito en el README"
-    evidence "Eventos del pod de compilación" \
+    fail "the build pod is stuck in Pending — it has not started and won't start on its own" \
+         "look at the reason: kubectl describe pod -l job-name=${JOB} | grep -A5 Events; on Insufficient memory scale the node up to u1.large — how to do it is written in the README"
+    evidence "Build pod events" \
       "$(kubectl describe pod -l "job-name=${JOB}" 2>/dev/null | sed -n '/Events:/,$p' | head -20)"
   elif [ "${FAILED:-0}" -ge 1 ] 2>/dev/null; then
-    fail "el Job ${JOB} terminó con error (intentos fallidos: ${FAILED})" \
-         "mira las últimas líneas del log: kubectl logs job/${JOB} --tail=40"
-    evidence "Cola del log de la compilación fallida" \
+    fail "Job ${JOB} finished with an error (failed attempts: ${FAILED})" \
+         "look at the last log lines: kubectl logs job/${JOB} --tail=40"
+    evidence "Tail of the failed build log" \
       "$(kubectl logs "job/${JOB}" --tail=30 2>/dev/null)"
   else
-    fail "el Job ${JOB} aún no ha terminado (estado del pod: ${POD_PHASE:-desconocido})" \
-         "la primera compilación tarda de un par de minutos a un cuarto de hora, según la conexión; sigue: kubectl logs -f job/${JOB}"
+    fail "Job ${JOB} has not finished yet (pod state: ${POD_PHASE:-unknown})" \
+         "the first build takes from a couple of minutes to a quarter of an hour, depending on the connection; watch: kubectl logs -f job/${JOB}"
   fi
 
-  # --- qué pasó exactamente dentro ----------------------------------------
-  # Un Job exitoso por sí mismo no prueba nada más allá de un código de retorno cero.
-  # Por eso abrimos el log y buscamos en él dos evidencias distintas: BUILD SUCCESSFUL —
-  # que la compilación llegó hasta el final, y la línea marcador APK-UPLOADED, que el script imprime
-  # solo después de copiar el archivo al bucket. La segunda es más fuerte que la primera: el APK puede
-  # compilarse y quedarse dentro del pod, que está a punto de desaparecer.
+  # --- what exactly happened inside ---------------------------------------
+  # A successful Job by itself proves nothing beyond a zero return code.
+  # So we open up the log and look in it for two different pieces of evidence: BUILD SUCCESSFUL —
+  # that compilation ran to completion, and the marker line APK-UPLOADED, which the script prints
+  # only after copying the file to the bucket. The second is stronger than the first: the APK may
+  # be built and left lying inside the pod, which is about to disappear.
   LOGS="$(kubectl logs "job/${JOB}" --tail=-1 2>/dev/null)"
   if [ -z "$LOGS" ]; then
-    warn "los logs de la compilación no están disponibles" \
-         "el pod de compilación se eliminó o aún no se ha creado; sin logs no se puede confirmar que el APK realmente se compiló"
+    warn "build logs are unavailable" \
+         "the build pod is deleted or not yet created; without logs it's impossible to confirm the APK was actually built"
   else
     if printf '%s' "$LOGS" | grep -q 'BUILD SUCCESSFUL'; then
       GRADLE_LINE="$(printf '%s' "$LOGS" | grep -m1 'BUILD SUCCESSFUL')"
-      ok "el APK realmente se compiló (${GRADLE_LINE})"
+      ok "the APK was actually built (${GRADLE_LINE})"
     else
-      fail "no hay línea BUILD SUCCESSFUL en los logs — la compilación no llegó hasta el final" \
-           "busca la primera línea con FAILURE: kubectl logs job/${JOB} | grep -n -m1 -A20 FAILURE"
+      fail "there is no BUILD SUCCESSFUL line in the logs — compilation did not run to completion" \
+           "look for the first line with FAILURE: kubectl logs job/${JOB} | grep -n -m1 -A20 FAILURE"
     fi
 
     UPLOADED="$(printf '%s' "$LOGS" | grep -m1 '^APK-UPLOADED ' | awk '{print $2}')"
     if [ -n "$UPLOADED" ]; then
-      ok "el APK llegó al bucket: ${UPLOADED}"
-      evidence "Contenido del bucket tras la compilación" \
-        "$(printf '%s' "$LOGS" | sed -n '/5\/5 subiendo el APK al Bucket/,$p' | grep -v '^APK-UPLOADED ' | head -20)"
+      ok "the APK reached the bucket: ${UPLOADED}"
+      evidence "Bucket contents after the build" \
+        "$(printf '%s' "$LOGS" | sed -n '/5\/5 uploading the APK to the bucket/,$p' | grep -v '^APK-UPLOADED ' | head -20)"
     else
-      fail "el APK se compiló, pero no llegó al bucket" \
-           "mira la cola del log: kubectl logs job/${JOB} --tail=20; lo más frecuente es que la culpa sea de bucketName — necesita el nombre largo del panel, no 'builds'"
+      fail "the APK was built, but did not reach the bucket" \
+           "look at the tail of the log: kubectl logs job/${JOB} --tail=20; most often bucketName is to blame — it needs the long name from the dashboard, not 'builds'"
     fi
   fi
 fi
 
-# --- ¿le alcanza el espacio al nodo para una compilación así? ---------------
-# No es una sentencia, sino una explicación: si el Job no cupo, la causa casi siempre está aquí.
+# --- does the node have enough room for a build like this -------------------
+# Not a verdict, but an explanation: if the Job didn't fit, the cause is almost always here.
 BIGGEST_MEM="$(kubectl get nodes -o jsonpath='{range .items[*]}{.status.allocatable.memory}{"\n"}{end}' 2>/dev/null \
   | sort -n | tail -1)"
 if [ -n "$BIGGEST_MEM" ]; then
@@ -175,18 +175,18 @@ if [ -n "$BIGGEST_MEM" ]; then
       GB="${BIGGEST_H%Gi}"
       GB_INT="${GB%%.*}"
       if [ "${GB_INT:-0}" -ge 6 ] 2>/dev/null; then
-        ok "el nodo más grande ofrece ${BIGGEST_H} de memoria — le alcanza a la compilación"
+        ok "the largest node offers ${BIGGEST_H} of memory — enough for the build"
       else
-        warn "el nodo más grande ofrece solo ${BIGGEST_H} de memoria" \
-             "la compilación pide 4Gi solo en requests; si el Job se cuelga en Pending, amplía el tipo de nodo a u1.large — cómo, está escrito en el README"
+        warn "the largest node offers only ${BIGGEST_H} of memory" \
+             "the build asks for 4Gi in requests alone; if the Job is stuck in Pending, scale the node type up to u1.large — how, is written in the README"
       fi
       ;;
     *)
-      warn "los nodos tienen menos de un gigabyte de memoria disponible (${BIGGEST_H})" \
-           "una compilación de Android no cabe ahí, amplía el tipo de nodo — cómo, está escrito en el README"
+      warn "the nodes have less than a gigabyte of available memory (${BIGGEST_H})" \
+           "an Android build won't fit there, scale the node type up — how, is written in the README"
       ;;
   esac
-  evidence "Recursos de los nodos" "$(kubectl get nodes -o wide 2>/dev/null)"
+  evidence "Node resources" "$(kubectl get nodes -o wide 2>/dev/null)"
 fi
 
 finish

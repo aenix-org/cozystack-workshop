@@ -94,7 +94,7 @@ ssh_pwauth: true
 write_files:
   - path: /opt/directory/index.html
     content: |
-      <!doctype html><html lang="ru"><head><meta charset="utf-8"><title>निर्देशिका</title></head><body><h1>कर्मचारी निर्देशिका</h1><ul><li>शर्मा आर. — 101</li><li>पाण्डेय प. — 102</li></ul></body></html>
+      <!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Directory</title></head><body><h1>Staff directory</h1><ul><li>Whitfield J. — 101</li><li>Petersen P. — 102</li></ul></body></html>
   - path: /etc/systemd/system/directory.service
     content: |
       [Unit]
@@ -115,12 +115,12 @@ runcmd: [ "systemctl daemon-reload", "systemctl enable --now directory" ]
 **वही चीज़ टेक्स्ट के रूप में।** दोनों ऑब्जेक्ट, डिस्क और मशीन, एक ही फ़ाइल `staff-directory-vm.yaml` में हैं, और एक ही कमांड से बनते हैं: पहले डिस्क, फिर मशीन। लागू करने से पहले, फ़ाइल खोलें और उसमें मौजूद `tenant-workshopXX` प्लेसहोल्डर को अपने खुद के टेनेंट के नाम से बदलें — वरना ऑब्जेक्ट ग़लत जगह पहुँच जाएँगे।
 
 ```bash
-# KUBECONFIG वह वेरिएबल है जिससे kubectl क्लस्टर का पता और लॉगिन डेटा पढ़ता है।
-# यहाँ आपको TENANT एक्सेस फ़ाइल चाहिए: VM प्रबंधन क्लस्टर पर टेनेंट में रहती है।
+# KUBECONFIG is the variable kubectl reads the cluster address and login data from.
+# Here you need the TENANT access file: the VM lives in the tenant on the management cluster.
 export KUBECONFIG=~/.kube/workshop
-# apply = "क्लस्टर को उसी हाल में ले आओ जो फ़ाइल में लिखा है"। कोई ऑब्जेक्ट न हो — यह उन्हें बनाता है,
-# ऑब्जेक्ट मौजूद हों — यह उन्हें वर्णित स्थिति में ले आता है।
-#   -f   विवरण किसी फ़ाइल से पढ़ो
+# apply = "bring the cluster to what's written in the file". No objects — it creates them,
+# objects present — it brings them to the described state.
+#   -f   read the description from a file
 kubectl apply -f staff-directory-vm.yaml
 ```
 
@@ -205,8 +205,8 @@ cloud-init मानक पहली-बार-बूट प्रोविज�
 प्रशिक्षक ने डायरेक्टरी को पहले से प्रकाशित कर रखा है: आपके टेनेंट में पहले से एक `Ingress spravochnik` है जिसका host `spravochnik.workshopXX.workshop.aenix.io` है और एक `Service spravochnik-http` है जो मशीन के भीतर पोर्ट 8080 तक ले जाता है। प्रकाशन डायरेक्टरी को उसी क्षण ग्रहण करने के लिए तैयार है जब वह उत्तर देना शुरू करती है। आइए इसे अभी जाँचें, मशीन के लोड होने का इंतज़ार किए बिना।
 
 ```bash
-# curl — "पते पर जाओ और उत्तर दिखाओ"। XX की जगह अपना खुद का टेनेंट नंबर डालें।
-#   --max-time 5   देर तक इंतज़ार करने की बजाय 5 सेकंड बाद हार मान लो
+# curl — "go to the address and show the response". Replace XX with your own tenant number.
+#   --max-time 5   give up after 5 seconds instead of waiting a long time
 curl --max-time 5 http://spravochnik.workshopXX.workshop.aenix.io
 ```
 
@@ -254,13 +254,13 @@ curl --max-time 5 http://spravochnik.workshopXX.workshop.aenix.io
 इसके सिंटैक्स की एक ख़ासियत को पहले ही समझ लेना फ़ायदेमंद है, वरना आपका पहला ही कमांड denied होकर लौटेगा। `virtctl` के लिए लक्ष्य किसी नंगे नाम के रूप में नहीं, बल्कि एक type उपसर्ग के साथ दिया जाता है: `vmi/<name>`। `vmi` का मतलब है virtual machine instance, मशीन का **चालू इंस्टेंस**; आपके द्वारा बनाया गया `VMInstance` ऑब्जेक्ट और चालू इंस्टेंस API में दो अलग-अलग ऑब्जेक्ट हैं। टेनेंट एक्सेस के तहत अधिकार `virtualmachineinstances` **subresource** पर दिए जाते हैं (`console` और `portforward`), पूरे `virtualmachines` ऑब्जेक्टों पर नहीं — एक नंगा नाम vm ऑब्जेक्ट पर जा टकराता है और `forbidden` होकर लौटता है। प्लेटफ़ॉर्म इंस्टेंस का नाम उपसर्ग `vm-instance-` और आपकी मशीन के नाम से बनाता है: `spravochnik` का इंस्टेंस `vm-instance-spravochnik` है।
 
 ```bash
-# टेनेंट एक्सेस: मशीन टेनेंट में रहती है
+# tenant access: the machine lives in the tenant
 export KUBECONFIG=~/.kube/workshop
-# console = मशीन के सीरियल कंसोल से कनेक्ट करो। यह वही स्क्रीन है जो
-# vSphere में "Open Console" देता है, बस टेक्स्ट-आधारित:
-#   --namespace  क्लस्टर का कौन-सा हिस्सा देखना है; आपके टेनेंट के लिए इसे
-#                tenant- और आपके लॉगिन को मिलाकर कहते हैं, XX की जगह अपना नंबर डालें
-#   vmi/...      लक्ष्य: मशीन का चालू इंस्टेंस, न कि VMInstance विवरण
+# console = connect to the machine's serial console. It's the same screen that
+# "Open Console" gives you in vSphere, only text-based:
+#   --namespace  which section of the cluster to look in; for your tenant it's called
+#                tenant- plus your login, replace XX with your own number
+#   vmi/...      the target: the running instance of the machine, not the VMInstance description
 virtctl console --namespace=tenant-workshopXX vmi/vm-instance-spravochnik
 ```
 
@@ -269,9 +269,9 @@ virtctl console --namespace=tenant-workshopXX vmi/vm-instance-spravochnik
 अंदर से यह एक साधारण Ubuntu है। पक्का करें कि डायरेक्टरी खड़ी हो गई है:
 
 ```bash
-uname -a                       # कर्नेल और आर्किटेक्चर: वही पंक्ति जो किसी बेयर-मेटल सर्वर पर होती है
-systemctl status directory     # डायरेक्टरी सेवा: active (running) होनी चाहिए
-curl -s localhost:8080 | head  # वही पेज, पर खुद मशीन के भीतर से अनुरोध किया गया
+uname -a                       # kernel and architecture: the same line as on a bare-metal server
+systemctl status directory     # the directory service: should be active (running)
+curl -s localhost:8080 | head  # the same page, but requested from inside the machine itself
 ```
 
 अगर `systemctl status directory` `active (running)` दिखाता है और `localhost:8080` पर `curl` ने कर्मचारियों की सूची वाला HTML लौटाया — तो सर्वर तैयार है, और बाहर का प्रकाशन बस `503` की जगह पेज लगाने ही वाला है। अंदर Kubernetes का कोई निशान नहीं है, और होना भी नहीं चाहिए: गेस्ट को नहीं पता कि वह एक क्लस्टर में है — ठीक वैसे ही जैसे vSphere में एक VM को vCenter के बारे में जानने की कोई ज़रूरत नहीं होती।
@@ -289,7 +289,7 @@ curl http://spravochnik.workshopXX.workshop.aenix.io
 **आपको क्या दिखना चाहिए** — डायरेक्टरी पेज का HTML:
 
 ```html
-<h1>कर्मचारी निर्देशिका</h1><ul><li>शर्मा आर. — 101</li><li>पाण्डेय प. — 102</li></ul>
+<h1>Staff directory</h1><ul><li>Whitfield J. — 101</li><li>Petersen P. — 102</li></ul>
 ```
 
 इस पते को ब्राउज़र में खोलें और आपको वही सूची दिखेगी। डायरेक्टरी बाहर से एक मानव-अनुकूल डोमेन नाम से दिखाई देती है, प्लेटफ़ॉर्म से मिले HTTPS के साथ, नेटवर्किंग को या सर्टिफ़िकेट के लिए एक भी टिकट भरे बिना।
@@ -307,12 +307,12 @@ curl http://spravochnik.workshopXX.workshop.aenix.io
 स्क्रिप्ट ऑब्जेक्टों की मौजूदगी नहीं, बल्कि तत्व में काम को जाँचती है: डोमेन नाम एक `200` लौटाता है और वह डायरेक्टरी पेज है, मशीन खुद चल रही है, और उसे प्रकाशित करने वाला `Ingress` अपनी जगह है। डोमेन द्वारा की जाने वाली जाँच टेनेंट एक्सेस के बिना भी काम करती है — इसके लिए `curl` काफ़ी है; टेनेंट एक्सेस मशीन-स्थिति की जाँचें जोड़ता है।
 
 ```bash
-# टेनेंट एक्सेस: यहाँ से स्क्रिप्ट खुद VM और Ingress लेती है
+# tenant access: from here the script takes the VM itself and the Ingress
 export KUBECONFIG=~/.kube/workshop
-# tenant- शब्द के बिना आपका लॉगिन: इससे स्क्रिप्ट सेक्शन का नाम tenant-workshopXX
-# और डोमेन नाम spravochnik.workshopXX.workshop.aenix.io दोनों बनाती है
+# your login without the word tenant-: from it the script builds both the section name tenant-workshopXX
+# and the domain name spravochnik.workshopXX.workshop.aenix.io
 export COZY_TENANT=workshopXX
-# नाम से पहले ./ का मतलब है "मौजूदा फ़ोल्डर की फ़ाइल", यानी labs/12-vm से
+# the ./ before the name means "the file from the current folder", i.e. from labs/12-vm
 ./check.sh
 ```
 

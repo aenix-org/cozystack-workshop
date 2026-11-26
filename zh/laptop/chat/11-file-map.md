@@ -25,7 +25,7 @@
 
 **转换机**有网络，所以它自己下载文件。仓库是公开的，不需要密钥：
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/laptop/scripts/convert.sh
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/laptop/scripts/convert.sh
 ```
 
 **你的 app-VM 一开始根本没有网络**——这个坏掉的状态正是我们在第 6 步要修的。

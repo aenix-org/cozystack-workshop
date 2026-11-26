@@ -1,53 +1,54 @@
-# 实验 13。Deployment 模板：运行什么，以及运行多少个副本。
+# Lab 13. Deployment template: what to run and in how many copies.
 #
-# templates/ 中的文件是蓝图，而不是现成的清单。Helm 把值代入其中，
-# 再把结果交给集群：`helm template main chart` 显示渲染后的文本而不实际应用，
-# `helm install main chart` 则会应用它。
+# Files in templates/ are blueprints, not ready-made manifests. Helm substitutes values into them
+# and hands the result to the cluster: `helm template main chart` shows the rendered text without
+# applying anything, `helm install main chart` applies it.
 #
-# 双大括号是替换点。在其中你会看到：
-#   .Values.名称  — 参数值：如果客户没有改动，取自 values.yaml，
-#                   如果客户在仪表盘的订购表单中选了自己的值，则取自那里；
-#   .Release.Name — 发布名，也就是该 chart 某次具体部署的名称。
-# 大括号之外的文本原样进入清单。
+# Double curly braces are a substitution point. Inside them you'll find:
+#   .Values.name  — a parameter value: from values.yaml if the customer didn't touch it,
+#                   or from the order form in the dashboard if they chose their own;
+#   .Release.Name — the release name, i.e. the name of a specific deployment of the chart.
+# Text outside the braces goes into the manifest as is.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  # 对象名由发布名拼装而成，而不是写死。同一个 chart 会在一个 namespace 中
-  # 被部署不止一次，固定的名称就意味着第二个订单会覆盖第一个。发布 `main` 产生
-  # 名为 `main` 的 Deployment、Service 和 ConfigMap —— 一看名字就知道它们是同一组。
+  # Object names are assembled from the release name, not hardcoded. The same chart
+  # is deployed into one namespace more than once, and a fixed name would mean the
+  # second order overwrites the first. Release `main` yields a Deployment, Service and ConfigMap
+  # named `main` — the name makes it obvious at a glance that they are one group.
   name: {{ .Release.Name }}
-  # 标签：name 对该应用的每个订单都相同，instance 用来区分不同订单。
-  # 对象之间靠它们互相找到彼此，`kubectl get` 的输出也靠它们来筛选。
+  # Labels: name is the same for every order of this application, instance distinguishes orders.
+  # Objects find each other by them, and `kubectl get` output is filtered by them too.
   labels:
     app.kubernetes.io/name: guest-pass
     app.kubernetes.io/instance: {{ .Release.Name }}
 spec:
-  # 保持运行多少个副本。如果某个副本消失了，集群会不加询问地创建一个新的 ——
-  # 这就是无需值班管理员的自愈能力。
+  # How many copies to keep running. If a copy disappears, the cluster creates a new one
+  # without asking — hence self-healing without an on-duty administrator.
   replicas: {{ .Values.replicas }}
-  # selector 告诉 Deployment 该把哪些 pod 视为自己的 —— 靠标签，而不是靠名称。
-  # 这里的标签和 template.metadata.labels 中的标签必须一致。一旦不一致，
-  # Deployment 就找不到自己的副本，会一遍又一遍地不停生成。
+  # selector tells the Deployment which pods to consider its own — by labels, not by names.
+  # The labels here and the labels in template.metadata.labels must match. If they diverge,
+  # the Deployment doesn't find its own copies and stamps them out again and again.
   selector:
     matchLabels:
       app.kubernetes.io/name: guest-pass
       app.kubernetes.io/instance: {{ .Release.Name }}
-  # template 是 pod 的蓝图。下面的一切描述的不是 Deployment 本身，而是它
-  # 依照这个蓝图创建出来的应用副本。
+  # template is the pod blueprint. Everything below describes not the Deployment itself, but the
+  # application copies it creates from this blueprint.
   template:
     metadata:
       labels:
         app.kubernetes.io/name: guest-pass
         app.kubernetes.io/instance: {{ .Release.Name }}
       annotations:
-        # 写在 pod 注解里的配置哈希。没有它，编辑 ConfigMap 不会重启
-        # pod，新文本也不会出现，直到有人手动把它们删掉。
-        # 这是对 chart 最常见的抱怨之一。
+        # Configuration hash in a pod annotation. Without it, editing the ConfigMap doesn't restart
+        # the pods, and the new text won't appear until someone deletes them by hand.
+        # This is the most common complaint about charts in general.
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
     spec:
-      # 应用不是以 root 运行，且权限被削减。目录中的 chart
-      # 会被其他租户部署在他们自己的 namespace 里，容器的权限是
-      # 你随应用一起对他们所作承诺的一部分。
+      # The application runs not as root and with reduced privileges. A chart from the catalog
+      # is deployed by other tenants in their namespaces, and the container's privileges are part of
+      # what you promise them along with the application.
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
@@ -59,44 +60,45 @@ spec:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # 镜像写在模板里，且故意不作为参数暴露：客户可以选择
-          # 大小和文本，但不能把应用本身替换成任意的东西。
+          # The image is written in the template and deliberately not exposed as a parameter: the customer
+          # chooses the size and text, but does not swap the application itself for an arbitrary one.
           image: nginxinc/nginx-unprivileged:1.27-alpine
-          # 没有这个变量，nginx 会按节点的每个核心各启动一个工作进程。
-          # 在有几十个核心的节点上就会有几十个进程，而一个内存限制只有
-          # 一百兆的 pod，会在第一个请求到来之前就以 OOMKilled 死掉。chart 会
-          # 发到其他租户那里，那里的节点可能是任何配置，所以这里必须这样做。
+          # Without this variable nginx starts one worker process per node core.
+          # On a node with several dozen cores there will be dozens of them, and a pod with a memory
+          # limit of a hundred megabytes will die with OOMKilled before the first request. The chart ships
+          # into other tenants, where nodes can be anything, so this is mandatory here.
           env:
             - name: NGINX_ENTRYPOINT_WORKER_PROCESSES_AUTOTUNE
               value: "1"
-          # 容器内部的端口。名称 http 在后面的探针和 Service 中会被用到，
-          # 这样端口号只记录在一个地方，而不是三个。
+          # The port inside the container. The name http is used further on in the probe and in the Service,
+          # so that the port number is recorded in one place, not in three.
           ports:
             - containerPort: 8080
               name: http
-          # requests —— 保证分配多少，调度器按这些数字挑选节点。
-          # 这里的 limits 只针对内存：一旦超出，容器就被杀掉并重新拉起。
-          # 故意没有 CPU 限制，否则应用会撞上上限，而不是只是跑得慢一些。
-          # `| quote` 过滤器会把代入的值用引号包起来：用户
-          # 可能输入 1，没有引号的话，一个数字就会进入清单，而那里期望的是形如
-          # "1" 或 "100m" 的字符串。
+          # requests — how much to allocate guaranteed; the scheduler picks a node by these numbers.
+          # limits here are memory-only: exceed it and the container is killed and brought back up.
+          # There is deliberately no CPU limit, otherwise the application hits a ceiling instead
+          # of just running slower.
+          # The `| quote` filter wraps the substituted value in quotes: the user
+          # may enter 1, and without quotes a number would go into the manifest where a string
+          # like "1" or "100m" is expected.
           resources:
             requests:
               cpu: {{ .Values.resources.cpu | quote }}
               memory: {{ .Values.resources.memory | quote }}
             limits:
               memory: {{ .Values.resources.memory | quote }}
-          # readinessProbe —— 那个「准备好接收请求了吗？」的问题。在 /healthz 应答之前，
-          # Service 不会把流量发给这个副本。由此实现不中断的更新：旧
-          # 副本会在新副本应答之后才从负载均衡中移出。
+          # readinessProbe — the question "ready to accept requests?". Until /healthz answers,
+          # the Service sends no traffic to this copy. Hence updates without interruption: the old
+          # copy is taken out of balancing after the new one has answered.
           readinessProbe:
             httpGet:
               path: /healthz
               port: http
             initialDelaySeconds: 2
-          # nginx 的页面和配置以文件形式从 ConfigMap 挂载进来。subPath 只代入
-          # 恰好一个文件：没有它，挂载的目录就会替换掉整个 /etc/nginx/
-          # conf.d，镜像自带的设置就会消失。
+          # The nginx page and config are mounted as files from the ConfigMap. subPath substitutes
+          # exactly one file: without it the mounted directory would replace the entire /etc/nginx/
+          # conf.d and the image's stock settings would disappear.
           volumeMounts:
             - name: page
               mountPath: /usr/share/nginx/html/index.html
@@ -104,8 +106,8 @@ spec:
             - name: conf
               mountPath: /etc/nginx/conf.d/default.conf
               subPath: default.conf
-      # ConfigMap 的名称由发布名拼装而成，所以 pod 总是挂载自己订单的配置，
-      # 而不是邻居的。
+      # The ConfigMap name is assembled from the release name, so the pod always mounts the configuration
+      # of its own order, not a neighbor's.
       volumes:
         - name: page
           configMap:

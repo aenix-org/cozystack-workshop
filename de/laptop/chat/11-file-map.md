@@ -27,7 +27,7 @@ Auf Ihrem Laptop brauchen Sie sie überhaupt nicht.
 Die **Konverter-Maschine** hat ein Netzwerk, also lädt sie die Datei selbst herunter. Das Repository
 ist öffentlich, es werden keine Schlüssel benötigt:
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/laptop/scripts/convert.sh
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/laptop/scripts/convert.sh
 ```
 
 **Ihre app-VM hat anfangs überhaupt kein Netzwerk** — genau dieser kaputte Zustand ist es, den wir

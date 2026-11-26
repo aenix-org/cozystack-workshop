@@ -33,7 +33,7 @@ Ya tienes todos los archivos —los obtuviste junto con el repositorio. No hay n
 ni volver a teclear: donde más abajo diga `kubectl apply -f nombre.yaml`, el archivo se toma de aquí.
 
 ```bash
-# Todos los comandos del lab se ejecutan desde esta carpeta; de lo contrario, las rutas relativas que contienen no cuadrarán.
+# All the lab's commands are run from this folder — otherwise the relative paths in them won't line up.
 cd labs/02-selfheal
 ```
 
@@ -50,13 +50,13 @@ La aplicación `rickroll` ya está en marcha. Antes de romper nada, veamos de qu
 se compone: con un solo comando le preguntamos al clúster por tres tipos de entidad a la vez.
 
 ```bash
-# KUBECONFIG — la ruta al archivo con la dirección del clúster y tus credenciales de acceso.
-# Hasta que la variable no esté definida, kubectl busca un clúster en la propia laptop y no lo encuentra.
+# KUBECONFIG — the path to the file with the cluster's address and your login credentials.
+# Until the variable is set, kubectl looks for a cluster on the laptop itself and doesn't find one.
 export KUBECONFIG=~/lab.kubeconfig
 
-# get = «muéstrame qué hay». Se enumeran tres tipos de objeto a la vez, separados por comas.
-#   -l app=rickroll   mostrar solo los etiquetados con app=rickroll, es decir, nuestra
-#                     aplicación, y no todo el contenido del clúster
+# get = "show me what's there". Three kinds of object are listed at once, separated by commas.
+#   -l app=rickroll   show only those labelled app=rickroll — that is, our
+#                     application, not the entire contents of the cluster
 kubectl get deployment,replicaset,pods -l app=rickroll
 ```
 
@@ -97,10 +97,10 @@ los Pods directamente: vigila al ReplicaSet.
 Puedes confirmar que esto no es una suposición así:
 
 ```bash
-# La tabla por defecto de kubectl no muestra el campo ownerReferences: hay que pedirlo explícitamente.
-#   -o jsonpath=...   «saca estos campos de la respuesta del servidor e imprímelos así»
-# Dentro de la expresión: range .items[*] — recorrer todos los Pods encontrados, .metadata.name —
-# el nombre del Pod, ownerReferences[0].kind y .name — el tipo y el nombre de quien lo creó.
+# The default kubectl table doesn't show the ownerReferences field — you have to ask for it explicitly.
+#   -o jsonpath=...   "pull these fields out of the server's response and print them like this"
+# Inside the expression: range .items[*] — walk through every Pod found, .metadata.name —
+# the Pod's name, ownerReferences[0].kind and .name — the kind and name of whatever created it.
 kubectl get pods -l app=rickroll -o jsonpath='{range .items[*]}{.metadata.name}{"  <- "}{.metadata.ownerReferences[0].kind}{"/"}{.metadata.ownerReferences[0].name}{"\n"}{end}'
 ```
 
@@ -134,41 +134,41 @@ luego, una vez por segundo, le preguntará al clúster si ha aparecido una copia
 estado Running. En cuanto aparezca, imprime cuánto tardó.
 
 ```bash
-# items[0].metadata.name — el nombre del primer Pod de la lista. Lo guardamos en la variable POD:
-# sin eso no podremos distinguir luego la copia vieja de la nueva.
+# items[0].metadata.name — the name of the first Pod in the list. We save it in the POD variable:
+# without that we won't be able to tell the old copy from the new one later.
 POD=$(kubectl get pods -l app=rickroll -o jsonpath='{.items[0].metadata.name}')
-echo "matando: $POD"
+echo "killing: $POD"
 
-# date +%s — la hora actual en segundos. Es nuestro cronómetro: lo anotamos antes de borrar,
-# y al final lo restamos de una nueva lectura.
+# date +%s — the current time in seconds. This is our stopwatch: we note it before the delete,
+# and subtract it from a fresh reading right at the end.
 START=$(date +%s)
 
-# delete pod — borrar la copia para siempre.
-#   --wait=false   no esperar a que el Pod desaparezca por completo, devolver el control de inmediato:
-#                  hay que empezar a contar los segundos desde este momento, no después
+# delete pod — delete the copy for good.
+#   --wait=false   don't wait for the Pod to fully disappear, return control immediately:
+#                  we need to start counting seconds from this moment, not afterwards
 kubectl delete pod "$POD" --wait=false
 
-# Una vez por segundo releemos la lista de Pods y buscamos una línea donde se cumpla todo esto a la vez:
-#   $1!=old        el nombre no coincide con el viejo, así que esta es una copia distinta
-#   $2=="1/1"      hay un contenedor listo de uno
-#   $3=="Running"  el Pod está en marcha
-#   --no-headers   no imprimir el encabezado de la tabla, para que awk vea solo datos
-#   2>/dev/null    ocultar los mensajes de error durante los segundos en que no hay ningún Pod
+# Once a second we re-read the Pod list and look for a line where all of these hold at once:
+#   $1!=old        the name doesn't match the old one — so this is a different copy
+#   $2=="1/1"      one container out of one is ready
+#   $3=="Running"  the pod is running
+#   --no-headers   don't print the table header, so awk sees only data
+#   2>/dev/null    hide error messages during the seconds when there are no Pods at all
 while true; do
   NEW=$(kubectl get pods -l app=rickroll --no-headers 2>/dev/null \
         | awk -v old="$POD" '$1!=old && $2=="1/1" && $3=="Running" {print $1; exit}')
   [ -n "$NEW" ] && break
   sleep 1
 done
-echo "nueva copia $NEW lista en $(( $(date +%s) - START ))s"
+echo "new copy $NEW ready in $(( $(date +%s) - START ))s"
 ```
 
 **Lo que deberías ver:**
 
 ```
-matando: rickroll-6f4b9c8d57-xk2mp
+killing: rickroll-6f4b9c8d57-xk2mp
 pod "rickroll-6f4b9c8d57-xk2mp" deleted
-nueva copia rickroll-6f4b9c8d57-p9wqt lista en 4s
+new copy rickroll-6f4b9c8d57-p9wqt ready in 4s
 ```
 
 Cuatro segundos. En el entorno de pruebas la variación va de dos a quince, según lo ocupado que esté el
@@ -197,16 +197,16 @@ una vez por segundo y dibuja un punto si tiene éxito, una `X` si hay error:
 ```bash
 export KUBECONFIG=~/lab.kubeconfig
 
-# run = crear un único Pod directamente desde la línea de comandos, sin manifiesto.
-#   --rm             borrar el Pod en cuanto interrumpas el comando
-#   -it              la salida del Pod llega a tu pantalla, Ctrl+C lo detiene
-#   --restart=Never  hay una sola copia y no hace falta recrearla: esto es una herramienta, no un servicio
-#   --image          busybox — una imagen de unos pocos megabytes que trae wget
-# Todo lo que va después de -- se ejecuta dentro del Pod. La dirección http://rickroll es el nombre del Service;
-# dentro del clúster se convierte por sí sola en la dirección de la aplicación.
-#   -q               no imprimir las estadísticas de descarga
-#   -T 2             esperar la respuesta no más de dos segundos, de lo contrario lo contamos como fallo
-#   -O /dev/null     descartar el cuerpo de la respuesta, solo nos importa el hecho de que haya respuesta
+# run = create a single Pod straight from the command line, without a manifest.
+#   --rm             delete the Pod as soon as you interrupt the command
+#   -it              the Pod's output comes to your screen, Ctrl+C stops it
+#   --restart=Never  there's a single copy and no need to recreate it: this is a tool, not a service
+#   --image          busybox — an image a few megabytes in size that has wget
+# Everything after -- runs inside the Pod. The address http://rickroll is the name of the Service;
+# inside the cluster it turns into the application's address on its own.
+#   -q               don't print download statistics
+#   -T 2             wait no longer than two seconds for a reply, otherwise we count it as a failure
+#   -O /dev/null     throw the response body away, all we care about is the fact of a reply
 kubectl run pinger --rm -it --restart=Never --image=busybox:1.36 -- \
   sh -c 'while true; do wget -q -T 2 -O /dev/null http://rickroll/healthz \
          && echo "$(date +%T) ." || echo "$(date +%T) X"; sleep 1; done'
@@ -231,8 +231,8 @@ Espera hasta que empiecen a correr los puntos.
 ```bash
 export KUBECONFIG=~/lab.kubeconfig
 
-# No se da el nombre del Pod, sino una etiqueta: borrar toda copia con la etiqueta app=rickroll.
-# Ahora mismo solo hay una, así que la que sondea el pinger es justamente la que se va.
+# No pod name is given, a label instead: delete every copy with the label app=rickroll.
+# Right now there's only one, so the one the pinger is polling is exactly the one that goes.
 kubectl delete pod -l app=rickroll
 ```
 
@@ -256,11 +256,11 @@ No detengas el pinger, lo necesitarás enseguida.
 📍 **Ventana 2.** Pedimos tres copias en vez de una y esperamos a que las tres estén listas.
 
 ```bash
-# scale cambia exactamente un campo en el registro de la aplicación: la cantidad de copias.
+# scale changes exactly one field in the application's record — the number of copies.
 kubectl scale deployment rickroll --replicas=3
 
-# rollout status retiene la terminal e imprime el progreso hasta que todas las copias que pediste
-# estén listas. El comando termina solo: no hace falta consultar get pods a mano.
+# rollout status holds the terminal and prints progress until all the copies you asked for
+# are ready. The command finishes on its own — no need to poll get pods by hand.
 kubectl rollout status deployment/rickroll
 ```
 
@@ -270,10 +270,10 @@ ve «ordenado 3, hay 1» y crea las dos copias que faltan. Esto toma los mismos 
 Asegúrate de que ahora hay tres copias y de que todas quedaron detrás del Service:
 
 ```bash
-# EndpointSlice — esa misma lista de direcciones vivas que el Service mantiene por ti.
-#   -l kubernetes.io/service-name=rickroll   tomar la lista que pertenece al Service rickroll
-#   -o jsonpath=...                          de cada entrada imprimir solo la dirección en sí,
-#                                            una por línea
+# EndpointSlice — that very list of live addresses the Service keeps for you.
+#   -l kubernetes.io/service-name=rickroll   take the list belonging to the Service rickroll
+#   -o jsonpath=...                          from each entry print only the address itself,
+#                                            one per line
 kubectl get endpointslices -l kubernetes.io/service-name=rickroll \
   -o jsonpath='{range .items[*].endpoints[*]}{.addresses[0]}{"\n"}{end}'
 ```
@@ -285,10 +285,10 @@ hablaba el lab 1: allí introduces las direcciones, aquí describes una condici�
 Ahora matamos una de las tres copias:
 
 ```bash
-# Tomamos el nombre de la primera de las tres copias; cuál exactamente da igual.
+# We take the name of the first of the three copies — which one exactly doesn't matter.
 POD=$(kubectl get pods -l app=rickroll -o jsonpath='{.items[0].metadata.name}')
 
-# Y la borramos. Aquí sin --wait=false: el comando retorna cuando el Pod ya ha desaparecido.
+# And delete it. No --wait=false here: the command returns once the Pod is already gone.
 kubectl delete pod "$POD"
 ```
 
@@ -313,15 +313,15 @@ El mecanismo está claro: borras una copia y vuelve. Probémoslo una vez más, p
 no una copia, sino la propia aplicación:
 
 ```bash
-# Borramos no una copia, sino el propio registro de la aplicación. No habrá confirmación,
-# el objeto no irá a ninguna papelera: no habrá de dónde restaurarlo salvo el archivo.
+# We delete not a copy but the application's record itself. There will be no confirmation,
+# the object won't go to any recycle bin — there'll be nowhere to restore it from but the file.
 kubectl delete deployment rickroll
 ```
 
 Esperamos unos segundos y miramos si las copias volvieron:
 
 ```bash
-# Buscamos pods por la etiqueta de la aplicación. Una respuesta vacía aquí también es una respuesta.
+# We look for pods by the application's label. An empty response here is an answer too.
 kubectl get pods -l app=rickroll
 ```
 
@@ -372,11 +372,11 @@ Por cierto, el eslabón intermedio conviene probarlo por separado y se comporta 
 aplicación (el siguiente paso) y luego intenta borrar el ReplicaSet en vez del Deployment:
 
 ```bash
-# rs — abreviatura de replicaset; kubectl entiende ambas grafías.
-# Borramos el eslabón intermedio, dejando el Deployment en su sitio.
+# rs — short for replicaset; kubectl understands both spellings.
+# We delete the middle link, leaving the Deployment in place.
 kubectl delete rs -l app=rickroll
 
-# Y miramos de inmediato qué queda: compara el nombre del conjunto con el que tenía antes del borrado.
+# And immediately look at what's left: compare the set's name with what it was before the delete.
 kubectl get rs -l app=rickroll
 ```
 
@@ -392,11 +392,11 @@ se encarga el Deployment, y sobrevivió al borrado del conjunto.
 Tienes la intención, está en un archivo. Restaurarla es un solo comando:
 
 ```bash
-# apply = «lleva el clúster a lo que describe el archivo». El objeto no existe: será creado.
-#   -f ../01-deploy/rickroll.yaml   el archivo está en la carpeta del lab 1, de ahí la ruta con ../
+# apply = "bring the cluster to what's described in the file". The object doesn't exist — it will be created.
+#   -f ../01-deploy/rickroll.yaml   the file lives in the lab 1 folder, hence the path via ../
 kubectl apply -f ../01-deploy/rickroll.yaml
 
-# Esperamos a que la copia se levante y quede lista para atender peticiones.
+# We wait for the copy to come up and become ready to take requests.
 kubectl rollout status deployment/rickroll
 ```
 
@@ -417,8 +417,8 @@ a partir de la antigüedad de los Pods y de los eventos del clúster.
 comienzo del lab 0. Puedes completar el lab sin WSL, pero no habrá informe-artefacto.
 
 ```bash
-# ./ significa «un archivo de la carpeta actual», no un comando del PATH del sistema.
-# El script no cambia nada en el clúster: solo lee e imprime un informe.
+# ./ means "a file from the current folder", not a command from the system PATH.
+# The script changes nothing in the cluster: it only reads and prints a report.
 ./check.sh
 ```
 
@@ -431,7 +431,7 @@ y el archivo ordena una copia: las dos de más las apagó el clúster por su cue
 preguntar y sin esperar tu orden. Para confirmarlo:
 
 ```bash
-# La columna READY debe indicar 1/1.
+# The READY column should read 1/1.
 kubectl get deployment rickroll
 ```
 

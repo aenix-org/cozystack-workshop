@@ -186,10 +186,10 @@ Jetzt bestellen wir die Datenbank als Text. Der Befehl installiert selbst nichts
 Bestellung an die Plattform, und die Plattform bringt auf ihrer Seite alles Nötige hoch.
 
 ```bash
-# apply = "den Cluster in den Zustand bringen, der in der Datei beschrieben ist".
-#   --kubeconfig ~/.kube/workshop  welche Zugangsdatei verwendet wird. Ohne sie nimmt kubectl
-#                                  den Standardzugang und verirrt sich in den falschen Cluster
-#   -f mongodb.yaml                welche Datei angewendet wird (-f = file)
+# apply = "bring the cluster to what's described in the file".
+#   --kubeconfig ~/.kube/workshop  which access file to use. Without it kubectl
+#                                  will take the default access and wander off to the wrong cluster
+#   -f mongodb.yaml                which file to apply (-f = file)
 kubectl --kubeconfig ~/.kube/workshop apply -f mongodb.yaml
 ```
 
@@ -200,9 +200,9 @@ Die Bereitschaft dauert drei bis fünf Minuten: der Server kommt hoch, das Repli
 initialisiert, die Benutzer werden angelegt. Sie können so beobachten, wie es vorangeht:
 
 ```bash
-# get = "zeig mir, was da ist". Die Spalte READY sagt Ihnen, ob die Bestellung einen funktionierenden Zustand erreicht hat.
-#   -n tenant-workshopXX  in welchem namespace geschaut wird (ein namespace ist eine Partition innerhalb
-#                         des Clusters; Ihr Tenant ist genau ein solcher separater namespace)
+# get = "show me what's there". The READY column will tell you whether the order reached a working state.
+#   -n tenant-workshopXX  which namespace to look in (a namespace is a partition inside
+#                         the cluster; your tenant is exactly such a separate namespace)
 kubectl --kubeconfig ~/.kube/workshop get mongodb passes -n tenant-workshopXX
 ```
 
@@ -289,28 +289,28 @@ Bringen Sie den Pod hoch. Setzen Sie Ihre Tenant-Nummer für `workshopXX` und Ih
 `YourPasswordHere` ein:
 
 ```bash
-# KUBECONFIG — welche Zugangsdatei kubectl verwendet. Hier ist es der Lab-Cluster
-# aus Lab 0: nur in ihm starten Sie Ihre eigenen Pods, der Tenant lässt Sie damit nicht hinein.
+# KUBECONFIG — which access file kubectl uses. Here it's the lab cluster
+# from lab 0: you launch your own Pods only in it, the tenant won't let you in with this.
 export KUBECONFIG=~/lab.kubeconfig
 
-# run = "einen einzelnen Pod erstellen und dieses Image darin ausführen". Die Flags, die zählen:
-#   --image=mongo:8.0        was auszuführen ist. Das Image enthält die mongosh-Shell
-#   --restart=Never          genau einen einzelnen Pod erstellen, kein Deployment. Sonst würde
-#                            der Cluster ihn jedes Mal wieder hochbringen, wenn er fertig ist
-#   --env=MONGO_URI=...      eine Umgebungsvariable im Pod. Das Passwort bleibt in ihr,
-#                            statt in jedem folgenden Befehl wiederholt zu werden
-#   --command -- sleep 86400 womit der Container beschäftigt gehalten wird. Das mongo-Image würde standardmäßig den
-#                            Datenbankserver starten — den brauchen wir nicht, wir brauchen einen lebenden Container,
-#                            in den man hineinsteigen kann. 86400 Sekunden sind ein Tag
+# run = "create a single Pod and run this image in it". The flags that matter:
+#   --image=mongo:8.0        what to run. The image contains the mongosh shell
+#   --restart=Never          create exactly a single Pod, not a Deployment. Otherwise
+#                            the cluster would bring it back up every time it finished
+#   --env=MONGO_URI=...      an environment variable inside the Pod. The password stays in it,
+#                            rather than being repeated in every following command
+#   --command -- sleep 86400 what to keep the container busy with. The mongo image would by default start
+#                            the database server — we don't need it, we need a live container
+#                            you can step into. 86400 seconds is a day
 kubectl run mongo-workbench \
   --image=mongo:8.0 \
   --restart=Never \
   --env=MONGO_URI="mongodb://passapp:YourPasswordHere@mongodb-passes-rs0.tenant-workshopXX.svc.cozy.local:27017/passes?authSource=admin&directConnection=true" \
   --command -- sleep 86400
 
-# wait = "gib die Kontrolle nicht zurück, bis die Bedingung erfüllt ist"
-#   --for=condition=Ready  wir warten, bis der Pod selbst Bereitschaft meldet
-#   --timeout=180s         wie lange zu warten ist, bevor ein Fehler zurückgegeben wird, statt ewig zu hängen
+# wait = "don't return control until the condition is met"
+#   --for=condition=Ready  we wait until the Pod reports readiness itself
+#   --timeout=180s         how long to wait before returning an error rather than hanging forever
 kubectl wait --for=condition=Ready pod/mongo-workbench --timeout=180s
 ```
 
@@ -321,18 +321,18 @@ Jetzt richten wir einen kurzen Befehl ein, damit wir das nicht jedes Mal komplet
 prüfen die Verbindung zur Datenbank:
 
 ```bash
-# mo — eine Abkürzung, die lebt, bis Sie das Terminalfenster schließen: so
-# deklarieren Sie Ihren eigenen Befehl in der Shell.
-#   exec        etwas in einem bereits laufenden Pod ausführen
-#   -i          die Standardeingabe nach innen weiterleiten: ohne sie können Sie kein Programm hineingeben
-#   sh -c '...' wir starten eine Shell im Pod, damit sie $MONGO_URI selbst einsetzt.
-#               Die Anführungszeichen sind mit Absicht einfach: der Pod soll die Variable einsetzen, nicht
-#               Ihr Terminal — sonst landet das Passwort in der Befehls-History
-#   --quiet     die mongosh-Begrüßung nicht ausgeben, nur die Antwort lassen
+# mo — a shortcut that lives until you close the terminal window: this is how you
+# declare your own command in the shell.
+#   exec        run something inside an already-running Pod
+#   -i          forward standard input inside: without it you can't feed in a program
+#   sh -c '...' we run a shell in the Pod so that it substitutes $MONGO_URI itself.
+#               The quotes are single on purpose: the Pod should substitute the variable, not
+#               your terminal — otherwise the password ends up in the command history
+#   --quiet     don't print the mongosh greeting, leave only the answer
 mo() { kubectl exec -i mongo-workbench -- sh -c 'mongosh --quiet "$MONGO_URI"'; }
 
-# ping — eine Dienstanfrage, "lebst du?". Sie liest und schreibt nichts, sie prüft die Verbindung
-# und dass die Zugangsdaten akzeptiert wurden. Das Zeichen | sendet diese Zeile an die Eingabe von mongosh
+# ping — a service request, "are you alive?". It reads and writes nothing, it checks the connection
+# and that the credentials were accepted. The | sign sends this line to mongosh's input
 echo 'db.runCommand({ ping: 1 })' | mo
 ```
 
@@ -354,8 +354,8 @@ Es ist bequemer, die Daten nicht Befehl für Befehl zu untersuchen, sondern in e
 bleibt offen, und Sie tippen Abfragen darin eine nach der anderen ein:
 
 ```bash
-# -it statt -i: ein t kommt hinzu — "gib mir ein Terminal". Daher der Eingabeprompt,
-# die Befehls-History auf der Pfeil-nach-oben-Taste und die Hervorhebung. Ohne t würde die Shell stumm auf Eingabe warten.
+# -it instead of -i: a t is added — "give me a terminal". Hence the input prompt,
+# command history on the up arrow, and highlighting. Without t the shell would silently wait for input.
 kubectl exec -it mongo-workbench -- sh -c 'mongosh "$MONGO_URI"'
 ```
 
@@ -375,8 +375,8 @@ darunter steht die Erklärung, warum.
 
 ```bash
 cd labs/10-mongodb
-# Das Zeichen < speist den Inhalt der Datei in die Eingabe des Befehls ein — dasselbe, als ob Sie
-# den gesamten Text der Datei von Hand in der mongosh-Shell eintippten.
+# The < sign feeds the file's contents into the command's input — the same thing as if you
+# typed the whole text of the file by hand in the mongosh shell.
 mo < passes.js
 ```
 
@@ -395,12 +395,12 @@ Nun zu den Dokumenten.
 
 ```js
   {
-    type: "Einmalausweis",
-    guest: "Johannes M. Weber",
+    type: "single-use",
+    guest: "James P. Whitfield",
     host: "petrov@corp.example",
-    entrance: "Nord",
+    entrance: "North",
     valid_on: ISODate("2026-09-01T09:00:00Z"),
-    purpose: "Vorstellungsgespräch"
+    purpose: "job interview"
   }
 ```
 
@@ -415,7 +415,7 @@ dem String `"2026-09-01"` aber nur, wenn Sie Glück mit der Schreibweise haben.
 einzelnen Eingangs ist `entrances` jetzt **eine Liste**:
 
 ```js
-    entrances: ["Nord", "Süd"],
+    entrances: ["North", "South"],
     badge_returned: false
 ```
 
@@ -429,7 +429,7 @@ solches Feld in diesem Dokument.** Das sind verschiedene Dinge, und sie werden v
 
 ```js
     car: {
-      plate: "M-AB 1234",
+      plate: "AB-1174-CD",
       model: "Ford Transit",
       trailer: false,
       weight_kg: 3500
@@ -444,9 +444,9 @@ darauf aufbauen.
 
 ```js
     members: [
-      { name: "Peter Adler", age: 16 },
-      { name: "Maria Wolf", age: 15 },
-      { name: "Elias Hartmann", age: 17 }
+      { name: "Peter Hale", age: 16 },
+      { name: "Mary Fenwick", age: 15 },
+      { name: "Isaac Hart", age: 17 }
     ]
 ```
 
@@ -471,9 +471,9 @@ Objekt geschrieben: „Feld — welchen Wert es haben soll“.
 **Alle Ausweise für ein bestimmtes Datum:**
 
 ```js
-// find = "zeig die Dokumente, die der Bedingung entsprechen"
-// { valid_on: ISODate(...) } — das Feld valid_on des Dokuments muss genau diesem
-// Datum gleichen. ISODate ist ein Datum, kein String: der Vergleich erfolgt nach Zeit, nicht nach Schreibweise
+// find = "show the documents that match the condition"
+// { valid_on: ISODate(...) } — the document's valid_on field must equal exactly this
+// date. ISODate is a date, not a string: the comparison is by time, not by spelling
 db.passes.find({ valid_on: ISODate("2026-09-02T07:30:00Z") })
 ```
 
@@ -482,16 +482,16 @@ db.passes.find({ valid_on: ISODate("2026-09-02T07:30:00Z") })
 **Nur Fahrzeugausweise:**
 
 ```js
-// Eine Bedingung auf ein gewöhnliches String-Feld: eine vollständige Übereinstimmung, hier gibt es keine Groß-/Kleinschreibungs-Toleranz
-db.passes.find({ type: "Fahrzeugausweis" })
+// A condition on an ordinary string field: a whole match, there's no case-insensitivity here
+db.passes.find({ type: "vehicle" })
 ```
 
 **Suche nach Kennzeichen — durch einen Punkt in ein verschachteltes Objekt hineinreichen:**
 
 ```js
-// "car.plate" — ein Pfad in das Dokument: das Feld plate innerhalb des Objekts car.
-// Die Anführungszeichen um den Pfad sind verpflichtend, sonst liest JavaScript den Punkt auf seine eigene Weise
-db.passes.find({ "car.plate": "M-AB 1234" })
+// "car.plate" — a path into the document: the plate field inside the car object.
+// The quotes around the path are mandatory, otherwise JavaScript will read the dot its own way
+db.passes.find({ "car.plate": "AB-1174-CD" })
 ```
 
 <details>
@@ -513,9 +513,9 @@ Zugriff auf eine Objekteigenschaft und versteht nicht, was von ihm verlangt wird
 **Ausweise, die an mehreren Eingängen gültig sind:**
 
 ```js
-// entrances ist kein String, sondern eine Liste: ["Nord", "Süd"]. Die Bedingung wird trotzdem
-// wie für ein gewöhnliches Feld geschrieben, MongoDB prüft sie selbst gegen jedes Element der Liste
-db.passes.find({ entrances: "Süd" })
+// entrances is not a string but a list: ["North", "South"]. The condition is still written
+// as for an ordinary field, MongoDB will check it against each element of the list itself
+db.passes.find({ entrances: "South" })
 ```
 
 Beachten Sie: die Bedingung wird geschrieben, als wäre `entrances` ein gewöhnliches Feld mit dem Wert
@@ -526,9 +526,9 @@ für „enthält“ nötig.
 **Gruppenausweise, die Minderjährige enthalten:**
 
 ```js
-// Der Pfad members.age führt in eine Liste von Objekten — zum Feld age jedes Teilnehmers.
-// $lt = less than (kleiner als). Eine Bedingung mit $ ist kein Wert, sondern eine Art des Vergleichs:
-// "das Feld muss kleiner als 16 sein", nicht "das Feld muss gleich 16 sein"
+// The path members.age leads inside a list of objects — to the age field of each participant.
+// $lt = less than. A condition with $ is not a value but a way of comparing:
+// "the field must be less than 16", not "the field must equal 16"
 db.passes.find({ "members.age": { $lt: 16 } })
 ```
 
@@ -539,8 +539,8 @@ Teilnehmer geprüft. `$lt` — „kleiner als“. Es gibt etwa zwanzig Bedingung
 **Alle Ausweise, bei denen überhaupt ein Fahrzeug angegeben ist:**
 
 ```js
-// $exists fragt nicht nach dem Wert, sondern nach dem bloßen Vorhandensein des Feldes im Dokument:
-// "hat dieses Dokument überhaupt ein Feld car?"
+// $exists asks not about the value but about the very presence of the field in the document:
+// "does this document have a car field at all?"
 db.passes.find({ car: { $exists: true } })
 ```
 
@@ -571,10 +571,10 @@ wortreicher und braucht länger, um sie zu beherrschen.
 </details>
 
 ```js
-// aggregate = "die Dokumente durch eine Kette von Stufen laufen lassen". Die Stufen gehen der Reihe nach,
-// jede erhält, was die vorherige erzeugt hat:
-//   $group — die Dokumente nach dem Wert des Feldes type in Gruppen einsortieren und jede zählen
-//   $sort  — die Gruppen nach count ordnen, -1 bedeutet "absteigend"
+// aggregate = "run the documents through a chain of stages". The stages go in order,
+// each receiving what the previous one produced:
+//   $group — sort the documents into groups by the value of the type field, and count each one
+//   $sort  — order the groups by count, -1 means "descending"
 db.passes.aggregate([
   { $group: { _id: "$type", count: { $sum: 1 } } },
   { $sort: { count: -1 } }
@@ -592,12 +592,12 @@ kostet: die Abfrage ist dieselbe wie zuvor, aber statt der Dokumente fragen wir 
 wie die Datenbank nach ihnen gesucht hat.
 
 ```js
-// explain = "gib mir nicht die Dokumente, sag mir, wie du nach ihnen gesucht hast"
-//   "executionStats"     Berichtsmodus: nicht nur der Plan, sondern was tatsächlich passiert ist
-//   .executionStats      wir nehmen genau diesen Abschnitt aus der Antwort, um nicht alles zu lesen
-// Im Bericht schauen wir auf totalDocsExamined — wie viele Dokumente die Datenbank gelesen hat,
-// um eines zurückzugeben
-db.passes.find({ "car.plate": "M-AB 1234" }).explain("executionStats").executionStats
+// explain = "don't give me the documents, tell me how you looked for them"
+//   "executionStats"     report mode: not only the plan, but what actually happened
+//   .executionStats      we take exactly this section from the answer, so as not to read all of it
+// In the report we look at totalDocsExamined — how many documents the database read,
+// to return one
+db.passes.find({ "car.plate": "AB-1174-CD" }).explain("executionStats").executionStats
 ```
 
 **Was Sie sehen sollten** — `totalDocsExamined` ist gleich der Anzahl der Dokumente in der Collection.
@@ -608,14 +608,14 @@ Wir bauen einen Index — eine separate Struktur, die die Datenbank verwendet, u
 zu finden, ohne alle der Reihe nach zu lesen:
 
 ```js
-// createIndex = "einen Index auf diesem Feld aufbauen und ihn von nun an selbst weiterpflegen"
-//   { "car.plate": 1 }   auf welchem Feld. 1 ist die Reihenfolge "aufsteigend"
-//   name: "car_plate"    wie der Index heißen soll, damit man ihn später erkennen und löschen kann
-//   sparse: true         nur Dokumente, die das Feld haben, kommen in den Index
+// createIndex = "build an index on this field and keep maintaining it yourself from now on"
+//   { "car.plate": 1 }   on which field. 1 is "ascending" order
+//   name: "car_plate"    what to name the index, so you can recognize and delete it later
+//   sparse: true         only documents that have the field get into the index
 db.passes.createIndex({ "car.plate": 1 }, { name: "car_plate", sparse: true })
 
-// Wir wiederholen denselben Bericht und vergleichen ihn mit dem vorherigen
-db.passes.find({ "car.plate": "M-AB 1234" }).explain("executionStats").executionStats
+// We repeat the same report and compare it with the previous one
+db.passes.find({ "car.plate": "AB-1174-CD" }).explain("executionStats").executionStats
 ```
 
 **Was Sie sehen sollten** — `totalDocsExamined` ist gleich eins, und im Plan ist `IXSCAN` statt
@@ -659,10 +659,10 @@ Arbeiten wir weiter. Der Beamte am Tor hat noch einen Einmalausweis ausgestellt 
 geschriebenes Skript:
 
 ```js
-// insertOne = "ein Dokument hinzufügen". Welche Felder darin sind, fragt die Datenbank nicht
+// insertOne = "add one document". What fields are in it, the database doesn't ask
 db.passes.insertOne({
-  tipe: "Einmalausweis",
-  guest: "Sebastian I. Neumann",
+  tipe: "single-use",
+  guest: "Nathan S. Graham",
   host: "petrov@corp.example",
   data: ISODate("2026-09-04T09:00:00Z")
 })
@@ -673,17 +673,17 @@ Schlüssel des Dokuments, den sich die Datenbank selbst ausgedacht hat. Prüfen 
 Dokumente sind:
 
 ```js
-// countDocuments = "die Dokumente zählen, die der Bedingung entsprechen".
-// Leere geschweifte Klammern sind eine Bedingung ohne Einschränkungen, also "alle"
+// countDocuments = "count the documents that match the condition".
+// Empty curly braces are a condition with no restrictions, that is, "all"
 db.passes.countDocuments({})
 ```
 
 Fünf. Nun das, was der Sicherheitsdienst jeden Morgen tut — er öffnet die Liste der Einmalausweise:
 
 ```js
-// Dieselbe Auswahl nach type wie im Suchschritt: zeig die Ausweise, deren
-// Feld type gleich "Einmalausweis" ist
-db.passes.find({ type: "Einmalausweis" })
+// The same selection by type as in the search step: show the passes whose
+// type field equals "single-use"
+db.passes.find({ type: "single-use" })
 ```
 
 > **Halten Sie inne und denken Sie nach, bevor Sie weiterlesen.**
@@ -705,8 +705,8 @@ sind.** Für sie ist `tipe` ein ebenso legitimes Feld wie jedes andere.
 Finden wir die Opfer — Dokumente, die überhaupt kein Feld `type` haben:
 
 ```js
-// $exists: false — das Gegenteil des vorherigen Schritts: "das Feld ist nicht im Dokument".
-// Es lohnt sich, eine solche Abfrage griffbereit zu halten: sie zeigt, was sich am Schema vorbei angesammelt hat
+// $exists: false — the opposite of the previous step: "the field is not in the document".
+// It's worth keeping such a query handy: it shows what has accumulated past the schema
 db.passes.find({ type: { $exists: false } })
 ```
 
@@ -727,8 +727,8 @@ Entfernen wir das beschädigte Dokument und schalten die Validierung ein.
 Wir löschen die Dokumente ohne type:
 
 ```js
-// deleteMany = "alle Dokumente löschen, die der Bedingung entsprechen". Die Bedingung ist dieselbe
-// wie in der Suche oben — was bedeutet, dass genau das gelöscht wird, was Sie gerade gesehen haben
+// deleteMany = "delete all documents that match the condition". The condition is the same
+// as in the search above — which means exactly what you just saw will be deleted
 db.passes.deleteMany({ type: { $exists: false } })
 ```
 
@@ -763,7 +763,7 @@ Dokumente sind, desto weniger können Sie von allen gemeinsam verlangen.
 
 ```js
         type: {
-          enum: ["Einmalausweis", "Wochenausweis", "Fahrzeugausweis", "Gruppenausweis"],
+          enum: ["single-use", "weekly", "vehicle", "group"],
         },
 ```
 
@@ -800,8 +800,8 @@ beobachten, wie viel hereinkommt, bevor man das Abweisen einschaltet.
 Wir wenden die Regel an:
 
 ```bash
-# Derselbe Kniff wie bei passes.js: der Inhalt der Datei wird in die Eingabe von mongosh gespeist.
-# Die Regel wird an eine lebende Collection gehängt — die Datenbank muss nicht gestoppt werden
+# The same trick as with passes.js: the file's contents are fed to mongosh's input.
+# The rule is hung on a live collection — no need to stop the database
 mo < validator.js
 ```
 
@@ -810,9 +810,9 @@ mo < validator.js
 Wir versuchen, denselben Tippfehler zu wiederholen — jetzt unter der Aufsicht der Regel:
 
 ```js
-// Das Feld tipe ist der Regel unbekannt, und im Dokument gibt es kein Pflichtfeld type.
-// Früher hätte sich ein solches Dokument stumm in die Collection gesetzt
-db.passes.insertOne({ tipe: "Einmalausweis", guest: "Kontrolle", host: "x@corp.example" })
+// The tipe field is unknown to the rule, and there's no required type in the document.
+// Before, such a document would silently settle into the collection
+db.passes.insertOne({ tipe: "single-use", guest: "Check", host: "x@corp.example" })
 ```
 
 **Was Sie sehen sollten** — `MongoServerError: Document failed validation`. Jetzt kommt der Tippfehler
@@ -845,15 +845,15 @@ Hier — eine Pipeline-Stufe:
 
 ```js
 db.passes.aggregate([
-  // $lookup = "für jeden Ausweis in eine andere Collection gehen und von dort einen Datensatz zurückholen"
+  // $lookup = "for each pass, go to another collection and bring back a record from there"
   { $lookup: {
-      from: "staff",          // wohin gehen — die Mitarbeiter-Collection
-      localField: "host",     // welches Ausweisfeld zu vergleichen ist
-      foreignField: "email",  // mit welchem Mitarbeiterfeld
-      as: "host_info"         // unter welchem Namen das Gefundene ins Dokument gelegt wird
+      from: "staff",          // where to go — the employees collection
+      localField: "host",     // which pass field to compare
+      foreignField: "email",  // with which employee field
+      as: "host_info"         // under what name to put what's found into the document
   } },
-  // Das Gefundene wird immer als Liste abgelegt, auch wenn es eine einzige Übereinstimmung gibt.
-  // $unwind rollt die Liste zurück in einen einzelnen Wert
+  // What's found is always put as a list, even if there's a single match.
+  // $unwind unrolls the list back into a single value
   { $unwind: "$host_info" }
 ])
 ```
@@ -893,10 +893,10 @@ gibt es eine Wahl, und mit ihr Verantwortung.
 Probieren Sie es:
 
 ```js
-// Das Feld host verweist seinem Sinn nach auf einen Mitarbeiter. Es gibt keinen solchen Mitarbeiter —
-// wird die Datenbank das prüfen? Das Dokument erfüllt die Regel aus dem letzten Schritt: type ist
-// vorhanden und aus der Liste, host ist ein String
-db.passes.insertOne({ type: "Einmalausweis", host: "existiert-nicht@corp.example", guest: "Test" })
+// The host field, by meaning, refers to an employee. No such employee exists —
+// will the database check this? The document satisfies the rule from the last step: type is
+// in place and from the list, host is a string
+db.passes.insertOne({ type: "single-use", host: "does-not-exist@corp.example", guest: "Test" })
 ```
 
 Das Dokument wird eingefügt. Es gibt keinen Mitarbeiter mit einer solchen E-Mail, und die Datenbank wird
@@ -914,8 +914,8 @@ anzurufen.
 Vergessen Sie nicht, das Testdokument zu entfernen:
 
 ```js
-// deleteOne = "ein Dokument löschen, das der Bedingung entspricht", nicht alle auf einmal
-db.passes.deleteOne({ host: "existiert-nicht@corp.example" })
+// deleteOne = "delete one document that matches the condition", not all of them at once
+db.passes.deleteOne({ host: "does-not-exist@corp.example" })
 ```
 
 </details>
@@ -933,11 +933,11 @@ können zwei Dokumente so ändern, dass entweder beide angewendet werden oder ke
 atomar. Wenn Sie mehr wollen — eröffnen Sie eine Sitzung und beginnen Sie explizit eine Transaktion:
 
 ```js
-// Eine Sitzung ist ein separates "Gespräch" mit der Datenbank, innerhalb dessen man eine Transaktion deklarieren kann
+// A session is a separate "conversation" with the database, within which you can declare a transaction
 const s = db.getMongo().startSession();
-s.startTransaction();          // ab diesem Punkt sammeln sich Änderungen an, sind aber für niemanden sichtbar
-// … Operationen über s.getDatabase("passes") …
-s.commitTransaction();         // alles auf einmal anwenden. Um alles auf einmal abzubrechen — abortTransaction()
+s.startTransaction();          // from this point changes accumulate, but are visible to no one
+// … operations through s.getDatabase("passes") …
+s.commitTransaction();         // apply it all at once. To cancel it all at once — abortTransaction()
 ```
 
 **Und eine dritte Wahrheit, die praktischste:** Transaktionen in MongoDB sind teurer als in einer
@@ -965,15 +965,15 @@ Sie können so sehen, was tatsächlich in der Collection ist:
 
 ```js
 db.passes.aggregate([
-  // $$ROOT — das ganze Dokument vollständig. $objectToArray zerlegt es in
-  // "Feldname — Wert"-Paare, damit man dann mit den Feldern als Daten arbeiten kann
+  // $$ROOT — the whole document in full. $objectToArray breaks it into
+  // "field name — value" pairs, so you can then work with the fields as data
   { $project: { fields: { $objectToArray: "$$ROOT" } } },
-  // Wir rollen die Liste der Paare auf: ein Paar — eine Zeile am Eingang der nächsten Stufe
+  // We unroll the list of pairs: one pair — one row at the input of the next stage
   { $unwind: "$fields" },
-  // Wir gruppieren nach zwei Merkmalen zugleich: dem Feldnamen (k) und dem Typ seines Wertes (t),
-  // und zählen, wie oft eine solche Kombination vorkam
+  // We group by two attributes at once: the field name (k) and its value type (t),
+  // and count how many times such a combination occurred
   { $group: { _id: { k: "$fields.k", t: { $type: "$fields.v" } }, n: { $sum: 1 } } },
-  { $sort: { "_id.k": 1 } }   // alphabetisch, damit ein Feld neben seinen eigenen Typen steht
+  { $sort: { "_id.k": 1 } }   // alphabetically, so one field sits next to its own types
 ])
 ```
 
@@ -1011,12 +1011,12 @@ Umgebungsvariablen übergeben.
 
 ```bash
 cd labs/10-mongodb
-# Dieselbe Zugangsdatei wie in den Schritten oben: das Skript arbeitet von innerhalb des Lab-Clusters
+# The same access file as in the steps above: the script works from inside the lab cluster
 export KUBECONFIG=~/lab.kubeconfig
-# Die Tenant-Nummer: daraus setzt das Skript die Datenbankadresse zusammen. Setzen Sie Ihre eigene ein
+# The tenant number: from it the script will assemble the database address. Substitute your own
 export COZY_TENANT=workshop03
-# Das Passwort in einfachen Anführungszeichen: darin rührt die Shell $, ! und & innerhalb des Strings nicht an.
-# Das Passwort gelangt nicht in den Bericht
+# The password in single quotes: inside them the shell doesn't touch $, ! and & within the string.
+# The password doesn't make it into the report
 export MONGO_PASSWORD='your-passapp-password'
 ./check.sh
 ```
@@ -1038,8 +1038,8 @@ Der Arbeits-Pod wird nicht mehr gebraucht — die ganze Zeit hielt er den Contai
 beschäftigt:
 
 ```bash
-# delete = "aus dem Cluster entfernen". Der Pod verschwindet zusammen mit seiner Variablen MONGO_URI,
-# sodass das Passwort nicht im Cluster verbleibt
+# delete = "remove from the cluster". The Pod disappears along with its MONGO_URI variable,
+# so the password doesn't remain in the cluster
 kubectl delete pod mongo-workbench
 ```
 

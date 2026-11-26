@@ -1,24 +1,24 @@
-# लैब 3. Fortio लोड जनरेटर: जनरेटर स्वयं और उसके वेब-इंटरफ़ेस के लिए एक स्थायी पता।
-# दो ऑब्जेक्ट, `---` से अलग किए गए।
+# Lab 3. Fortio load generator: the generator itself and a stable address for its
+# web interface. Two objects, separated by `---`.
 #
-# यह आपके `lab` प्रशिक्षण क्लस्टर पर लागू होता है, न कि प्रबंधन क्लस्टर के किसी टेनेंट पर:
+# Applied to your `lab` training cluster, not to a tenant on the management cluster:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl apply -f fortio.yaml
-# यहाँ tenant-workshopXX जैसे कोई प्लेसहोल्डर नहीं हैं — अपना नंबर कहीं भी डालने की ज़रूरत नहीं।
-# यही फ़ाइल लैब 4 में भी चाहिए होगी: `kubectl apply -f ../03-scale/fortio.yaml`.
+# There are no placeholders like tenant-workshopXX here — you don't need to substitute your number anywhere.
+# This same file will be needed in lab 4: `kubectl apply -f ../03-scale/fortio.yaml`.
 #
-# मैनिफ़ेस्ट के सामान्य फ़ील्ड (apiVersion, kind, metadata.name, selector, template,
-# securityContext) ../01-deploy/rickroll.yaml में पंक्ति-दर-पंक्ति समझाए गए हैं और यहाँ
-# दोहराए नहीं गए हैं। हम केवल उसी पर टिप्पणी करते हैं जो लोड जनरेटर के लिए विशिष्ट है।
+# The manifest's common fields (apiVersion, kind, metadata.name, selector, template,
+# securityContext) are dissected line by line in ../01-deploy/rickroll.yaml and are not
+# repeated here. We comment only on what is specific to the load generator.
 ---
-# वेब-इंटरफ़ेस वाला लोड जनरेटर।
-# hey/ab के बजाय जानबूझकर चुना गया: लोड ब्राउज़र में एक बटन से शुरू होता है,
-# और लेटेंसी हिस्टोग्राम वहीं दिखता है। पिछले वर्कशॉप में हमने ठीक कंसोल
-# टूल्स पर ही लोगों को खोया था।
+# Load generator with a web interface.
+# Chosen over hey/ab on purpose: you start the load with a button in the browser,
+# and you see the latency histogram right there. At past workshops we lost
+# people precisely on console tools.
 #
-# Fortio क्लस्टर में एक सामान्य एप्लिकेशन की तरह रहता है और अंदर से rickroll पते पर हिट करता है।
-# बाहर से, लैपटॉप से, लोड डालना ट्रैफ़िक के लिहाज़ से अधिक ईमानदार होता, पर वह क्लस्टर तक के
-# चैनल पर अटक जाता, और आप एप्लिकेशन के बजाय अपने Wi-Fi को मापते।
+# Fortio lives in the cluster as an ordinary application and hits the rickroll address from inside.
+# Loading it from outside, from a laptop, would be more honest in terms of traffic, but it would run into the channel
+# to the cluster, and you would be measuring your Wi-Fi rather than the application.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -26,9 +26,9 @@ metadata:
   labels:
     app: fortio
 spec:
-  # जनरेटर की एक ही कॉपी काफ़ी है: यह स्वयं कई थ्रेड्स में लोड देती है।
-  # दूसरी कॉपी यहाँ केवल तस्वीर को धुँधला करती — वेब-इंटरफ़ेस के काउंटर
-  # हर कॉपी के अपने होते हैं, और आप आधे ही अनुरोध देखते।
+  # One copy of the generator is enough: it produces load in many threads by itself.
+  # A second copy here would only blur the picture — the counters in the web interface
+  # are per-copy, and you would see half the requests.
   replicas: 1
   selector:
     matchLabels:
@@ -38,9 +38,9 @@ spec:
       labels:
         app: fortio
     spec:
-      # वही सुरक्षा प्रोफ़ाइल जो rickroll की है: root के रूप में नहीं चलता, एक निश्चित
-      # UID, मानक seccomp. जानबूझकर रखा गया — ताकि फ़ाइल को `restricted` प्रोफ़ाइल सक्षम
-      # वाले क्लस्टर में भी लागू किया जा सके, जहाँ अन्यथा पॉड शुरू नहीं होगा।
+      # The same security profile as rickroll: runs not as root, a specific
+      # UID, standard seccomp. Left in on purpose — so the file can also be applied
+      # in a cluster with the `restricted` profile enabled, where otherwise the pod would not start.
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
@@ -52,32 +52,32 @@ spec:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # latest टैग वर्कशॉप के लिए एक जानबूझकर किया गया सरलीकरण है, ताकि वर्शन मिलाने न पड़ें।
-          # प्रोडक्शन क्लस्टर में ऐसा नहीं करते: इस टैग के तहत इमेज दो apply के बीच चुपचाप
-          # बदल सकती है, और आप कल का परिणाम दोहरा नहीं पाएँगे।
+          # The latest tag is a deliberate simplification for the workshop, to avoid matching versions.
+          # In a production cluster you don't do this: the image under this tag may silently
+          # change between two applies, and you won't be able to reproduce yesterday's result.
           image: fortio/fortio:latest
-          # `server` मोड वेब-इंटरफ़ेस को उठाता है और उसे चालू रखता है। इस आर्गुमेंट के बिना
-          # Fortio कमांड लाइन से एक ही प्रोग्राम चलाकर बाहर हो जाता, और क्लस्टर
-          # कंटेनर को बार-बार पुनः चालू करता रहता।
+          # The `server` mode brings up the web interface and keeps it running. Without this argument
+          # Fortio would run a single pass from the command line and exit, and the cluster
+          # would restart the container in a loop.
           args: ["server"]
           ports:
             - containerPort: 8080
               name: http
           resources:
-            # अनुरोध rickroll के अपने (20m) से अधिक है: जनरेटर को नोड पर जगह पहले से
-            # चाहिए, अन्यथा शेड्यूलर उसे तंगी में रख देगा और रैंप-अप असमान होगा।
+            # The request is higher than rickroll's own (20m): the generator needs room on the node
+            # in advance, otherwise the scheduler will pack it in tightly and the ramp-up will be uneven.
             requests:
               cpu: 100m
               memory: 64Mi
             limits:
-              # जनरेटर को CPU की गुंजाइश चाहिए, अन्यथा वह अपनी ही सीमा से
-              # टकराएगा और आप एप्लिकेशन नहीं, बल्कि Fortio को लोड करेंगे।
+              # The generator needs CPU headroom, otherwise it will hit
+              # its own limit and you will be loading Fortio, not the application.
               cpu: "1"
               memory: 256Mi
 ---
-# क्लस्टर के भीतर जनरेटर का एक स्थायी पता। वेब-इंटरफ़ेस को लैपटॉप से
-# `kubectl port-forward svc/fortio 8081:8080` के ज़रिए खोलने के लिए चाहिए — बाहर से क्लस्टर
-# कुछ भी प्रकाशित नहीं करता, और Fortio तक कोई और दरवाज़ा नहीं है।
+# A stable address for the generator inside the cluster. Needed to open the web interface
+# from a laptop via `kubectl port-forward svc/fortio 8081:8080` — from the outside the cluster
+# publishes nothing, and there are no other doors to Fortio.
 apiVersion: v1
 kind: Service
 metadata:
@@ -86,7 +86,7 @@ spec:
   selector:
     app: fortio
   ports:
-    # दोनों ओर 8080: सर्विस भी और कंटेनर भी। नंबर वही है जो पॉड के भीतर rickroll का है,
-    # पर कोई टकराव नहीं — हर पॉड का अपना नेटवर्क स्टैक होता है।
+    # 8080 on both sides: both the service and the container. The number is the same as rickroll's
+    # inside the pod, but there is no collision — each pod has its own network stack.
     - port: 8080
       targetPort: http

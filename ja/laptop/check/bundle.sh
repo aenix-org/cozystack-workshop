@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# すべてのラボの結果を1つのファイルにまとめ、認定システムへのアップロード用にする。
+# Collects the results of all labs into a single file for upload to the certification system.
 #
-# 重要な性質: このスクリプトは何も再実行しない。各ラボがあなたが提出した時点で
-# 記録した内容をそのまま取り出す。そうしないと次のようなことが起きる: ラボ自体が
-# 後片付けをするよう指示し、テナントのクォータは全サービスを何週間も維持させて
-# くれない — そのため最後の再チェックでは、3週間前に誠実にやり終えた作業が
-# 失敗と表示されてしまう。
+# Important property: the script RESTARTS NOTHING. It takes what each lab
+# recorded at the moment you submitted it. Otherwise this would happen: the labs
+# themselves tell you to clean up after yourself, and the tenant quota won't let you
+# keep all services running for weeks — so a final re-check would show a failure for
+# work honestly done three weeks ago.
 #
-#   ./bundle.sh                 見つかったすべてを収集する
-#   ./bundle.sh --rerun 07-redis  1つのラボをやり直して結果を更新する
+#   ./bundle.sh                 collect everything found
+#   ./bundle.sh --rerun 07-redis  redo a single lab and update its result
 #
 set -uo pipefail
 
@@ -18,23 +18,23 @@ REPO="$(cd "$HERE/.." && pwd)"
 OUT="${1:-$HOME/cozystack-labs-bundle.json}"
 
 if [ "${1:-}" = "--rerun" ]; then
-  lab="${2:?ラボを指定してください、例: ./bundle.sh --rerun 07-redis}"
-  [ -d "$REPO/labs/$lab" ] || { echo "そのようなラボはありません: $lab"; exit 1; }
-  echo "$lab をやり直しています…"
+  lab="${2:?specify a lab, for example: ./bundle.sh --rerun 07-redis}"
+  [ -d "$REPO/labs/$lab" ] || { echo "no such lab: $lab"; exit 1; }
+  echo "redoing $lab…"
   ( cd "$REPO/labs/$lab" && ./check.sh )
-  echo "結果を更新しました。オプションなしで ./bundle.sh を実行してください"
+  echo "result updated, now run ./bundle.sh without options"
   exit 0
 fi
 
 if [ ! -d "$RESULTS_DIR" ] || [ -z "$(ls -A "$RESULTS_DIR" 2>/dev/null)" ]; then
   cat <<'MSG'
-結果が見つかりません。
+No results found.
 
-各ラボは、その中で ./check.sh を実行したときに結果を保存します。
-少なくとも1つを完了してチェックを実行してから、ここに戻ってきてください。
+Each lab saves its result when you run ./check.sh in it.
+Complete at least one and run the check — then come back here.
 
-別のマシンでラボを実施した場合は、そこから
-~/.cozystack-labs/results フォルダをコピーするか、パスを指定してください: COZY_LAB_RESULTS=/パス ./bundle.sh
+If you did the labs on another machine, copy the folder
+~/.cozystack-labs/results from there, or specify a path: COZY_LAB_RESULTS=/path ./bundle.sh
 MSG
   exit 1
 fi
@@ -44,9 +44,9 @@ import json, os, sys, glob, datetime
 
 results_dir, out_path, repo = sys.argv[1], sys.argv[2], sys.argv[3]
 
-# ラボが全部でいくつあるか — チェックスクリプトの有無で数える。
-# 16番目（「月曜日に何をするか」）にはスクリプトがない: これはテキストの
-# 演習であり、得点には含まれない。
+# How many labs exist at all — counted by the presence of a check script.
+# The sixteenth ("What to do on Monday") has no script: it's a text
+# exercise, and it doesn't count toward the score.
 all_labs = sorted(
     os.path.basename(os.path.dirname(p))
     for p in glob.glob(os.path.join(repo, "labs", "*", "check.sh"))
@@ -58,10 +58,10 @@ for path in sorted(glob.glob(os.path.join(results_dir, "result-*.json"))):
         with open(path) as fh:
             d = json.load(fh)
     except Exception as exc:
-        problems.append(f"{os.path.basename(path)}: 読み取れません ({exc})")
+        problems.append(f"{os.path.basename(path)}: unreadable ({exc})")
         continue
     if d.get("schema_version") != 1:
-        problems.append(f"{os.path.basename(path)}: 不明なフォーマットバージョン")
+        problems.append(f"{os.path.basename(path)}: unknown format version")
         continue
     labs.append(d)
     if d.get("env", {}).get("cluster_uid"):
@@ -80,46 +80,46 @@ bundle = {
                       .strftime("%Y-%m-%dT%H:%M:%SZ"),
     "labs_total": len(all_labs),
     "labs_passed": len(passed),
-    "cluster_uids": sorted(uids),          # 複数ある場合 — 異なるクラスターで実施した
+    "cluster_uids": sorted(uids),          # more than one — done on different clusters
     "kubernetes_versions": sorted(versions),
     "results": labs,
 }
 with open(out_path, "w") as fh:
     json.dump(bundle, fh, ensure_ascii=False, indent=1)
 
-# 同じ内容をプレーンテキストで — 人が何を送っているか見えるように。
+# The same thing in plain text — so a person can see what they're sending.
 txt = out_path.rsplit(".", 1)[0] + ".txt"
 with open(txt, "w") as fh:
-    fh.write("Cozystack ラボ結果\n")
-    fh.write("収集日時: %s\n\n" % bundle["generated_at"])
-    fh.write("%d / %d ラボ 合格\n\n" % (len(passed), len(all_labs)))
+    fh.write("Cozystack lab results\n")
+    fh.write("Collected: %s\n\n" % bundle["generated_at"])
+    fh.write("Passed %d of %d labs\n\n" % (len(passed), len(all_labs)))
     for lab in all_labs:
         rec = next((d for d in labs if d["lab"] == lab), None)
         if rec is None:
-            mark, extra = "—", "結果なし"
+            mark, extra = "—", "no result"
         elif rec["verdict"] == "passed":
-            mark = "合格"
-            extra = "チェック数: %d" % len(rec["checks"])
+            mark = "passed"
+            extra = "checks: %d" % len(rec["checks"])
         else:
-            mark = "不合格"
-            extra = "失敗: %d" % rec["totals"]["fail"]
+            mark = "not passed"
+            extra = "failed: %d" % rec["totals"]["fail"]
         fh.write("  %-20s %-9s %s\n" % (lab, mark, extra))
-    fh.write("\nクラスター数: %d。Kubernetes バージョン: %s\n"
-             % (len(uids), ", ".join(sorted(versions)) or "不明"))
-    fh.write("\nファイルに入るのはチェックの識別子とその結果だけです。\n"
-             "アドレスも、名前も、ログの内容も含まれていません。\n")
+    fh.write("\nClusters: %d. Kubernetes versions: %s\n"
+             % (len(uids), ", ".join(sorted(versions)) or "undetermined"))
+    fh.write("\nOnly check identifiers and their outcomes go into the file.\n"
+             "No addresses, no names, no log contents are in it.\n")
 
-print("%d / %d ラボ 合格。" % (len(passed), len(all_labs)))
+print("Passed %d of %d labs." % (len(passed), len(all_labs)))
 if failed:
-    print("不合格: %s" % ", ".join(failed))
+    print("Not passed: %s" % ", ".join(failed))
 if missing:
-    print("結果なし: %s" % ", ".join(missing))
+    print("No result: %s" % ", ".join(missing))
 if len(uids) > 1:
-    print("\n注意: 結果は %d 個の異なるクラスターから取得されました。これは許容されますが、"
-          "アップロード時にこのセットはフラグ付けされます。" % len(uids))
+    print("\nWarning: results were taken from %d different clusters. This is allowed, "
+          "but the set will be flagged on upload." % len(uids))
 for p in problems:
-    print("  問題: %s" % p)
-print("\nアップロード用ファイル: %s" % out_path)
-print("同じ内容のプレーンテキスト:  %s" % txt)
-print("送信する前にテキストファイルを確認してください — 送られる内容がすべて見えます。")
+    print("  problem: %s" % p)
+print("\nFile to upload: %s" % out_path)
+print("The same in plain text:  %s" % txt)
+print("Look at the text file before sending — it shows everything that goes out.")
 PYEOF

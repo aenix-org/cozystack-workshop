@@ -1,35 +1,35 @@
-// "출입증"(Pass) 서비스, 캐시 버전. 하나의 실행 파일, 두 개의 역할.
+// The "Pass" service, cached version. One executable, two roles.
 //
-//	MODE=hr   — 레거시 직원 디렉터리의 스텁. 느리게 응답하며,
-//	            실제 시스템과 똑같이 동작한다: HR_DELAY 기본값은 800ms.
-//	MODE=api  — "출입증" 서비스 자체. 디렉터리에 질의하고, REDIS_ADDR가
-//	            지정돼 있으면 먼저 캐시를 들여다본다.
+//	MODE=hr   — a stub for the legacy employee directory. Answers slowly,
+//	            exactly like the real one does: HR_DELAY is 800ms by default.
+//	MODE=api  — the "Pass" service itself. Queries the directory, and if REDIS_ADDR
+//	            is set, first looks in the cache.
 //
-// 두 경우를 하나의 역할로 처리하는 이유는 이미지가 하나여야 하기 때문이다: 거의 동일한
-// 두 개의 이미지가 레지스트리에 있으면 버전 올리는 것을 잊을 수 있는 자리가 두 곳이 된다.
+// One role for both cases, because the image must be single: two nearly identical
+// images in the registry are two places where you can forget to bump the version.
 //
-// 외부 의존성은 없고 표준 라이브러리뿐이다. 여기서 Redis 클라이언트는
-// 직접 만든 오십 줄짜리다 — Redis 프로토콜은 텍스트 기반이고 GET/SET 정도는
-// 함수 하나에 들어간다. 실무에서는 기성 라이브러리를 쓴다; 여기서는 빌드가
-// 패키지를 받으러 인터넷에 나가지 않는 것이 더 중요하다.
+// There are no external dependencies, only the standard library. The Redis client here
+// is our own, fifty lines long — the Redis protocol is textual and for GET/SET it fits
+// into one function. In production you take a ready-made library; here it matters more that
+// the build does not go to the internet for packages.
 //
-// Go를 읽을 줄 몰라도 된다: 아래에 무엇이 어디에 있는지 표시해 두었다. 먼저 작은 헬퍼들,
-// 그다음 직접 만든 Redis 클라이언트, 그다음 두 역할 — "느린 디렉터리"와 "서비스
-// 자체". 이 랩이 만들어진 핵심은 파일 끝에 가까운 setupAPI에서 일어난다.
+// You don't need to know how to read Go: below it is laid out where everything is. First the small helpers,
+// then the homemade Redis client, then the two roles — the "slow directory" and the "service
+// itself". The main thing the lab is built around happens in setupAPI, closer to the end of the file.
 //
-// 읽다가 걸리지 않도록, 언어의 세 가지 관례:
+// Three conventions of the language, so you don't stumble while reading:
 //
-//	func 이름(인자) (반환값) { ... } — 함수 선언;
-//	함수는 종종 여러 값을 한꺼번에 반환하며, 그중 마지막이 오류다:
-//	err == nil 은 "잘 됐다", err != nil 은 "잘 안 됐다"로 읽는다;
-//	//로 시작하는 줄은 주석이며, 프로그램 동작에 영향을 주지 않는다.
+//	func name(arguments) (what it returns) { ... } — a function declaration;
+//	a function often returns several values at once, and the last of them is an error:
+//	err == nil reads as "went fine", err != nil — "did not go fine";
+//	lines starting with // are comments, they don't affect how the program works.
 //
-// 이 파일은 옆에 있는 Dockerfile로 노트북에서 빌드된다: docker build ... app/ — README 참고.
+// The file is built by the neighboring Dockerfile, on the laptop: docker build ... app/ — see README.
 package main
 
-// 이 파일이 사용하는 라이브러리 목록. 하나도 빠짐없이 표준, Go 배포판에 포함된 것이다.
-// 서드파티 줄은 단 하나도 없다: 빌드는 인터넷에 나가지 않으며 누군가의 외부 패키지가
-// 공개 저장소에서 삭제됐다고 해서 깨지지 않는다.
+// The list of libraries the file uses. Every single one is standard, from the Go distribution.
+// Not one third-party line: the build does not go to the internet and won't break because
+// someone's foreign package was removed from a public repository.
 import (
 	"bufio"
 	"encoding/json"
@@ -47,11 +47,11 @@ import (
 	"time"
 )
 
-// ---------------------------------------------------------------- 환경
+// ---------------------------------------------------------------- environment
 
-// env는 환경 변수를 읽고, 그것이 비어 있거나 설정돼 있지 않으면 예비(fallback)
-// 값을 반환한다. 여기서 매니페스트에서 보이는 성질이 나온다: 애플리케이션의 동작은
-// 이미지 재빌드가 아니라 YAML 한 줄과 파드 재시작으로 바뀐다.
+// env reads an environment variable and, if it is empty or unset, returns the fallback
+// value. Hence the property you see in the manifests: the application's behavior
+// changes with a line in YAML and a pod restart, not with a rebuild of the image.
 func env(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
@@ -59,31 +59,31 @@ func env(key, fallback string) string {
 	return fallback
 }
 
-// envInt — 숫자에 대해 같은 일을 한다. 변수가 숫자가 아니면 애플리케이션은
-// 죽지 않는다: 로그에 기록하고 예비 값을 취한다. 매니페스트의 오타가 서비스를
-// 쓰러뜨려서는 안 된다 — 로그에 드러나야 한다.
+// envInt — the same for numbers. If the variable turns out not to be a number, the application does not
+// crash: it writes to the log and takes the fallback value. A typo in the manifest must not bring down
+// the service — it must be visible in the log.
 func envInt(key string, fallback int) int {
 	if v := os.Getenv(key); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
 			return n
 		}
-		log.Printf("%s=%q은(는) 숫자가 아니므로 %d을(를) 사용합니다", key, v, fallback)
+		log.Printf("%s=%q is not a number, using %d", key, v, fallback)
 	}
 	return fallback
 }
 
 // ---------------------------------------------------------------- Redis
 
-// Redis 자신이 보낸 오류("-"로 시작하는 줄): 예를 들어
-// NOAUTH 나 WRONGTYPE. 이것을 네트워크 오류와 구분하는 것이 중요하다: 잘못된 비밀번호는
-// 재연결로 고쳐지지 않으며, 재시도는 원인을 가릴 뿐이다.
+// An error sent by Redis itself (a line starting with "-"): for example
+// NOAUTH or WRONGTYPE. Telling it apart from a network error matters: reconnecting
+// won't fix a wrong password, and retries only mask the cause.
 type redisError struct{ msg string }
 
 func (e *redisError) Error() string { return "redis: " + e.msg }
 
-// redisClient — 캐시로 가는 하나의 영속 TCP 연결과, 두 개의 동시 요청이 이 연결에
-// 뒤섞여 쓰지 않도록 하는 잠금 mu. 연결은 열어 둔다: 요청마다 새로 맺는 것이
-// 요청 자체보다 비싸기 때문이다.
+// redisClient — one persistent TCP connection to the cache plus a lock mu, so that two
+// concurrent requests don't write into this connection intermixed. We keep the connection
+// open: establishing a new one for every request costs more than the request itself.
 type redisClient struct {
 	addr     string
 	password string
@@ -93,9 +93,9 @@ type redisClient struct {
 	rd   *bufio.Reader
 }
 
-// connectLocked는 연결을 열고, 비밀번호가 지정돼 있으면 곧바로 AUTH 명령으로
-// 자신을 소개한다. 이름의 Locked 접미사는 "잠금 mu가 이미 잡혀 있을 때만 호출하라"는
-// 뜻이다 — 이는 언어의 성질이 아니라 이 함수들 사이의 약속이다.
+// connectLocked opens the connection and, if a password is set, immediately introduces itself
+// with the AUTH command. The Locked suffix in the name means "call only when the lock mu
+// is already held" — this is an agreement between these functions, not a property of the language.
 func (r *redisClient) connectLocked() error {
 	c, err := net.DialTimeout("tcp", r.addr, 3*time.Second)
 	if err != nil {
@@ -120,10 +120,10 @@ func (r *redisClient) closeLocked() {
 	r.rd = nil
 }
 
-// do는 명령을 실행하고, 연결이 끊겼으면 한 번 재연결한다.
-// 값, "값 있음" 표시, 그리고 오류를 반환한다.
-// 시도는 정확히 두 번, 열 번이 아니다: Redis가 거부로 응답하면 재시도는 사용자에게
-// 응답을 늦추고 원인을 로그 여기저기로 번지게 할 뿐이다.
+// do runs a command and reconnects once if the connection dropped.
+// Returns the value, a "value present" flag, and an error.
+// There are exactly two attempts, not ten: if Redis answers with a refusal, retries only delay
+// the response to the user and smear the cause across the logs.
 func (r *redisClient) do(args ...string) (string, bool, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -142,16 +142,16 @@ func (r *redisClient) do(args ...string) (string, bool, error) {
 		lastErr = err
 		var re *redisError
 		if errors.As(err, &re) {
-			return "", false, err // Redis 자신이 응답했다 — 재시도는 도움이 안 된다
+			return "", false, err // Redis itself answered — a retry won't help
 		}
-		r.closeLocked() // 네트워크: 끊고 다시 시도한다
+		r.closeLocked() // network: drop it and try again
 	}
 	return "", false, lastErr
 }
 
-// commandLocked는 Redis가 이해하는 형태로 명령을 보낸다: 먼저
-// 뒤에 몇 개의 조각이 오는지, 그다음 각 조각의 길이와 내용. 3초 데드라인은
-// 멈춰 버린 캐시가 디렉터리로 직접 가는 것보다 응답을 더 늦추지 않도록 하기 위함이다.
+// commandLocked sends the command in the form Redis understands: first
+// how many chunks follow, then the length and content of each. The three-second deadline is
+// so a hung cache does not delay the response longer than a trip to the directory itself.
 func (r *redisClient) commandLocked(args ...string) (string, bool, error) {
 	var b strings.Builder
 	fmt.Fprintf(&b, "*%d\r\n", len(args))
@@ -167,9 +167,9 @@ func (r *redisClient) commandLocked(args ...string) (string, bool, error) {
 	return r.readReplyLocked()
 }
 
-// readReplyLocked는 응답을 파싱한다. 줄의 첫 글자가 무엇이 왔는지 알려 주며,
-// 함수 전체가 다섯 가지 경우의 처리다. "$-1" 경우가 따로 중요하다: 이것은 고장이 아니라
-// "그런 키가 없다", 즉 평범한 캐시 미스다.
+// readReplyLocked parses the reply. The first character of the line tells what exactly arrived,
+// and the whole function is the handling of five cases. The "$-1" case is separately important: it is not a breakage,
+// but "there is no such key", that is, an ordinary cache miss.
 func (r *redisClient) readReplyLocked() (string, bool, error) {
 	line, err := r.rd.ReadString('\n')
 	if err != nil {
@@ -177,67 +177,67 @@ func (r *redisClient) readReplyLocked() (string, bool, error) {
 	}
 	line = strings.TrimRight(line, "\r\n")
 	if line == "" {
-		return "", false, errors.New("redis: 빈 응답")
+		return "", false, errors.New("redis: empty reply")
 	}
 	switch line[0] {
-	case '+', ':': // 단순 문자열 또는 숫자
+	case '+', ':': // a simple string or a number
 		return line[1:], true, nil
-	case '-': // 서버로부터의 오류
+	case '-': // an error from the server
 		return "", false, &redisError{msg: line[1:]}
-	case '$': // 길이가 알려진 문자열; -1은 "키 없음"을 뜻한다
+	case '$': // a string of known length; -1 means "no key"
 		n, err := strconv.Atoi(line[1:])
 		if err != nil {
 			return "", false, err
 		}
 		if n < 0 {
-			return "", false, nil // 캐시 미스는 오류가 아니다
+			return "", false, nil // a cache miss is not an error
 		}
-		buf := make([]byte, n+2) // 끝의 \r\n을 위한 +2
+		buf := make([]byte, n+2) // +2 for the trailing \r\n
 		if _, err := io.ReadFull(r.rd, buf); err != nil {
 			return "", false, err
 		}
 		return string(buf[:n]), true, nil
 	default:
-		return "", false, fmt.Errorf("redis: 알 수 없는 응답 %q", line)
+		return "", false, fmt.Errorf("redis: unexpected reply %q", line)
 	}
 }
 
-// Get와 SetTTL — 서비스가 사용하는 명령 전부다. 캐시로부터 그 밖에
-// 요구되는 것은 없으며, 그래서 여기 클라이언트가 한 페이지에 들어간다.
+// Get and SetTTL — the whole set of commands the service uses. Nothing else is
+// required from the cache, which is why the client here fits on a page.
 func (r *redisClient) Get(key string) (string, bool, error) { return r.do("GET", key) }
 
-// SetTTL은 값을 넣고 곧바로 수명(TTL)을 지정한다. SET에 EXPIRE를 더한 것이
-// 아니라 한 명령으로: 두 명령 사이에 연결이 끊길 수 있고, 그러면 키가
-// 캐시에 영원히 남게 된다.
+// SetTTL puts the value and immediately assigns a time to live. With one command, not
+// SET plus EXPIRE: between two commands the connection may drop, and the key
+// would stay in the cache forever.
 func (r *redisClient) SetTTL(key, val string, ttlSeconds int) error {
 	_, _, err := r.do("SET", key, val, "EX", strconv.Itoa(ttlSeconds))
 	return err
 }
 
-// ---------------------------------------------------------------- 데이터
+// ---------------------------------------------------------------- data
 
-// employee — 서비스가 외부로 반환하고 캐시에 넣는 것. 오른쪽의 `json:"id"` 태그는
-// JSON에서의 필드 이름을 정한다: Go에서 필드는 대문자로 시작해야만 외부에서 보이고, JSON에서는
-// 소문자가 관례이며, 이 태그들이 둘을 연결한다.
+// employee — what the service returns to the outside and puts in the cache. The `json:"id"` tags on the right
+// set the field names in JSON: in Go fields are visible from outside only with a capital letter, while in JSON
+// it is customary to use lowercase, and these tags link them together.
 type employee struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 	Dept string `json:"dept"`
 }
 
-// 데이터는 지어낸 것이다. 학습용 스탠드에 실제 인사 정보는 없으며 있어서도 안 된다.
+// The data is made up. There are no real HR records in a training stand, and there must not be.
 var surnames = []string{
-	"김민○", "이수○", "임준○", "박서○",
-	"최동○", "한은○", "오상○", "서나○",
+	"Whitfield J.", "Prescott A.", "Sidney P.", "Marsh M.",
+	"Grant D.", "Poole E.", "Wolfe S.", "Frost N.",
 }
 
 var departments = []string{
-	"보안팀", "회계팀", "개발팀",
-	"물류팀", "인사팀", "행정팀",
+	"Security", "Accounting", "Engineering",
+	"Logistics", "HR", "Administration",
 }
 
-// 데이터는 지어낸 것이지만 같은 식별자에 대해서는 동일하다:
-// 그렇지 않으면 응답만 보고 캐시인지 디렉터리로 다녀온 것인지 구분할 수 없다.
+// The data is made up, but the same for the same identifier:
+// otherwise you couldn't tell from the response whether it's the cache or a trip to the directory.
 func personFor(id string) employee {
 	h := 7
 	for _, c := range id {
@@ -253,22 +253,22 @@ func personFor(id string) employee {
 	}
 }
 
-// writeJSON은 응답을 보낸다: 콘텐츠 타입 헤더, 응답 코드, 그리고 본문.
-// SetEscapeHTML(false)는 러시아어 글자와 따옴표가 \u-시퀀스로 바뀌지 않도록
-// 하기 위해 필요하다 — 그렇지 않으면 응답을 눈으로 해독해야 한다.
+// writeJSON sends the response: the header with the content type, the response code, and the body.
+// SetEscapeHTML(false) is needed so that Russian letters and quotes don't turn
+// into \u-sequences — otherwise you'd have to decode the response by eye.
 func writeJSON(w http.ResponseWriter, code int, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(code)
 	enc := json.NewEncoder(w)
 	enc.SetEscapeHTML(false)
 	if err := enc.Encode(v); err != nil {
-		log.Printf("응답을 전송하지 못했습니다: %v", err)
+		log.Printf("failed to write response: %v", err)
 	}
 }
 
-// employeeID는 쿼리 문자열에서 ?id= 를 꺼낸다. 빈 식별자는 "0"으로 바꾸는데,
-// 캐시의 키가 항상 정해진 형태를 갖고 꼬리 없는 "employee:" 키가
-// 만들어지지 않도록 하기 위함이다.
+// employeeID pulls ?id= out of the query string. An empty identifier is turned into "0",
+// so that the key in the cache always has a definite shape and no key
+// "employee:" without a tail is created.
 func employeeID(r *http.Request) string {
 	id := r.URL.Query().Get("id")
 	if id == "" {
@@ -277,61 +277,61 @@ func employeeID(r *http.Request) string {
 	return id
 }
 
-// ---------------------------------------------------------------- 메인
+// ---------------------------------------------------------------- main
 
-// main — 진입점: 프로그램의 동작이 여기서 시작된다. HTTP 서버를 띄우고,
-// 거기에 /healthz를 걸고, MODE를 보고 두 역할 중 하나를 건다. 역할은 시작 시
-// 한 번 선택되며 파드가 사는 동안 바뀌지 않는다.
+// main — the entry point: the program's work begins here. It brings up an HTTP server, hangs
+// /healthz on it and, looking at MODE, one of the two roles. The role is chosen once
+// at startup and does not change during the pod's life.
 func main() {
 	mode := env("MODE", "api")
 	port := env("PORT", "8080")
-	pod := env("POD_NAME", "알 수 없음")
+	pod := env("POD_NAME", "unknown")
 
 	mux := http.NewServeMux()
-	// /healthz는 두 역할 모두에 있다: 매니페스트에 기술된 준비성 프로브가 여기를 두드린다.
-	// 이것은 항상 응답하고 아무것도 검사하지 않는다 — 여기서 프로브의 임무는 시스템의
-	// 건강을 평가하는 것이 아니라, 프로세스가 떠서 포트를 듣고 있음을 알리는 것이다.
+	// /healthz exists in both roles: the readiness probe described in the manifests knocks here.
+	// It always answers and checks nothing — the probe's job here is to tell
+	// that the process came up and is listening on the port, not to assess the health of the system.
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		_, _ = w.Write([]byte("ok\n"))
 	})
 
-	// 두 역할로의 분기. 알 수 없는 값은 "어떻게든" 시작할 이유가 되지 않는다:
-	// 즉시, 그리고 분명한 메시지와 함께 죽는다. 잘못된 역할로 조용히 시작하면
-	// 로그를 한 시간 들여다보는 대가를 치르게 된다.
+	// The fork into two roles. An unknown value is no reason to start up "somehow":
+	// we crash immediately and with a clear message. A silent startup in the wrong role would cost
+	// an hour of staring at logs.
 	switch mode {
 	case "hr":
 		setupHR(mux, pod)
 	case "api":
 		setupAPI(mux, pod)
 	default:
-		log.Fatalf("알 수 없는 MODE=%q, 허용되는 값은 hr과 api입니다", mode)
+		log.Fatalf("unknown MODE=%q, allowed values are hr and api", mode)
 	}
 
-	// ReadHeaderTimeout은 클라이언트가 요청을 시작해 놓고 조용해지면 연결을 닫는다. 이것이 없으면
-	// 그런 "클라이언트" 몇 개만으로도 아무것도 요청하지 않고 서버 전체를 차지하기에 충분하다.
+	// ReadHeaderTimeout closes the connection if a client started a request and went quiet. Without it
+	// a few such "clients" are enough to occupy the whole server without requesting anything.
 	srv := &http.Server{
 		Addr:              ":" + port,
 		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
-	log.Printf("모드 %s, 포트 %s, 파드 %s", mode, port, pod)
+	log.Printf("mode %s, port %s, pod %s", mode, port, pod)
 	log.Fatal(srv.ListenAndServe())
 }
 
-// setupHR — 레거시 디렉터리의 스텁. 그 유일한 특징은
-// 느리다는 것이며, 이는 우연이 아니라 과제의 본질이다.
+// setupHR — a stub for the legacy directory. Its only distinctive feature is that
+// it is slow, and this is not an accident but the essence of the task.
 func setupHR(mux *http.ServeMux, pod string) {
 	delay, err := time.ParseDuration(env("HR_DELAY", "800ms"))
 	if err != nil {
-		log.Printf("HR_DELAY=%q을(를) 파싱하지 못해 800ms를 사용합니다", os.Getenv("HR_DELAY"))
+		log.Printf("could not parse HR_DELAY=%q, using 800ms", os.Getenv("HR_DELAY"))
 		delay = 800 * time.Millisecond
 	}
-	log.Printf("디렉터리가 %s 만에 응답합니다", delay)
+	log.Printf("directory responds in %s", delay)
 
-	// 이 역할의 유일한 주소. time.Sleep이 곧 "레거시 시스템" 전부다: 랩에 캐시가
-	// 등장하는 이유가 되는 바로 그 수백 밀리초. 응답의 source 필드는
-	// 데이터가 캐시가 아니라 여기서 왔음을 보여 준다.
+	// The only address of this role. time.Sleep is the whole "legacy system": those very
+	// hundreds of milliseconds for whose sake the cache appears in the lab. The source field in the response
+	// shows that the data came from here, not from the cache.
 	mux.HandleFunc("/employee", func(w http.ResponseWriter, r *http.Request) {
 		id := employeeID(r)
 		time.Sleep(delay)
@@ -346,41 +346,41 @@ func setupHR(mux *http.ServeMux, pod string) {
 	})
 }
 
-// setupAPI — "출입증" 서비스 자체. 여기에 캐시 로직이 살고, 여기에
-// "왜 응답에 cache: off라고 나오는가"라는 질문의 답도 있다.
+// setupAPI — the "Pass" service itself. Here lives the cache logic, and here too lies the answer
+// to the question "why does the response say cache: off".
 func setupAPI(mux *http.ServeMux, pod string) {
 	hrURL := env("HR_URL", "http://hr-legacy")
 	ttl := envInt("CACHE_TTL", 60)
 	version := env("APP_VERSION", "v2")
 
-	// 캐시는 REDIS_ADDR가 있다는 사실만으로 켜진다 — cache-patch.yaml이
-	// 추가하는 그 변수. 변수가 없으면 cache는 비어 있고, 아래의 모든
-	// `if cache != nil` 검사가 발동하지 않으며, 서비스는 이전처럼 동작한다.
+	// The cache is turned on by the very presence of REDIS_ADDR — the variable that
+	// cache-patch.yaml adds. No variable — cache stays empty, all the checks
+	// `if cache != nil` below don't fire, and the service works as it worked.
 	var cache *redisClient
 	if addr := os.Getenv("REDIS_ADDR"); addr != "" {
 		cache = &redisClient{addr: addr, password: os.Getenv("REDIS_PASSWORD")}
-		log.Printf("캐시 활성화: %s, 레코드 TTL %d초", addr, ttl)
+		log.Printf("cache enabled: %s, entry TTL %d s", addr, ttl)
 	} else {
-		log.Printf("캐시 비활성화: REDIS_ADDR가 지정되지 않아 모든 요청이 디렉터리로 갑니다")
+		log.Printf("cache disabled: REDIS_ADDR is not set, every request will go to the directory")
 	}
 
-	// 연결 풀을 키운 별도의 클라이언트: 그렇지 않으면 부하 상태에서
-	// 시간의 절반이 디렉터리로의 TCP 연결을 맺는 데 쓰이고,
-	// 측정은 디렉터리의 지연이 아니라 우리 자신의 부주의를 보여 주게 된다.
+	// A separate client with an enlarged connection pool: otherwise under load
+	// half the time would go to establishing TCP connections to the directory,
+	// and the measurement would show not the directory's latency but our own sloppiness.
 	tr := http.DefaultTransport.(*http.Transport).Clone()
 	tr.MaxIdleConnsPerHost = 64
 	hrClient := &http.Client{Timeout: 10 * time.Second, Transport: tr}
 
-	// 루트 "/" — 서비스의 명함: 버전, 파드, 노드, 레지스트리, 캐시 모드. cache 필드로
-	// 로그를 들여다보거나 매니페스트를 파헤치지 않고도 off인지 redis인지 바로 알 수 있다.
+	// The root "/" — the service's business card: version, pod, node, registry and cache mode. From the cache field
+	// you can immediately see off or redis, without looking into the logs or parsing the manifest.
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{
 			"service":   "passes-api",
 			"version":   version,
 			"pod":       pod,
-			"node":      env("NODE_NAME", "알 수 없음"),
-			"namespace": env("POD_NAMESPACE", "알 수 없음"),
-			"registry":  env("IMAGE_REGISTRY", "미지정"),
+			"node":      env("NODE_NAME", "unknown"),
+			"namespace": env("POD_NAMESPACE", "unknown"),
+			"registry":  env("IMAGE_REGISTRY", "not set"),
 			"cache":     cacheMode(cache),
 			"cache_ttl": ttl,
 			"hr_url":    hrURL,
@@ -388,47 +388,47 @@ func setupAPI(mux *http.ServeMux, pod string) {
 		})
 	})
 
-	// 랩의 메인 주소. 동작 순서: 캐시에 묻고, 미스면 디렉터리로 가고,
-	// 응답을 캐시에 넣는다. 이 랩에서 측정하는 모든 것이 이 마흔
-	// 줄에서 일어난다.
+	// The main address of the lab. The order of actions: ask the cache, on a miss go to the directory,
+	// put the response in the cache. Everything you measure in this lab happens in these forty
+	// lines.
 	mux.HandleFunc("/employee", func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		id := employeeID(r)
-		// 캐시의 키 — "employee:"에 식별자를 더한 것. 접두사는 서로 다른 종류의
-		// 레코드가 충돌하지 않도록 필요하다: 캐시는 애플리케이션 전체에 하나이고, 그 안의 이름은 평평하다.
+		// The key in the cache — "employee:" plus the identifier. The prefix is needed so that different kinds
+		// of records don't collide: the cache is one for the whole application, and the names in it are flat.
 		key := "employee:" + id
 
 		var emp employee
 		fromCache := false
 
-		// 첫 번째 단계: 캐시에 묻는다. 세 가지 결과 — 오류, 적중, 미스 — 는 서로 다르게
-		// 처리되며, 그 사이의 차이가 여기서는 근본적이다.
+		// Step one: ask the cache. Three outcomes — an error, a hit, a miss — are handled
+		// differently, and the difference between them is fundamental here.
 		if cache != nil {
 			raw, found, err := cache.Get(key)
 			switch {
 			case err != nil:
-				// 캐시를 사용할 수 없다 — 그것이 사용자에게 오류를 반환할 이유는 아니다.
-				// 디렉터리로 간다: 느리지만 올바르다.
-				log.Printf("캐시를 사용할 수 없습니다 (%v), 디렉터리로 갑니다", err)
+				// The cache is unavailable — that is no reason to return an error to the user.
+				// We go to the directory: slow, but correct.
+				log.Printf("cache unavailable (%v), going to the directory", err)
 			case found:
 				if json.Unmarshal([]byte(raw), &emp) == nil {
 					fromCache = true
 				} else {
-					log.Printf("키 %s에 대해 캐시에 쓰레기 값이 들어 있어 디렉터리로 갑니다", key)
+					log.Printf("cache holds garbage for key %s, going to the directory", key)
 				}
 			}
 		}
 
-		// 두 번째 단계: 미스이거나 사용할 수 없는 캐시 — 디렉터리로 간다. 느리지만 그것이
-		// 유일한 진실의 원천이다. 응답을 캐시에 넣는다; 넣기에 실패했더라도
-		// 사용자는 그것을 알 필요가 없다 — 그는 이미 응답을 받았고, 다만
-		// 다음 요청이 또 느릴 뿐이다.
+		// Step two: a miss or an unavailable cache — we go to the directory. Slow, but it is
+		// the only source of truth. We put the response in the cache; if putting it failed,
+		// the user need not know about it — they have already got their response, it's just that
+		// the next request will again be slow.
 		if !fromCache {
 			fetched, err := fetchEmployee(hrClient, hrURL, id)
 			if err != nil {
-				log.Printf("디렉터리가 응답하지 않았습니다: %v", err)
+				log.Printf("directory did not respond: %v", err)
 				writeJSON(w, http.StatusBadGateway, map[string]any{
-					"error": "직원 디렉터리를 사용할 수 없습니다",
+					"error": "employee directory is unavailable",
 					"pod":   pod,
 				})
 				return
@@ -437,15 +437,15 @@ func setupAPI(mux *http.ServeMux, pod string) {
 			if cache != nil {
 				if b, err := json.Marshal(emp); err == nil {
 					if err := cache.SetTTL(key, string(b), ttl); err != nil {
-						log.Printf("캐시에 저장하지 못했습니다: %v", err)
+						log.Printf("failed to write to cache: %v", err)
 					}
 				}
 			}
 		}
 
-		// cached와 took_ms 필드 — 이 모든 것이 시작된 이유다: 이것으로 요청이 캐시에
-		// 적중했는지 아닌지, 그리고 몇 밀리초가 들었는지 볼 수 있다. check.sh도 이것들을 읽어
-		// 랩을 통과로 셈할지 말지 결정한다.
+		// The cached and took_ms fields — what all of this was started for: from them you can see whether the request hit
+		// the cache or not and how many milliseconds it cost. check.sh also reads them
+		// when it decides whether to count the lab as passed or not.
 		writeJSON(w, http.StatusOK, map[string]any{
 			"id":      emp.ID,
 			"name":    emp.Name,
@@ -459,7 +459,7 @@ func setupAPI(mux *http.ServeMux, pod string) {
 	})
 }
 
-// cacheMode는 내부 상태를 응답용 한 단어로 변환한다: off 또는 redis.
+// cacheMode translates the internal state into one word for the response: off or redis.
 func cacheMode(c *redisClient) string {
 	if c == nil {
 		return "off"
@@ -467,9 +467,9 @@ func cacheMode(c *redisClient) string {
 	return "redis"
 }
 
-// fetchEmployee — HTTP를 통한 디렉터리로의 왕복. 식별자는 이스케이프된다
-// (url.QueryEscape): 이것이 없으면 id 안의 공백이나 "&"가 요청 URL을 무너뜨린다.
-// 응답 본문은 반드시 닫힌다(defer), 그렇지 않으면 부하 상태에서 연결이 바닥난다.
+// fetchEmployee — a trip to the directory over HTTP. The identifier is escaped
+// (url.QueryEscape): without this a space or "&" inside id would break the request URL apart.
+// The response body is always closed (defer), otherwise under load connections would run out.
 func fetchEmployee(c *http.Client, base, id string) (employee, error) {
 	u := strings.TrimRight(base, "/") + "/employee?id=" + url.QueryEscape(id)
 	resp, err := c.Get(u)
@@ -478,7 +478,7 @@ func fetchEmployee(c *http.Client, base, id string) (employee, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return employee{}, fmt.Errorf("디렉터리가 %s로 응답했습니다", resp.Status)
+		return employee{}, fmt.Errorf("directory responded %s", resp.Status)
 	}
 	var emp employee
 	if err := json.NewDecoder(resp.Body).Decode(&emp); err != nil {

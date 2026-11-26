@@ -1,158 +1,158 @@
 #!/usr/bin/env bash
-# लैब 6 की जाँच: एप्लिकेशन क्लस्टर में अपने खुद के निजी रजिस्ट्री से डिप्लॉय होता है।
+# Lab 6 check: the application is deployed into the cluster from ITS OWN private registry.
 #
-# हम "Harbor बन गया" यह नहीं जाँचते, बल्कि पूरी शृंखला जाँचते हैं: रजिस्ट्री अपने API पर जवाब देती है,
-# मैनिफ़ेस्ट में मौजूद इमेज ठीक उसी में रहती है, क्लस्टर के पास उसी पते के लिए क्रेडेंशियल हैं,
-# और इस इमेज वाला पॉड सचमुच चलता है और जवाब देता है।
+# We check not "Harbor was created", but the whole chain: the registry answers on its API,
+# the image in the manifest lives exactly in it, the cluster has credentials for that same address,
+# and a pod with this image actually runs and responds.
 #
-# दो क्लस्टर, और यही मुख्य कारण है कि यह स्क्रिप्ट अपने पड़ोसियों से ज़्यादा जटिल दिखती है:
-# KUBECONFIG आपका lab क्लस्टर है, जहाँ एप्लिकेशन चलता है; COZY_KUBECONFIG है
-# Cozystack प्रबंधन क्लस्टर, जहाँ आपके टेनेंट में managed Harbor सेवा रहती है।
-# दोनों को एक ही कमांड से क्वेरी नहीं किया जा सकता, इसलिए नीचे kubectl को कॉल करने के दो अलग तरीके हैं।
+# Two clusters, and this is the main reason the script looks more complex than its neighbors:
+# KUBECONFIG is your lab cluster, where the application runs; COZY_KUBECONFIG is the
+# Cozystack management cluster, where the managed Harbor service lives in your tenant.
+# You can't query both with one command, so below there are two different ways to call kubectl.
 #
-# आपके द्वारा, lab फ़ोल्डर से चलाया जाता है; यह कुछ नहीं बदलता, केवल देखता है और रिपोर्ट छापता है:
+# Run by you, from the lab folder; it changes nothing, only looks and prints a report:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     export COZY_KUBECONFIG=~/.kube/workshop
 #     ./check.sh
 
 LAB_NAME="06-harbor"
-LAB_TITLE="लैब 6 · आपकी अपनी निजी इमेज रजिस्ट्री"
-# सभी लैब की साझा संरचना: ok / fail / warn / evidence / finish और एनवायरनमेंट जाँच।
+LAB_TITLE="Lab 6 · Your own private image registry"
+# Shared scaffolding for all labs: ok / fail / warn / evidence / finish and environment checks.
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
-# क्लस्टर एक्सेस फ़ाइल के बिना और टेनेंट नंबर के बिना जाँचने के लिए कुछ नहीं है — तुरंत बाहर निकलें।
+# Without a cluster access file and without a tenant number there is nothing to check — exit right away.
 need_kubeconfig
 need_tenant
 
 APP="passes-api"
-# प्रबंधन क्लस्टर पर टेनेंट नेमस्पेस: नाम उपसर्ग tenant- और आपके नंबर से बनता है,
-# यानी tenant-workshopXX. नंबर एनवायरनमेंट से लिया जाता है,
-# इसे स्क्रिप्ट के टेक्स्ट में हाथ से डालने की ज़रूरत नहीं।
+# The tenant namespace on the management cluster: the name is built from the prefix
+# tenant- and your number, that is tenant-workshopXX. The number is taken from the environment,
+# you don't need to substitute it into the script text by hand.
 TENANT_NS="tenant-${COZY_TENANT}"
 COZY_KUBECONFIG="${COZY_KUBECONFIG:-$HOME/.kube/workshop}"
 
-# kubectl को कॉल करने के दो तरीके: kget आपके lab क्लस्टर में जाता है, cozy — प्रबंधन क्लस्टर में।
-# त्रुटियाँ जानबूझकर दबाई गई हैं: यहाँ किसी ऑब्जेक्ट का न होना विफलता नहीं बल्कि अपेक्षित
-# परिणामों में से एक है, और इसे नीचे स्पष्ट सलाह के साथ एक अलग शाखा में संभाला जाता है।
+# Two ways to call kubectl: kget goes to your lab cluster, cozy — to the management cluster.
+# Errors are silenced on purpose: a missing object here is not a failure but one of the expected
+# outcomes, and it is handled below by a separate branch with clear advice.
 kget() { kubectl get "$@" 2>/dev/null; }
 cozy() { kubectl --kubeconfig "$COZY_KUBECONFIG" "$@" 2>/dev/null; }
 
-# --- प्रबंधन क्लस्टर पर managed Harbor सेवा ---------------------------
-# वैकल्पिक भाग: टेनेंट kubeconfig के बिना भी लैब जाँचने योग्य है,
-# लेकिन प्लेटफ़ॉर्म की ओर से सेवा हमें दिखाई नहीं देगी।
+# --- managed Harbor service on the management cluster ------------------------
+# Optional part: without the tenant kubeconfig the lab is still checkable,
+# but we won't see the service from the platform side.
 #
-# हम "कमांड ने काम नहीं किया" वाले मामले को अलग से पकड़ते हैं: टेनेंट में भूमिका एप्लिकेशन
-# देखने की अनुमति नहीं दे सकती। यह प्रतिभागी की गलती नहीं और जाँच विफल करने का कारण नहीं, इसलिए
-# यहाँ warn — "नहीं देखा", न कि fail — "गलत किया"। हम जानबूझकर कमांड त्रुटि को
-# खाली जवाब से अलग करते हैं: खाली सूची का मतलब है Harbor कभी बना ही नहीं।
+# We separately catch the "command didn't work" case: the role in the tenant may not allow
+# viewing applications. This is not the participant's fault and not a reason to fail the check, so
+# here it's warn — "didn't look", not fail — "done wrong". We deliberately distinguish a command
+# error from an empty response: an empty list means Harbor was never created at all.
 if [ ! -r "$COZY_KUBECONFIG" ]; then
-  warn "टेनेंट kubeconfig ${COZY_KUBECONFIG} नहीं मिला — Harbor की स्थिति जाँची नहीं गई" \
-       "पथ सेट करें: export COZY_KUBECONFIG=~/.kube/workshop"
+  warn "tenant kubeconfig ${COZY_KUBECONFIG} not found — Harbor state was not checked" \
+       "set the path: export COZY_KUBECONFIG=~/.kube/workshop"
 else
   HARBOR_ERR="$(kubectl --kubeconfig "$COZY_KUBECONFIG" get harbors.apps.cozystack.io \
     -n "$TENANT_NS" --no-headers 2>&1 >/dev/null)"
   HARBOR_LIST="$(cozy get harbors.apps.cozystack.io -n "$TENANT_NS" --no-headers)"
   if [ -n "$HARBOR_ERR" ]; then
-    warn "टेनेंट ${TENANT_NS} में Harbor एप्लिकेशन नहीं देख सके" \
-         "टेनेंट में भूमिका शायद यह कमांड न दे — यह लैब की त्रुटि नहीं; बाकी सब नीचे जाँचा जाता है"
+    warn "could not view Harbor applications in tenant ${TENANT_NS}" \
+         "the role in the tenant may not allow this command — this is not a lab error; everything else is checked below"
   elif [ -z "$HARBOR_LIST" ]; then
-    fail "टेनेंट ${TENANT_NS} में कोई Harbor एप्लिकेशन नहीं है" \
-         "इसे डैशबोर्ड में बनाएँ: Create application -> Harbor"
+    fail "there is no Harbor application in tenant ${TENANT_NS}" \
+         "create it in the dashboard: Create application -> Harbor"
   else
     HARBOR_NAME="$(printf '%s' "$HARBOR_LIST" | awk 'NR==1{print $1}')"
     HARBOR_READY="$(cozy get harbors.apps.cozystack.io "$HARBOR_NAME" -n "$TENANT_NS" \
       -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')"
     if [ "$HARBOR_READY" = "True" ]; then
-      ok "managed Harbor सेवा «${HARBOR_NAME}» तैयार है"
+      ok "managed Harbor service «${HARBOR_NAME}» is ready"
     else
-      warn "Harbor «${HARBOR_NAME}» मौजूद है, लेकिन तैयारी की सूचना नहीं देता" \
-           "इसकी स्थिति डैशबोर्ड में देखें; Harbor को ऊपर आने में 5-10 मिनट लगते हैं, और टेनेंट में ऑब्जेक्ट स्टोरेज के बिना यह बिल्कुल ऊपर नहीं आएगा"
+      warn "Harbor «${HARBOR_NAME}» exists, but does not report readiness" \
+           "check its state in the dashboard; Harbor takes 5-10 minutes to come up, and without object storage in the tenant it won't come up at all"
     fi
-    evidence "टेनेंट में Harbor एप्लिकेशन" "$HARBOR_LIST"
-    # हम क्रेडेंशियल सीक्रेट पढ़ने की कोशिश नहीं करते: टेनेंट इस सीक्रेट को पढ़ सकता है,
-    # लेकिन हमें रिपोर्ट में पासवर्ड की वैसे भी ज़रूरत नहीं।
+    evidence "Harbor applications in the tenant" "$HARBOR_LIST"
+    # We don't try to read the credentials secret: the tenant can read this secret,
+    # but we don't need the password in the report anyway.
   fi
 fi
 
-# --- एप्लिकेशन इमेज कहाँ से खींचता है ------------------------------------------
-# लैब का मकसद यह है कि इमेज आपकी रजिस्ट्री से आई, इंटरनेट से नहीं। यह
-# मैनिफ़ेस्ट में इमेज नाम से जाँचा जाता है: स्लैश तक नाम का पहला भाग रजिस्ट्री
-# पता है। अगर उसमें न बिंदु है न कोलन, तो वहाँ पता है ही नहीं, और
-# क्लस्टर चुपचाप इमेज के लिए Docker Hub जाएगा — ठीक वहीं जहाँ सुरक्षा ने मना किया।
-# HARBOR-HOST प्लेसहोल्डर और ज्ञात सार्वजनिक रजिस्ट्रियों को हम अलग शाखाओं में पकड़ते हैं:
-# औपचारिक रूप से पता मौजूद है, पर लैब की आवश्यकता पूरी नहीं, और हर मामले में सलाह अलग है।
+# --- where the application pulls the image from -----------------------------
+# The point of the lab is that the image came from your registry, not from the internet. This is
+# checked by the image name in the manifest: the first part of the name up to the slash is the
+# registry address. If it has neither a dot nor a colon, there is no address there at all, and the
+# cluster would silently go for the image to Docker Hub — that is exactly where security forbade it.
+# We catch the HARBOR-HOST placeholder and known public registries in separate branches:
+# formally the address is in place, but the lab requirement is not met, and the advice differs in each case.
 IMAGE="$(kget deployment "$APP" -o jsonpath='{.spec.template.spec.containers[0].image}')"
 REGISTRY=""
 if [ -z "$IMAGE" ]; then
-  fail "lab क्लस्टर में ${APP} एप्लिकेशन नहीं है" \
-       "passes.yaml लागू करें, उसमें अपना Harbor पता डालकर"
+  fail "there is no application ${APP} in the lab cluster" \
+       "apply passes.yaml with your Harbor address substituted into it"
 else
   REGISTRY="${IMAGE%%/*}"
   case "$REGISTRY" in
-    *.*|*:*) : ;;              # रजिस्ट्री पते जैसा दिखता है
-    *) REGISTRY="" ;;          # पता नहीं — यानी इमेज Docker Hub से खींची जाती है
+    *.*|*:*) : ;;              # looks like a registry address
+    *) REGISTRY="" ;;          # no address — so the image is pulled from Docker Hub
   esac
 
   if [ -z "$REGISTRY" ]; then
-    fail "इमेज ${IMAGE} सार्वजनिक रजिस्ट्री से खींची जाती है, आपकी से नहीं" \
-         "इमेज नाम की शुरुआत आपके Harbor के पते से होनी चाहिए"
+    fail "image ${IMAGE} is pulled from a public registry, not from yours" \
+         "the image name should start with the address of your Harbor"
   elif printf '%s' "$REGISTRY" | grep -qi 'HARBOR-HOST'; then
-    fail "मैनिफ़ेस्ट में अभी भी प्लेसहोल्डर पता HARBOR-HOST है" \
-         "अपना Harbor पता डालें: sed -i 's|HARBOR-HOST|harbor.yourdomain|g' passes.yaml"
+    fail "the placeholder address HARBOR-HOST is still in the manifest" \
+         "substitute your Harbor address: sed -i 's|HARBOR-HOST|harbor.yourdomain|g' passes.yaml"
   elif printf '%s' "$REGISTRY" | grep -qiE '^(docker\.io|registry-1\.docker\.io|quay\.io|ghcr\.io|gcr\.io|registry\.k8s\.io)$'; then
-    fail "इमेज सार्वजनिक रजिस्ट्री ${REGISTRY} से खींची जाती है" \
-         "सुरक्षा ने निजी रजिस्ट्री माँगी थी — इमेज बनाकर अपने Harbor में पुश करें"
+    fail "the image is pulled from public registry ${REGISTRY}" \
+         "security asked for a private registry — build and push the image to your own Harbor"
   else
-    ok "एप्लिकेशन आपकी रजिस्ट्री से शुरू होता है: ${REGISTRY}"
-    evidence "एप्लिकेशन इमेज" "$IMAGE"
+    ok "the application starts from your registry: ${REGISTRY}"
+    evidence "Application image" "$IMAGE"
   fi
 fi
 
-# --- रजिस्ट्री सचमुच काम करती है ------------------------------------------
-# मैनिफ़ेस्ट में पता सही लिखा हो सकता है, पर उस पर रजिस्ट्री न हो: Harbor
-# तुरंत ऊपर नहीं आता, और डोमेन में टाइपो बिल्कुल वैसा ही दिखता है। इसलिए हम
-# इसके API पर दस्तक देते हैं और "pong" जवाब का इंतज़ार करते हैं — यह पुष्टि करता है कि वहाँ Harbor है,
-# न कि किसी और की साइट और न लोड बैलेंसर का स्टब।
+# --- the registry actually works --------------------------------------------
+# The address in the manifest may be written correctly, but there may be no registry at it: Harbor
+# does not come up instantly, and a typo in the domain looks exactly the same. So we
+# knock on its API and wait for a "pong" response — this confirms that it is Harbor there,
+# and not someone else's site and not a load balancer stub.
 if [ -z "$REGISTRY" ]; then
-  : # ऊपर पहले ही रिपोर्ट कर दिया
+  : # already reported above
 elif ! command -v curl >/dev/null 2>&1; then
-  warn "curl उपयोगिता नहीं है — रजिस्ट्री उपलब्धता जाँची नहीं गई" \
-       "ब्राउज़र में https://${REGISTRY} खोलें, वहाँ Harbor इंटरफ़ेस होना चाहिए"
+  warn "no curl utility — registry availability was not checked" \
+       "open https://${REGISTRY} in a browser, there should be a Harbor interface"
 else
   PING="$(curl -fsS --max-time 20 "https://${REGISTRY}/api/v2.0/ping" 2>/dev/null)"
   if printf '%s' "$PING" | grep -qi 'pong'; then
     VER="$(curl -fsS --max-time 20 "https://${REGISTRY}/api/v2.0/systeminfo" 2>/dev/null \
-      | python3 -c 'import sys,json;print(json.load(sys.stdin).get("harbor_version","अज्ञात"))' 2>/dev/null)"
-    ok "रजिस्ट्री API पर जवाब देती है: https://${REGISTRY} (Harbor ${VER:-संस्करण अज्ञात})"
-    evidence "रजिस्ट्री" "https://${REGISTRY}
+      | python3 -c 'import sys,json;print(json.load(sys.stdin).get("harbor_version","unknown"))' 2>/dev/null)"
+    ok "registry responds on the API: https://${REGISTRY} (Harbor ${VER:-version unknown})"
+    evidence "Registry" "https://${REGISTRY}
 API ping: ${PING}
-Harbor संस्करण: ${VER:-अज्ञात}"
+Harbor version: ${VER:-unknown}"
   else
-    fail "रजिस्ट्री https://${REGISTRY} /api/v2.0/ping पर जवाब नहीं देती" \
-         "पता और डैशबोर्ड में Harbor एप्लिकेशन की स्थिति जाँचें"
+    fail "registry https://${REGISTRY} does not respond to /api/v2.0/ping" \
+         "check the address and the state of the Harbor application in the dashboard"
   fi
 fi
 
-# --- क्लस्टर के पास एक्सेस क्रेडेंशियल हैं -------------------------------------
-# यह काफ़ी नहीं कि सीक्रेट मैनिफ़ेस्ट में संदर्भित है — मायने यह रखता है कि उसमें ठीक उसी
-# रजिस्ट्री के क्रेडेंशियल हों जिससे इमेज खींची जाती है। सबसे आम लैब गलती सही दिखती है:
-# सीक्रेट बना, मैनिफ़ेस्ट में नामित, पर उसके अंदर का पता गलत है
-# (अतिरिक्त https://, एक पोर्ट, अलग होस्टनेम), और kubelet उसे लागू नहीं करेगा।
-# इसलिए हम सीक्रेट की सामग्री खोलते हैं और नामों की नहीं, पतों की तुलना करते हैं।
+# --- the cluster has access credentials -------------------------------------
+# It's not enough that the secret is referenced in the manifest — what matters is that it has
+# credentials for exactly the registry the image is pulled from. The most common lab mistake looks
+# correct: the secret is created, named in the manifest, but the address inside it is wrong
+# (extra https://, a port, a different hostname), and kubelet won't apply it.
+# So we unpack the secret contents and compare addresses, not names.
 PULL_SECRETS="$(kget deployment "$APP" \
   -o jsonpath='{range .spec.template.spec.imagePullSecrets[*]}{.name}{"\n"}{end}')"
 if [ -z "$IMAGE" ]; then
-  : # कोई एप्लिकेशन नहीं, ऊपर रिपोर्ट किया
+  : # no application, reported above
 elif [ -z "$PULL_SECRETS" ]; then
-  fail "मैनिफ़ेस्ट ${APP} में कोई imagePullSecret निर्दिष्ट नहीं है" \
-       "निजी रजिस्ट्री से इमेज क्रेडेंशियल के बिना डाउनलोड नहीं होगी: imagePullSecrets जोड़ें, passes.yaml देखें"
+  fail "no imagePullSecret is specified in manifest ${APP}" \
+       "an image from a private registry won't download without credentials: add imagePullSecrets, see passes.yaml"
 else
   SECRET_OK=""
   for s in $PULL_SECRETS; do
     STYPE="$(kget secret "$s" -o jsonpath='{.type}')"
     [ "$STYPE" = "kubernetes.io/dockerconfigjson" ] || continue
-    # हम कॉन्फ़िग को python से पार्स करते हैं: base64 -d macOS और Linux पर अलग व्यवहार करता है,
-    # और पासवर्ड रिपोर्ट में नहीं छापना चाहिए — हम केवल पतों की सूची लेते हैं।
+    # We parse the config with python: base64 -d behaves differently on macOS and Linux,
+    # and the password must not be printed to the report — we take only the list of addresses.
     SERVERS="$(kget secret "$s" -o jsonpath='{.data.\.dockerconfigjson}' \
       | python3 -c 'import sys,json,base64
 raw = sys.stdin.read().strip()
@@ -168,55 +168,55 @@ except Exception:
   done
 
   if [ -n "$SECRET_OK" ]; then
-    ok "क्लस्टर के पास सीक्रेट ${SECRET_OK} में ${REGISTRY} के क्रेडेंशियल हैं (पासवर्ड: <छिपा हुआ>)"
+    ok "the cluster has credentials for ${REGISTRY} in secret ${SECRET_OK} (password: <hidden>)"
   else
-    fail "निर्दिष्ट सीक्रेट्स (${PULL_SECRETS}) में से किसी में ${REGISTRY:-आपकी रजिस्ट्री} के क्रेडेंशियल नहीं हैं" \
-         "इसे ऐसे बनाएँ: kubectl create secret docker-registry harbor --docker-server=${REGISTRY:-पता} --docker-username=admin --docker-password=..."
+    fail "none of the specified secrets (${PULL_SECRETS}) contains credentials for ${REGISTRY:-your registry}" \
+         "create it like this: kubectl create secret docker-registry harbor --docker-server=${REGISTRY:-ADDRESS} --docker-username=admin --docker-password=..."
   fi
 fi
 
-# --- पॉड सचमुच शुरू हुए -----------------------------------------------
-# हम ImagePullBackOff और ErrImagePull स्थितियों को अलग से संभालते हैं: यह ठीक वही विफलता
-# है जो लैब जानबूझकर दिखाती है, और प्रतिभागी के लिए इसे देखकर पहचानना ज़रूरी है, बजाय
-# एक सामान्य "पॉड काम नहीं कर रहे" पाने के। हम असली कारण को साक्ष्य के रूप में छापते हैं —
-# रजिस्ट्री विफलता पर और इमेज नाम में टाइपो पर पॉड की स्थिति एक जैसी होती है।
+# --- the pods actually started ----------------------------------------------
+# We separately handle the ImagePullBackOff and ErrImagePull states: this is exactly the failure
+# the lab shows on purpose, and it's important for the participant to recognize it by sight, rather
+# than get a generic "pods aren't working". We print the real cause as evidence —
+# on a registry failure and on a typo in the image name the pod state is the same.
 PODS="$(kget pods -l app=passes-api --no-headers)"
 RUNNING="$(printf '%s' "$PODS" | awk '$3=="Running"' | grep -c .)"
 BADSTATE="$(printf '%s' "$PODS" | awk '$3!="Running"{print $3}' | sort -u | tr '\n' ' ')"
 
 if [ "$RUNNING" -ge 1 ]; then
-  ok "एप्लिकेशन की चल रही प्रतियाँ: ${RUNNING}"
-  evidence "एप्लिकेशन पॉड" "$(kget pods -l app=passes-api -o wide)"
+  ok "application replicas running: ${RUNNING}"
+  evidence "Application pods" "$(kget pods -l app=passes-api -o wide)"
 elif printf '%s' "$BADSTATE" | grep -q 'ImagePullBackOff\|ErrImagePull'; then
-  fail "इमेज डाउनलोड नहीं हो रही: ${BADSTATE}" \
-       "यह रजिस्ट्री एक्सेस अस्वीकृति या इमेज नाम में टाइपो है; असली कारण kubectl describe pod -l app=passes-api दिखाएगा"
-  evidence "विफलता का कारण" "$(kubectl describe pod -l app=passes-api 2>/dev/null \
+  fail "the image is not downloading: ${BADSTATE}" \
+       "this is a registry access denial or a typo in the image name; the real cause will be shown by kubectl describe pod -l app=passes-api"
+  evidence "Failure cause" "$(kubectl describe pod -l app=passes-api 2>/dev/null \
     | grep -A2 'Failed to pull\|Warning' | head -20)"
 else
-  fail "एप्लिकेशन की कोई चल रही प्रति नहीं है (स्थितियाँ: ${BADSTATE:-कोई पॉड नहीं})" \
-       "kubectl describe pod -l app=passes-api देखें"
+  fail "there is no running application replica (states: ${BADSTATE:-no pods})" \
+       "see kubectl describe pod -l app=passes-api"
 fi
 
-# सबसे कठिन-निदान वाली लैब त्रुटि के लिए एक अलग जाँच: इमेज ARM के लिए बनी,
-# जबकि क्लस्टर नोड्स x86 पर हैं। सब कुछ सही दिखता है — इमेज बनी, रजिस्ट्री में पुश हुई,
-# नोड पर डाउनलोड हुई — पर प्रोसेस शुरू नहीं होता। आसपास कुछ भी प्रोसेसर आर्किटेक्चर
-# का संकेत नहीं देता, और एकमात्र सुराग पॉड लॉग में है, इसलिए
-# हम उन्हें एक अलग जाँच से देखते हैं और कारण सीधे बताते हैं।
+# A separate check for the hardest-to-diagnose lab error: the image was built
+# for ARM, while the cluster nodes are x86. Everything looks correct — the image built, was pushed
+# to the registry, downloaded onto the node — but the process doesn't start. Nothing around hints
+# at the processor architecture, and the only clue lies in the pod logs, so
+# we look at them with a separate check and name the cause directly.
 LOGS="$(kubectl logs -l app=passes-api --tail=20 --all-containers 2>&1)"
 if printf '%s' "$LOGS" | grep -q 'exec format error'; then
-  fail "इमेज किसी अन्य प्रोसेसर आर्किटेक्चर के लिए बनी है" \
-       "इस फ़्लैग के साथ फिर से बनाएँ: docker build --platform linux/amd64 -t ${IMAGE} app/ और इसे फिर पुश करें"
+  fail "the image was built for a different processor architecture" \
+       "rebuild with the flag: docker build --platform linux/amd64 -t ${IMAGE} app/ and push it again"
 fi
 
-# --- एप्लिकेशन सार्थक रूप से जवाब देता है ----------------------------------
-# चल रहा पॉड अभी काम करती सेवा नहीं है। हम क्लस्टर के अंदर जाते हैं, एप्लिकेशन को उसके
-# आंतरिक नाम से अनुरोध करते हैं और जवाब से पॉड का नाम पढ़ते हैं। अगर यह सचमुच चल रहे
-# पॉड से मेल खाता है — तो जवाब देने वाला ठीक वही एप्लिकेशन है जो हमने डिप्लॉय किया, न कि
-# कुछ और जिसने गलती से यह पता ले लिया। मेल न होना warn है, fail नहीं:
-# दो अनुरोधों के बीच कोई प्रति फिर से बन सकती थी, और यह प्रतिभागी की गलती नहीं।
+# --- the application responds meaningfully ----------------------------------
+# A running pod does not yet mean a working service. We go inside the cluster, request the
+# application by its internal name and read the pod name from the response. If it matches a really
+# running pod — then the responder is exactly the application we deployed, and not
+# something else that accidentally took this address. A mismatch is warn, not fail:
+# a replica could have been recreated between two requests, and it's not the participant's fault.
 if [ -z "$(kget svc "$APP" -o name)" ]; then
-  fail "${APP} नाम की कोई Service नहीं है" \
-       "यह passes.yaml में वर्णित है — पूरी फ़ाइल लागू करें, केवल Deployment नहीं"
+  fail "there is no Service named ${APP}" \
+       "it is described in passes.yaml — apply the whole file, not just the Deployment"
 else
   BODY="$(in_cluster_curl "http://${APP}.default.svc.cluster.local/")"
   SERVED_POD="$(printf '%s' "$BODY" \
@@ -225,14 +225,14 @@ try: print(json.load(sys.stdin).get("pod",""))
 except Exception: pass' 2>/dev/null)"
 
   if [ -z "$SERVED_POD" ]; then
-    fail "सेवा ${APP} ने अपेक्षित JSON नहीं लौटाया" \
-         "kubectl logs -l app=passes-api देखें और सुनिश्चित करें कि Service में पोर्ट एप्लिकेशन पोर्ट से मेल खाता है"
+    fail "service ${APP} did not return the expected JSON" \
+         "see kubectl logs -l app=passes-api and make sure the port in the Service matches the application port"
   elif printf '%s' "$PODS" | grep -q "$SERVED_POD"; then
-    ok "सेवा JSON से जवाब देती है, जवाब सचमुच चल रहे पॉड ${SERVED_POD} से आया"
-    evidence "सेवा का जवाब" "$BODY"
+    ok "the service responds with JSON, the response came from the actually running pod ${SERVED_POD}"
+    evidence "Service response" "$BODY"
   else
-    warn "सेवा ने पॉड ${SERVED_POD} की ओर से जवाब दिया, जो चल रहे पॉड्स में नहीं है" \
-         "संभवतः प्रति अनुरोधों के बीच फिर से बनी — जाँच फिर से चलाएँ"
+    warn "the service responded on behalf of pod ${SERVED_POD}, which is not among the running ones" \
+         "the replica was most likely recreated between requests — run the check again"
   fi
 fi
 

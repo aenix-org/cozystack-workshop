@@ -37,16 +37,16 @@ vSphere なら、そうした場所は誰かがあなたに割り当ててくれ
 解決策は **WSL** — Windows 内部の Linux サブシステムです。管理者として実行した PowerShell で、たった1つのコマンドでインストールできます。
 
 ```powershell
-# Windows 内部に Linux サブシステムをインストールします: カーネル、サービス、そして
-# デフォルトの Ubuntu ディストリビューション。インストール後、Windows は再起動を求めてきます。
+# installs the Linux subsystem inside Windows: the kernel, the service and the default
+# Ubuntu distribution. After installation Windows will ask you to reboot.
 wsl --install
 ```
 
 再起動すると Ubuntu のコンソールが手に入り、あとは他のみんなと同じようにその中で作業します。WSL の中では、クラスターに接続するためのコマンドである自前の `kubectl` が必要になります。
 
 ```bash
-# snap は Ubuntu のパッケージマネージャーです。--classic は隔離なしでパッケージをインストールします:
-# 隔離モードでは kubectl がホームフォルダーにあるアクセスファイルを見られません。
+# snap is Ubuntu's package manager. --classic installs the package without isolation:
+# in isolated mode kubectl won't see the access file in your home folder.
 sudo snap install kubectl --classic
 ```
 
@@ -59,7 +59,7 @@ Windows のドライブは WSL からは `/mnt/c/...` というパスで見え�
 ファイルはすべてすでにあなたのものです。リポジトリと一緒に取得済みです。作成したり、あらためて打ち込んだりするものは何もありません。以下で `kubectl apply -f name.yaml` と書かれているところでは、ファイルはここから取られます。
 
 ```bash
-# パスはリポジトリのルートから数えます — 次のステップでそれを取得します
+# the path is counted from the repository root — you fetch it in the next step
 cd labs/00-cluster
 ```
 
@@ -75,8 +75,8 @@ cd labs/00-cluster
 リポジトリにはマニフェスト — クラスターに何を作成するかを記述したファイル — と、チェックスクリプトが入っています。これらはこのラボから必要になります。
 
 ```bash
-# clone = 変更履歴も含め、リポジトリ全体をダウンロードします。
-# 隣に cozystack-migration-workshop というフォルダーが現れるので、その中に移動します。
+# clone = download the entire repository, together with its change history.
+# A folder cozystack-migration-workshop appears alongside; we move into it.
 git clone https://github.com/aenix-org/cozystack-migration-workshop.git
 cd cozystack-migration-workshop
 ```
@@ -92,8 +92,8 @@ cd cozystack-migration-workshop
 このパスはすべてのラボで使われます — ファイルを別の場所に保存すると、ここから先は毎回自分のパスに置き換えることになります。
 
 ```bash
-# ファイルが読めること、そしてクラスターが応答することを確認します。
-# --kubeconfig は、このコマンドで kubectl がどのアクセスファイルを使うかを指定します。
+# Check that the file is readable and the cluster answers.
+# --kubeconfig tells kubectl which access file to use in this command.
 kubectl --kubeconfig ~/.kube/workshop get kubernetes.apps.cozystack.io -n tenant-workshopXX
 ```
 
@@ -162,19 +162,19 @@ spec:
 ⚠️ 以下のコマンドは**管理クラスター上で**、テナントと一緒に渡されたアクセスで実行されます。`lab` クラスターそのものへのアクセスファイルはまだ存在しません。それはクラスターが立ち上がってから初めて現れます。
 
 ```bash
-# ラボのフォルダーに移動します — ここから先、すべてのファイルはここから取られます
+# move into the lab folder — from here on all files are taken from here
 cd labs/00-cluster
-# 適用する前に、ファイル内の XX をあなた自身のテナント番号に置き換えてください。
-# apply = 「クラスターをファイルに記述された状態にせよ」。このコマンド自身がクラスターを
-# 立ち上げるのではありません — それはプラットフォームに注文を渡し、プラットフォームが
-# 何をどの順で作成するかを決めます。
-#   -f   記述をファイルから取る
+# before applying, substitute your own tenant number in the file in place of XX.
+# apply = "bring the cluster to what's described in the file". The command doesn't bring
+# the cluster up itself — it hands the order to the platform, which decides what to
+# create and in what order.
+#   -f   take the description from the file
 kubectl apply -f cluster.yaml
-# get = 「何があるか見せろ」。kubernetes.apps.cozystack.io はオブジェクト型の完全名で、
-# ファイルに記述されたまさにそれ（kind: Kubernetes）、lab はあなたの注文の名前です。
-#   -n   どの namespace を見るか。フラグなしだと kubectl はデフォルトの namespace を見ます
-#   -w   変更を監視して出力する。抜けるには Ctrl+C、これでインストールは中断されません
-# READY 列に True が現れるまで待ちます。
+# get = "show what's there". kubernetes.apps.cozystack.io is the full name of the object
+# type, the very one described in the file (kind: Kubernetes), lab is the name of your order.
+#   -n   which namespace to look in; without the flag kubectl looks in the default namespace
+#   -w   watch and print changes. To exit — Ctrl+C, the installation won't be interrupted by it
+# Wait until True appears in the READY column.
 kubectl -n tenant-workshopXX get kubernetes.apps.cozystack.io lab -w
 ```
 
@@ -187,9 +187,9 @@ kubectl -n tenant-workshopXX get kubernetes.apps.cozystack.io lab -w
 ⚠️ **20分以上経ってもステータスが変わらない場合 — 原因はあなたのクラスターにないかもしれません。** プラットフォーム上のすべてのアプリケーションのインストールは共有のキューが取り仕切っており、そこに誰かの長い操作が並んでいると、あなたのクラスターは順番を待つことになります。作業に取り掛かられたかどうかを見るには:
 
 ```bash
-# 注文そのものと、プラットフォームがそれについて書いていることを見ます。
-# 出力の末尾にある status.conditions セクションがその報告です: 作業に取り掛かられたか、
-# 何が妨げているか、何を待っているか。
+# Look at the order itself and at what the platform writes about it.
+# The status.conditions section at the end of the output is its report: whether it's been
+# picked up for work, what's blocking, what it's waiting for.
 kubectl --kubeconfig ~/.kube/workshop -n tenant-workshopXX \
   get kubernetes.apps.cozystack.io lab -o yaml
 ```
@@ -197,7 +197,7 @@ kubectl --kubeconfig ~/.kube/workshop -n tenant-workshopXX \
 そこを見ても要領を得ないなら — テナントのイベントを見てください。これはプラットフォームがあなたのオブジェクトに対して何をしたかのログです。
 
 ```bash
-# events = 出来事のログ。新しいものが下に来るよう、時刻で並べ替えます。
+# events = a log of incidents. We sort by time so the freshest is at the bottom.
 kubectl --kubeconfig ~/.kube/workshop -n tenant-workshopXX \
   get events --sort-by=.lastTimestamp | tail -20
 ```
@@ -227,12 +227,12 @@ kubectl --kubeconfig ~/.kube/workshop -n tenant-workshopXX \
 **主な方法 — コマンドで。** Cozystack はあなたのクラスターに、まさにこの Secret を読むことだけを許可し、それ以外は何も許可しない専用のアクセスルールを設定します。コマンドは**管理クラスター上で**、テナントと一緒に渡されたアクセスで実行され、その結果はノートPC上のファイルに入れられます。
 
 ```bash
-# get secret = Secret を見せる。-o go-template — 全体を印字するのではなく、
-# そこから1つのフィールドを取り出してテキストとして出力します:
-#   index .data "admin.conf"   Secret から admin.conf という鍵を取る
-#   base64decode               Secret の内容は base64 エンコードされて保存されているので、
-#                              この関数が元のテキストを返します
-#   > ~/lab.kubeconfig         出力を画面ではなくファイルに書き込む
+# get secret = show the Secret; -o go-template — don't print it whole,
+# but pull one field out of it and output it as text:
+#   index .data "admin.conf"   take the admin.conf key from the Secret
+#   base64decode               the contents of Secrets are stored base64-encoded,
+#                              this function returns the original text
+#   > ~/lab.kubeconfig         write the output to a file instead of the screen
 kubectl -n tenant-workshopXX get secret kubernetes-lab-admin-kubeconfig \
   -o go-template='{{ printf "%s\n" (index .data "admin.conf" | base64decode) }}' > ~/lab.kubeconfig
 ```
@@ -248,18 +248,18 @@ kubectl -n tenant-workshopXX get secret kubernetes-lab-admin-kubeconfig \
 macOS と Linux:
 
 ```bash
-# KUBECONFIG は、kubectl がどのアクセスファイルを取るかを知るための変数です。
-# export により、このターミナルウィンドウで以降実行されるすべてのコマンドから見えるようになります。
+# KUBECONFIG is the variable from which kubectl learns which access file to take.
+# export makes it visible to all commands run further in this terminal window.
 export KUBECONFIG=~/lab.kubeconfig
-# nodes はクラスターのノード、あなたのアプリケーションが動くまさにあの仮想マシンです。
-# その応答は、ついでにアクセスファイルが機能していることも証明します。
+# nodes are the cluster's nodes, the very virtual machines your applications will run on.
+# The answer also proves the access file works.
 kubectl get nodes
 ```
 
 Windows PowerShell — WSL をインストールできなかった場合のみ:
 
 ```powershell
-# PowerShell では環境変数は $env: で設定し、ウィンドウを閉じるまで存続します
+# in PowerShell environment variables are set via $env: and live until the window closes
 $env:KUBECONFIG="$HOME\lab.kubeconfig"
 kubectl get nodes
 ```
@@ -280,10 +280,10 @@ kubernetes-lab-md0-xxxxx    Ready    <none>   3m    v1.35.6
 📍 **場所:** ノートPC上、`kubectl` で作業していたのと同じターミナルウィンドウで。
 
 ```bash
-# スクリプトはラボのフォルダーから実行します: ファイルを自分の隣で探すからです
+# the script runs from the lab folder: it looks for files next to itself
 cd labs/00-cluster
-# 名前の前の ./ は「ファイルをまさにここから実行せよ」という意味です。これがないとシェルは
-# check.sh というコマンドをシステムフォルダーの中で探し、見つけられません
+# ./ before the name means "run the file right from here"; without it the shell
+# will look for the check.sh command among the system folders and won't find it
 ./check.sh
 ```
 

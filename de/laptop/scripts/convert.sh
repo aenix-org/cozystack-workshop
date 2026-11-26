@@ -1,44 +1,44 @@
 #!/bin/bash
-# VMware OVA -> qcow2 innerhalb der conversion-VM konvertieren.
-# In der conversion-VM (ubuntu-20.04) als root ausführen:  sudo bash convert.sh
+# Convert VMware OVA -> qcow2 inside the conversion-VM.
+# Run in the conversion-VM (ubuntu-20.04) as root:  sudo bash convert.sh
 set -euo pipefail
 
 # =========================================================================
-# TRAGEN SIE IHRE WERTE EIN.
-#   Die Zugangsdaten stammen aus dem Dashboard: Bucket -> Ihr Bucket -> Reiter Secrets
-#   (Secret bucket-<name>-app-credentials: accessKey / secretKey / bucketName).
-#   Den Link zur Quell-OVA stellt der Operator bereit (gemeinsamer Image-Bucket).
+# PASTE YOUR VALUES.
+#   Credentials come from the dashboard: Bucket -> your bucket -> Secrets tab
+#   (secret bucket-<name>-app-credentials: accessKey / secretKey / bucketName).
+#   The link to the source OVA is provided by the operator (shared image bucket).
 # =========================================================================
-S3_ENDPOINT="https://s3.workshop.aenix.io"   # Feld endpoint aus Secrets, aber MIT DEM PRÄFIX https://
-                                             # (im Dashboard ohne Schema angezeigt, https:// selbst hinzufügen)
-BUCKET="ВСТАВЬТЕ_bucketName"                 # bucketName Ihres Buckets
-ACCESS_KEY="ВСТАВЬТЕ_accessKey"              # accessKey Ihres Buckets
-SECRET_KEY="ВСТАВЬТЕ_secretKey"              # secretKey Ihres Buckets
-OVA_URL="https://s3.workshop.aenix.io/bucket-a9209f83-4ac1-463e-8477-d8365bef787b/app-1.ova"  # fertige Demo-OVA für den Workshop (bereits hochgeladen; kann durch Ihre eigene ersetzt werden)
+S3_ENDPOINT="https://s3.workshop.aenix.io"   # endpoint field from Secrets, but WITH THE https:// PREFIX
+                                             # (shown without the scheme in the dashboard, add https:// yourself)
+BUCKET="PASTE_bucketName"                 # bucketName of your bucket
+ACCESS_KEY="PASTE_accessKey"              # accessKey of your bucket
+SECRET_KEY="PASTE_secretKey"              # secretKey of your bucket
+OVA_URL="https://s3.workshop.aenix.io/bucket-a9209f83-4ac1-463e-8477-d8365bef787b/app-1.ova"  # ready-made demo OVA for the workshop (already uploaded; you can replace it with your own)
 # =========================================================================
 
-echo "== 1. nested-virt? (falls /dev/kvm fehlt -> TCG, langsamer, aber funktioniert) =="
-if [ -e /dev/kvm ]; then echo "  /dev/kvm vorhanden — Hardwarebeschleunigung"; else
-  echo "  /dev/kvm FEHLT -> LIBGUESTFS_BACKEND=direct (TCG)"; export LIBGUESTFS_BACKEND=direct; fi
+echo "== 1. nested-virt? (if /dev/kvm is missing -> TCG, slower, but works) =="
+if [ -e /dev/kvm ]; then echo "  /dev/kvm present — hardware acceleration"; else
+  echo "  /dev/kvm MISSING -> LIBGUESTFS_BACKEND=direct (TCG)"; export LIBGUESTFS_BACKEND=direct; fi
 
-echo "== 2. lade die Quell-OVA herunter =="
+echo "== 2. downloading the source OVA =="
 cd /root
 wget -O source.ova "$OVA_URL"
 
-echo "== 3. virt-v2v: VMware OVA -> qcow2 (das Flag -of qcow2 ist zwingend erforderlich) =="
+echo "== 3. virt-v2v: VMware OVA -> qcow2 (the -of qcow2 flag is mandatory) =="
 rm -rf /root/out && mkdir -p /root/out
 time virt-v2v -i ova /root/source.ova -o local -os /root/out -of qcow2 -on app
 
-echo "== 4. lade das Ergebnis in IHREN Bucket (S3) hoch =="
+echo "== 4. uploading the result to YOUR bucket (S3) =="
 mc alias set mybucket "$S3_ENDPOINT" "$ACCESS_KEY" "$SECRET_KEY"
 mc cp /root/out/app-sda "mybucket/$BUCKET/app.qcow2"
 
-echo "== 5. generiere einen Link für die VM Disk (presigned, 7 Tage gültig) =="
-echo "   Kopieren Sie die URL aus der Zeile 'Share:' unten — das ist der Link für den http-Import."
-echo "   (der Link ist temporär und signiert — anonymer Zugriff auf den Bucket ist NICHT erforderlich)"
+echo "== 5. generating a link for the VM Disk (presigned, valid for 7 days) =="
+echo "   Copy the URL from the 'Share:' line below — that is the link for http-import."
+echo "   (the link is temporary and signed — anonymous access to the bucket is NOT required)"
 mc share download --expire 168h "mybucket/$BUCKET/app.qcow2"
 
 echo ""
-echo "== FERTIG. Kopieren Sie die URL aus der Zeile 'Share:' oben und tragen Sie sie ein in"
-echo "   manifests/03-app-vm.yaml (Feld url), danach kubectl apply -f."
-echo "   Dasselbe über das Dashboard: VM Disk -> Deploy new -> source = http -> diese URL."
+echo "== DONE. Copy the URL from the 'Share:' line above and put it into"
+echo "   manifests/03-app-vm.yaml (the url field), then kubectl apply -f."
+echo "   The same via the dashboard: VM Disk -> Deploy new -> source = http -> this URL."

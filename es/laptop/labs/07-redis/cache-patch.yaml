@@ -1,48 +1,48 @@
 ---
-# Lab 7 · activación real de la caché. Se aplica sobre el passes-api ya desplegado
-# en vuestro clúster `lab` (export KUBECONFIG=~/lab.kubeconfig):
+# Lab 7 · turning the cache on for real. Applied on top of the already-deployed passes-api
+# in your `lab` cluster (export KUBECONFIG=~/lab.kubeconfig):
 #   kubectl patch deployment passes-api --patch-file cache-patch.yaml
 #
-# Esto es un patch, no un manifiesto completo: aquí solo se describe lo que cambia. Todo lo demás —
-# la imagen, las etiquetas, las probes, los recursos — permanece intacto desde passes-api.yaml. Por eso el
-# archivo empieza directamente en spec: la ruta hasta el contenedor reproduce la estructura del Deployment,
-# para que el clúster entienda dónde exactamente aplicar la edición.
+# This is a patch, not a full manifest: it describes only what changes. Everything else —
+# the image, labels, probes, resources — stays untouched from passes-api.yaml. That is why the
+# file starts straight from spec: the path down to the container mirrors the Deployment
+# structure so the cluster understands exactly where to apply the edit.
 #
-# El nombre del contenedor `api` no es un adorno, sino una dirección: por él el clúster encuentra el
-# contenedor correcto en la lista. Si os equivocáis en el nombre, en lugar de una edición obtendréis un segundo contenedor.
+# The container name `api` is not decoration but an address: the cluster uses it to find the
+# right container in the list. Get the name wrong and instead of an edit you get a second container.
 #
-# Sustituid la dirección de vuestro propio Redis en lugar de REDIS-ADDR — es un marcador de posición, no un nombre de host.
-# La dirección la tomáis del panel, en la tarjeta de vuestra aplicación gestionada de Redis.
+# Substitute the address of your own Redis in place of REDIS-ADDR — it is a placeholder, not a hostname.
+# You take the address from the dashboard, in the card of your managed Redis application.
 spec:
   template:
     spec:
       containers:
         - name: api
-          # Las listas env en Kubernetes se fusionan por el campo name, por eso las tres entradas de abajo
-          # se añaden a las que ya existen en el Deployment, en lugar de reemplazarlas.
+          # env lists in Kubernetes are merged by the name field, so the three entries below
+          # are added to those already in the Deployment rather than replacing them.
           env:
-            # La aparición de esta variable es lo que significa «activar la caché»: la aplicación la comprueba
-            # al arrancar y, si está definida, va primero a Redis. Vacía o
-            # ausente — funciona como antes, consultando el directorio en cada petición.
+            # The appearance of this variable is what "turn the cache on" means: the application checks
+            # it at startup and, if it is set, goes to Redis first. Empty or
+            # missing — it works as before, hitting the directory on every request.
             - name: REDIS_ADDR
               value: "REDIS-ADDR:6379"
-            # La contraseña no la escribimos como texto: llega desde un secreto que vosotros
-            # crearéis con un comando aparte. En un manifiesto que vive en Git,
-            # una contraseña no tiene sitio.
+            # We do not write the password as text: it arrives from a secret that you
+            # will create with a separate command. In a manifest that lives in Git,
+            # a password has no place.
             #
-            # secretKeyRef es una referencia: name — el nombre del objeto-secreto en el mismo clúster,
-            # key — qué campo dentro de él tomar. El valor se sustituye al arrancar
-            # el pod y nunca aparece en el archivo.
+            # secretKeyRef is a reference: name — the name of the secret object in the same cluster,
+            # key — which field inside it to take. The value is substituted when the
+            # pod starts and never appears in the file.
             - name: REDIS_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: redis-password
                   key: password
-            # Cuántos segundos vive un registro en la caché. Sesenta — porque el
-            # directorio de empleados cambia una vez al día, no una vez por segundo.
+            # How many seconds a record lives in the cache. Sixty — because the
+            # employee directory changes once a day, not once a second.
             #
-            # Un plazo mayor — consultamos el directorio con menos frecuencia, pero servimos un apellido
-            # obsoleto durante más tiempo. Uno menor — los datos son más frescos, la ganancia es menor. Es un compromiso,
-            # no un ajuste con un valor correcto.
+            # A longer term — we hit the directory less often, but serve a stale
+            # surname for longer. A shorter one — the data is fresher, the gain is smaller. This is a trade-off,
+            # not a setting with a correct value.
             - name: CACHE_TTL
               value: "60"

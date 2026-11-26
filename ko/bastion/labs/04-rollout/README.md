@@ -30,7 +30,7 @@
 파일은 이미 다 갖고 있습니다. 리포지토리와 함께 받았으니까요. 새로 만들거나 다시 타이핑할 것은 없습니다. 아래에서 `kubectl apply -f name.yaml`이 보이면, 그 파일은 여기서 가져오는 것입니다.
 
 ```bash
-# 이제부터 모든 명령은 이 폴더에서 실행합니다: `kubectl apply -f`의 경로는 이 폴더 기준입니다.
+# From here on, all commands are run from this folder: paths in `kubectl apply -f` are counted from it.
 cd labs/04-rollout
 ```
 
@@ -51,28 +51,28 @@ cd labs/04-rollout
 **사본을 세 개로 만듭니다.** 교체가 하나씩 눈에 보이도록 말이죠. 여기서 사본이란 Pod입니다. 클러스터에서의 최소 실행 단위이자, 애플리케이션 컨테이너와 그 환경을 합친 것으로, VM 한 대에 가장 가까운 대응물입니다. 사본이 하나여도 롤아웃은 다운타임 없이 지나가지만, "Pod 하나가 있었는데 이제 다른 Pod가 됐다"만 보일 뿐 클러스터가 어떤 순서로 교체하는지는 보이지 않습니다.
 
 ```bash
-# KUBECONFIG — 클러스터의 주소와 로그인 자격 증명이 담긴 파일. 이 변수가 설정되어 있는 동안에는
-# 모든 kubectl 명령이 명령을 낸 클러스터가 아니라 `lab` 클러스터로 갑니다.
+# KUBECONFIG — the file with the cluster's address and the credentials to log into it. While the
+# variable is set, every kubectl command goes to the `lab` cluster, not the one it was issued from.
 export KUBECONFIG=~/lab.kubeconfig
 
-# hpa — 스케일링 랩에서 만든 오토스케일러. 사본 수가 우리 명령에만
-# 반응해 바뀌도록 이것을 삭제합니다.
-#   --ignore-not-found  이미 클러스터에 없어도 오류로 취급하지 않는다
+# hpa — the autoscaler set up in the scaling lab. We delete it
+# so the number of copies changes only on our command.
+#   --ignore-not-found  don't treat it as an error if it's no longer in the cluster
 kubectl delete hpa rickroll --ignore-not-found
 
-# scale = "이만큼 사본을 유지하라". 이 숫자는 애플리케이션 명세로 들어가고,
-# 그다음 클러스터가 스스로 부족한 사본을 띄웁니다.
+# scale = "keep this many copies". The number goes into the application's description,
+# and the cluster then brings up the missing ones itself.
 kubectl scale deployment rickroll --replicas=3
 
-# rollout status = "요청한 것이 실제가 될 때까지 기다려라". 이 명령은 세 사본이 모두
-# 준비될 때까지 창을 붙잡아 두고, 그제서야 프롬프트를 돌려줍니다.
+# rollout status = "wait until the requested becomes actual". The command keeps the window
+# busy until all three copies are ready, and only then returns the prompt.
 kubectl rollout status deployment/rickroll
 ```
 
 Fortio 부하 생성기가 제자리에 있는지 확인하세요:
 
 ```bash
-# get = "무엇이 있는지 보여줘라". 응답 `Error from server (NotFound)`는 없다는 뜻입니다.
+# get = "show what's there". The reply `Error from server (NotFound)` means it isn't there.
 kubectl get deployment fortio
 ```
 
@@ -95,10 +95,10 @@ metadata:
 data:
   index.html: |
     ...
-    <div class="tag">버전 2</div>
+    <div class="tag">VERSION 2</div>
     <h1>We're No Strangers To Love</h1>
     ...
-    <div class="pod">요청을 처리한 Pod<b>__POD__</b></div>
+    <div class="pod">served by pod<b>__POD__</b></div>
 ```
 
 안에는 페이지 하나가 들어 있습니다. 다른 제목, 다른 색 배합, 눈에 띄는 "버전 2" 배지. 차이는 일부러 눈에 잘 띄게 만들었습니다. diff가 아니라 브라우저를 볼 테니까요.
@@ -122,8 +122,8 @@ data:
 적용하세요. 클러스터에 두 번째 ConfigMap이 생기지만, 아직 아무것도 그것을 참조하지 않으므로 실행 중인 애플리케이션은 건드리지 않습니다:
 
 ```bash
-# apply = "클러스터를 파일에 기술된 상태로 만들어라".
-#   -f name.yaml   명세를 어디서 가져올지; 파일은 바로 이 폴더에 있다
+# apply = "bring the cluster to what's described in the file".
+#   -f name.yaml   where to take the description from; the file is in this same folder
 kubectl apply -f rickroll-page-v2.yaml
 ```
 
@@ -132,10 +132,10 @@ kubectl apply -f rickroll-page-v2.yaml
 이제 애플리케이션을 열어 **아무것도 바뀌지 않았음**을 확인하세요:
 
 ```bash
-# port-forward = bastion에서 클러스터 안으로 이어지는 임시 터널.
-#   svc/rickroll  어디로 이어지는가: Service로, 즉 요청을 사본들에 분배하며
-#   8080:80       왼쪽은 bastion의 포트, 오른쪽은 클러스터 안 서비스의 포트
-# 터널이 열려 있는 동안 창은 붙잡혀 있고, Ctrl+C로 닫힙니다.
+# port-forward = a temporary tunnel from the bastion into the cluster.
+#   svc/rickroll  where it leads: into the Service, that is, with requests spread across the copies
+#   8080:80       on the left the port on the bastion, on the right the service's port inside the cluster
+# While the tunnel is open the window is busy; it closes on Ctrl+C.
 kubectl port-forward svc/rickroll 8080:80
 ```
 
@@ -148,9 +148,9 @@ kubectl port-forward svc/rickroll 8080:80
 버전을 바꾸기 전에, 교체가 따를 규칙을 살펴봅시다. 이 규칙은 애플리케이션 명세 자체에 들어 있습니다:
 
 ```bash
-# -o jsonpath=... — 표 대신, 경로를 지정해 객체의 필드 하나만 출력한다.
-#   {.spec.strategy}  클러스터가 사본을 교체하는 규칙 블록
-#   {"\n"}            끝에 개행; 없으면 출력이 프롬프트에 붙는다
+# -o jsonpath=... — instead of a table, print a single field of the object by giving the path to it.
+#   {.spec.strategy}  the block of rules by which the cluster replaces copies
+#   {"\n"}            a newline at the end, otherwise the output runs into the prompt
 kubectl get deployment rickroll -o jsonpath='{.spec.strategy}{"\n"}'
 ```
 
@@ -192,10 +192,10 @@ kubectl get deployment rickroll -o jsonpath='{.spec.strategy}{"\n"}'
 📍 **창 1** — Fortio로 가는 터널:
 
 ```bash
-# 새 터미널 창은 이전 창의 변수를 기억하지 못합니다 — KUBECONFIG를 다시 설정합니다.
+# A new terminal window doesn't remember the previous one's variables — we set KUBECONFIG again.
 export KUBECONFIG=~/lab.kubeconfig
-# 부하 생성기로 가는 터널: bastion의 8081 포트 → fortio 서비스의 8080 포트.
-# 왼쪽에 8081을 고른 것은 8080에서 애플리케이션 자체로 가는 터널과 충돌하지 않기 위해서입니다.
+# A tunnel to the load generator: port 8081 on the bastion → port 8080 of the fortio service.
+# 8081 was chosen on the left so as not to collide with the tunnel to the application itself on 8080.
 kubectl port-forward svc/fortio 8081:8080
 ```
 
@@ -213,13 +213,13 @@ kubectl port-forward svc/fortio 8081:8080
 폼이 잘 안 됐다면 같은 부하를 명령으로 줄 수도 있습니다:
 
 ```bash
-# exec = 이미 실행 중인 Pod 안에서 명령을 실행한다. 부하는 여러분의 bastion이 아니라
-# Fortio 자신이 클러스터 안에서 생성하므로, 이 경우 터널이 필요 없습니다.
-#   deploy/fortio  fortio 애플리케이션의 아무 사본에서
-#   --             오른쪽에 있는 모든 것은 kubectl이 아니라 컨테이너에 대한 명령이다
-#   -qps 300       초당 300 요청
-#   -c 20          동시 연결 20개
-#   -t 180s        3분간 부하를 유지
+# exec = run a command inside an already-running Pod. The load is generated not by your bastion,
+# but by Fortio itself from inside the cluster, so no tunnel is needed for this.
+#   deploy/fortio  in any copy of the fortio application
+#   --             everything to the right is a command for the container, not for kubectl
+#   -qps 300       three hundred requests per second
+#   -c 20          twenty simultaneous connections
+#   -t 180s        hold the load for three minutes
 kubectl exec deploy/fortio -- fortio load -qps 300 -c 20 -t 180s http://rickroll/
 ```
 
@@ -227,9 +227,9 @@ kubectl exec deploy/fortio -- fortio load -qps 300 -c 20 -t 180s http://rickroll
 
 ```bash
 export KUBECONFIG=~/lab.kubeconfig
-# -l app=rickroll — 이 레이블을 가진 Pod만 보여준다; 다른 것은 출력에 들어오지 않는다.
-# -w = "지켜보며 이어 붙이기": 창이 붙잡힌 채, 어떤 사본의 상태가 바뀔 때마다
-# 새 줄을 출력한다. 종료 — Ctrl+C.
+# -l app=rickroll — show only Pods with this label; others won't get into the output.
+# -w = "watch and append": the window stays busy and prints a new line every time
+# the state of some copy changes. Exit — Ctrl+C.
 kubectl get pods -l app=rickroll -w
 ```
 
@@ -238,18 +238,18 @@ kubectl get pods -l app=rickroll -w
 📍 **창 3** — 비어 있는 창. 첫 번째는 Fortio로 가는 터널을 붙들고 있고, 두 번째는 Pod를 지켜보느라 붙잡혀 있으므로, 패치는 세 번째에서 실행합니다. 거기서 접근을 다시 설정해야 합니다:
 
 ```bash
-# 새 터미널 창은 이전 창의 변수를 기억하지 못합니다 — KUBECONFIG를 다시 설정합니다.
+# A new terminal window doesn't remember the previous one's variables — we set KUBECONFIG again.
 export KUBECONFIG=~/lab.kubeconfig
 ```
 
 이제 애플리케이션 명세에서 정확히 필드 하나를 바꿉니다. `page`라는 이름의 볼륨 — 컨테이너 안에 넣어지는 폴더 — 이 그 내용을 ConfigMap `rickroll-page-v2`에서 가져오게 만드는 것입니다. "애플리케이션을 업데이트하라"는 명령은 없고 앞으로도 없을 겁니다. 있는 것은 어떻게 되어야 하는지에 대한 새 기록뿐입니다. 클러스터가 실제 상태와의 불일치를 스스로 알아채고 사본 교체를 시작합니다.
 
 ```bash
-# patch = 객체 전체를 다시 쓰지 않고 필드 하나를 콕 집어 바꾼다.
-#   --type=json  수정 형식: "연산 + 경로 + 값"
-#   op: replace  이 경로에 있는 것을 교체한다
-#   path         객체 안 필드의 주소; volumes/0 — 목록의 첫 번째 볼륨(아래 참고)
-#   value        볼륨이 페이지를 가져올 새 ConfigMap 이름
+# patch = change a field in an object pinpoint-style, without rewriting the whole object.
+#   --type=json  the edit format: "operation + path + value"
+#   op: replace  replace what sits at this path
+#   path         the address of the field inside the object; volumes/0 — the first volume in the list (see below)
+#   value        the new ConfigMap name from which the volume will take the page
 kubectl patch deployment rickroll --type=json \
   -p='[{"op":"replace","path":"/spec/template/spec/volumes/0/configMap/name","value":"rickroll-page-v2"}]'
 ```
@@ -270,9 +270,9 @@ JSON Patch를 택한 것은 그것이 메커니즘을 순수한 형태로 보여
 **더 안전한 방법** — 같은 일을 평범한 merge patch로 하는 것입니다. Kubernetes의 목록은 키로 병합될 수 있고, `volumes`의 그 키는 `name`입니다:
 
 ```bash
-# --type=json 없이 하면 merge patch입니다: 객체의 일부를 매니페스트에 있는 것과 같은 형태로
-# 기술하면, 클러스터가 그것을 이미 있는 것과 병합합니다. volumes 목록은 `name` 키로 병합되므로,
-# 여기서는 "몇 번째 인덱스의 볼륨"이 아니라 `page` 볼륨이 지정됩니다.
+# Without --type=json this is a merge patch: you describe a piece of the object in the same form
+# it has in the manifest, and the cluster merges it with what's already there. The volumes list merges
+# by the `name` key, so here the `page` volume is addressed, not "the volume at such-and-such index".
 kubectl patch deployment rickroll -p \
   '{"spec":{"template":{"spec":{"volumes":[{"name":"page","configMap":{"name":"rickroll-page-v2"}}]}}}}'
 ```
@@ -288,9 +288,9 @@ kubectl patch deployment rickroll -p \
 교체가 진행되는 것을 지켜보세요:
 
 ```bash
-# rollout status는 교체 진행 상황을 한 줄씩 출력하고 모든 사본이 업데이트되면 끝납니다.
-# 롤아웃이 수렴하지 않으면 명령이 0이 아닌 종료 코드를 반환합니다 — 스크립트에서
-# 이를 멈추는 데 편리합니다.
+# rollout status prints the progress of the replacement line by line and finishes when all copies are updated.
+# If the rollout doesn't converge, the command returns a non-zero exit code — convenient for
+# stopping it in scripts.
 kubectl rollout status deployment/rickroll
 ```
 
@@ -305,8 +305,8 @@ deployment "rickroll" successfully rolled out
 이름의 꼬리를 눈여겨보세요. 새 사본은 가운데 부분도 바뀌었습니다 — 다른 ReplicaSet이라는 뜻입니다. Deployment는 옛것을 손보지 않았고, 옆에 두 번째 것을 만들어 사본을 한쪽에서 다른 쪽으로 부어 넣습니다. 옛것은 어디로도 사라지지 않았습니다. 사본이 0인 채로 무대 뒤에서 대기하고 있습니다:
 
 ```bash
-# rs — ReplicaSet의 줄임말, 명세의 한 버전에 대한 사본들의 집합.
-# DESIRED — 이 집합에서 요청된 사본 수, READY — 그중 응답할 준비가 된 수.
+# rs — shorthand for ReplicaSet, a set of copies of one version of the description.
+# DESIRED — how many copies are requested in this set, READY — how many of them are ready to answer.
 kubectl get rs -l app=rickroll
 ```
 
@@ -323,7 +323,7 @@ rickroll-7c5d4f9b21   3         3         3       40s
 애플리케이션으로 가는 터널을 여세요:
 
 ```bash
-# 랩 시작 때와 같은 터널: bastion의 8080 포트 → rickroll 서비스의 80 포트.
+# The same tunnel as at the start of the lab: port 8080 on the bastion → port 80 of the rickroll service.
 kubectl port-forward svc/rickroll 8080:80
 ```
 
@@ -349,8 +349,8 @@ All done 54000 calls (plus 0 warmup) 0.412 ms avg, 300.0 qps
 Fortio에서 부하를 다시 시작하고(같은 파라미터), 그것이 도는 동안 변경 이력을 살펴보세요:
 
 ```bash
-# history = 저장된 명세 리비전의 목록. 각 줄은 명령 하나로 되돌아갈 수 있는
-# 상태입니다. CHANGE-CAUSE — 왜 바꿨는지에 대한 선택적 메모.
+# history = the list of saved revisions of the description. Each line is a state you can
+# return to with a single command. CHANGE-CAUSE — an optional note on why it was changed.
 kubectl rollout history deployment/rickroll
 ```
 
@@ -365,11 +365,11 @@ REVISION  CHANGE-CAUSE
 롤백:
 
 ```bash
-# 추가 파라미터 없는 undo = 이전 리비전으로 되돌아간다. 이것은 "시간을 되감는" 것이
-# 아니라, 옛 명세의 평범한 롤아웃입니다: 사본이 하나씩, 똑같은 maxSurge와
-# maxUnavailable 규칙에 따라 교체됩니다.
+# undo with no extra parameters = return to the previous revision. This isn't "rewinding
+# time", it's an ordinary rollout of the old description: copies are replaced one at a time, by the same
+# maxSurge and maxUnavailable rules.
 kubectl rollout undo deployment/rickroll
-# 사본 구성이 명세와 수렴할 때까지 기다립니다.
+# We wait until the makeup of the copies converges with the description.
 kubectl rollout status deployment/rickroll
 ```
 
@@ -390,14 +390,14 @@ kubectl rollout status deployment/rickroll
 평범한 아침을 그려 보세요: 동료가 페이지의 세 번째 버전을 준비하다가 서두르는 바람에 이름에 오타를 냅니다. 그런데 매니페스트는 유효합니다 — 그런 객체가 없다는 것을 클러스터가 알아야 할 의무는 없으니까요. 정확히 이것을 재현해 봅시다:
 
 ```bash
-# 두 번째 버전으로 전환할 때와 같은 패치이지만, ConfigMap 이름에 오류가 있습니다:
-# 클러스터에는 `rickroll-page-v3` 객체가 없습니다. 참조의 존재 여부는 수락 시점에 검사되지 않으므로,
-# 명령은 성공적으로 끝납니다.
+# The same patch as when switching to the second version, but with a mistake in the ConfigMap name:
+# there is no object `rickroll-page-v3` in the cluster. The reference's existence isn't checked on acceptance,
+# so the command will finish successfully.
 kubectl patch deployment rickroll --type=json \
   -p='[{"op":"replace","path":"/spec/template/spec/volumes/0/configMap/name","value":"rickroll-page-v3"}]'
 
-# --timeout=90s — 무한정 기다리지 않는다: 준비된 사본을 얻지 못하면 명령은 1분 반 뒤에
-# 포기하고 오류를 반환한다. 롤아웃 자체는 어디로도 가지 않고 걸린 채로 남는다.
+# --timeout=90s — don't wait forever: not having gotten ready copies, the command gives up after a
+# minute and a half and returns an error. The rollout itself won't go anywhere and will stay hanging.
 kubectl rollout status deployment/rickroll --timeout=90s
 ```
 
@@ -411,8 +411,8 @@ error: timed out waiting for the condition
 사본 구성을 보세요: 이전 사본 셋은 작동 중이고, 새 사본은 시작 단계에서 멈춰 있습니다.
 
 ```bash
-# READY 열은 Pod 안의 준비된 컨테이너를 셉니다: 1/1 — 준비됨, 0/1 — 아님.
-# STATUS는 시작이 정확히 어디서 멈췄는지 알려 줍니다.
+# The READY column counts the ready containers inside the Pod: 1/1 — ready, 0/1 — not.
+# STATUS says exactly where the startup stalled.
 kubectl get pods -l app=rickroll
 ```
 
@@ -434,10 +434,10 @@ rickroll-8b6a1e5c39-wr4tz   0/1     ContainerCreating   0          90s
 **왜 사본이 뜨지 않았나.** 우리는 `rickroll-page-v3`이라는 이름의 ConfigMap을 만든 적이 없습니다 — 클러스터에 없습니다. 클러스터에 직접 물어보세요:
 
 ```bash
-# events — 클러스터의 사건 기록으로, vCenter의 Tasks & Events 탭에 가장 가까운 대응물입니다.
-#   --field-selector reason=FailedMount  볼륨 마운트 실패 기록만 남긴다
-#   --sort-by=.lastTimestamp             시간순으로 정렬, 가장 최근 것이 맨 아래로 온다
-#   | tail -3                            마지막 세 줄만 보이고 나머지는 버린다
+# events — the cluster's log of occurrences, the nearest analogue of the Tasks & Events tab in vCenter.
+#   --field-selector reason=FailedMount  keep only the records about a failed volume mount
+#   --sort-by=.lastTimestamp             sort by time, the freshest end up at the bottom
+#   | tail -3                            show the last three lines, discard the rest
 kubectl get events --field-selector reason=FailedMount --sort-by=.lastTimestamp | tail -3
 ```
 
@@ -451,8 +451,8 @@ Warning  FailedMount  kubelet  MountVolume.SetUp failed for volume "page":
 **이제 두 번째 질문, 이 단계가 만들어진 이유입니다.** 걸려 있는 롤아웃 한복판에서 애플리케이션을 열어 보세요:
 
 ```bash
-# 같은 터널. 트래픽은 준비 상태 검사를 통과한 사본, 즉 옛 사본 셋에게만 갑니다:
-# 걸려 있는 사본은 밸런싱에 들어가지 못했습니다.
+# The same tunnel. Traffic will go only to the copies that passed the readiness check,
+# that is, to the three old ones: the stuck one didn't make it into balancing.
 kubectl port-forward svc/rickroll 8080:80
 ```
 
@@ -475,9 +475,9 @@ kubectl port-forward svc/rickroll 8080:80
 빠져나오기:
 
 ```bash
-# 이전 리비전 — ConfigMap 이름이 올바르게 적힌 것 — 을 되돌립니다.
+# We return the previous revision — the one where the ConfigMap name is written correctly.
 kubectl rollout undo deployment/rickroll
-# 걸려 있던 사본이 사라지고 사본 구성이 명세와 수렴할 때까지 기다립니다.
+# We wait until the stuck copy disappears and the makeup of the copies converges with the description.
 kubectl rollout status deployment/rickroll
 ```
 
@@ -488,7 +488,7 @@ kubectl rollout status deployment/rickroll
 📍 **위치:** bastion에서, `kubectl`로 작업하던 바로 그 터미널 창에서.
 
 ```bash
-# 스크립트는 클러스터의 무엇도 바꾸지 않습니다: 상태를 읽어 보고서를 출력할 뿐입니다.
+# The script changes nothing in the cluster: it only reads the state and prints a report.
 ./check.sh
 ```
 
@@ -501,15 +501,15 @@ kubectl rollout status deployment/rickroll
 `rickroll` 애플리케이션은 나중에 필요하니 — 삭제하지 않습니다. 사본을 하나로 되돌리세요:
 
 ```bash
-# 여분의 사본 두 개는 노드의 메모리를 비워 줍니다 — 앞으로의 랩에서는 부하가 없습니다.
+# Two extra copies will free up the node's memory — there won't be any load in the labs ahead.
 kubectl scale deployment rickroll --replicas=1
 ```
 
 부하 생성기는 더 이상 필요 없습니다:
 
 ```bash
-# delete -f = 파일에 나열된 바로 그 객체들만 삭제하고, 그 밖의 것은 건드리지 않는다.
-# 경로는 옆 폴더로 이어지는데, 그 파일이 스케일링 랩이 있는 곳에 있기 때문입니다.
+# delete -f = delete exactly the objects listed in the file, and nothing besides them.
+# The path leads to the neighboring folder, because the file is where the scaling lab is.
 kubectl delete -f ../03-scale/fortio.yaml
 ```
 

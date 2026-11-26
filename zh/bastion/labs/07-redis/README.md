@@ -55,7 +55,7 @@
 所有文件都已经在你手上了——你连同仓库一起拿到了它们。不需要再创建或手敲任何东西：下面凡是写着 `kubectl apply -f name.yaml` 的地方，文件都来自这里。
 
 ```bash
-# 本实验的所有命令都在实验目录里运行——请切换进去
+# all commands in this lab run from the lab folder — switch into it
 cd labs/07-redis
 ```
 
@@ -94,7 +94,7 @@ if cache != nil {
     raw, found, err := cache.Get(key)
     switch {
     case err != nil:
-        log.Printf("缓存不可用（%v），改为访问目录服务", err)
+        log.Printf("cache unavailable (%v), going to the directory", err)
     case found:
         if json.Unmarshal([]byte(raw), &emp) == nil {
             fromCache = true
@@ -143,15 +143,15 @@ tr.MaxIdleConnsPerHost = 64
 ```bash
 cd labs/07-redis
 
-# build =「根据 Dockerfile 构建镜像」。
-#   --platform linux/amd64  为哪种处理器构建；集群节点是 x86
-#   -t <主机>/<项目>/<名称>:<标签>  给结果起什么名字；名字开头的镜像仓库地址
-#                           就是 push 之后会把它发往的地方
-#   app/                    含有 Dockerfile 和源码、用来构建的目录
+# build = "build the image from the Dockerfile".
+#   --platform linux/amd64  which processor to build for; the cluster nodes are x86
+#   -t <host>/<project>/<name>:<tag>  what to name the result; the registry host at the
+#                           start of the name is where push will send it later
+#   app/                    the folder with the Dockerfile and sources to build from
 docker build --platform linux/amd64 -t harbor.workshop03.example.org/passes/passes-api:v2 app/
 
-# push =「把镜像发送到镜像仓库」。地址取自镜像名的第一部分，
-# 凭据取自你上一个实验里做过的 docker login。
+# push = "send the image to the registry". The address is taken from the first part of the
+# image name, the credentials — from the docker login you did in the previous lab.
 docker push harbor.workshop03.example.org/passes/passes-api:v2
 ```
 
@@ -164,26 +164,26 @@ docker push harbor.workshop03.example.org/passes/passes-api:v2
 两个清单里，镜像仓库地址的位置上放的是占位符 `HARBOR-HOST`：`sed` 会替换它，就地修改文件。然后 `apply` 把文件里描述的内容交给集群，`rollout status` 等待副本起来。
 
 ```bash
-# KUBECONFIG 告诉 kubectl 用哪个访问文件。我们切换到
-# 你的实验集群 `lab`；它一直有效，直到你关闭终端窗口。
+# KUBECONFIG tells kubectl which access file to use. We switch to
+# your `lab` cluster; it holds until you close the terminal window.
 export KUBECONFIG=~/lab.kubeconfig
 
-# sed -i =「就地修改文件」。
-#   's|old|new|g'  替换每一处出现；这里用 | 作分隔符而不是 /，
-#                  因为地址里含有斜杠
-#   macOS 版的 sed 要求 -i 后面必须跟一个参数；空引号
-#   表示「不做备份」。在 Linux 上则不能有这个参数。
-#   行尾有两个文件：sed 一次可接受多个文件并在一趟里改完。
+# sed -i = "edit the file in place".
+#   's|old|new|g'  replace every occurrence; the | separator is used instead of / because
+#                  the address contains slashes
+#   The macOS version of sed requires a mandatory argument after -i; empty quotes
+#   mean "don't make a backup". On Linux that argument must not be there.
+#   There are two files at the end of the line: sed accepts several at once and edits them in one pass.
 
 # Linux
 sed -i    's|HARBOR-HOST|harbor.workshop03.example.org|g' hr-legacy.yaml passes-api.yaml
 # macOS
 sed -i '' 's|HARBOR-HOST|harbor.workshop03.example.org|g' hr-legacy.yaml passes-api.yaml
 
-# apply =「把集群带到文件里所描述的状态」。-f 标志对每个文件重复一次。
+# apply = "bring the cluster to what's described in the files". The -f flag is repeated for each file.
 kubectl apply -f hr-legacy.yaml -f passes-api.yaml
 
-# rollout status 等待副本就绪后自行退出；等不到就返回错误
+# rollout status waits for the copies to be ready and exits on its own; if they don't, it returns an error
 kubectl rollout status deployment/hr-legacy
 kubectl rollout status deployment/passes-api
 ```
@@ -191,28 +191,28 @@ kubectl rollout status deployment/passes-api
 ⚠️ 两个清单都引用了 `harbor` Secret——就是上一个实验里那个 `imagePullSecret`。如果你没做过，Pod 会进入 `ImagePullBackOff`。创建这个 Secret：
 
 ```bash
-# create secret docker-registry =「创建一个含镜像仓库凭据的 Secret」；
-# 这样的 Secret 能被 kubelet 自己在把镜像拉到节点上时读取。
-#   harbor             这个 Secret 在集群里的名字——两个清单都引用它
-#   --docker-server    这些凭据是给哪个镜像仓库的
-#   --docker-username  谁来登录；--docker-password —— Harbor 管理员密码
+# create secret docker-registry = "create a Secret with registry credentials";
+# such a Secret can be read by the kubelet itself when it pulls the image onto a node.
+#   harbor             the Secret's name in the cluster — both manifests reference it
+#   --docker-server    which registry these credentials are for
+#   --docker-username  who logs in; --docker-password — the Harbor administrator password
 kubectl create secret docker-registry harbor \
   --docker-server=harbor.workshop03.example.org \
-  --docker-username=admin --docker-password='你的密码'
+  --docker-username=admin --docker-password='YOUR-PASSWORD'
 ```
 
 我们来检查这条链路是否工作。服务只能从集群内部看到，所以我们也从那里发请求：起一个带 `curl` 的一次性 Pod，它去请求 `passes-api` 服务，打印答案，然后消失。
 
 ```bash
-# run probe =「启动一个名为 probe 的 Pod」。
-#   --rm              一旦它跑完就删除该 Pod
-#   -i                把它的输出显示给我们
-#   --restart=Never   不要重启:这是一次性命令，不是常驻服务
-#   --image=...       用哪个镜像;版本被固定住，免得来了新的东西
-#   --quiet           不打印辅助信息，只打印答案
-#   --                这两个短横线之后的一切，都是 Pod 内部的命令
-# 形如 <service>.<namespace>.svc.cluster.local 的地址是服务的内部名字;
-# Pod 靠它互相找到对方，而无需知道地址。
+# run probe = "run a Pod named probe".
+#   --rm              delete the Pod as soon as it's done
+#   -i                show us its output
+#   --restart=Never   don't restart: this is a one-time command, not a permanent service
+#   --image=...       which image to use; the version is pinned so nothing new arrives
+#   --quiet           don't print service lines, only the answer
+#   --                everything after these two dashes is the command inside the Pod
+# An address of the form <service>.<namespace>.svc.cluster.local is the service's internal name;
+# by it the Pods find each other without knowing addresses.
 kubectl run probe --rm -i --restart=Never --image=curlimages/curl:8.11.1 --quiet -- \
   curl -s "http://passes-api.default.svc.cluster.local/employee?id=42"
 ```
@@ -235,7 +235,7 @@ kubectl run probe --rm -i --restart=Never --image=curlimages/curl:8.11.1 --quiet
 部署生成器。它像普通应用一样起来，住在集群里、紧挨着服务——这样测量就不依赖你的网络，也不依赖隧道：
 
 ```bash
-# 文件里有两个对象:生成器本身和给它的一个服务
+# the file has two objects: the generator itself and a service for it
 kubectl apply -f fortio.yaml
 kubectl rollout status deployment/fortio
 ```
@@ -243,17 +243,17 @@ kubectl rollout status deployment/fortio
 现在启动负载。`kubectl exec` 命令在一个已经运行的 Pod 内部执行某些东西——这里是在生成器内部启动生成器本身，进入轰击模式：
 
 ```bash
-# exec deploy/fortio = 在这个应用的 Pod 内部执行一条命令
-#   --            分界线:左边是 kubectl，右边是进入 Pod 的命令
-#   fortio load   轰击模式:发送请求并测量响应时间
-#   -qps 20       每秒二十个请求——我们设定节奏，而不是「使出全力猛压」
-#   -t 20s        测量持续多久
-#   -c 16         十六个并行连接。这个数字不是随便取的:
-#                 目录服务用 800 ms 回答，所以一个连接每秒只能勉强
-#                 处理一个多一点的请求。要维持设定的每秒 20 个，
-#                 连接数不能少于十六——否则 Fortio 会撞上延迟墙，
-#                 交不出所要求的节奏。
-#   最后一个参数是我们要轰击的地址
+# exec deploy/fortio = run a command inside this application's Pod
+#   --            the boundary: kubectl on the left, on the right the command that goes into the Pod
+#   fortio load   bombardment mode: send requests and measure the response time
+#   -qps 20       twenty requests per second — we set a pace, not "push as hard as we can"
+#   -t 20s        how long the measurement lasts
+#   -c 16         sixteen parallel connections. The number isn't arbitrary:
+#                 the directory answers in 800 ms, so one connection manages
+#                 a little more than one request per second. To hold the set 20 per
+#                 second, you need no fewer than sixteen connections — otherwise Fortio
+#                 will hit the latency wall and not deliver the requested pace.
+#   the last argument is the address we're bombarding
 kubectl exec deploy/fortio -- fortio load -qps 20 -t 20s -c 16 \
   "http://passes-api.default.svc.cluster.local/employee?id=42"
 ```
@@ -274,10 +274,10 @@ Code 200 : 400 (100.0 %)
 用鼠标——这里不是 Cozystack 控制台：它面向管理集群，展示租户的目录条目，但不会窥探你的实验集群 `lab` 内部。生成器本身有自己的 Web 界面，而你得通过隧道才能够到它。
 
 ```bash
-# port-forward svc/fortio = 从 bastion 到集群里生成器服务的一条隧道
-#   8081:8080 — 左边的数字是你 bastion 上的端口，右边是集群里服务的端口
-# 用 8081 是因为 8080 在你机器上可能被别的东西占用了。
-# 别关这个窗口:隧道随命令运行而存活。要停止它——Ctrl+C。
+# port-forward svc/fortio = a tunnel from the bastion to the generator's service in the cluster
+#   8081:8080 — the left number is the port on your bastion, the right one the service port in the cluster
+# Port 8081 is used because 8080 might be taken by something else on your machine.
+# Don't close the window: the tunnel lives as long as the command runs. To stop it — Ctrl+C.
 kubectl port-forward svc/fortio 8081:8080
 ```
 
@@ -353,11 +353,11 @@ Redis 住在管理集群上你的租户里，而应用在你的实验集群 `lab
 我们来看看出现了哪些服务：
 
 ```bash
-# --kubeconfig 直接在命令里指定访问文件——只此一次，不动 KUBECONFIG。
-# 这样连续两条命令可以发往不同集群而不至于搞混。
-#   -n tenant-workshopXX  你租户的 namespace
-#   get svc               「列出服务」——背后有 Pod 支撑的固定地址
-#   | grep redis          只保留输出里带 redis 这个词的行
+# --kubeconfig sets the access file right in the command — just once, without touching KUBECONFIG.
+# This way two commands in a row can be addressed to different clusters without getting confused.
+#   -n tenant-workshopXX  the namespace of your tenant
+#   get svc               "show the services" — permanent addresses backed by Pods
+#   | grep redis          keep only the lines with the word redis in the output
 kubectl --kubeconfig ~/.kube/config -n tenant-workshopXX get svc | grep redis
 ```
 
@@ -390,15 +390,15 @@ rfrm-redis-cache.tenant-workshopXX.svc.cozy.local
 ```bash
 export KUBECONFIG=~/lab.kubeconfig
 
-# run redis-probe = 一个带 redis-cli 客户端的一次性 Pod:
-#   --rm --restart=Never  干完活就自我删除，不需要重启
-#   -i --quiet            把输出显示给我们，且不打印辅助信息
-#   --env=REDISCLI_AUTH   密码以环境变量而非参数的形式进入 Pod
-#   --                    这些短横线右边是进入 Pod 的命令
-#   redis-cli -h <名字>   连到哪个服务器；名字就是那个完整的
-#   ping                  简短的「你活着吗」；它的回答是 PONG
+# run redis-probe = a one-off Pod with the redis-cli client:
+#   --rm --restart=Never  it did its job and deleted itself, no need to restart
+#   -i --quiet            show us the output and don't print service lines
+#   --env=REDISCLI_AUTH   the password goes into the Pod as an environment variable, not an argument
+#   --                    to the right of these dashes is the command that goes into the Pod
+#   redis-cli -h <name>   which server to connect to; the name is that same full one
+#   ping                  a short "are you alive"; the answer to it is PONG
 kubectl run redis-probe --rm -i --restart=Never --image=redis:7-alpine --quiet \
-  --env=REDISCLI_AUTH='你的密码' -- \
+  --env=REDISCLI_AUTH='YOUR-PASSWORD' -- \
   redis-cli -h rfrm-redis-cache.tenant-workshopXX.svc.cozy.local ping
 ```
 
@@ -411,8 +411,8 @@ PONG
 ⚠️ **如果你得到的不是 `PONG` 而是一个名字解析错误**——那说明从你的集群里看不到管理集群的内部名字。用 IP 来访问就能解决：
 
 ```bash
-# -o jsonpath='{.spec.clusterIP}' —— 打印对象的一个字段：平台
-# 分配给这个服务的内部地址。{"\n"} 加一个换行。
+# -o jsonpath='{.spec.clusterIP}' — print one field of the object: the internal address
+# the platform assigned to this service. {"\n"} adds a line break.
 kubectl --kubeconfig ~/.kube/config -n tenant-workshopXX get svc rfrm-redis-cache \
   -o jsonpath='{.spec.clusterIP}{"\n"}'
 ```
@@ -426,26 +426,26 @@ kubectl --kubeconfig ~/.kube/config -n tenant-workshopXX get svc rfrm-redis-cach
 我们改动应用不是用一整份清单，而是用一个补丁——这样你能精确看到改了什么。先把你 Redis 的地址替换进补丁，再把补丁交给集群：`kubectl patch` 是把改动追加到一个已存在的对象上，而不是把它整个替换掉。
 
 ```bash
-# 和之前一样的地址替换，只是占位符不同——REDIS-ADDR
+# the same address substitution as before, only the placeholder is different — REDIS-ADDR
 
 # Linux
 sed -i    's|REDIS-ADDR|rfrm-redis-cache.tenant-workshopXX.svc.cozy.local|g' cache-patch-broken.yaml
 # macOS
 sed -i '' 's|REDIS-ADDR|rfrm-redis-cache.tenant-workshopXX.svc.cozy.local|g' cache-patch-broken.yaml
 
-# patch deployment passes-api =「用文件里的内容把这个对象修补一下」
-#   --patch-file  从哪里取改动
-# 改动环境变量意味着新的 Pod:旧的会被替换。
+# patch deployment passes-api = "fix up this object with what's in the file"
+#   --patch-file  where to take the changes from
+# Changing environment variables means new Pods: the old ones will be replaced.
 kubectl patch deployment passes-api --patch-file cache-patch-broken.yaml
 
-# 等到新副本就绪——否则我们量到的还是旧的
+# wait until the new copies become ready — otherwise we'll measure the old ones still
 kubectl rollout status deployment/passes-api
 ```
 
 再测一次——用开启缓存之前测量时的同一条命令。轰击的条件必须精确到最后一个标志都一致，否则就没什么可比的了：
 
 ```bash
-# 同样是每秒二十个请求，同样是二十秒，同样是十六个连接
+# the same twenty requests per second, the same twenty seconds, the same sixteen connections
 kubectl exec deploy/fortio -- fortio load -qps 20 -t 20s -c 16 \
   "http://passes-api.default.svc.cluster.local/employee?id=42"
 ```
@@ -462,7 +462,7 @@ kubectl exec deploy/fortio -- fortio load -qps 20 -t 20s -c 16 \
 先看看应用自己回答了什么：响应里有几个字段能显示缓存是否开启、答案是否来自它。
 
 ```bash
-# 和之前一样的一次性 curl Pod:我们从集群内部请求这个服务
+# the same one-off Pod with curl as before: we ask the service from inside the cluster
 kubectl run probe --rm -i --restart=Never --image=curlimages/curl:8.11.1 --quiet -- \
   curl -s "http://passes-api.default.svc.cluster.local/employee?id=42"
 ```
@@ -476,15 +476,15 @@ kubectl run probe --rm -i --restart=Never --image=curlimages/curl:8.11.1 --quiet
 现在看日志。应用把它做不到的事写在那里——而那是目前唯一能看到真相的地方：
 
 ```bash
-# logs =「显示应用写到它输出里的东西」。
-#   -l app=passes-api  一次性覆盖所有带这个标签的副本，而不是某个指名的副本
-#   --tail=20          每个副本的最后二十行，而不是整个日志
+# logs = "show what the application wrote to its output".
+#   -l app=passes-api  across all copies with this label at once, not one named copy
+#   --tail=20          the last twenty lines of each copy, not the whole log
 kubectl logs -l app=passes-api --tail=20
 ```
 
 ```
-缓存不可用（redis: NOAUTH Authentication required.），改为访问目录服务
-缓存不可用（redis: NOAUTH Authentication required.），改为访问目录服务
+cache unavailable (redis: NOAUTH Authentication required.), going to the directory
+cache unavailable (redis: NOAUTH Authentication required.), going to the directory
 ```
 
 答案就在这里。我们指定了 Redis 地址，却没指定密码。Redis 要求认证——是你自己在创建时打开了 `Auth enabled`，而这是正确的设置。应用老老实实地尝试了，被拒绝了，把这事写进日志，然后去了目录服务。
@@ -504,33 +504,33 @@ kubectl logs -l app=passes-api --tail=20
 Redis 密码住在管理集群里，而应用在你的集群里需要它。我们把它搬过来——经由一个 shell 变量，好让密码不落进命令历史：
 
 ```bash
-# read 把键盘上输入的内容放进 REDIS_PASS 变量:
-#   -s  不在屏幕上显示所输入的内容
-#   -r  不把反斜杠当作特殊字符
-# 这一行之后屏幕上不会出现任何东西:从控制台粘贴密码然后回车。
+# read puts what's typed on the keyboard into the REDIS_PASS variable:
+#   -s  don't show what's typed on the screen
+#   -r  don't treat a backslash as a special character
+# Nothing will appear on screen after this line: paste the password from the dashboard and Enter.
 read -rs REDIS_PASS
 
-# create secret generic = 一个普通的 Secret，一组键值对。
-#   redis-password              这个 Secret 在集群里的名字
-#   --from-literal=password=... 在它里面建一个 password 键，值就是这个；
-#                               补丁引用的正是「Secret 名字 + 键」这一对
+# create secret generic = an ordinary Secret, a set of key-value pairs.
+#   redis-password              the Secret's name in the cluster
+#   --from-literal=password=... create a password key in it with this value;
+#                               it's the "Secret name + key" pair the patch will reference
 kubectl create secret generic redis-password --from-literal=password="$REDIS_PASS"
 
-# unset 抹掉这个变量，好让密码不会传到这个窗口里后面的命令
+# unset erases the variable so the password doesn't reach the next commands in this window
 unset REDIS_PASS
 ```
 
 应用完整的补丁。它有同样的 Redis 地址，外加一个对刚创建的 Secret 的引用，以及缓存条目的存活时间；讲解就在命令后面的折叠块里。
 
 ```bash
-# 同样的地址替换，这次是在可用的补丁文件里
+# the same address substitution, now in the working patch file
 
 # Linux
 sed -i    's|REDIS-ADDR|rfrm-redis-cache.tenant-workshopXX.svc.cozy.local|g' cache-patch.yaml
 # macOS
 sed -i '' 's|REDIS-ADDR|rfrm-redis-cache.tenant-workshopXX.svc.cozy.local|g' cache-patch.yaml
 
-# 用文件内容修补现有的 Deployment，并等待新副本
+# fix up the existing Deployment with the file's contents and wait for the new copies
 kubectl patch deployment passes-api --patch-file cache-patch.yaml
 kubectl rollout status deployment/passes-api
 ```
@@ -571,10 +571,10 @@ spec:
 在加负载之前，我们先一个一个地检查。对一个还没被问过的标识符连发两个相同的请求：第一个注定慢，第二个——快。
 
 ```bash
-# 还是那个一次性 curl Pod，但这次在它内部启动一个 sh shell:
-#   sh -c '...'  执行以单个字符串传入的多条命令
-#   ; echo       在两个答案之间插一个换行，免得它们粘在一起
-# 用 id=777 是因为这个员工还没被问过:他肯定不在缓存里。
+# the same one-off Pod with curl, but an sh shell is launched inside it:
+#   sh -c '...'  run several commands passed as a single string
+#   ; echo       insert a line break between the answers so they don't run together
+# id=777 is used because this employee hasn't been asked for yet: it's definitely not in the cache.
 kubectl run probe --rm -i --restart=Never --image=curlimages/curl:8.11.1 --quiet -- \
   sh -c 'curl -s "http://passes-api.default.svc.cluster.local/employee?id=777"; echo;
          curl -s "http://passes-api.default.svc.cluster.local/employee?id=777"'
@@ -592,7 +592,7 @@ kubectl run probe --rm -i --restart=Never --image=curlimages/curl:8.11.1 --quiet
 现在做一次负载下的测量，同一条命令、同样的标志，第三次：
 
 ```bash
-# 轰击条件里我们什么都不改:变的只有服务内部的东西
+# we change nothing in the bombardment conditions: only what's inside the service changes
 kubectl exec deploy/fortio -- fortio load -qps 20 -t 20s -c 16 \
   "http://passes-api.default.svc.cluster.local/employee?id=42"
 ```
@@ -630,8 +630,8 @@ Code 200 : 400 (100.0 %)
 **每个请求都是唯一的。** 如果访客列表每次都请求一个新员工的信息，那就根本不会有命中，反而给每个请求都加上了一趟 Redis。会变得更慢。你可以这样确认——针对不同标识符跑两组短序列，看每一组的头几个请求：
 
 ```bash
-# 针对不同员工连着两次轰击，每次十秒。
-# 每组开头，缓存对这个键都是空的——于是第一个请求会去目录服务。
+# two bombardments in a row over different employees, ten seconds each.
+# At the start of each series the cache is empty for that key — and the first request goes to the directory.
 kubectl exec deploy/fortio -- fortio load -qps 20 -t 10s -c 16 \
   "http://passes-api.default.svc.cluster.local/employee?id=1"
 kubectl exec deploy/fortio -- fortio load -qps 20 -t 10s -c 16 \
@@ -678,13 +678,13 @@ TTL 是缓存唯一真正的参数，而它不是根据技术理由来选的。
 ```bash
 cd labs/07-redis
 
-# 在哪个集群里检查应用——你的 `lab`
+# which cluster to check the application in — your `lab`
 export KUBECONFIG=~/lab.kubeconfig
-# 你的租户编号:脚本用它拼出 namespace 名字 tenant-workshop03
+# your tenant number: from it the script assembles the namespace name tenant-workshop03
 export COZY_TENANT=workshop03
-# 管理集群的访问在哪里——脚本会去那里查看 Redis 本身。
-# 可以不设:那样脚本会去找 ~/.kube/config，找不到就跳过
-# 对管理集群的检查，并会告诉你这一点。
+# where the access to the management cluster lives — there the script looks at Redis itself.
+# You can leave it unset: then the script looks for ~/.kube/config, and not finding it — skips
+# the checks on the management cluster and says so.
 export COZY_KUBECONFIG=~/.kube/config
 
 ./check.sh
@@ -701,9 +701,9 @@ export COZY_KUBECONFIG=~/.kube/config
 当你做完所有实验之后：
 
 ```bash
-# delete -f = 从集群里删除文件中所描述的那些对象
+# delete -f = remove from the cluster exactly the objects described in the files
 kubectl delete -f passes-api.yaml -f hr-legacy.yaml -f fortio.yaml
-# 这个 Secret 是用命令创建的，不是用文件——我们按名字删除它
+# the Secret was created by a command, not a file — we delete it by name
 kubectl delete secret redis-password
 ```
 

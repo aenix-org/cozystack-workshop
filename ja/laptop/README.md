@@ -76,7 +76,7 @@ kubectl get vminstance -n tenant-workshopXX
 
 ```powershell
 New-Item -ItemType Directory -Force "$HOME\.kube" | Out-Null
-notepad "$HOME\.kube\workshop"    # kubeconfig を貼り付ける; ファイルの種類 —「すべてのファイル」
+notepad "$HOME\.kube\workshop"    # paste the kubeconfig; file type — "All Files"
 [Environment]::SetEnvironmentVariable("KUBECONFIG", "$HOME\.kube\workshop", "User")
 $env:KUBECONFIG = "$HOME\.kube\workshop"
 kubectl get vminstance -n tenant-workshopXX
@@ -110,7 +110,7 @@ cd cozystack-migration-workshop/laptop
 # Linux
 find manifests scripts -type f -exec sed -i 's/tenant-workshopXX/tenant-workshop03/g' {} +
 
-# macOS — 同じ sed だが、-i の後に空のクォートが必要
+# macOS — the same sed, but it requires empty quotes after -i
 find manifests scripts -type f -exec sed -i '' 's/tenant-workshopXX/tenant-workshop03/g' {} +
 ```
 
@@ -129,7 +129,7 @@ grep -rn tenant-workshopXX manifests scripts || echo "all clean, you can continu
 ```
 
 1か所だけ、コマンドは意図的に触れません。`manifests/03-app-vm.yaml` の
-`url: "ВСТАВЬТЕ_PRESIGNED_URL"` という行です — このリンクは第2フェーズの後に得られます。
+`url: "PASTE_PRESIGNED_URL"` という行です — このリンクは第2フェーズの後に得られます。
 
 詳しくは: [chat/10](chat/10-clone-and-set-number.md) ·
 ファイルマップ [chat/11](chat/11-file-map.md)
@@ -195,7 +195,7 @@ kubectl get vminstance convert -n tenant-workshopXX -w
 virtctl console --namespace=tenant-workshopXX vm-instance-convert
 ```
 
-中で: `nano convert.sh` を実行し、`scripts/convert.sh` の内容を貼り付け、`ВСТАВЬТЕ_...` の代わりに
+中で: `nano convert.sh` を実行し、`scripts/convert.sh` の内容を貼り付け、`PASTE_...` の代わりに
 自分の `bucketName`、`accessKey`、`secretKey` を書き込み、`bash convert.sh` を実行します。
 
 **私たちのイベントではなく、ご自身でこのワークショップを進めていますか？** `convert.sh` の `OVA_URL` は、ワークショップ用クラウドのオブジェクトストレージにあるデモイメージを指しています。イベント中にすばやく、外部トラフィックを使わずにダウンロードできるようにそこに置いていますが、ワークショップが終わるとそのコピーはなくなります。リンクを公開コピー `https://github.com/aenix-org/cozystack-workshop/releases/download/vmware-demo-ova/app-1.ova`（約 810 MB）か、ご自身の OVA に置き換えてください。
@@ -222,7 +222,7 @@ kubectl delete vminstance convert --namespace tenant-workshopXX
 kubectl delete vmdisk convert-tools --namespace tenant-workshopXX
 ```
 
-得られたリンクを `manifests/03-app-vm.yaml` の `url: "ВСТАВЬТЕ_PRESIGNED_URL"` の代わりに書き込み、
+得られたリンクを `manifests/03-app-vm.yaml` の `url: "PASTE_PRESIGNED_URL"` の代わりに書き込み、
 それから:
 
 ```bash
@@ -313,13 +313,13 @@ curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/actuator/health
 `SCRAM authentication requires libpq version 10 or above` と答えます。新しいものをインストールします:
 
 ```bash
-# 1. PGDG リポジトリ — PostgreSQL パッケージの供給元
+# 1. The PGDG repository — the source of PostgreSQL packages
 yum install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm
 
-# 2. libzstd: CentOS 7 のリポジトリにはないので、EPEL のアーカイブから取ってくる
+# 2. libzstd: not in the CentOS 7 repositories, so we take it from the EPEL archive
 yum install -y https://archives.fedoraproject.org/pub/archive/epel/7/x86_64/Packages/l/libzstd-1.5.5-1.el7.x86_64.rpm
 
-# 3. クライアント本体 — 生きている pgdg15 リポジトリのみから
+# 3. The client itself — only from the live pgdg15 repository
 yum install -y --disablerepo='pgdg*' --enablerepo=pgdg15 postgresql15
 ```
 
@@ -339,7 +339,7 @@ psql --version
 スキーマを取ってきて適用します:
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/laptop/scripts/orders-schema.sql
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/laptop/scripts/orders-schema.sql
 
 PGPASSWORD='Orders2019!' psql \
   -h postgres-db-rw.tenant-workshopXX.svc.cozy.local -U orders -d orders \
@@ -391,13 +391,13 @@ curl -s http://localhost:8080/api/orders
 > `type/name` を要求し、接頭辞がないと `target must contain type and name separated by '/'` と答えます。
 
 ```bash
-# app-VM にログイン (root / cozydemo)
+# log into the app-VM (root / cozydemo)
 virtctl console --namespace=tenant-workshopXX vm-instance-app-1
 
-# conversion-VM にログイン (ubuntu / ubuntu)
+# log into the conversion-VM (ubuntu / ubuntu)
 virtctl console --namespace=tenant-workshopXX vm-instance-convert
 
-# アプリケーションのポートをノートPC に転送する
+# forward the application's port to the laptop
 virtctl port-forward --namespace=tenant-workshopXX vmi/vm-instance-app-1 8080:8080
 ```
 

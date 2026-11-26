@@ -1,24 +1,24 @@
-# ラボ3。Fortio 負荷ジェネレーター: ジェネレーター本体と、その Web
-# インターフェースへの安定したアドレス。`---` で区切られた 2 つのオブジェクト。
+# Lab 3. Fortio load generator: the generator itself and a stable address for its
+# web interface. Two objects, separated by `---`.
 #
-# 管理クラスターのテナントではなく、あなたの学習用クラスター `lab` に適用します:
+# Applied to your `lab` training cluster, not to a tenant on the management cluster:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl apply -f fortio.yaml
-# ここには tenant-workshopXX のようなプレースホルダーはありません — 自分の番号をどこかに差し込む必要はありません。
-# この同じファイルはラボ4でも必要になります: `kubectl apply -f ../03-scale/fortio.yaml`。
+# There are no placeholders like tenant-workshopXX here — you don't need to substitute your number anywhere.
+# This same file is needed in lab 4: `kubectl apply -f ../03-scale/fortio.yaml`.
 #
-# マニフェストの共通フィールド (apiVersion, kind, metadata.name, selector, template,
-# securityContext) は ../01-deploy/rickroll.yaml で 1 行ずつ解説されているため、ここでは
-# 繰り返しません。負荷ジェネレーター固有のものだけをコメントします。
+# Common manifest fields (apiVersion, kind, metadata.name, selector, template,
+# securityContext) are broken down line by line in ../01-deploy/rickroll.yaml and are not
+# repeated here. We comment only on what is specific to the load generator.
 ---
-# Web インターフェース付きの負荷ジェネレーター。
-# hey/ab の代わりにあえてこれを選びました: 負荷はブラウザのボタンで開始し、
-# 遅延のヒストグラムもその場で見られます。過去のワークショップでは、まさに
-# コンソールツールで人を取りこぼしていました。
+# Load generator with a web UI.
+# Chosen over hey/ab on purpose: you start the load with a button in the browser,
+# and the latency histogram is visible right there. At past workshops we lost
+# people precisely on console tools.
 #
-# Fortio は通常のアプリケーションとしてクラスター内に存在し、内部から rickroll のアドレスを叩きます。
-# 外部から、VM から負荷をかけたほうがトラフィック的には正直ですが、クラスターへの回線に
-# 突き当たってしまい、アプリケーションではなく自分の Wi-Fi を測ることになってしまいます。
+# Fortio lives in the cluster as an ordinary application and hits the rickroll address from the inside.
+# Loading it from the outside, from the VM, would be more honest traffic-wise, but it would run into the channel
+# to the cluster, and you would be measuring your Wi-Fi rather than the application.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -26,9 +26,9 @@ metadata:
   labels:
     app: fortio
 spec:
-  # ジェネレーターは 1 コピーで十分です: それ自身が多数のスレッドで負荷を生み出します。
-  # ここで 2 つ目のコピーは絵をぼかすだけです — Web インターフェースのカウンターは
-  # コピーごとに別々で、リクエストの半分しか見えなくなります。
+  # One copy of the generator is enough: it produces load in many threads by itself.
+  # A second copy here would only blur the picture — each copy has its own counters in the web
+  # interface, and you would see half of the requests.
   replicas: 1
   selector:
     matchLabels:
@@ -38,9 +38,9 @@ spec:
       labels:
         app: fortio
     spec:
-      # rickroll と同じセキュリティプロファイル: root 以外で動作し、特定の
-      # UID、標準の seccomp。あえて残しています — `restricted` プロファイルが有効な
-      # クラスターでもこのファイルを適用できるように。そうでなければ Pod は起動しません。
+      # The same security profile as rickroll: runs as non-root, a specific
+      # UID, standard seccomp. Left in on purpose — so the file can be applied
+      # even in a cluster with the `restricted` profile enabled, where the pod would otherwise not start.
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
@@ -52,32 +52,32 @@ spec:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # latest タグはバージョンを照合しないためのワークショップ向けの意図的な簡略化です。
-          # 本番クラスターではこうしません: このタグの下のイメージは 2 回の apply の間に
-          # 気づかれずに入れ替わることがあり、昨日の結果を再現できなくなります。
+          # The latest tag is a deliberate simplification for the workshop, to avoid comparing versions.
+          # In a production cluster this is not done: the image under this tag may silently
+          # change between two applies, and you won't be able to reproduce yesterday's result.
           image: fortio/fortio:latest
-          # `server` モードは Web インターフェースを立ち上げて動かし続けます。この引数がないと
-          # Fortio はコマンドラインから 1 回だけ実行して終了し、クラスターはコンテナを
-          # ループで再起動し続けることになります。
+          # The `server` mode brings up the web interface and keeps it running. Without this argument
+          # Fortio would do a single run from the command line and exit, and the cluster
+          # would keep restarting the container in a loop.
           args: ["server"]
           ports:
             - containerPort: 8080
               name: http
           resources:
-            # リクエストは rickroll 自身 (20m) より高くしています: ジェネレーターにはノード上の場所が
-            # 事前に必要で、そうでないとスケジューラーがぎりぎりに配置し、立ち上がりが不揃いになります。
+            # The request is higher than rickroll's own (20m): the generator needs room on the node
+            # in advance, otherwise the scheduler will place it tightly and the ramp-up will be uneven.
             requests:
               cpu: 100m
               memory: 64Mi
             limits:
-              # ジェネレーターには CPU の余裕が必要です。そうでないと自分自身に
-              # 突き当たり、アプリケーションではなく Fortio に負荷をかけることになります。
+              # The generator needs CPU headroom, otherwise it will run
+              # into itself and you'll be loading Fortio rather than the application.
               cpu: "1"
               memory: 256Mi
 ---
-# クラスター内部のジェネレーターの安定したアドレス。`kubectl port-forward svc/fortio 8081:8080`
-# 経由で VM から Web インターフェースを開くために必要です — 外部にクラスターは
-# 何も公開しておらず、Fortio への他の扉はありません。
+# Stable address of the generator inside the cluster. Needed to open the web interface
+# from the VM via `kubectl port-forward svc/fortio 8081:8080` — from the outside the cluster
+# publishes nothing, and there are no other doors to Fortio.
 apiVersion: v1
 kind: Service
 metadata:
@@ -86,7 +86,7 @@ spec:
   selector:
     app: fortio
   ports:
-    # 両側とも 8080: サービスもコンテナも。番号は Pod 内の rickroll と同じですが、
-    # 衝突はありません — 各 Pod には独自のネットワークスタックがあります。
+    # 8080 on both sides: both the service and the container. The number is the same as rickroll's
+    # inside the pod, but there's no collision — each pod has its own network stack.
     - port: 8080
       targetPort: http

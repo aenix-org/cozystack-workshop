@@ -1,46 +1,46 @@
-# Lab 9 · solicita una base de datos ClickHouse para analítica sobre el registro de pases de acceso.
-# Una descripción de lo que quieres obtener; la plataforma ensambla y configura el servicio.
-# Lo mismo que pedirías con el ratón en el dashboard — solo que como texto.
-# Se aplica NO al clúster de laboratorio, sino a un tenant en el clúster de gestión:
+# Lab 9 · order a ClickHouse database for analytics over the access-pass log.
+# A description of what you want to get; the platform assembles and configures the service.
+# The same thing you would order with the mouse in the dashboard — just as text.
+# Applied NOT to the lab cluster, but to a tenant on the management cluster:
 #   kubectl --kubeconfig="$HOME/.kube/config" apply -f clickhouse.yaml
 #
-# ANTES DE APLICAR: reemplaza tenant-workshopXX por tu namespace,
-# y ЗдесьВашПароль por una contraseña que se te ocurra.
+# BEFORE APPLYING: replace tenant-workshopXX with your namespace,
+# and YourPasswordHere with a password you come up with.
 apiVersion: apps.cozystack.io/v1alpha1
 kind: ClickHouse
 metadata:
   name: analytics
   namespace: tenant-workshopXX
 spec:
-  # Una copia y un shard. En producción se mantienen al menos dos copias, de lo contrario perder un nodo
-  # significa que los datos quedan inaccesibles — pero necesitamos un millón de filas, no tolerancia
-  # a fallos, y una copia extra simplemente consumiría los recursos del stand.
+  # One copy and one shard. In production you keep at least two copies, otherwise losing a node
+  # means the data becomes unavailable — but we need a million rows, not fault
+  # tolerance, and an extra copy would just eat up the stand's resources.
   replicas: 1
   shards: 1
-  # Disco para los datos de las tablas. Un millón de filas de esta lab ocupará decenas de megabytes:
-  # el almacenamiento columnar con diccionarios comprime un registro así muy fuertemente.
+  # Disk for the table data. A million rows from this lab will take up tens of megabytes:
+  # columnar storage with dictionaries compresses such a log very heavily.
   size: 5Gi
-  # Un disco separado para los registros del sistema del servidor, incluido el registro de consultas.
+  # A separate disk for the server's system logs, including the query log.
   logStorageSize: 2Gi
-  # Tras cuántos días descartar el registro de consultas. Vamos a mirar en él.
+  # After how many days to discard the query log. We are going to look into it.
   logTTL: 15
-  # replicated — volúmenes que tienen una copia en otro nodo del clúster: el nodo se cayó,
-  # los datos permanecieron.
+  # replicated — volumes that have a copy on another cluster node: the node dropped out,
+  # the data stayed.
   storageClass: replicated
-  # 1 CPU, 4 GB. ClickHouse calcula en memoria, y en agrupaciones sobre
-  # un millón de filas esto se nota.
+  # 1 CPU, 4 GB. ClickHouse computes in memory, and on groupings over
+  # a million rows this is noticeable.
   resourcesPreset: u1.small
-  # El usuario de la base de datos y su contraseña. Piensa tu propia contraseña y recuérdala: la necesita
-  # el pod de trabajo (la variable CH_AUTH) y el script de verificación (la variable CH_PASSWORD).
-  # Tras la creación es visible en el dashboard, en el secreto clickhouse-analytics-credentials.
+  # The database user and its password. Come up with your own password and remember it: it is needed
+  # by the worker pod (the CH_AUTH variable) and the check script (the CH_PASSWORD variable).
+  # After creation it is visible in the dashboard, in the clickhouse-analytics-credentials secret.
   users:
     analyst:
-      password: ЗдесьВашПароль
-  # Copias de seguridad al almacenamiento de objetos. Los datos aquí están generados,
-  # no hay nada que restaurar — desactivado en el stand de formación.
+      password: YourPasswordHere
+  # Backups to object storage. The data here is generated,
+  # there is nothing to restore — disabled on the training stand.
   backup:
     enabled: false
-  # Keeper es necesario para reconciliar entre copias. Hay una sola copia — no hay con quién
-  # reconciliar, y tres pods de Keeper ocuparían recursos para nada.
+  # Keeper is needed to reconcile between copies. There is one copy — there is no one
+  # to reconcile with, and three Keeper pods would take up resources for nothing.
   clickhouseKeeper:
     enabled: false

@@ -1,20 +1,20 @@
-# Lab 13. ConfigMap-Template: die Seite „Ausweise“ und die nginx-Konfiguration.
+# Lab 13. ConfigMap template: the "Passes" page and nginx configuration.
 #
-# Die ConfigMap speichert Textdateien und liefert sie an die Pods aus. Die Seite liegt hier und nicht
-# im Image, damit der Text ohne Neubau geändert werden kann: der Wert greeting wird beim Rendern eingesetzt,
-# und es genügt, das Release zu aktualisieren.
+# The ConfigMap stores text files and serves them to the pods. The page lives here rather than
+# inside the image, so the text can be changed without a rebuild: the greeting value is substituted
+# at render time, and it is enough to update the release.
 #
-# Die Ersetzung funktioniert auch innerhalb von `|`-Blöcken: Helm verarbeitet die Template-Datei als
-# reinen Text und weiß nichts über die YAML-Struktur. Näheres siehe templates/deployment.yaml.
+# Substitution works inside `|` blocks too: Helm processes the template file as plain
+# text and knows nothing about the YAML structure. See templates/deployment.yaml for details.
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ .Release.Name }}
-# Die Schlüssel in data sind Dateinamen, und was unter `|` steht, ist ihr gesamter Inhalt.
-# Jeder Schlüssel wird als eigene Datei in den Container gemountet, siehe volumeMounts im Deployment.
+# Keys in data are file names, and what is under `|` is their entire contents.
+# Each key is mounted into the container as a separate file, see volumeMounts in the Deployment.
 data:
-  # Die Seite, die der Mitarbeiter sehen wird. Hierher gelangen zwei Werte: greeting aus dem
-  # Bestellformular und der Release-Name — damit an der geöffneten Seite erkennbar ist, wessen Bestellung es ist.
+  # The page the employee will see. Two values land here: greeting from the order
+  # form and the release name — so that the open page shows whose order it is.
   index.html: |
     <!doctype html>
     <html lang="en">
@@ -31,9 +31,9 @@ data:
     <p>Guest Pass service, release <b>{{ .Release.Name }}</b></p>
     <div class="pod">served by __POD__</div>
     </html>
-  # nginx-Konfiguration. sub_filter ersetzt die Markierung __POD__ im Moment der Auslieferung durch den
-  # Pod-Namen: so zeigt der Browser, welche der Kopien geantwortet hat. Eine separate Antwort auf /healthz
-  # braucht die readinessProbe aus dem Deployment — sie fragt genau diese Adresse ab.
+  # nginx configuration. sub_filter replaces the __POD__ marker with the pod name at the moment the
+  # page is served: this way the browser shows which of the copies answered. A separate response on /healthz
+  # is needed by the readinessProbe from the Deployment — it queries exactly this address.
   default.conf: |
     server {
       listen 8080;

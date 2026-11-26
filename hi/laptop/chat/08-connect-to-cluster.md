@@ -7,8 +7,8 @@
 **आपके क्रेडेंशियल्स:**
 ```
 dashboard: https://dashboard.workshop.aenix.io
-login:     workshopXX      ← आपका नंबर, मैं आपको व्यक्तिगत रूप से बताऊँगा
-password:  ...             ← मैं आपको व्यक्तिगत रूप से बताऊँगा
+login:     workshopXX      ← your number, I'll tell you in person
+password:  ...             ← I'll tell you in person
 ```
 
 1. ऊपर दिए गए लिंक पर डैशबोर्ड खोलें।
@@ -20,13 +20,13 @@ password:  ...             ← मैं आपको व्यक्तिग�
 **macOS और Linux**
 ```bash
 mkdir -p ~/.kube
-nano ~/.kube/workshop      # जो कॉपी किया उसे पेस्ट करें, फिर सेव करें
+nano ~/.kube/workshop      # paste what you copied, then save
 export KUBECONFIG=~/.kube/workshop
 ```
 
 **Windows** (PowerShell)
 ```powershell
-notepad $HOME\.kube\workshop   # पेस्ट करें, फिर सेव करें
+notepad $HOME\.kube\workshop   # paste, then save
 $env:KUBECONFIG = "$HOME\.kube\workshop"
 ```
 
@@ -50,13 +50,13 @@ kubeconfig में, `certificate-authority-data` फ़ील्ड में 
 चलिए इसे स्टेप दर स्टेप सुलझाते हैं, PowerShell में:
 ```powershell
 $env:KUBECONFIG
-# खाली — मतलब डिफ़ॉल्ट फ़ाइल इस्तेमाल हो रही है, वह नहीं जो आपको दी गई थी
+# empty — means it's using the default file, not the one you were given
 
 Select-String -Path "$HOME\.kube\workshop" -Pattern "certificate-authority-data" -Quiet
-# False — फ़ाइल अधूरी सेव हुई थी; डैशबोर्ड से सीक्रेट फिर से डाउनलोड करें
+# False — the file was saved incompletely; download the secret from the dashboard again
 
 Get-Content "$HOME\.kube\workshop" -TotalCount 1
-# apiVersion से शुरू होना चाहिए; छोटे-छोटे चौकोर या खालीपन का मतलब फ़ाइल UTF-16 में है
+# should start with apiVersion; little squares or emptiness mean the file is in UTF-16
 ```
 
 तीसरा बिंदु Windows का सबसे कपटी जाल है। Notepad और `>` रीडायरेक्शन फ़ाइल को

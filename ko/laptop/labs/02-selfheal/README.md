@@ -33,7 +33,7 @@ Kubernetes의 가장 요란한 약속인 자가 복구를 파헤쳐 봅시다. �
 것은 없습니다: 아래에서 `kubectl apply -f 이름.yaml`이라고 적힌 곳의 파일은 여기서 가져옵니다.
 
 ```bash
-# 이 랩의 모든 명령은 이 폴더에서 실행합니다 — 그러지 않으면 명령 안의 상대 경로가 맞지 않습니다.
+# All the lab's commands are run from this folder — otherwise the relative paths in them won't line up.
 cd labs/02-selfheal
 ```
 
@@ -50,13 +50,13 @@ cd labs/02-selfheal
 이루어져 있는지 살펴봅시다: 명령 하나로 클러스터에 세 가지 종류의 개체를 한꺼번에 물어봅니다.
 
 ```bash
-# KUBECONFIG — 클러스터의 주소와 로그인 자격 증명이 담긴 파일의 경로입니다.
-# 이 변수가 설정되기 전까지 kubectl은 노트북 자체에서 클러스터를 찾다가 찾지 못합니다.
+# KUBECONFIG — the path to the file with the cluster's address and your login credentials.
+# Until the variable is set, kubectl looks for a cluster on the laptop itself and doesn't find one.
 export KUBECONFIG=~/lab.kubeconfig
 
-# get = 「무엇이 있는지 보여 줘」. 쉼표로 구분하여 세 종류의 객체를 한꺼번에 나열합니다.
-#   -l app=rickroll   app=rickroll 레이블이 붙은 것만 보여 줍니다 — 즉 클러스터의
-#                     전체 내용이 아니라 우리 애플리케이션만
+# get = "show me what's there". Three kinds of object are listed at once, separated by commas.
+#   -l app=rickroll   show only those labelled app=rickroll — that is, our
+#                     application, not the entire contents of the cluster
 kubectl get deployment,replicaset,pods -l app=rickroll
 ```
 
@@ -97,10 +97,10 @@ ReplicaSet의 이름은 Deployment의 이름에 해시를 더한 것입니다. �
 이것이 추측이 아님을 이렇게 확인할 수 있습니다:
 
 ```bash
-# 기본 kubectl 표는 ownerReferences 필드를 보여 주지 않습니다 — 명시적으로 요청해야 합니다.
-#   -o jsonpath=...   「서버 응답에서 이 필드들을 꺼내 이렇게 출력해」
-# 표현식 안에서: range .items[*] — 찾은 모든 Pod를 순회, .metadata.name —
-# Pod의 이름, ownerReferences[0].kind와 .name — 그것을 만든 대상의 종류와 이름.
+# The default kubectl table doesn't show the ownerReferences field — you have to ask for it explicitly.
+#   -o jsonpath=...   "pull these fields out of the server's response and print them like this"
+# Inside the expression: range .items[*] — walk through every Pod found, .metadata.name —
+# the Pod's name, ownerReferences[0].kind and .name — the kind and name of whatever created it.
 kubectl get pods -l app=rickroll -o jsonpath='{range .items[*]}{.metadata.name}{"  <- "}{.metadata.ownerReferences[0].kind}{"/"}{.metadata.ownerReferences[0].name}{"\n"}{end}'
 ```
 
@@ -134,26 +134,26 @@ Delete from Disk를 클릭한 것처럼 완전히 삭제합니다.
 그것이 얼마나 걸렸는지 출력합니다.
 
 ```bash
-# items[0].metadata.name — 목록의 첫 번째 Pod 이름입니다. 이것을 POD 변수에 저장합니다:
-# 그러지 않으면 나중에 옛 복사본과 새 복사본을 구별할 수 없습니다.
+# items[0].metadata.name — the name of the first Pod in the list. We save it in the POD variable:
+# without that we won't be able to tell the old copy from the new one later.
 POD=$(kubectl get pods -l app=rickroll -o jsonpath='{.items[0].metadata.name}')
 echo "killing: $POD"
 
-# date +%s — 현재 시각을 초 단위로. 이것이 우리의 스톱워치입니다: 삭제 전에 기록해 두고,
-# 맨 마지막에 새로 잰 값에서 뺍니다.
+# date +%s — the current time in seconds. This is our stopwatch: we note it before the delete,
+# and subtract it from a fresh reading right at the end.
 START=$(date +%s)
 
-# delete pod — 복사본을 완전히 삭제합니다.
-#   --wait=false   Pod가 완전히 사라질 때까지 기다리지 않고 즉시 제어권을 돌려줍니다:
-#                  초를 세기 시작해야 하는 것은 이후가 아니라 바로 이 순간부터이기 때문입니다
+# delete pod — delete the copy for good.
+#   --wait=false   don't wait for the Pod to fully disappear, return control immediately:
+#                  we need to start counting seconds from this moment, not afterwards
 kubectl delete pod "$POD" --wait=false
 
-# 1초에 한 번씩 Pod 목록을 다시 읽어, 다음이 동시에 성립하는 줄을 찾습니다:
-#   $1!=old        이름이 옛것과 일치하지 않음 — 즉 이것은 다른 복사본
-#   $2=="1/1"      컨테이너 하나 중 하나가 준비됨
-#   $3=="Running"  Pod가 실행 중
-#   --no-headers   표 머리글을 출력하지 않아 awk가 데이터만 보게 함
-#   2>/dev/null    Pod가 아예 없는 몇 초 동안 오류 메시지를 숨김
+# Once a second we re-read the Pod list and look for a line where all of these hold at once:
+#   $1!=old        the name doesn't match the old one — so this is a different copy
+#   $2=="1/1"      one container out of one is ready
+#   $3=="Running"  the pod is running
+#   --no-headers   don't print the table header, so awk sees only data
+#   2>/dev/null    hide error messages during the seconds when there are no Pods at all
 while true; do
   NEW=$(kubectl get pods -l app=rickroll --no-headers 2>/dev/null \
         | awk -v old="$POD" '$1!=old && $2=="1/1" && $3=="Running" {print $1; exit}')
@@ -195,16 +195,16 @@ Pod가 재시작된 것이 아니라 — 다른 Pod입니다. 옛것은 이제 �
 ```bash
 export KUBECONFIG=~/lab.kubeconfig
 
-# run = 매니페스트 없이 명령줄에서 곧바로 Pod 하나를 만듭니다.
-#   --rm             명령을 중단하는 즉시 Pod를 삭제합니다
-#   -it              Pod의 출력이 여러분 화면으로 오고, Ctrl+C로 멈춥니다
-#   --restart=Never  복사본은 하나이고 다시 만들 필요가 없습니다: 이것은 서비스가 아니라 도구입니다
-#   --image          busybox — wget이 들어 있는 몇 메가바이트짜리 이미지
-# -- 뒤의 모든 것은 Pod 안에서 실행됩니다. 주소 http://rickroll은 Service의 이름이며,
-# 클러스터 안에서 스스로 애플리케이션의 주소로 바뀝니다.
-#   -q               다운로드 통계를 출력하지 않습니다
-#   -T 2             응답을 2초 넘게 기다리지 않고, 그러지 않으면 실패로 간주합니다
-#   -O /dev/null     응답 본문은 버립니다, 우리에게 중요한 것은 응답이 왔다는 사실뿐입니다
+# run = create a single Pod straight from the command line, without a manifest.
+#   --rm             delete the Pod as soon as you interrupt the command
+#   -it              the Pod's output comes to your screen, Ctrl+C stops it
+#   --restart=Never  there's a single copy and no need to recreate it: this is a tool, not a service
+#   --image          busybox — an image a few megabytes in size that has wget
+# Everything after -- runs inside the Pod. The address http://rickroll is the name of the Service;
+# inside the cluster it turns into the application's address on its own.
+#   -q               don't print download statistics
+#   -T 2             wait no longer than two seconds for a reply, otherwise we count it as a failure
+#   -O /dev/null     throw the response body away, all we care about is the fact of a reply
 kubectl run pinger --rm -it --restart=Never --image=busybox:1.36 -- \
   sh -c 'while true; do wget -q -T 2 -O /dev/null http://rickroll/healthz \
          && echo "$(date +%T) ." || echo "$(date +%T) X"; sleep 1; done'
@@ -229,8 +229,8 @@ kubectl run pinger --rm -it --restart=Never --image=busybox:1.36 -- \
 ```bash
 export KUBECONFIG=~/lab.kubeconfig
 
-# Pod 이름을 주지 않고 대신 레이블을 줍니다: app=rickroll 레이블이 붙은 모든 복사본을 삭제합니다.
-# 지금은 하나뿐이므로, pinger가 조회하고 있는 바로 그것이 사라집니다.
+# No pod name is given, a label instead: delete every copy with the label app=rickroll.
+# Right now there's only one, so the one the pinger is polling is exactly the one that goes.
 kubectl delete pod -l app=rickroll
 ```
 
@@ -254,11 +254,11 @@ pinger를 멈추지 마세요, 곧바로 필요합니다.
 📍 **창 2.** 하나 대신 세 개의 복사본을 주문하고 셋이 모두 준비될 때까지 기다립니다.
 
 ```bash
-# scale은 애플리케이션 기록에서 정확히 한 필드만 바꿉니다 — 복사본의 개수.
+# scale changes exactly one field in the application's record — the number of copies.
 kubectl scale deployment rickroll --replicas=3
 
-# rollout status는 요청한 복사본이 모두 준비될 때까지 터미널을 붙잡고 진행 상황을
-# 출력합니다. 이 명령은 스스로 끝납니다 — 손으로 get pods를 조회할 필요가 없습니다.
+# rollout status holds the terminal and prints progress until all the copies you asked for
+# are ready. The command finishes on its own — no need to poll get pods by hand.
 kubectl rollout status deployment/rickroll
 ```
 
@@ -268,10 +268,10 @@ kubectl rollout status deployment/rickroll
 이제 복사본이 셋인지, 그리고 셋 모두 Service 뒤에 자리 잡았는지 확인하세요:
 
 ```bash
-# EndpointSlice — Service가 여러분을 위해 관리하는 바로 그 살아 있는 주소 목록.
-#   -l kubernetes.io/service-name=rickroll   Service rickroll에 속한 목록을 가져옵니다
-#   -o jsonpath=...                          각 항목에서 주소 자체만, 한 줄에
-#                                            하나씩 출력합니다
+# EndpointSlice — that very list of live addresses the Service keeps for you.
+#   -l kubernetes.io/service-name=rickroll   take the list belonging to the Service rickroll
+#   -o jsonpath=...                          from each entry print only the address itself,
+#                                            one per line
 kubectl get endpointslices -l kubernetes.io/service-name=rickroll \
   -o jsonpath='{range .items[*].endpoints[*]}{.addresses[0]}{"\n"}{end}'
 ```
@@ -283,10 +283,10 @@ kubectl get endpointslices -l kubernetes.io/service-name=rickroll \
 이제 세 복사본 중 하나를 죽입니다:
 
 ```bash
-# 세 복사본 중 첫 번째 것의 이름을 가져옵니다 — 정확히 어느 것인지는 상관없습니다.
+# We take the name of the first of the three copies — which one exactly doesn't matter.
 POD=$(kubectl get pods -l app=rickroll -o jsonpath='{.items[0].metadata.name}')
 
-# 그리고 그것을 삭제합니다. 여기서는 --wait=false가 없습니다: 명령은 Pod가 이미 사라진 뒤에 돌아옵니다.
+# And delete it. No --wait=false here: the command returns once the Pod is already gone.
 kubectl delete pod "$POD"
 ```
 
@@ -311,15 +311,15 @@ kubectl delete pod "$POD"
 이번에는 복사본이 아니라 애플리케이션 자체를 삭제합니다:
 
 ```bash
-# 복사본이 아니라 애플리케이션의 기록 자체를 삭제합니다. 확인 절차는 없고,
-# 객체는 어떤 휴지통으로도 가지 않습니다 — 파일 말고는 복원할 곳이 없습니다.
+# We delete not a copy but the application's record itself. There will be no confirmation,
+# the object won't go to any recycle bin — there'll be nowhere to restore it from but the file.
 kubectl delete deployment rickroll
 ```
 
 몇 초 기다린 뒤 복사본이 돌아왔는지 봅니다:
 
 ```bash
-# 애플리케이션의 레이블로 Pod를 찾습니다. 여기서 빈 응답도 하나의 답입니다.
+# We look for pods by the application's label. An empty response here is an answer too.
 kubectl get pods -l app=rickroll
 ```
 
@@ -370,11 +370,11 @@ ReplicaSet과 세 Pod 모두가 Deployment과 함께 떠났습니다.
 (다음 단계), Deployment이 아니라 ReplicaSet을 삭제해 보세요:
 
 ```bash
-# rs — replicaset의 약자; kubectl은 두 표기를 모두 이해합니다.
-# Deployment은 그대로 두고 가운데 고리를 삭제합니다.
+# rs — short for replicaset; kubectl understands both spellings.
+# We delete the middle link, leaving the Deployment in place.
 kubectl delete rs -l app=rickroll
 
-# 그리고 곧바로 무엇이 남았는지 봅니다: 세트의 이름을 삭제 전과 비교하세요.
+# And immediately look at what's left: compare the set's name with what it was before the delete.
 kubectl get rs -l app=rickroll
 ```
 
@@ -390,11 +390,11 @@ kubectl get rs -l app=rickroll
 의도는 여러분에게 있고, 파일에 들어 있습니다. 복원은 명령 하나입니다:
 
 ```bash
-# apply = 「클러스터를 파일에 기술된 대로 만들어라」. 객체가 없으면 — 만들어집니다.
-#   -f ../01-deploy/rickroll.yaml   파일은 랩 1 폴더에 있으므로, ../를 거치는 경로입니다
+# apply = "bring the cluster to what's described in the file". The object doesn't exist — it will be created.
+#   -f ../01-deploy/rickroll.yaml   the file lives in the lab 1 folder, hence the path via ../
 kubectl apply -f ../01-deploy/rickroll.yaml
 
-# 복사본이 올라와 요청을 받을 준비가 될 때까지 기다립니다.
+# We wait for the copy to come up and become ready to take requests.
 kubectl rollout status deployment/rickroll
 ```
 
@@ -415,8 +415,8 @@ kubectl rollout status deployment/rickroll
 시작 부분에 적혀 있습니다. WSL 없이도 랩을 완료할 수 있지만, 산출물 보고서는 나오지 않습니다.
 
 ```bash
-# ./ 는 시스템 PATH의 명령이 아니라 「현재 폴더의 파일」을 뜻합니다.
-# 이 스크립트는 클러스터에서 아무것도 바꾸지 않습니다: 읽고 보고서를 출력할 뿐입니다.
+# ./ means "a file from the current folder", not a command from the system PATH.
+# The script changes nothing in the cluster: it only reads and prints a report.
 ./check.sh
 ```
 
@@ -429,7 +429,7 @@ kubectl rollout status deployment/rickroll
 묻지도 않고 여러분의 명령을 기다리지도 않고 껐습니다. 확인하려면:
 
 ```bash
-# READY 열은 1/1이어야 합니다.
+# The READY column should read 1/1.
 kubectl get deployment rickroll
 ```
 

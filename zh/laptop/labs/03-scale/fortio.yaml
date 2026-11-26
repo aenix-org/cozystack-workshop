@@ -1,24 +1,24 @@
-# 实验 3。Fortio 负载生成器：生成器本身以及指向其
-# Web 界面的固定地址。两个对象，用 `---` 分隔。
+# Lab 3. Fortio load generator: the generator itself and a stable address for its
+# web interface. Two objects, separated by `---`.
 #
-# 应用到你的 `lab` 训练集群，而不是管理集群上的租户里：
+# Applied to your `lab` training cluster, not to a tenant on the management cluster:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl apply -f fortio.yaml
-# 这里没有类似 tenant-workshopXX 的占位符——不需要在任何地方替换成你的编号。
-# 同一个文件在实验 4 中还会用到：`kubectl apply -f ../03-scale/fortio.yaml`。
+# There are no placeholders like tenant-workshopXX here — you don't need to substitute your number anywhere.
+# This same file will be needed in lab 4: `kubectl apply -f ../03-scale/fortio.yaml`.
 #
-# 清单中通用的字段（apiVersion、kind、metadata.name、selector、template、
-# securityContext）已在 ../01-deploy/rickroll.yaml 中逐行讲解，这里不再
-# 重复。我们只注释负载生成器自身特有的部分。
+# The manifest's common fields (apiVersion, kind, metadata.name, selector, template,
+# securityContext) are dissected line by line in ../01-deploy/rickroll.yaml and are not
+# repeated here. We comment only on what is specific to the load generator.
 ---
-# 带 Web 界面的负载生成器。
-# 特意选它而不是 hey/ab：负载通过浏览器里的按钮启动，
-# 延迟直方图也就在同一处可见。在过去的工作坊里，我们恰恰是在
-# 命令行工具上流失了参与者。
+# Load generator with a web interface.
+# Chosen over hey/ab on purpose: you start the load with a button in the browser,
+# and you see the latency histogram right there. At past workshops we lost
+# people precisely on console tools.
 #
-# Fortio 作为普通应用运行在集群里，从内部访问 rickroll 地址。
-# 从外部、从笔记本电脑施加负载在流量上会更真实，但会受制于到集群的
-# 链路，于是你测量的将是自己的 Wi-Fi，而不是应用。
+# Fortio lives in the cluster as an ordinary application and hits the rickroll address from inside.
+# Loading it from outside, from a laptop, would be more honest in terms of traffic, but it would run into the channel
+# to the cluster, and you would be measuring your Wi-Fi rather than the application.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -26,9 +26,9 @@ metadata:
   labels:
     app: fortio
 spec:
-  # 一份生成器副本就够了：它自己会用许多线程产生负载。
-  # 在这里加第二份副本只会把画面搞乱——Web 界面里的计数器
-  # 每份副本各自独立，你会只看到一半的请求。
+  # One copy of the generator is enough: it produces load in many threads by itself.
+  # A second copy here would only blur the picture — the counters in the web interface
+  # are per-copy, and you would see half the requests.
   replicas: 1
   selector:
     matchLabels:
@@ -38,9 +38,9 @@ spec:
       labels:
         app: fortio
     spec:
-      # 与 rickroll 相同的安全配置：不以 root 运行、指定具体的
-      # UID、标准的 seccomp。特意保留——这样该文件也能应用到
-      # 启用了 `restricted` 配置的集群里，否则 Pod 无法启动。
+      # The same security profile as rickroll: runs not as root, a specific
+      # UID, standard seccomp. Left in on purpose — so the file can also be applied
+      # in a cluster with the `restricted` profile enabled, where otherwise the pod would not start.
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
@@ -52,32 +52,32 @@ spec:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # latest 标签是为工作坊有意的简化，省得去核对版本。
-          # 在生产集群里不会这么做：该标签下的镜像可能在两次 apply 之间
-          # 悄然更换，你就无法复现昨天的结果。
+          # The latest tag is a deliberate simplification for the workshop, to avoid matching versions.
+          # In a production cluster you don't do this: the image under this tag may silently
+          # change between two applies, and you won't be able to reproduce yesterday's result.
           image: fortio/fortio:latest
-          # `server` 模式会启动 Web 界面并让它一直运行。没有这个参数，
-          # Fortio 会从命令行跑完一轮就退出，而集群会
-          # 反复重启该容器。
+          # The `server` mode brings up the web interface and keeps it running. Without this argument
+          # Fortio would run a single pass from the command line and exit, and the cluster
+          # would restart the container in a loop.
           args: ["server"]
           ports:
             - containerPort: 8080
               name: http
           resources:
-            # 这个请求量高于 rickroll 本身（20m）：生成器需要预先在节点上
-            # 占好位置，否则调度器会把它塞得很紧，加速过程会不平稳。
+            # The request is higher than rickroll's own (20m): the generator needs room on the node
+            # in advance, otherwise the scheduler will pack it in tightly and the ramp-up will be uneven.
             requests:
               cpu: 100m
               memory: 64Mi
             limits:
-              # 生成器需要有富余的 CPU，否则它会撞到自己的
-              # 上限，而你负载的将是 Fortio，而不是应用。
+              # The generator needs CPU headroom, otherwise it will hit
+              # its own limit and you will be loading Fortio, not the application.
               cpu: "1"
               memory: 256Mi
 ---
-# 生成器在集群内部的固定地址。用于通过 `kubectl port-forward svc/fortio 8081:8080`
-# 从笔记本电脑打开 Web 界面——集群对外
-# 不发布任何东西，也没有其他通往 Fortio 的门。
+# A stable address for the generator inside the cluster. Needed to open the web interface
+# from a laptop via `kubectl port-forward svc/fortio 8081:8080` — from the outside the cluster
+# publishes nothing, and there are no other doors to Fortio.
 apiVersion: v1
 kind: Service
 metadata:
@@ -86,7 +86,7 @@ spec:
   selector:
     app: fortio
   ports:
-    # 两侧都是 8080：服务和容器都是。这个号码与 Pod 内部的 rickroll
-    # 相同，但不会冲突——每个 Pod 有自己独立的网络栈。
+    # 8080 on both sides: both the service and the container. The number is the same as rickroll's
+    # inside the pod, but there is no collision — each pod has its own network stack.
     - port: 8080
       targetPort: http

@@ -57,12 +57,12 @@ Beide bekommen Sie im Dashboard. Der Tenant-Kubeconfig liegt im Secret `kubeconf
 Cluster ging.** Vor jedem Befehlsblock steht, für welchen Cluster er gedacht ist. Wenn Sie unsicher sind:
 
 ```bash
-# echo gibt den Wert der Variablen aus: welche Zugangsdatei kubectl gerade verwendet.
-# Leer bedeutet, kubectl nimmt die Standarddatei ~/.kube/config, nicht die, die Sie meinen.
+# echo prints the value of the variable: which access file kubectl is using right now.
+# Empty means kubectl will use the default file ~/.kube/config, not the one you think.
 echo $KUBECONFIG
 
-# get nodes = „zeige die Nodes des Clusters". Hier ist es ein Lackmustest:
-# die Antwort verrät, an welchen der beiden Cluster der Befehl ging.
+# get nodes = "show the cluster's nodes". Here it's a litmus test:
+# the answer tells you which of the two clusters the command went to.
 kubectl get nodes
 ```
 
@@ -77,7 +77,7 @@ neu zu erstellen oder abzutippen: Wo unten `kubectl apply -f name.yaml` steht, w
 genommen.
 
 ```bash
-# jeder Befehl in diesem Lab wird aus dem Lab-Ordner ausgeführt — wechseln Sie hinein
+# every command in this lab is run from the lab folder — change into it
 cd labs/06-harbor
 ```
 
@@ -151,12 +151,12 @@ Anwendung, die Sie erstellen, richtet die Plattform eine separate Regel ein, die
 erlaubt:
 
 ```bash
-# get secret = „zeige das Secret-Objekt". Der Name des Secrets setzt sich aus dem Präfix
-# für den Anwendungstyp und seinem Namen zusammen: harbor- + harbor.
-#   -n tenant-workshopXX  in welchem Namespace zu suchen ist — in Ihrem Tenant
-#   -o jsonpath='...'     ein einzelnes Feld aus dem Objekt herausziehen, statt es ganz auszugeben
-#   base64 -d             dekodieren: Werte in Secrets liegen in base64
-#   ; echo                einen Zeilenumbruch anhängen, sonst klebt das Passwort am Prompt
+# get secret = "show the Secret object". The secret's name is assembled from the prefix
+# for the application type and its name: harbor- + harbor.
+#   -n tenant-workshopXX  which namespace to look in — your tenant
+#   -o jsonpath='...'     pull a single field out of the object rather than printing the whole thing
+#   base64 -d             decode: values inside secrets are stored in base64
+#   ; echo                add a newline, otherwise the password runs into the prompt
 kubectl -n tenant-workshopXX get secret harbor-harbor-credentials \
   -o jsonpath='{.data.admin-password}' | base64 -d; echo
 ```
@@ -172,9 +172,9 @@ Zugangsdaten auf Ihrem Bastion, in der Datei `~/.docker/config.json`. Danach geh
 `docker pull` zu dieser Registry, ohne nach irgendetwas zu fragen.
 
 ```bash
-# login = „merke dir die Zugangsdaten für diese Registry".
-# Das Argument ist die Registry-Adresse aus dem Schlüssel url; harbor-harbor.workshop03.example.org ist hier ein Beispiel.
-# Der Befehl fragt nach einem Benutzernamen (admin) und einem Passwort; das Passwort wird beim Tippen nicht angezeigt.
+# login = "remember the credentials for this registry".
+# The argument is the registry address from the url key; harbor-harbor.workshop03.example.org here is an example.
+# The command will ask for a username (admin) and a password; the password isn't shown as you type.
 docker login harbor-harbor.workshop03.example.org
 ```
 
@@ -314,13 +314,13 @@ Bauen wir. Ersetzen Sie die Adresse durch Ihre eigene:
 ```bash
 cd labs/06-harbor
 
-# build = „baue das Image nach dem Dockerfile".
-#   --platform linux/amd64  für welchen Prozessor bauen; die Cluster-Nodes laufen auf x86,
-#                           und der Bastion kann auf ARM laufen — dann kommt ohne das Flag das Falsche heraus
-#   -t <Adresse>/<Projekt>/<Name>:<Tag>  wie das Ergebnis heißen soll. Die Registry-Adresse am Anfang des Namens
-#                           ist der Ort, wohin docker push es später schickt
-#   app/                    das letzte Argument — der Ordner mit Dockerfile und Quellen;
-#                           sein gesamter Inhalt wird dem Builder übergeben
+# build = "build the image from the Dockerfile".
+#   --platform linux/amd64  which processor to build for; the cluster nodes are on x86,
+#                           and the bastion may be on ARM — then without the flag you get the wrong thing
+#   -t <address>/<project>/<name>:<tag>  what to name the result. The registry address at the start of the name
+#                           is where docker push will later send it
+#   app/                    the last argument — the folder with the Dockerfile and sources;
+#                           its entire contents are handed to the builder
 docker build --platform linux/amd64 -t harbor-harbor.workshop03.example.org/passes/passes-api:v1 app/
 ```
 
@@ -344,8 +344,8 @@ Das gebaute Image liegt bisher nur auf Ihrer Festplatte. `docker push` schickt e
 Registry; Layer, die in der Registry bereits vorhanden sind, werden nicht erneut übertragen.
 
 ```bash
-# push = „schicke das Image an die Registry". Wohin, entnimmt docker dem Image-Namen:
-# der erste Teil des Namens ist die Registry-Adresse, dorthin geht es, mit den Zugangsdaten von docker login.
+# push = "send the image to the registry". Where to send it, docker takes from the image name:
+# the first part of the name is the registry address, and there it goes, with the credentials from docker login.
 docker push harbor-harbor.workshop03.example.org/passes/passes-api:v1
 ```
 
@@ -365,9 +365,9 @@ früher oder später jeder lernt: **In die Produktion rollt man per Digest aus, 
 📍 **Wo:** auf dem Bastion, der `lab`-Cluster.
 
 ```bash
-# KUBECONFIG sagt kubectl, welche Zugangsdatei zu verwenden ist. Wir wechseln zu Ihrem `lab`-Cluster:
-# ab hier gehen alle kubectl-Befehle dorthin.
-# Gilt, bis das Terminalfenster geschlossen wird.
+# KUBECONFIG tells kubectl which access file to use. We switch to your `lab` cluster:
+# from here on all kubectl commands go to it.
+# It stays in effect until the terminal window is closed.
 export KUBECONFIG=~/lab.kubeconfig
 ```
 
@@ -376,11 +376,11 @@ Im Lab-Ordner liegt `passes-broken.yaml`. Statt der Registry-Adresse steht darin
 Ort und Stelle, ohne etwas zu fragen oder zu zeigen. Nehmen Sie die Zeile für Ihr System:
 
 ```bash
-# sed -i = „bearbeite die Datei an Ort und Stelle"
-#   's|was|wodurch|g'  alle Vorkommen ersetzen; das Trennzeichen | wird statt / verwendet, weil
-#                     die Adresse Schrägstriche enthält und diese sonst maskiert werden müssten
-#   Die sed-Version in macOS verlangt nach -i ein zwingendes Argument; die leeren Anführungszeichen
-#   bedeuten „keine Sicherungskopie anlegen". Unter Linux darf es ein solches Argument nicht geben.
+# sed -i = "edit the file in place"
+#   's|what|with what|g'  replace all occurrences; the separator | is used instead of / because
+#                     the address has slashes and they would have to be escaped
+#   The sed in macOS requires a mandatory argument after -i; the empty quotes
+#   mean "make no backup copy". On Linux there must be no such argument.
 
 # Linux
 sed -i    's|HARBOR-HOST|harbor-harbor.workshop03.example.org|g' passes-broken.yaml
@@ -391,13 +391,13 @@ sed -i '' 's|HARBOR-HOST|harbor-harbor.workshop03.example.org|g' passes-broken.y
 Wenden Sie sie an:
 
 ```bash
-# apply = „bringe den Cluster in den in der Datei beschriebenen Zustand"
+# apply = "bring the cluster to what's described in the file"
 kubectl apply -f passes-broken.yaml
 
-# get pods = „zeige die Pods".
-#   -l app=passes-api  nur die mit diesem Label, nicht alles
-#   -w                 nicht beenden, sondern Änderungen ausgeben, sobald sie auftreten;
-#                      Beobachtung abbrechen — Ctrl+C
+# get pods = "show the Pods".
+#   -l app=passes-api  only the ones with this label, not everything
+#   -w                 don't exit, print changes as they appear;
+#                      stop watching — Ctrl+C
 kubectl get pods -l app=passes-api -w
 ```
 
@@ -412,9 +412,9 @@ passes-api-6c9d4f7b8-2xk4n    0/1     ImagePullBackOff   0          22s
 Brechen Sie die Beobachtung mit `Ctrl+C` ab und sehen Sie, was der Cluster sagt:
 
 ```bash
-# describe = „erzähle ausführlich über das Objekt". Ganz am Ende der Ausgabe kommt das Ereignisprotokoll:
-# was der Cluster mit dem Pod versucht hat und wie es endete.
-# tail -12 behält die letzten zwölf Zeilen — die Ereignisse stehen genau dort.
+# describe = "tell me about the object in detail". At the very end of the output comes the event log:
+# what the cluster tried to do with the Pod and how it ended.
+# tail -12 keeps the last twelve lines — the events are right there.
 kubectl describe pod -l app=passes-api | tail -12
 ```
 
@@ -483,35 +483,35 @@ Wir erstellen ein Secret mit den Registry-Zugangsdaten. Eine gesonderte Variante
 `create secret` erzeugt ein Secret der Art, die `kubelet` beim Herunterladen von Images selbst lesen kann:
 
 ```bash
-# create secret docker-registry = „erstelle ein Secret mit Registry-Zugangsdaten"
-#   harbor             der Name des Secrets im Cluster; das Anwendungs-Manifest verweist darauf
-#   --docker-server    für welche Registry diese Zugangsdaten sind — dieselbe Adresse wie im Image-Namen
-#   --docker-username  wer sich anmeldet
-#   --docker-password  das Passwort; einfache Anführungszeichen sind nötig, wenn es $, ! oder Leerzeichen enthält
+# create secret docker-registry = "create a secret with registry credentials"
+#   harbor             the secret's name inside the cluster; the application manifest will refer to it
+#   --docker-server    which registry these credentials are for — the same address as in the image name
+#   --docker-username  who's logging in
+#   --docker-password  the password; single quotes are needed if it has a $, ! or space
 kubectl create secret docker-registry harbor \
   --docker-server=harbor-harbor.workshop03.example.org \
   --docker-username=admin \
-  --docker-password='IHR-PASSWORT'
+  --docker-password='YOUR-PASSWORD'
 ```
 
 ⚠️ **Ein Passwort in der Befehlszeile bleibt in der Shell-History.** Auf der Testumgebung spielt das keine
 Rolle, in einer Arbeitsumgebung schon. Ein Weg ohne die History:
 
 ```bash
-# read legt das über die Tastatur Eingegebene in die Variable HARBOR_PASS:
-#   -s  das Eingegebene nicht am Bildschirm zeigen
-#   -r  einen Backslash nicht als Sonderzeichen behandeln
-# Nach dieser Zeile erscheint nichts am Bildschirm: fügen Sie das Passwort ein und drücken Sie Enter.
+# read puts what's typed at the keyboard into the HARBOR_PASS variable:
+#   -s  don't show what's typed on the screen
+#   -r  don't treat a backslash as a special character
+# Nothing will appear on the screen after this line: paste the password and press Enter.
 read -rs HARBOR_PASS
 
-# Ab hier wird das Passwort aus der Variablen eingesetzt, sodass nur der Variablenname
-# in die Shell-History gelangt. Die doppelten Anführungszeichen sind zwingend: ohne sie würden Leerzeichen den Wert zerreißen.
+# From here the password is substituted from the variable, so only the variable name
+# goes into the shell history. The double quotes are mandatory: without them spaces would break the value.
 kubectl create secret docker-registry harbor \
   --docker-server=harbor-harbor.workshop03.example.org \
   --docker-username=admin \
   --docker-password="$HARBOR_PASS"
 
-# unset löscht die Variable, damit das Passwort nicht an die nächsten Befehle in diesem Fenster gerät
+# unset erases the variable so the password doesn't reach the next commands in this window
 unset HARBOR_PASS
 ```
 
@@ -521,8 +521,8 @@ unset HARBOR_PASS
 Fragen wir den Cluster, welche Art von Secret dabei herausgekommen ist:
 
 ```bash
-#   -o jsonpath='{.type}'  ein einzelnes Feld des Objekts ausgeben — den Typ des Secrets
-#   {"\n"}                 einen Zeilenumbruch anhängen, sonst klebt die Ausgabe am Prompt
+#   -o jsonpath='{.type}'  print a single field of the object — the secret's type
+#   {"\n"}                 add a newline, otherwise the output runs into the prompt
 kubectl get secret harbor -o jsonpath='{.type}{"\n"}'
 ```
 
@@ -539,10 +539,10 @@ Um sich den Inhalt anzusehen (das Passwort liegt dort in base64 — das ist **ke
 sondern eine Art, Binärdaten als Text zu schreiben, und jeder kann es dekodieren):
 
 ```bash
-# .data.\.dockerconfigjson — der Schlüssel im Secret. Der Schlüsselname selbst beginnt mit einem Punkt,
-# deshalb wird er maskiert: sonst hielte jsonpath ihn für einen Pfadtrenner.
-# base64 -d dekodiert den Wert zurück in Text — Sie sehen dasselbe Format
-# wie in der Datei ~/.docker/config.json auf Ihrem Bastion.
+# .data.\.dockerconfigjson — the key inside the secret. The key name itself starts with a dot,
+# so it's escaped: otherwise jsonpath would take it for a path separator.
+# base64 -d decodes the value back into text — you'll see the same format
+# as in the file ~/.docker/config.json on your bastion.
 kubectl get secret harbor -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d
 ```
 
@@ -570,12 +570,12 @@ sed -i    's|HARBOR-HOST|harbor-harbor.workshop03.example.org|g' passes.yaml
 # macOS
 sed -i '' 's|HARBOR-HOST|harbor-harbor.workshop03.example.org|g' passes.yaml
 
-# delete -f = genau die in der Datei beschriebenen Objekte aus dem Cluster entfernen
+# delete -f = remove from the cluster exactly the objects described in the file
 kubectl delete -f passes-broken.yaml
 kubectl apply -f passes.yaml
 
-# rollout status wartet, bis die neuen Replicas bereit werden, und beendet sich dann von selbst.
-# Kommt es nicht ans Ziel, gibt es einen Fehler zurück, weshalb eine solche Zeile in Skripten praktisch ist.
+# rollout status waits until the new replicas become ready, then finishes on its own.
+# If it doesn't get there, it returns an error, which is why such a line is handy in scripts.
 kubectl rollout status deployment/passes-api
 ```
 
@@ -602,19 +602,19 @@ Dienst `passes-api`. Das nächste Analogon ist eine temporäre Portweiterleitung
 ohne Eingriff ins Netzwerk.
 
 ```bash
-# port-forward svc/passes-api = ein Tunnel zum Service, nicht zu einem bestimmten Pod
-#   8080:80 — die linke Zahl ist der Port auf Ihrem Bastion, die rechte der Service-Port im Cluster
-# Schließen Sie das Fenster nicht: der Tunnel lebt, solange der Befehl läuft.
+# port-forward svc/passes-api = a tunnel to the service, not to a specific Pod
+#   8080:80 — the left number is the port on your bastion, the right one the service port in the cluster
+# Don't close the window: the tunnel lives as long as the command runs.
 kubectl port-forward svc/passes-api 8080:80
 ```
 
 In einem anderen Terminalfenster:
 
 ```bash
-# curl — „gehe zur Adresse und zeige die Antwort".
-#   -s     den Fortschrittsindikator nicht anzeigen
-#   ; echo einen Zeilenumbruch anhängen: die Antwort kommt als eine einzige Zeile, und ohne ihn
-#          klebt sie am Shell-Prompt
+# curl — "go to the address and show the answer".
+#   -s     don't show the progress indicator
+#   ; echo add a newline: the answer comes as a single line, and without it
+#          it runs into the shell prompt
 curl -s http://localhost:8080/; echo
 ```
 
@@ -637,11 +637,11 @@ Das Feld `pod` in der Antwort ist der Name der Replica, die geantwortet hat. Ver
 Liste der Replicas:
 
 ```bash
-# ein neues Terminalfenster weiß nichts von der Variablen KUBECONFIG — setzen Sie sie auch hier,
-# sonst geht kubectl an den falschen Cluster
+# a new terminal window knows nothing about the KUBECONFIG variable — set it here too,
+# otherwise kubectl will go to the wrong cluster
 export KUBECONFIG=~/lab.kubeconfig
 
-# dieselbe Auswahl per Label: die Liste sollte den Namen enthalten, den Sie in der Antwort gesehen haben
+# the same selection by label: the list should contain the name you saw in the answer
 kubectl get pods -l app=passes-api
 ```
 
@@ -654,9 +654,9 @@ Die Lastverteilung können Sie wirklich so prüfen — acht Anfragen aus einem t
 des Clusters lebt:
 
 ```bash
-# run bringt einen einmaligen Pod hoch, --rm räumt ihn danach weg.
-# Alles nach -- läuft innerhalb des Pods: achtmal rufen wir den Service über seinen internen Namen auf
-# und drucken die Zeile mit dem Namen der antwortenden Replica.
+# run brings up a one-off Pod, --rm cleans it up afterwards.
+# Everything after -- runs inside the Pod: eight times we hit the service by its internal name
+# and print the line with the name of the replica that answered.
 kubectl run probe --rm -i --restart=Never --quiet --image=curlimages/curl:8.11.1 \
   -- sh -c 'for i in $(seq 1 8); do curl -s http://passes-api/ | grep -o "passes-api-[a-z0-9-]*"; done'
 ```
@@ -680,13 +680,13 @@ sind zwingend, die dritte ist der Pfad zum Tenant-Kubeconfig.
 ```bash
 cd labs/06-harbor
 
-# in welchem Cluster die Anwendung zu prüfen ist — in Ihrem `lab`
+# which cluster to check the application in — your `lab`
 export KUBECONFIG=~/lab.kubeconfig
-# Ihre Tenant-Nummer: daraus setzt das Skript den Namespace-Namen tenant-workshop03 zusammen
+# your tenant number: from it the script assembles the namespace name tenant-workshop03
 export COZY_TENANT=workshop03
-# wo der Zugang zum Management-Cluster liegt — dort schaut das Skript auf Harbor selbst.
-# Sie können es ungesetzt lassen: dann sucht das Skript ~/.kube/config, und findet es das nicht — überspringt
-# es die Prüfungen am Management-Cluster und sagt es.
+# where the access to the management cluster lives — there the script will look at Harbor itself.
+# You can leave it unset: then the script looks for ~/.kube/config, and not finding it — skips
+# the checks on the management cluster and says so.
 export COZY_KUBECONFIG=~/.kube/config
 
 ./check.sh
@@ -707,9 +707,9 @@ Die Anwendung und Harbor werden im nächsten Lab gebraucht — löschen Sie sie 
 Wenn Sie mit allen Labs fertig sind:
 
 ```bash
-# die in der Datei beschriebenen Objekte löschen: sowohl das Deployment als auch den Service
+# delete the objects described in the file: both the Deployment and the Service
 kubectl delete -f passes.yaml
-# das Secret wurde per Befehl erstellt, nicht per Datei — löschen Sie es per Namen
+# the secret was created by a command, not a file — delete it by name
 kubectl delete secret harbor
 ```
 

@@ -1,30 +1,30 @@
 ---
-# Lab 5 · Infrastruktur in Git. Namespace für den Dienst «Gästeausweis».
+# Lab 5 · Infrastructure in Git. Namespace for the "Passes" service.
 #
-# Diese Datei wird nicht von Hand auf den Cluster angewendet. Sie legen sie in Ihr Repository auf
-# GitHub, in den Ordner apps/, und Flux überträgt sie selbst in den Cluster `lab` — nach Zeitplan:
+# You do not apply this file to the cluster by hand. You put it into your repository on
+# GitHub, in the apps/ folder, and Flux moves it into the `lab` cluster itself, on schedule:
 #     cp app/*.yaml ~/passes-gitops/apps/
 #     cd ~/passes-gitops && git add apps && git commit -m "add passes service v1" && git push
 #
-# Wie man ein beliebiges Manifest liest: apiVersion — die Version des Beschreibungsschemas (daran
-# erkennt der Cluster, wie er es parsen muss), kind — was wir erstellen, metadata.name — der Name,
-# unter dem das Objekt später gesucht wird. Diese drei Felder gibt es in jedem Objekt und sie werden
-# unten nicht gesondert erklärt.
+# How to read any manifest: apiVersion — the version of the description schema (the cluster
+# uses it to know how to parse the object), kind — what we are creating, metadata.name — the
+# name by which the object is later found. These three fields are present in every object and
+# are not explained separately below.
 #
-# Ein Namespace ist eine logische Trennwand innerhalb eines einzelnen Clusters:
-# eigener Namenssichtbarkeitsbereich, eigene Rechte, eigene Quotas. Das Nächstliegende in vSphere ist
-# ein Ordner im vCenter-Baum oder ein Resource Pool.
+# A namespace is a logical partition inside a single cluster: its own name scope, its own
+# permissions, its own quotas. The closest thing in vSphere is a folder in the vCenter tree
+# or a resource pool.
 #
-# Warum er zusammen mit der Anwendung in Git liegt und nicht von Hand erstellt wird: wenn der Dienst
-# aus dem Repository verschwindet, entfernt Flux auch den Namespace. Es bleibt keine leere Trennwand
-# zurück, bei der sich in einem halben Jahr niemand mehr erinnert, wozu sie angelegt wurde.
+# Why it lives in Git together with the application rather than being created by hand: when
+# the service leaves the repository, Flux will remove the namespace too. No empty partition
+# will be left behind that in six months nobody remembers why it was set up.
 apiVersion: v1
 kind: Namespace
 metadata:
   name: passes
-  # Das Label beeinflusst nicht den Betrieb des Dienstes — es wird gebraucht, um mit einem einzigen
-  # Befehl alles zu finden, was zum «Gästeausweis» gehört: kubectl get all -A -l app.kubernetes.io/part-of=passes.
-  # Der Name part-of stammt aus dem gängigen Satz von Kubernetes-Labels und ist nicht von uns erfunden:
-  # fremde Werkzeuge (Monitoring, Exporte) suchen genau nach ihm.
+  # The label does not affect how the service runs — it is needed so that a single command
+  # can find everything related to "Passes": kubectl get all -A -l app.kubernetes.io/part-of=passes.
+  # The part-of name is taken from the common Kubernetes set of labels, not invented by us:
+  # external tools (monitoring, exports) look for exactly this one.
   labels:
     app.kubernetes.io/part-of: passes

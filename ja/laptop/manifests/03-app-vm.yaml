@@ -1,6 +1,6 @@
-# 適用する前に tenant-workshopXX を自分の namespace に置き換えてください。
-# 全ファイルまとめて行うほうが簡単です: README の番号の置換に関するセクションを参照。
-# さらに: 下の url フィールドに convert.sh からの presigned リンクを挿入してください (ステップ 2)。
+# Before applying, replace tenant-workshopXX with your namespace.
+# Easier to do it across all files at once: see README, the section on substituting the number.
+# Also: in the url field below, insert the presigned link from convert.sh (step 2).
 #
 apiVersion: apps.cozystack.io/v1alpha1
 kind: VMDisk
@@ -10,7 +10,7 @@ metadata:
 spec:
   source:
     http:
-      url: "ВСТАВЬТЕ_PRESIGNED_URL"  # convert.sh より (Share: の行)
+      url: "PASTE_PRESIGNED_URL"  # from convert.sh (Share: line)
   storage: 10Gi
   storageClass: replicated
 ---
@@ -25,6 +25,6 @@ spec:
   runStrategy: Always
   disks:
     - name: app-1
-# アプリへの外部からのアクセスは `virtctl port-forward` 経由です (README を参照)。
-# このスタンド (Cilium + robotlb) の external LoadBalancer は VM に対して機能しないため、
-# ここでは external を有効に「しません」。
+# External access to the app is via `virtctl port-forward` (see README).
+# external LoadBalancer on this stand (Cilium + robotlb) does not work for VMs,
+# so we do NOT enable external here.

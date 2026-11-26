@@ -34,9 +34,9 @@ Den vierten, `endpoint`, müssen Sie nicht notieren — er ist für alle gleich 
 **Wohin sie kommen.** In Schritt 3 öffnen Sie auf der Konvertermaschine die Datei `convert.sh`, und darin einen Block „FÜGEN SIE IHRE WERTE EIN“ aus drei Zeilen:
 
 ```
-BUCKET="ВСТАВЬТЕ_bucketName"
-ACCESS_KEY="ВСТАВЬТЕ_accessKey"
-SECRET_KEY="ВСТАВЬТЕ_secretKey"
+BUCKET="PASTE_bucketName"
+ACCESS_KEY="PASTE_accessKey"
+SECRET_KEY="PASTE_secretKey"
 ```
 
 Genau diese drei Werte fügen Sie dort ein, jeden in seine eigenen Anführungszeichen. An anderer Stelle werden sie nicht gebraucht: Das Skript lädt das fertige Image selbst in Ihren Bucket hoch und erstellt selbst einen Link darauf.

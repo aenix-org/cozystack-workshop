@@ -37,16 +37,16 @@ Los comandos de los labs están escritos para la línea de comandos de Linux y m
 La solución es **WSL** — un subsistema Linux dentro de Windows. Se instala con un solo comando en PowerShell ejecutado como Administrador:
 
 ```powershell
-# instala el subsistema Linux dentro de Windows: el kernel, el servicio y la distribución
-# Ubuntu por defecto. Tras la instalación Windows te pedirá reiniciar.
+# installs the Linux subsystem inside Windows: the kernel, the service and the default
+# Ubuntu distribution. After installation Windows will ask you to reboot.
 wsl --install
 ```
 
 Tras el reinicio tendrás una consola Ubuntu, y de ahí en adelante trabajas en ella como todos los demás. Dentro de WSL necesitarás un `kubectl` propio — el comando con el que te diriges al clúster:
 
 ```bash
-# snap es el gestor de paquetes de Ubuntu. --classic instala el paquete sin aislamiento:
-# en modo aislado kubectl no verá el archivo de acceso en tu carpeta personal.
+# snap is Ubuntu's package manager. --classic installs the package without isolation:
+# in isolated mode kubectl won't see the access file in your home folder.
 sudo snap install kubectl --classic
 ```
 
@@ -59,7 +59,7 @@ Los discos de Windows son visibles desde WSL bajo la ruta `/mnt/c/...`, así que
 Todos los archivos ya son tuyos — los tomaste junto con el repositorio. No hay nada que crear ni volver a teclear: allí donde más abajo diga `kubectl apply -f nombre.yaml`, el archivo se toma de aquí.
 
 ```bash
-# la ruta se cuenta desde la raíz del repositorio — la obtienes en el paso siguiente
+# the path is counted from the repository root — you fetch it in the next step
 cd labs/00-cluster
 ```
 
@@ -75,8 +75,8 @@ cd labs/00-cluster
 El repositorio contiene los manifiestos — archivos que describen qué crear en el clúster — y los scripts de comprobación. Los necesitas a partir de este lab:
 
 ```bash
-# clone = descarga el repositorio completo, junto con su historial de cambios.
-# Al lado aparece una carpeta cozystack-migration-workshop; entramos en ella.
+# clone = download the entire repository, together with its change history.
+# A folder cozystack-migration-workshop appears alongside; we move into it.
 git clone https://github.com/aenix-org/cozystack-migration-workshop.git
 cd cozystack-migration-workshop
 ```
@@ -92,8 +92,8 @@ Todo lo que pidas a la plataforma vive en el **clúster de gestión** — el mis
 Esta ruta se usa en todos los labs — si guardas el archivo en otro lugar, de aquí en adelante tendrás que sustituir la tuya cada vez.
 
 ```bash
-# Comprueba que el archivo se puede leer y que el clúster responde.
-# --kubeconfig le dice a kubectl qué archivo de acceso usar en este comando.
+# Check that the file is readable and the cluster answers.
+# --kubeconfig tells kubectl which access file to use in this command.
 kubectl --kubeconfig ~/.kube/workshop get kubernetes.apps.cozystack.io -n tenant-workshopXX
 ```
 
@@ -162,19 +162,19 @@ spec:
 ⚠️ Los comandos de abajo se ejecutan **en el clúster de gestión** — con el acceso que te dieron junto con el tenant. Todavía no existe un archivo de acceso al clúster `lab` en sí: aparece solo después de que el clúster levante.
 
 ```bash
-# entra en la carpeta del lab — de aquí en adelante todos los archivos se toman de aquí
+# move into the lab folder — from here on all files are taken from here
 cd labs/00-cluster
-# antes de aplicar, sustituye en el archivo tu propio número de tenant en lugar de XX.
-# apply = "lleva el clúster a lo que describe el archivo". El comando no levanta el
-# clúster por sí mismo — entrega la orden a la plataforma, que decide qué crear y en
-# qué orden.
-#   -f   toma la descripción del archivo
+# before applying, substitute your own tenant number in the file in place of XX.
+# apply = "bring the cluster to what's described in the file". The command doesn't bring
+# the cluster up itself — it hands the order to the platform, which decides what to
+# create and in what order.
+#   -f   take the description from the file
 kubectl apply -f cluster.yaml
-# get = "muestra lo que hay". kubernetes.apps.cozystack.io es el nombre completo del tipo
-# de objeto, el mismo descrito en el archivo (kind: Kubernetes), lab es el nombre de tu orden.
-#   -n   en qué namespace buscar; sin el flag kubectl mira en el namespace por defecto
-#   -w   observa e imprime los cambios. Para salir — Ctrl+C, la instalación no se interrumpe por ello
-# Espera hasta que aparezca True en la columna READY.
+# get = "show what's there". kubernetes.apps.cozystack.io is the full name of the object
+# type, the very one described in the file (kind: Kubernetes), lab is the name of your order.
+#   -n   which namespace to look in; without the flag kubectl looks in the default namespace
+#   -w   watch and print changes. To exit — Ctrl+C, the installation won't be interrupted by it
+# Wait until True appears in the READY column.
 kubectl -n tenant-workshopXX get kubernetes.apps.cozystack.io lab -w
 ```
 
@@ -187,9 +187,9 @@ El estado pasará a `Ready`, normalmente en cinco a diez minutos.
 ⚠️ **Si han pasado más de veinte minutos y el estado no cambia — la causa puede no estar en tu clúster.** La instalación de todas las aplicaciones en la plataforma la lleva una cola compartida, y si en ella hay una operación larga de alguien, tu clúster espera su turno. Para ver si lo han tomado para trabajarlo:
 
 ```bash
-# Mira la orden en sí y lo que la plataforma escribe sobre ella.
-# La sección status.conditions al final de la salida es su informe: si la han tomado para
-# trabajarla, qué la bloquea, qué está esperando.
+# Look at the order itself and at what the platform writes about it.
+# The status.conditions section at the end of the output is its report: whether it's been
+# picked up for work, what's blocking, what it's waiting for.
 kubectl --kubeconfig ~/.kube/workshop -n tenant-workshopXX \
   get kubernetes.apps.cozystack.io lab -o yaml
 ```
@@ -197,7 +197,7 @@ kubectl --kubeconfig ~/.kube/workshop -n tenant-workshopXX \
 Si tampoco ahí queda nada claro — mira los eventos del tenant. Es un registro de lo que la plataforma hizo con tus objetos:
 
 ```bash
-# events = un registro de incidencias. Ordenamos por tiempo para que lo más reciente quede abajo.
+# events = a log of incidents. We sort by time so the freshest is at the bottom.
 kubectl --kubeconfig ~/.kube/workshop -n tenant-workshopXX \
   get events --sort-by=.lastTimestamp | tail -20
 ```
@@ -227,12 +227,12 @@ De aquí se sigue algo importante: **Kubernetes aquí no reemplaza a la virtuali
 **La forma principal — con un comando.** Cozystack configura en tu clúster una regla de acceso aparte que permite leer exactamente este Secret y nada más. El comando se ejecuta **en el clúster de gestión**, con el acceso que te dieron junto con el tenant, y el resultado se pone en un archivo en tu laptop:
 
 ```bash
-# get secret = muestra el Secret; -o go-template — no lo imprimas entero,
-# sino saca de él un campo y muéstralo como texto:
-#   index .data "admin.conf"   toma la clave admin.conf del Secret
-#   base64decode               el contenido de los Secrets se guarda codificado en base64,
-#                              esta función devuelve el texto original
-#   > ~/lab.kubeconfig         escribe la salida en un archivo en lugar de la pantalla
+# get secret = show the Secret; -o go-template — don't print it whole,
+# but pull one field out of it and output it as text:
+#   index .data "admin.conf"   take the admin.conf key from the Secret
+#   base64decode               the contents of Secrets are stored base64-encoded,
+#                              this function returns the original text
+#   > ~/lab.kubeconfig         write the output to a file instead of the screen
 kubectl -n tenant-workshopXX get secret kubernetes-lab-admin-kubeconfig \
   -o go-template='{{ printf "%s\n" (index .data "admin.conf" | base64decode) }}' > ~/lab.kubeconfig
 ```
@@ -248,18 +248,18 @@ kubectl -n tenant-workshopXX get secret kubernetes-lab-admin-kubeconfig \
 macOS y Linux:
 
 ```bash
-# KUBECONFIG es la variable de la que kubectl aprende qué archivo de acceso tomar.
-# export la hace visible a todos los comandos ejecutados más adelante en esta ventana de terminal.
+# KUBECONFIG is the variable from which kubectl learns which access file to take.
+# export makes it visible to all commands run further in this terminal window.
 export KUBECONFIG=~/lab.kubeconfig
-# nodes son los nodos del clúster, las mismas máquinas virtuales sobre las que correrán tus aplicaciones.
-# La respuesta demuestra además que el archivo de acceso funciona.
+# nodes are the cluster's nodes, the very virtual machines your applications will run on.
+# The answer also proves the access file works.
 kubectl get nodes
 ```
 
 Windows PowerShell — solo si no pudiste instalar WSL:
 
 ```powershell
-# en PowerShell las variables de entorno se establecen con $env: y viven hasta que se cierra la ventana
+# in PowerShell environment variables are set via $env: and live until the window closes
 $env:KUBECONFIG="$HOME\lab.kubeconfig"
 kubectl get nodes
 ```
@@ -280,10 +280,10 @@ kubernetes-lab-md0-xxxxx    Ready    <none>   3m    v1.35.6
 📍 **Dónde:** en tu laptop, en la misma ventana de terminal donde estabas trabajando con `kubectl`.
 
 ```bash
-# el script se ejecuta desde la carpeta del lab: busca los archivos junto a sí mismo
+# the script runs from the lab folder: it looks for files next to itself
 cd labs/00-cluster
-# ./ antes del nombre significa "ejecuta el archivo justo desde aquí"; sin ello el shell
-# buscará el comando check.sh entre las carpetas del sistema y no lo encontrará
+# ./ before the name means "run the file right from here"; without it the shell
+# will look for the check.sh command among the system folders and won't find it
 ./check.sh
 ```
 

@@ -7,8 +7,8 @@
 **あなたの認証情報:**
 ```
 dashboard: https://dashboard.workshop.aenix.io
-login:     workshopXX      ← あなたの番号、直接お伝えします
-password:  ...             ← 直接お伝えします
+login:     workshopXX      ← your number, I'll tell you in person
+password:  ...             ← I'll tell you in person
 ```
 
 1. 上のリンクからダッシュボードを開きます。
@@ -20,13 +20,13 @@ password:  ...             ← 直接お伝えします
 **macOS と Linux**
 ```bash
 mkdir -p ~/.kube
-nano ~/.kube/workshop      # コピーした内容を貼り付けて保存します
+nano ~/.kube/workshop      # paste what you copied, then save
 export KUBECONFIG=~/.kube/workshop
 ```
 
 **Windows**（PowerShell）
 ```powershell
-notepad $HOME\.kube\workshop   # 貼り付けて保存します
+notepad $HOME\.kube\workshop   # paste, then save
 $env:KUBECONFIG = "$HOME\.kube\workshop"
 ```
 
@@ -50,13 +50,13 @@ kubeconfig の `certificate-authority-data` フィールドにあり、デフォ
 PowerShell でステップごとに確認していきましょう:
 ```powershell
 $env:KUBECONFIG
-# 空 — デフォルトのファイルが使われており、渡されたものではないという意味です
+# empty — means it's using the default file, not the one you were given
 
 Select-String -Path "$HOME\.kube\workshop" -Pattern "certificate-authority-data" -Quiet
-# False — ファイルが不完全に保存されています。ダッシュボードから Secret を再度ダウンロードしてください
+# False — the file was saved incompletely; download the secret from the dashboard again
 
 Get-Content "$HOME\.kube\workshop" -TotalCount 1
-# apiVersion で始まるはずです。小さな四角や空白が出る場合、ファイルは UTF-16 です
+# should start with apiVersion; little squares or emptiness mean the file is in UTF-16
 ```
 
 3つ目の点は Windows の最も厄介な落とし穴です。メモ帳と `>` によるリダイレクトは、ファイルを

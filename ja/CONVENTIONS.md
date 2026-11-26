@@ -87,9 +87,9 @@ VMwareのシステム管理者です。Kubernetesを見るのは初めて、あ�
 
 ```markdown
 <details>
-<summary><b>マニフェストを1行ずつ読み解く</b></summary>
+<summary><b>Walking through the manifest line by line</b></summary>
 
-...1行ずつ、散文で...
+...line by line, in prose...
 
 </details>
 ```
@@ -117,9 +117,9 @@ VMwareのシステム管理者です。Kubernetesを見るのは初めて、あ�
 取ってあります）:
 
 ```markdown
-> **読み進める前に、立ち止まって考えてください。**
+> **Stop and think before you read on.**
 >
-> 質問。あれば、2つ目の質問。
+> A question. A second question, if there is one.
 ```
 
 スポイラーの見出しは常に `答えと、このエラーより広い教訓` です。

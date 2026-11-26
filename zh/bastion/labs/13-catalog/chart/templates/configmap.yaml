@@ -1,20 +1,20 @@
-# 实验 13。ConfigMap 模板：「通行证」页面和 nginx 配置。
+# Lab 13. ConfigMap template: the "Passes" page and nginx configuration.
 #
-# ConfigMap 存储文本文件并将其提供给 Pod。页面放在这里而不是镜像内部，
-# 是为了在不重新构建的情况下修改文本：greeting 值在渲染时被替换，
-# 只需更新一次 release 即可。
+# The ConfigMap stores text files and serves them to the pods. The page lives here rather than
+# inside the image, so the text can be changed without a rebuild: the greeting value is substituted
+# at render time, and it is enough to update the release.
 #
-# 替换在 `|` 块内部同样有效：Helm 将模板文件当作纯文本处理，
-# 对 YAML 结构一无所知。详见 templates/deployment.yaml。
+# Substitution works inside `|` blocks too: Helm processes the template file as plain
+# text and knows nothing about the YAML structure. See templates/deployment.yaml for details.
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ .Release.Name }}
-# data 中的键是文件名，而 `|` 下面的内容则是它们的完整内容。
-# 每个键都作为单独的文件挂载到容器中，参见 Deployment 中的 volumeMounts。
+# Keys in data are file names, and what is under `|` is their entire contents.
+# Each key is mounted into the container as a separate file, see volumeMounts in the Deployment.
 data:
-  # 员工将看到的页面。这里会填入两个值：来自订单表单的 greeting，
-  # 以及 release 名称——这样打开页面就能看出这是谁的订单。
+  # The page the employee will see. Two values land here: greeting from the order
+  # form and the release name — so that the open page shows whose order it is.
   index.html: |
     <!doctype html>
     <html lang="en">
@@ -31,9 +31,9 @@ data:
     <p>Guest Pass service, release <b>{{ .Release.Name }}</b></p>
     <div class="pod">served by __POD__</div>
     </html>
-  # nginx 配置。sub_filter 在提供页面时将 __POD__ 标记替换为 Pod 名称：
-  # 这样浏览器就能显示是哪个副本作出了响应。Deployment 中的 readinessProbe
-  # 需要对 /healthz 的单独响应——它查询的正是这个地址。
+  # nginx configuration. sub_filter replaces the __POD__ marker with the pod name at the moment the
+  # page is served: this way the browser shows which of the copies answered. A separate response on /healthz
+  # is needed by the readinessProbe from the Deployment — it queries exactly this address.
   default.conf: |
     server {
       listen 8080;

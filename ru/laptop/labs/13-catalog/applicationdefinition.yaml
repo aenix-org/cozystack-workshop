@@ -1,61 +1,61 @@
 ---
-# Лаба 13. Описание приложения для каталога Cozystack — та самая «позиция в каталоге».
+# Lab 13. Application definition for the Cozystack catalog — that very "catalog entry".
 #
-# Сам по себе этот объект ничего не разворачивает. Он связывает три вещи: ваш чарт
-# (что разворачивать), новый тип объектов в API (чем приложение заказывают) и карточку
-# в дашборде (что при этом видит человек). Пока его нет, чарт остаётся папкой с файлами,
-# о которой платформа не знает, и в списке приложений рядом с Postgres и Redis пусто.
+# On its own this object deploys nothing. It ties together three things: your chart
+# (what to deploy), a new object type in the API (how the application is ordered) and a card
+# in the dashboard (what a person sees while doing so). Until it exists, the chart remains a folder
+# of files that the platform knows nothing about, and the application list next to Postgres and Redis is empty.
 #
-# Применяется одной командой, без namespace:
+# Applied with a single command, without a namespace:
 #   kubectl apply -f applicationdefinition.yaml
 #
-# ВАЖНО: этот объект CLUSTER-SCOPED — у него нет namespace, он один на весь
-# кластер. Тенант применить его НЕ МОЖЕТ, это проверено:
+# IMPORTANT: this object is CLUSTER-SCOPED — it has no namespace, there is one for the whole
+# cluster. A tenant CANNOT apply it, this is verified:
 #   kubectl auth can-i create applicationdefinitions   ->   no
-# Ваша работа заканчивается на том, что файл написан и проверен локально.
-# Применяет его платформенный админ. См. README, раздел «Где заканчиваются
-# ваши права».
+# Your work ends once the file is written and checked locally.
+# The platform admin applies it. See the README, section "Where your
+# rights end".
 apiVersion: cozystack.io/v1alpha1
 kind: ApplicationDefinition
 metadata:
   name: guest-pass
 spec:
-  # --- КАК ЭТО ВЫГЛЯДИТ В API ----------------------------------------------
+  # --- HOW THIS LOOKS IN THE API ----------------------------------------------
   application:
-    # Kind нового типа объектов. После применения в кластере появится
-    # kind: GuestPass, и с ним можно будет работать обычным kubectl.
+    # Kind of the new object type. After applying, a kind: GuestPass will appear
+    # in the cluster, and you will be able to work with it using ordinary kubectl.
     kind: GuestPass
     plural: guestpasses
     singular: guestpass
-    # Схема значений — та же, что лежит в чарте файлом values.schema.json,
-    # только записанная одной строкой. По ней API отказывает в неверных
-    # значениях, а дашборд рисует форму создания.
+    # Values schema — the same one that sits in the chart as the values.schema.json file,
+    # only written on a single line. The API uses it to reject invalid
+    # values, and the dashboard uses it to render the creation form.
     openAPISchema: |-
       {"title":"Chart Values","type":"object","properties":{"replicas":{"description":"Number of application replicas.","type":"integer","default":2},"greeting":{"description":"Text shown on the main page.","type":"string","default":"Order a pass for your guest"},"external":{"description":"Enable external access from outside the cluster.","type":"boolean","default":false},"resources":{"description":"Explicit CPU and memory configuration.","type":"object","default":{},"properties":{"cpu":{"description":"CPU available to each replica.","pattern":"^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$","anyOf":[{"type":"integer"},{"type":"string"}],"x-kubernetes-int-or-string":true},"memory":{"description":"Memory (RAM) available to each replica.","pattern":"^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$","anyOf":[{"type":"integer"},{"type":"string"}],"x-kubernetes-int-or-string":true}}}}}
 
-  # --- ЧТО РАЗВОРАЧИВАТЬ ----------------------------------------------------
+  # --- WHAT TO DEPLOY ----------------------------------------------
   release:
-    # Имя релиза = prefix + имя объекта. Объект GuestPass с именем `main`
-    # развернётся релизом `guest-pass-main`. Префикс обязателен и нужен,
-    # чтобы релизы разных приложений не сталкивались именами.
+    # Release name = prefix + object name. A GuestPass object named `main`
+    # deploys as release `guest-pass-main`. The prefix is mandatory and exists
+    # so that releases of different applications do not clash by name.
     prefix: guest-pass-
     labels:
-      # Тем же ключом Cozystack распределяет релизы тенантов по шардам Flux.
-      # Без него релиз обслуживать будет некому.
+      # With the same key Cozystack distributes tenant releases across Flux shards.
+      # Without it there will be no one to service the release.
       sharding.fluxcd.io/key: tenants
     chartRef:
-      # Откуда взять чарт. Допустимые kind: OCIRepository, HelmChart,
-      # ExternalArtifact. Внешние каталоги обычно приезжают через
-      # GitRepository -> HelmChart, и namespace у них — cozy-public.
+      # Where to take the chart from. Allowed kinds: OCIRepository, HelmChart,
+      # ExternalArtifact. External catalogs usually arrive via
+      # GitRepository -> HelmChart, and their namespace is cozy-public.
       kind: HelmChart
       name: cozystack-guest-pass
       namespace: cozy-public
 
-  # --- КАК ЭТО ВЫГЛЯДИТ В ДАШБОРДЕ ------------------------------------------
+  # --- HOW THIS LOOKS IN THE DASHBOARD ------------------------------------------
   dashboard:
-    # Раздел каталога. Используются PaaS, IaaS, NaaS, Administration,
-    # Networking — берите существующий, а не придумывайте свой,
-    # иначе приложение окажется в разделе из одного пункта.
+    # Catalog section. Used: PaaS, IaaS, NaaS, Administration,
+    # Networking — take an existing one, do not invent your own,
+    # otherwise the application ends up in a section with a single item.
     category: PaaS
     singular: Guest Pass
     plural: Guest Passes
@@ -63,9 +63,9 @@ spec:
     tags:
       - internal
       - web
-    # Иконка — SVG в base64. Именно base64, не путь и не URL: дашборд
-    # ничего никуда не ходит скачивать. Исходник лежит рядом в icon.svg.
+    # Icon — SVG in base64. Specifically base64, not a path and not a URL: the dashboard
+    # does not go anywhere to download anything. The source sits next to it in icon.svg.
     icon: PHN2ZyB3aWR0aD0iMTQ0IiBoZWlnaHQ9IjE0NCIgdmlld0JveD0iMCAwIDE0NCAxNDQiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxNDQiIGhlaWdodD0iMTQ0IiByeD0iMjQiIGZpbGw9IiMyRjZGRUQiLz4KPHJlY3QgeD0iMzAiIHk9IjQwIiB3aWR0aD0iODQiIGhlaWdodD0iNjQiIHJ4PSI4IiBmaWxsPSJ3aGl0ZSIvPgo8Y2lyY2xlIGN4PSI1NCIgY3k9IjY0IiByPSIxMSIgZmlsbD0iIzJGNkZFRCIvPgo8cGF0aCBkPSJNMzggOTJjMC05IDcuMi0xNCAxNi0xNHMxNiA1IDE2IDE0djRIMzh2LTR6IiBmaWxsPSIjMkY2RkVEIi8+CjxyZWN0IHg9Ijc4IiB5PSI1OCIgd2lkdGg9IjI2IiBoZWlnaHQ9IjYiIHJ4PSIzIiBmaWxsPSIjOURCQkY3Ii8+CjxyZWN0IHg9Ijc4IiB5PSI3MiIgd2lkdGg9IjI2IiBoZWlnaHQ9IjYiIHJ4PSIzIiBmaWxsPSIjOURCQkY3Ii8+CjxyZWN0IHg9Ijc4IiB5PSI4NiIgd2lkdGg9IjE4IiBoZWlnaHQ9IjYiIHJ4PSIzIiBmaWxsPSIjOURCQkY3Ii8+CjxyZWN0IHg9IjYyIiB5PSIyNCIgd2lkdGg9IjIwIiBoZWlnaHQ9IjIwIiByeD0iNiIgZmlsbD0iIzFCNENDMCIvPgo8L3N2Zz4K
-    # Порядок полей в YAML-представлении объекта. Косметика, но без него
-    # поля выстраиваются как попало и форма читается хуже.
+    # Field order in the object's YAML representation. Cosmetic, but without it
+    # the fields line up haphazardly and the form reads worse.
     keysOrder: [["apiVersion"], ["kind"], ["metadata"], ["metadata", "name"], ["spec", "replicas"], ["spec", "greeting"], ["spec", "external"], ["spec", "resources"]]

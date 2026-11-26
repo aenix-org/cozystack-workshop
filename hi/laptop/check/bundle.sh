@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
-# सभी लैब के परिणामों को प्रमाणन प्रणाली में अपलोड करने के लिए एक ही फ़ाइल में एकत्र करता है।
+# Collects the results of all labs into a single file for upload to the certification system.
 #
-# महत्वपूर्ण गुण: यह स्क्रिप्ट कुछ भी दोबारा नहीं चलाती। यह वही लेती है जो हर लैब ने उस
-# क्षण दर्ज किया था जब आपने उसे सौंपा था। वरना यह होता: लैब स्वयं आपको अपने पीछे सफ़ाई
-# करने को कहती हैं, और टेनेंट कोटा आपको सभी सेवाओं को हफ़्तों तक चालू रखने नहीं देता —
-# तो अंत में की गई पुनर्जाँच तीन हफ़्ते पहले ईमानदारी से किए गए काम पर विफलता दिखा देती।
+# Important property: the script RESTARTS NOTHING. It takes what each lab
+# recorded at the moment you submitted it. Otherwise this would happen: the labs
+# themselves tell you to clean up after yourself, and the tenant quota won't let you
+# keep all services running for weeks — so a final re-check would show a failure for
+# work honestly done three weeks ago.
 #
-#   ./bundle.sh                 जो कुछ मिला, सब एकत्र करें
-#   ./bundle.sh --rerun 07-redis  एक लैब दोबारा करें और उसका परिणाम अपडेट करें
+#   ./bundle.sh                 collect everything found
+#   ./bundle.sh --rerun 07-redis  redo a single lab and update its result
 #
 set -uo pipefail
 
@@ -17,23 +18,23 @@ REPO="$(cd "$HERE/.." && pwd)"
 OUT="${1:-$HOME/cozystack-labs-bundle.json}"
 
 if [ "${1:-}" = "--rerun" ]; then
-  lab="${2:?लैब बताएं, उदाहरण के लिए: ./bundle.sh --rerun 07-redis}"
-  [ -d "$REPO/labs/$lab" ] || { echo "ऐसी कोई लैब नहीं: $lab"; exit 1; }
-  echo "दोबारा कर रहे हैं $lab…"
+  lab="${2:?specify a lab, for example: ./bundle.sh --rerun 07-redis}"
+  [ -d "$REPO/labs/$lab" ] || { echo "no such lab: $lab"; exit 1; }
+  echo "redoing $lab…"
   ( cd "$REPO/labs/$lab" && ./check.sh )
-  echo "परिणाम अपडेट हो गया, अब ./bundle.sh बिना विकल्पों के चलाएं"
+  echo "result updated, now run ./bundle.sh without options"
   exit 0
 fi
 
 if [ ! -d "$RESULTS_DIR" ] || [ -z "$(ls -A "$RESULTS_DIR" 2>/dev/null)" ]; then
   cat <<'MSG'
-कोई परिणाम नहीं मिला।
+No results found.
 
-हर लैब अपना परिणाम तब सहेजती है जब आप उसमें ./check.sh चलाते हैं।
-कम से कम एक पूरी करें और जाँच चलाएं — फिर यहाँ लौट आएं।
+Each lab saves its result when you run ./check.sh in it.
+Complete at least one and run the check — then come back here.
 
-अगर आपने लैब किसी दूसरी मशीन पर की थीं, तो वहाँ से फ़ोल्डर
-~/.cozystack-labs/results कॉपी करें, या पथ बताएं: COZY_LAB_RESULTS=/पथ ./bundle.sh
+If you did the labs on another machine, copy the folder
+~/.cozystack-labs/results from there, or specify a path: COZY_LAB_RESULTS=/path ./bundle.sh
 MSG
   exit 1
 fi
@@ -43,9 +44,9 @@ import json, os, sys, glob, datetime
 
 results_dir, out_path, repo = sys.argv[1], sys.argv[2], sys.argv[3]
 
-# कुल कितनी लैब मौजूद हैं — जाँच स्क्रिप्ट की मौजूदगी से गिना जाता है।
-# सोलहवीं ("सोमवार को क्या करें") के पास कोई स्क्रिप्ट नहीं: यह एक पाठ्य
-# अभ्यास है, और यह अंक में नहीं गिना जाता।
+# How many labs exist at all — counted by the presence of a check script.
+# The sixteenth ("What to do on Monday") has no script: it's a text
+# exercise, and it doesn't count toward the score.
 all_labs = sorted(
     os.path.basename(os.path.dirname(p))
     for p in glob.glob(os.path.join(repo, "labs", "*", "check.sh"))
@@ -57,10 +58,10 @@ for path in sorted(glob.glob(os.path.join(results_dir, "result-*.json"))):
         with open(path) as fh:
             d = json.load(fh)
     except Exception as exc:
-        problems.append(f"{os.path.basename(path)}: पढ़ी नहीं जा सकती ({exc})")
+        problems.append(f"{os.path.basename(path)}: unreadable ({exc})")
         continue
     if d.get("schema_version") != 1:
-        problems.append(f"{os.path.basename(path)}: अज्ञात प्रारूप संस्करण")
+        problems.append(f"{os.path.basename(path)}: unknown format version")
         continue
     labs.append(d)
     if d.get("env", {}).get("cluster_uid"):
@@ -79,46 +80,46 @@ bundle = {
                       .strftime("%Y-%m-%dT%H:%M:%SZ"),
     "labs_total": len(all_labs),
     "labs_passed": len(passed),
-    "cluster_uids": sorted(uids),          # एक से अधिक — अलग-अलग क्लस्टरों पर किया गया
+    "cluster_uids": sorted(uids),          # more than one — done on different clusters
     "kubernetes_versions": sorted(versions),
     "results": labs,
 }
 with open(out_path, "w") as fh:
     json.dump(bundle, fh, ensure_ascii=False, indent=1)
 
-# वही चीज़ सादे पाठ में — ताकि व्यक्ति देख सके कि वह क्या भेज रहा है।
+# The same thing in plain text — so a person can see what they're sending.
 txt = out_path.rsplit(".", 1)[0] + ".txt"
 with open(txt, "w") as fh:
-    fh.write("Cozystack लैब परिणाम\n")
-    fh.write("एकत्र किया गया: %s\n\n" % bundle["generated_at"])
-    fh.write("%d में से %d लैब सौंपी गईं\n\n" % (len(passed), len(all_labs)))
+    fh.write("Cozystack lab results\n")
+    fh.write("Collected: %s\n\n" % bundle["generated_at"])
+    fh.write("Passed %d of %d labs\n\n" % (len(passed), len(all_labs)))
     for lab in all_labs:
         rec = next((d for d in labs if d["lab"] == lab), None)
         if rec is None:
-            mark, extra = "—", "कोई परिणाम नहीं"
+            mark, extra = "—", "no result"
         elif rec["verdict"] == "passed":
-            mark = "सौंपी गई"
-            extra = "जाँचें: %d" % len(rec["checks"])
+            mark = "passed"
+            extra = "checks: %d" % len(rec["checks"])
         else:
-            mark = "नहीं सौंपी गई"
-            extra = "विफल: %d" % rec["totals"]["fail"]
+            mark = "not passed"
+            extra = "failed: %d" % rec["totals"]["fail"]
         fh.write("  %-20s %-9s %s\n" % (lab, mark, extra))
-    fh.write("\nक्लस्टर: %d. Kubernetes संस्करण: %s\n"
-             % (len(uids), ", ".join(sorted(versions)) or "अनिर्धारित"))
-    fh.write("\nफ़ाइल में केवल जाँचों के पहचानकर्ता और उनके परिणाम जाते हैं।\n"
-             "इसमें न कोई पता, न कोई नाम, न कोई लॉग सामग्री होती है।\n")
+    fh.write("\nClusters: %d. Kubernetes versions: %s\n"
+             % (len(uids), ", ".join(sorted(versions)) or "undetermined"))
+    fh.write("\nOnly check identifiers and their outcomes go into the file.\n"
+             "No addresses, no names, no log contents are in it.\n")
 
-print("%d में से %d लैब सौंपी गईं।" % (len(passed), len(all_labs)))
+print("Passed %d of %d labs." % (len(passed), len(all_labs)))
 if failed:
-    print("नहीं सौंपी गईं: %s" % ", ".join(failed))
+    print("Not passed: %s" % ", ".join(failed))
 if missing:
-    print("कोई परिणाम नहीं: %s" % ", ".join(missing))
+    print("No result: %s" % ", ".join(missing))
 if len(uids) > 1:
-    print("\nचेतावनी: परिणाम %d अलग-अलग क्लस्टरों से लिए गए हैं। यह अनुमत है, "
-          "पर अपलोड पर इस सेट को चिह्नित कर दिया जाएगा।" % len(uids))
+    print("\nWarning: results were taken from %d different clusters. This is allowed, "
+          "but the set will be flagged on upload." % len(uids))
 for p in problems:
-    print("  समस्या: %s" % p)
-print("\nअपलोड के लिए फ़ाइल: %s" % out_path)
-print("वही सादे पाठ में:  %s" % txt)
-print("भेजने से पहले पाठ फ़ाइल देखें — इसमें वह सब दिखता है जो बाहर जा रहा है।")
+    print("  problem: %s" % p)
+print("\nFile to upload: %s" % out_path)
+print("The same in plain text:  %s" % txt)
+print("Look at the text file before sending — it shows everything that goes out.")
 PYEOF

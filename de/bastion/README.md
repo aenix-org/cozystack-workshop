@@ -46,7 +46,7 @@ Ersetzen Sie überall im Folgenden `workshopXX` durch Ihre eigene Nummer (die Le
 ## Anmeldung am Bastion
 
 ```bash
-ssh workshopXX@<bastion-adresse>
+ssh workshopXX@<bastion-address>
 ```
 
 Das Passwort ist dasselbe wie für das Dashboard. Es wird kein SSH-Schlüssel benötigt: Die Anmeldung
@@ -70,11 +70,11 @@ Es gibt nichts zu suchen und zu ersetzen — wenden Sie die Dateien einfach so a
 ```bash
 cd ~/workshop
 ls manifests scripts
-grep -rl tenant-workshop manifests | head -1 | xargs grep -m1 namespace   # Sie werden Ihre Nummer sehen
+grep -rl tenant-workshop manifests | head -1 | xargs grep -m1 namespace   # you will see your number
 ```
 
 Eine Stelle bleibt absichtlich als Platzhalter: in `manifests/03-app-vm.yaml` die Zeile
-`url: "ВСТАВЬТЕ_PRESIGNED_URL"` — diesen Link erhalten Sie nach der zweiten Phase und tragen ihn selbst ein.
+`url: "PASTE_PRESIGNED_URL"` — diesen Link erhalten Sie nach der zweiten Phase und tragen ihn selbst ein.
 
 Im Detail: [chat/10](chat/10-clone-and-set-number.md) ·
 Dateiübersicht [chat/11](chat/11-file-map.md)
@@ -140,7 +140,7 @@ virtctl console --namespace=tenant-workshopXX vm-instance-convert
 ```
 
 Im Inneren: `nano convert.sh`, fügen Sie den Text von `scripts/convert.sh` ein und setzen Sie Ihre
-eigenen `bucketName`, `accessKey` und `secretKey` anstelle von `ВСТАВЬТЕ_...` ein.
+eigenen `bucketName`, `accessKey` und `secretKey` anstelle von `PASTE_...` ein.
 
 **Sie arbeiten den Workshop auf eigene Faust durch, nicht bei unserer Veranstaltung?** `OVA_URL` in `convert.sh` zeigt auf das Demo-Image im Object Storage der Workshop-Cloud. Dort liegt es, damit es während der Veranstaltung schnell und ohne externen Traffic heruntergeladen wird; nach dem Workshop gibt es diese Kopie nicht mehr. Ersetzen Sie den Link durch die öffentliche Kopie, `https://github.com/aenix-org/cozystack-workshop/releases/download/vmware-demo-ova/app-1.ova` (etwa 810 MB), oder durch Ihr eigenes OVA.
 
@@ -149,9 +149,9 @@ wenn Ihre SSH-Sitzung zum Bastion abbricht, wird ein gewöhnlicher Lauf auf halb
 `screen` hält den Prozess am Leben, selbst wenn die Verbindung weg ist:
 
 ```bash
-screen -S convert          # eine separate Sitzung öffnen
-sudo bash convert.sh       # innerhalb dieser Sitzung ausführen
-#  Verbindung abgebrochen? Per SSH zurück auf den Bastion, dann:  screen -r convert
+screen -S convert          # open a separate session
+sudo bash convert.sh       # run it inside that session
+#  connection dropped? ssh back into the bastion, then:  screen -r convert
 ```
 
 **Sie sollten sehen:** am Ende der Ausgabe, nach dem Wort `Share:` — einen signierten Link zum Image.
@@ -177,7 +177,7 @@ kubectl delete vmdisk convert-tools --namespace tenant-workshopXX
 ```
 
 Tragen Sie den erhaltenen Link in `manifests/03-app-vm.yaml` anstelle von
-`url: "ВСТАВЬТЕ_PRESIGNED_URL"` ein, dann:
+`url: "PASTE_PRESIGNED_URL"` ein, dann:
 
 ```bash
 kubectl apply -f manifests/03-app-vm.yaml
@@ -267,13 +267,13 @@ nicht verbunden. Hier ist `localhost` genau die Maschine, in der Sie sitzen: die
 und antwortet `SCRAM authentication requires libpq version 10 or above`. Wir installieren ein frisches:
 
 ```bash
-# 1. Das PGDG-Repository — die Quelle der PostgreSQL-Pakete
+# 1. The PGDG repository — the source of PostgreSQL packages
 yum install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm
 
-# 2. libzstd: nicht in den CentOS-7-Repositories, deshalb holen wir es aus dem EPEL-Archiv
+# 2. libzstd: not in the CentOS 7 repositories, so we take it from the EPEL archive
 yum install -y https://archives.fedoraproject.org/pub/archive/epel/7/x86_64/Packages/l/libzstd-1.5.5-1.el7.x86_64.rpm
 
-# 3. Der Client selbst — nur aus dem aktiven pgdg15-Repository
+# 3. The client itself — only from the live pgdg15 repository
 yum install -y --disablerepo='pgdg*' --enablerepo=pgdg15 postgresql15
 ```
 
@@ -292,7 +292,7 @@ Falls `command not found` — der Client ist außerhalb von `PATH` gelandet: sch
 Wir holen das Schema und wenden es an (diese App-VM erreicht das Internet, die Datei wird also heruntergeladen):
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/bastion/scripts/orders-schema.sql
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/bastion/scripts/orders-schema.sql
 
 PGPASSWORD='Orders2019!' psql \
   -h postgres-db-rw.tenant-workshopXX.svc.cozy.local -U orders -d orders \
@@ -347,13 +347,13 @@ Im Detail: [chat/30](chat/30-step-9-verify-chain.md)
 > und `virtctl port-forward` verlangen dagegen die Form `vmi/<name>`.
 
 ```bash
-# an der App-VM anmelden (root / cozydemo)
+# log into the app-VM (root / cozydemo)
 virtctl console --namespace=tenant-workshopXX vm-instance-app-1
 
-# an der Conversion-VM anmelden (ubuntu / ubuntu)
+# log into the conversion-VM (ubuntu / ubuntu)
 virtctl console --namespace=tenant-workshopXX vm-instance-convert
 
-# eine Shell in der App-VM über SSH (sobald das Netzwerk der Maschine läuft)
+# a shell inside the app-VM over SSH (once the machine's network is up)
 virtctl ssh ubuntu@vmi/vm-instance-app-1 --namespace=tenant-workshopXX
 ```
 

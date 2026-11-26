@@ -7,15 +7,15 @@
 **आपके क्रेडेंशियल्स** (लॉगिन और पासवर्ड तीनों जगह एक जैसे हैं):
 ```
 dashboard: https://dashboard.workshop.aenix.io
-bastion:   ssh workshopXX@<bastion-पता>
-login:     workshopXX      ← आपका नंबर, मैं आपको व्यक्तिगत रूप से बताऊँगा
-password:  ...             ← मैं आपको व्यक्तिगत रूप से बताऊँगा
+bastion:   ssh workshopXX@<bastion-address>
+login:     workshopXX      ← your number, I'll tell you in person
+password:  ...             ← I'll tell you in person
 ```
 
 bastion में लॉगिन करें — पासवर्ड वही है जो डैशबोर्ड का है, **SSH key की ज़रूरत नहीं**:
 
 ```bash
-ssh workshopXX@<bastion-पता>
+ssh workshopXX@<bastion-address>
 ```
 
 अंदर पहुँचते ही क्लस्टर तक पहुँच पहले से सेट है: kubeconfig `~/.kube/config` में रहता है, और `kubectl`

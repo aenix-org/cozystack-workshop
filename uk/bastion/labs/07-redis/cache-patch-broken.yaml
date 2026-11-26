@@ -1,21 +1,21 @@
 ---
-# Лаба 7 · ЦЕЙ ПАТЧ НАВМИСНО НЕПОВНИЙ. Він потрібен, щоб ви побачили, як виглядає
-# «кеш начебто увімкнули, а швидше не стало». Робочий варіант — у cache-patch.yaml.
+# Lab 7 · THIS PATCH IS INTENTIONALLY INCOMPLETE. It exists so that you can see what
+# "we sort of enabled the cache, but it didn't get any faster" looks like. The working version is in cache-patch.yaml.
 #
-# Застосовується у вашому кластері `lab` (export KUBECONFIG=~/lab.kubeconfig):
+# Applied in your `lab` cluster (export KUBECONFIG=~/lab.kubeconfig):
 #   kubectl patch deployment passes-api --patch-file cache-patch-broken.yaml
 #
-# Підглядати відповідь не треба. Застосуйте, зробіть кілька запитів і подивіться логи
-# застосунку: kubectl logs -l app=passes-api. Застосунок каже, що з ним не так,
-# — питання в тому, щоб прочитати повідомлення і зрозуміти, чого в цьому файлі не вистачає.
+# No peeking at the answer. Apply it, make a couple of requests, and look at the
+# application logs: kubectl logs -l app=passes-api. The application tells you what's wrong with it
+# — the point is to read the message and figure out what's missing from this file.
 #
-# Підставте адресу свого Redis замість REDIS-ADDR (див. крок про пошук адреси).
-# Заглушку залишати не можна: тоді ви отримаєте не ту помилку, заради якої все затівалося.
+# Substitute your own Redis address in place of REDIS-ADDR (see the step about finding the address).
+# You can't leave the placeholder: then you'll get the wrong error, not the one this whole thing was set up for.
 spec:
   template:
     spec:
       containers:
-        # Ім'я контейнера — адреса, за якою кластер знаходить місце для правки.
+        # The container name is the address by which the cluster finds the place to edit.
         - name: api
           env:
             - name: REDIS_ADDR

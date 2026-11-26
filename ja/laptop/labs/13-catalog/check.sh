@@ -1,154 +1,156 @@
 #!/usr/bin/env bash
-# ラボ13のチェック: チャートとアプリ定義が管理者への引き渡しに耐える状態か確認する。
+# Check for lab 13: the chart and app definition are ready to hand off to the admin.
 #
-# このチェックは意図的にローカル完結。テナントは ApplicationDefinition を適用できない
-# （オブジェクトが cluster-scoped）ため、クラスタ内で探しても意味がない。
-# オブジェクトが存在しないのは参加者の落ち度ではない。ここでは参加者が責任を負う範囲
-# ——チャートがビルドでき、スキーマが機能し、定義がパースでき、チャートと一致している——を確認する。
+# This check is DELIBERATELY local. A tenant cannot apply an ApplicationDefinition
+# (the object is cluster-scoped), so looking for it in the cluster is pointless:
+# the object's absence is not the participant's fault. We check what they are
+# responsible for: the chart builds, the schema works, the definition parses and
+# agrees with the chart.
 #
-# ラボのフォルダから実行:
+# Run from the lab folder:
 #   cd labs/13-catalog && ./check.sh
-# クラスタは必須ではない: KUBECONFIG がなければ 2 つのチェックはエラーではなく警告として
-# スキップされる。
+# A cluster is not required: without KUBECONFIG two checks are skipped with a warning,
+# not an error.
 
 LAB_NAME="13-catalog"
-LAB_TITLE="ラボ13 · Cozystack カタログに自作アプリを載せる"
+LAB_TITLE="Lab 13 · Your own application in the Cozystack catalog"
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 CHART="$HERE/chart"
 APPDEF="$HERE/applicationdefinition.yaml"
 
-# --- ツール -----------------------------------------------------------------
-# helm がなければチェックするものが何もないので、スクリプトはここで即座に止まり、
-# この先で同じ失敗を大量に吐き続けることはしない。
+# --- tools -----------------------------------------------------------------
+# Without helm there is nothing to check, so the script stops right here and does not
+# spew a dozen identical failures further down.
 if ! command -v helm >/dev/null 2>&1; then
-  fail "このマシンに helm が入っていません" \
-       "インストールしてください: brew install helm (macOS) または https://helm.sh/docs/intro/install/ — これがないとラボは検証できません"
+  fail "helm is not installed on this machine" \
+       "install it: brew install helm (macOS) or https://helm.sh/docs/intro/install/ — without it the lab cannot be checked"
   finish
   exit $?
 fi
 HELM_VER="$(helm version --short 2>/dev/null)"
-ok "helm があります (${HELM_VER})"
-evidence "helm のバージョン" "$HELM_VER"
+ok "helm is present (${HELM_VER})"
+evidence "helm version" "$HELM_VER"
 
-# --- チャートがある ---------------------------------------------------------
-# 「チャートが壊れている」と「スクリプトを間違ったフォルダから実行した」を区別する。
-# 後者のミスの方が前者より多く、そのメッセージは分けておくべきだ。
+# --- chart is present ------------------------------------------------------
+# Distinguish "the chart is broken" from "the script was run from the wrong folder".
+# The second mistake is more common than the first, and its message should be separate.
 if [ ! -f "$CHART/Chart.yaml" ]; then
-  fail "${CHART} にチャートが見つかりません" \
-       "スクリプトはラボのフォルダから実行してください: cd labs/13-catalog && ./check.sh"
+  fail "no chart found in ${CHART}" \
+       "run the script from the lab folder: cd labs/13-catalog && ./check.sh"
   finish
   exit $?
 fi
 
-# --- リンタ ----------------------------------------------------------------
-# helm lint はチャートをテキストとして読む: テンプレートのタイポ、Chart.yaml の
-# 欠けたフィールド、存在しない値への参照を見つける。ここではクラスタまでは行かない。
+# --- linter ----------------------------------------------------------------
+# helm lint reads the chart as text: it finds typos in templates, missing Chart.yaml
+# fields, references to nonexistent values. It never reaches the cluster here.
 LINT_OUT="$(helm lint "$CHART" 2>&1)"
 if printf '%s' "$LINT_OUT" | grep -q '0 chart(s) failed'; then
-  ok "チャートは helm lint を通ります"
+  ok "the chart passes helm lint"
   evidence "helm lint" "$LINT_OUT"
 else
-  fail "チャートが helm lint を通りません" \
-       "下の出力を読んで指摘されたファイルを直してください: helm lint chart"
+  fail "the chart does not pass helm lint" \
+       "read the output below and fix the indicated files: helm lint chart"
   evidence "helm lint" "$LINT_OUT"
 fi
 
-# --- レンダリング ----------------------------------------------------------------
-# 空の出力やコメントだけの出力はリンタをすり抜けるので、レンダリング結果に Deployment が
-# 含まれているか確認し、実際に何が出てきたかを列挙する。
-# ここで大事なのは「コマンドが動いた」ことではなく「本物のオブジェクトが生成された」ことだ。
+# --- render ----------------------------------------------------------------
+# Empty output and output made only of comments would slip past the linter, so we check
+# that the rendered output contains a Deployment, and list what actually came out.
+# The point here is not "the command ran" but "real objects were produced".
 RENDER="$(helm template main "$CHART" 2>&1)"
 if printf '%s' "$RENDER" | grep -q '^kind: Deployment'; then
   KINDS="$(printf '%s' "$RENDER" | grep '^kind:' | awk '{print $2}' | sort -u | tr '\n' ' ')"
-  ok "チャートがレンダリングでき、オブジェクトが生成されます: ${KINDS}"
-  evidence "チャートがレンダリングするもの" "$KINDS"
+  ok "the chart renders, producing objects: ${KINDS}"
+  evidence "What the chart renders" "$KINDS"
 else
-  fail "helm template が Deployment を 1 つも生成しませんでした" \
-       "レンダリングエラーを確認してください: helm template main chart"
-  evidence "helm template の出力" "$(printf '%s' "$RENDER" | head -30)"
+  fail "helm template did not produce a single Deployment" \
+       "look at the render error: helm template main chart"
+  evidence "helm template output" "$(printf '%s' "$RENDER" | head -30)"
 fi
 
-# --- チャートが本物のクラスタに受理される ----------------------------------
-# ラボ全体で唯一、マニフェストをテキストではなく本物のクラスタのスキーマに照らして
-# 検証するチェック。
+# --- the chart is accepted by a real cluster -------------------------------
+# The only check in the whole lab set that verifies the manifest against a real cluster
+# schema rather than against text.
 #
-# `helm lint` と `helm template` はテンプレートは確認するが、Kubernetes のスキーマは確認しない:
-# フィールドが誤った位置にあるマニフェストは両者をすり抜けるが、クラスタはそれを拒否する。
-# 身をもって学んだ——volumes の中に誤って入れられた securityContext が両者を通り抜け、
-# サーバ上でだけ崩れた。このチェックはチャートが適用される場所でこそ必要だ。
+# `helm lint` and `helm template` check the templates, but NOT the Kubernetes schema: a
+# manifest with a field in the wrong place slips past them, while the cluster rejects it.
+# Learned the hard way — a securityContext mistakenly placed inside volumes passed both
+# and only fell apart on the server. The check is needed where the chart is applied.
 #
-# なぜ lint と template では代替できないのか:
-#   helm lint      はチャートの構造を見る: ファイルが揃っているか、テンプレートがパースできるか;
-#   helm template  は値を差し込んでテキストを出力する——だがそのフィールドが何であり、
-#                  そのオブジェクトにそもそも存在しうるかは、知らないし知りようもない;
-#   apply --dry-run=server はマニフェストを apiserver に送り、apiserver がそれを型スキーマと
-#                  admission 制御に通し、受理するかどうかを答える。その際に何も作成しない。
-#                  ゆえに `unknown field` やポリシーによる拒否が出る——
-#                  まさに顧客の環境でチャートがつまずくところだ。
-# --dry-run=client フラグではこのチェックはできない: マニフェストを自分のマシン上でパースするだけだ。
+# Why lint and template do not replace it:
+#   helm lint      looks at the chart's structure: files are present, templates parse;
+#   helm template  substitutes values and emits text — but what those fields are and whether
+#                  such an object can even have them, it does not and cannot know;
+#   apply --dry-run=server sends the manifest to the apiserver, which runs it through the
+#                  type schema and admission control and answers whether it would accept it,
+#                  creating nothing. Hence `unknown field` and a policy rejection —
+#                  exactly what the chart trips over at the customer's site.
+# The --dry-run=client flag does not give this check: it parses the manifest on your machine.
 if [ -n "${KUBECONFIG:-}" ] && kubectl version -o json >/dev/null 2>&1; then
   DRY="$(printf '%s' "$RENDER" | kubectl apply --dry-run=server -f - 2>&1)"
-  # 権限による拒否とスキーマによる拒否は別物であり、混同してはならない。テナントアクセス
-  # (~/.kube/workshop) では Deployment と ConfigMap の権限がそもそもないので、ここには
-  # Forbidden が飛んでくる——そしてそれはチャートの品質について何も語らない。本質的な
-  # チェックは、あなたが完全な所有者である `lab` クラスタへのアクセスでしか行えない。
+  # A permission denial and a schema denial are different things, and must not be confused.
+  # Under tenant access (~/.kube/workshop) there are no rights on Deployment and ConfigMap
+  # at all, so a Forbidden will arrive here — and that says nothing about the chart's
+  # quality. A meaningful check is only possible with access to the `lab` cluster, where
+  # you are the full owner.
   if printf '%s' "$DRY" | grep -qiE 'forbidden|cannot create|is not allowed'; then
-    warn "サーバ側のチャートチェックはスキップ: 現在のアクセスでは実行できません" \
-         "自分のクラスタへのアクセスで実行してください: KUBECONFIG=~/lab.kubeconfig ./check.sh"
+    warn "server-side chart check skipped: current access does not permit it" \
+         "run it with access to your own cluster: KUBECONFIG=~/lab.kubeconfig ./check.sh"
   elif printf '%s' "$DRY" | grep -qiE 'error|unknown field|invalid'; then
-    fail "クラスタがレンダリングされたチャートを拒否しました" \
-         "確認: helm template main chart | kubectl apply --dry-run=server -f -"
-    evidence "サーバの拒否" "$(printf '%s' "$DRY" | grep -iE 'error|unknown field' | head -5)"
+    fail "the cluster rejects the rendered chart" \
+         "look: helm template main chart | kubectl apply --dry-run=server -f -"
+    evidence "Server rejection" "$(printf '%s' "$DRY" | grep -iE 'error|unknown field' | head -5)"
   else
-    ok "クラスタがレンダリングされたチャートを受理しました — フィールドとその位置は正しい"
+    ok "the cluster accepts the rendered chart — the fields and their places are correct"
   fi
 else
-  warn "クラスタに対するチャートチェックはスキップ: アクセスがありません" \
-       "KUBECONFIG を設定して helm template を kubectl apply --dry-run=server に通してください"
+  warn "chart check against the cluster skipped: no access" \
+       "set KUBECONFIG to run helm template through kubectl apply --dry-run=server"
 fi
 
-# --- パラメータが本当にマニフェストまで届く -------------------------
-# チャートがビルドでき、レンダリングもできるのに、パラメータがどこにも差し込まれない
-# ——たとえば値がテンプレートに数値として直書きされている——ことがある。そこで各パラメータを
-# 実際に試す: 明らかに珍しい値を与え、それが完成したマニフェストに現れるか探す。
+# --- parameters actually reach the manifests -------------------------------
+# A chart may build and render while a parameter is substituted nowhere —
+# for example, the value was hard-coded into the template as a number. So we test each
+# parameter for real: set a deliberately unusual value and look for it in the finished manifest.
 R5="$(helm template main "$CHART" --set replicas=5 2>/dev/null | grep -c 'replicas: 5')"
 if [ "${R5:-0}" -ge 1 ]; then
-  ok "replicas パラメータがマニフェストまで届きます (--set replicas=5 で replicas: 5 になる)"
+  ok "the replicas parameter reaches the manifest (--set replicas=5 gives replicas: 5)"
 else
-  fail "replicas パラメータがマニフェストまで届きません" \
-       "templates/deployment.yaml に replicas: {{ .Values.replicas }} と書いてください"
+  fail "the replicas parameter does not reach the manifest" \
+       "templates/deployment.yaml should have replicas: {{ .Values.replicas }}"
 fi
 
 EXT="$(helm template main "$CHART" --set external=true 2>/dev/null | grep -c 'type: LoadBalancer')"
 if [ "${EXT:-0}" -ge 1 ]; then
-  ok "external パラメータが Service の type を LoadBalancer に切り替えます"
+  ok "the external parameter switches the Service type to LoadBalancer"
 else
-  warn "external パラメータが Service の type を切り替えません" \
-       "チャートの不具合ではないが、Cozystack カタログの慣習: アプリの external フィールドはまさに外部アクセスを意味する"
+  warn "the external parameter does not switch the Service type" \
+       "not a chart defect, but a Cozystack catalog convention: an application's external field means exactly external access"
 fi
 
-# --- スキーマが本当に守る ------------------------------------------
-# 何も拒否しないスキーマは役に立たない。ちゃんと拒否するか確認する。
+# --- the schema actually protects ------------------------------------------
+# A schema that rejects nothing is useless. We check that it rejects.
 if helm template main "$CHART" --set replicas=abc >/dev/null 2>&1; then
-  fail "値のスキーマが明らかに不正な値を拒否しません (replicas=abc が通った)" \
-       "values.yaml の隣に values.schema.json があり、その中で replicas が integer として宣言されているか確認してください"
+  fail "the values schema does not reject an obviously invalid value (replicas=abc passed)" \
+       "check that values.schema.json sits next to values.yaml and declares replicas as an integer"
 else
-  ok "値のスキーマが誤った型を拒否します (replicas=abc は通らない)"
+  ok "the values schema rejects the wrong type (replicas=abc does not pass)"
 fi
 
-# --- ApplicationDefinition: 必須フィールド ------------------------------
-# 参加者は定義を適用できないので、apiserver の拒否も目にしない。そこで必須フィールドを
-# ここで数え上げる: どれか一つでも欠けると、管理者は自分の側で拒否を受け、その始末は
-# ファイルの作者に回ってくる。
+# --- ApplicationDefinition: required fields --------------------------------
+# The participant cannot apply the definition, so they will not see the apiserver's
+# rejection either. So we tally the required fields here: without any one of them the admin
+# gets a rejection on their own side, and the file's author is the one who has to sort it out.
 if [ ! -f "$APPDEF" ]; then
-  fail "見つかりません: ${APPDEF}" \
-       "このファイルはチャートの隣に置くべきものです。ラボのリポジトリから取ってください"
+  fail "not found: ${APPDEF}" \
+       "the file should sit next to the chart; take it from the labs repository"
 else
   MISSING=""
-  # YAML をパースせず、キーを 1 行ずつ探す: PyYAML はどのマシンにもあるわけではなく、
-  # 1 ファイルの確認のために依存を持ち込む価値はない。
+  # We look for keys line by line, without parsing YAML: PyYAML is not on every machine,
+  # and pulling in a dependency just to check one file is not worth it.
   check_key() {
     grep -Eq "$1" "$APPDEF" || MISSING="$MISSING $2"
   }
@@ -164,19 +166,19 @@ else
   check_key '^[[:space:]]{4}icon:[[:space:]]+\S+' 'dashboard.icon'
 
   if [ -z "$MISSING" ]; then
-    ok "ApplicationDefinition に必須フィールドがすべて揃っています"
+    ok "all required fields are present in the ApplicationDefinition"
   else
-    fail "ApplicationDefinition にフィールドが足りません:${MISSING}" \
-         "README の解説と突き合わせてください — どれか一つでも欠けると管理者は適用時に拒否を受けます"
+    fail "the ApplicationDefinition is missing fields:${MISSING}" \
+         "cross-check with the walkthrough in the README — without any one of them the admin gets a rejection on apply"
   fi
 
-  # --- 定義内のスキーマがパースでき、チャートのスキーマと一致する ---------
-  # これは同じものの 2 つの別コピーであり、両者に何のリンクもない。
-  # ズレると、ダッシュボードのフォームはチャートが期待しないフィールドを表示する。
+  # --- the schema in the definition parses and matches the chart schema ----
+  # These are two separate copies of the same thing, with no link between them.
+  # If they drift apart, the dashboard form will show fields the chart does not expect.
   SCHEMA_LINE="$(awk '/openAPISchema:/{getline; sub(/^[[:space:]]+/,""); print; exit}' "$APPDEF")"
   if [ -z "$SCHEMA_LINE" ]; then
-    fail "ApplicationDefinition の openAPISchema が空です" \
-         "そこに chart/values.schema.json の内容を 1 行で入れてください"
+    fail "the ApplicationDefinition has an empty openAPISchema" \
+         "put the contents of chart/values.schema.json there on a single line"
   else
     CMP="$(SCHEMA_LINE="$SCHEMA_LINE" python3 - "$CHART/values.schema.json" <<'PY' 2>&1
 import os, sys, json
@@ -195,34 +197,34 @@ if a == b:
 else:
     only_def = sorted(set(a) - set(b))
     only_chart = sorted(set(b) - set(a))
-    print("DIFF 定義にのみ: %s | チャートにのみ: %s"
+    print("DIFF only in the definition: %s | only in the chart: %s"
           % (",".join(only_def) or "-", ",".join(only_chart) or "-"))
 PY
 )"
     case "$CMP" in
       SAME*)
-        ok "定義内のスキーマがパースでき、チャートのスキーマと一致します (${CMP#SAME })"
-        evidence "アプリのパラメータ" "${CMP#SAME }"
+        ok "the schema in the definition parses and matches the chart schema (${CMP#SAME })"
+        evidence "Application parameters" "${CMP#SAME }"
         ;;
       DIFF*)
-        fail "定義内のスキーマがチャートのスキーマとズレています: ${CMP#DIFF }" \
-             "一致させてください: openAPISchema の内容は chart/values.schema.json を 1 行にしたものです"
+        fail "the schema in the definition has drifted from the chart schema: ${CMP#DIFF }" \
+             "bring them into agreement: the openAPISchema contents are chart/values.schema.json on a single line"
         ;;
       BADJSON*)
-        fail "openAPISchema が JSON としてパースできません: ${CMP#BADJSON }" \
-             "スキーマは 'openAPISchema: |-' の下に正しい JSON を 1 行で書く必要があります"
+        fail "openAPISchema does not parse as JSON: ${CMP#BADJSON }" \
+             "the schema must be a single line of valid JSON under 'openAPISchema: |-'"
         ;;
       *)
-        warn "スキーマを照合できませんでした (${CMP})" \
-             "openAPISchema が chart/values.schema.json と一致するか手で確認してください"
+        warn "could not compare the schemas (${CMP})" \
+             "check by hand that openAPISchema matches chart/values.schema.json"
         ;;
     esac
   fi
 
-  # --- アイコン ---------------------------------------------------------------
-  # ダッシュボードは base64 に詰めた SVG を期待し、画像を取りに外へは行かない。ここでの
-  # エラーは静かだ: マニフェストは適用されるが、カタログではアイコンの場所が空になる。そこで
-  # 文字列をデコードし、中身が本当に SVG か確認する。
+  # --- icon -----------------------------------------------------------------
+  # The dashboard expects an SVG packed into base64, and does not go anywhere for the image.
+  # An error here is silent: the manifest applies, but in the catalog the icon spot is empty.
+  # So we decode the string and check that what is inside really is an SVG.
   ICON="$(grep -Eo '^[[:space:]]{4}icon:[[:space:]]+\S+' "$APPDEF" | head -1 | awk '{print $2}')"
   if [ -n "$ICON" ]; then
     ICON_HEAD="$(printf '%s' "$ICON" | python3 -c 'import sys,base64
@@ -232,45 +234,45 @@ except Exception:
     print("")' 2>/dev/null)"
     case "$ICON_HEAD" in
       *"<svg"*)
-        ok "アイコンが base64 からデコードでき、SVG であることが分かりました"
-        evidence "アイコンの先頭" "$ICON_HEAD"
+        ok "the icon decodes from base64 and turns out to be an SVG"
+        evidence "Start of the icon" "$ICON_HEAD"
         ;;
       "")
-        fail "アイコンが base64 からデコードできません" \
-             "文字列を作り直してください: base64 -i icon.svg | tr -d '\\n' (Linux では: base64 -w0 icon.svg)"
+        fail "the icon does not decode from base64" \
+             "rebuild the string: base64 -i icon.svg | tr -d '\\n' (on Linux: base64 -w0 icon.svg)"
         ;;
       *)
-        fail "アイコンはデコードできますが、SVG ではありません" \
-             "ダッシュボードはまさに SVG を期待します。ラスタ画像はゴミとして表示されます"
+        fail "the icon decodes, but it is not an SVG" \
+             "the dashboard expects exactly an SVG; a raster image it will show as garbage"
         ;;
     esac
   fi
 fi
 
-# --- 権限: ここでの拒否は想定内 --------------------------------------------
-# これは参加者のチェックではなく、プラットフォームの作りの確認だ。だから
-# `no` という答えが成功であり、`yes` は喜ぶことではなく驚くべきことだ。
+# --- rights: a denial here is expected --------------------------------------
+# This is not a check of the participant but a confirmation of how the platform is built.
+# So an answer of `no` is a success, and `yes` is cause for surprise, not celebration.
 if [ -n "${KUBECONFIG:-}" ] && kubectl version -o json >/dev/null 2>&1; then
   CANI="$(kubectl auth can-i create applicationdefinitions 2>/dev/null)"
   case "$CANI" in
     no)
-      ok "確認済み: あなたに ApplicationDefinition の適用は許可されていません (can-i -> no)"
-      evidence "ApplicationDefinition に対する権限" \
+      ok "confirmed: you are not allowed to apply an ApplicationDefinition (can-i -> no)"
+      evidence "Rights on ApplicationDefinition" \
         "kubectl auth can-i create applicationdefinitions -> no
-オブジェクトは cluster-scoped で全テナントのカタログを変えるため、適用するのはプラットフォーム管理者です。"
+The object is cluster-scoped and changes the catalog for all tenants, so the platform admin applies it."
       ;;
     yes)
-      warn "あなたには ApplicationDefinition を適用する権限があります (can-i -> yes)" \
-           "つまりテナントではなく管理者アカウントで作業しています。ラボはテナントアカウントを想定しています"
+      warn "you have rights to apply an ApplicationDefinition (can-i -> yes)" \
+           "that means you are working under an admin account, not a tenant one; the lab is meant for a tenant account"
       ;;
     *)
-      warn "クラスタに権限を問い合わせられませんでした" \
-           "ラボの合格には支障ありません: チェックはローカルで、ここではクラスタは不要です"
+      warn "could not ask the cluster about rights" \
+           "does not block passing the lab: the check is local, no cluster is needed here"
       ;;
   esac
 else
-  warn "クラスタに問い合わせていません (KUBECONFIG 未設定か応答なし)" \
-       "チェックはローカルで、ここではクラスタは不要です。権限の拒否を見るには: export KUBECONFIG=~/.kube/workshop"
+  warn "the cluster was not queried (KUBECONFIG not set or not responding)" \
+       "the check is local, no cluster is needed here. To see the rights denial: export KUBECONFIG=~/.kube/workshop"
 fi
 
 finish

@@ -1,46 +1,46 @@
 #!/usr/bin/env bash
-# लैब 7 की जाँच: कैश वाकई चीज़ों को तेज़ करता है, और यह आँकड़ों में दिखता है।
+# Check for lab 7: the cache really speeds things up, and it shows in the numbers.
 #
-# यहाँ मुख्य जाँच व्यवहारगत है, ढाँचागत नहीं। स्क्रिप्ट स्वयं एक अप्रयुक्त
-# पहचानकर्ता लेती है, उसे दो बार अनुरोध करती है और देखती है: पहली बार सैकड़ों
-# मिलीसेकंड का मिस होना चाहिए, दूसरी बार — इकाई अंकों वाला हिट। सही पर्यावरण
-# चरों वाला मैनिफ़ेस्ट यह जाँच पास नहीं करेगा, अगर कैश वास्तव में जवाब न दे।
+# The main check here is behavioral, not structural. The script itself takes an unused
+# identifier, requests it twice and watches: the first time should be a miss of hundreds
+# of milliseconds, the second — a hit of single-digit milliseconds. A manifest with the right
+# environment variables will not pass this check if the cache does not actually respond.
 #
-# दो क्लस्टर: KUBECONFIG — आपका lab क्लस्टर, COZY_KUBECONFIG — Cozystack प्रबंधन
-# क्लस्टर, जहाँ managed Redis सेवा रहती है।
+# Two clusters: KUBECONFIG — your lab cluster, COZY_KUBECONFIG — the Cozystack management
+# cluster, where the managed Redis service lives.
 
-# LAB_NAME और LAB_TITLE रिपोर्ट के शीर्षक में जाते हैं। आगे साझा जाँच लाइब्रेरी
-# सोर्स की जाती है: उससे ok / warn / fail / evidence / finish आते हैं और, सबसे
-# ज़रूरी, in_cluster_curl — यह क्लस्टर के भीतर curl वाला एक-बार का पॉड खड़ा करती है।
-# भीतर से, VM से नहीं: लैब की सेवाएँ बाहर एक्सपोज़ नहीं हैं, और passes-api नाम से
-# केवल क्लस्टर के भीतर से पहुँच में है। need_kubeconfig और need_tenant स्क्रिप्ट को
-# पहले ही रोक देते हैं, अगर पहुँच या टेनेंट नंबर सेट न हो, — वरना सभी जाँचें एक साथ
-# विफल होंगी और रिपोर्ट से कारण समझ नहीं आएगा।
+# LAB_NAME and LAB_TITLE go into the report header. Next, the shared checks library is
+# sourced: from it come ok / warn / fail / evidence / finish and, most importantly,
+# in_cluster_curl — it spins up a one-off pod with curl INSIDE the cluster. From the inside,
+# not from the VM: the lab services are not exposed outward, and passes-api is reachable by
+# name only from within the cluster. need_kubeconfig and need_tenant stop the script early
+# if access or the tenant number are not set, — otherwise all checks would fail at once
+# and you would not be able to tell the reason from the report.
 LAB_NAME="07-redis"
-LAB_TITLE="लैब 7 · धीमे बैकएंड के आगे कैश"
+LAB_TITLE="Lab 7 · Cache in front of a slow backend"
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
 need_kubeconfig
 need_tenant
 
-# जिन नामों और पतों को पूरी जाँच देखती है वे एक जगह इकट्ठा हैं: उन्हें स्क्रिप्ट के
-# पाठ में ढूँढना नहीं पड़ेगा। COZY_KUBECONFIG को बाहर से ओवरराइड किया जा सकता है,
-# अगर आपकी टेनेंट पहुँच डिफ़ॉल्ट जगह पर न हो।
+# The names and addresses the whole check looks at are gathered in one place: you will not
+# have to search for them through the script text. COZY_KUBECONFIG can be overridden from
+# outside if your tenant access is not in the default location.
 APP="passes-api"
 HR="hr-legacy"
 SVC="http://${APP}.default.svc.cluster.local"
 TENANT_NS="tenant-${COZY_TENANT}"
 COZY_KUBECONFIG="${COZY_KUBECONFIG:-$HOME/.kube/config}"
 
-# पूरी स्क्रिप्ट के लिए दो शॉर्टकट: kget lab क्लस्टर से बात करता है (जो KUBECONFIG में है),
-# cozy — Cozystack प्रबंधन क्लस्टर से। त्रुटि संदेश जानबूझकर दबाए गए हैं:
-# यहाँ किसी ऑब्जेक्ट का न होना सामान्य स्थिति है, जिसे स्क्रिप्ट अपने शब्दों में और
-# सुझाव के साथ बताएगी, न कि kubectl के किसी और के पाठ से।
+# Two shortcuts for the whole script: kget talks to the lab cluster (the one in KUBECONFIG),
+# cozy — to the Cozystack management cluster. Error messages are suppressed on purpose:
+# a missing object here is a normal situation, which the script will describe in its own words
+# and with a hint, rather than with someone else's text from kubectl.
 kget() { kubectl get "$@" 2>/dev/null; }
 cozy() { kubectl --kubeconfig "$COZY_KUBECONFIG" "$@" 2>/dev/null; }
 
-# JSON से एक फ़ील्ड निकालें। jq के बिना: वह बेयर macOS पर नहीं होता, लेकिन python3
-# हर जगह होता है जहाँ बाकी जाँच लाइब्रेरी काम करती है।
+# Extract a field from JSON. Without jq: it is not on a bare macOS, but python3 is everywhere
+# the rest of the checks library works.
 jfield() {
   python3 -c 'import sys,json
 try:
@@ -49,24 +49,24 @@ except Exception:
     pass' "$1" 2>/dev/null
 }
 
-# --- प्रबंधन क्लस्टर पर managed Redis सेवा -----------------------------------
-# Redis आपके lab क्लस्टर में नहीं, बल्कि प्रबंधन क्लस्टर के एक टेनेंट में रहता है: यह
-# managed सेवा है, प्लेटफ़ॉर्म इसे स्वयं चलाता रहता है। टेनेंट में अधिकार सबके लिए अलग
-# होते हैं, इसलिए न पहुँच अस्वीकृति और न ही लापता kubeconfig लैब को विफल करते हैं — कैश
-# का काम नीचे सीधे, जीवंत अनुरोधों से जाँचा जाता है, और यही असली प्रमाण है।
+# --- managed Redis service on the management cluster -------------------------
+# Redis lives not in your lab cluster, but in a tenant on the management cluster: it is a
+# managed service, the platform keeps it running itself. Rights in the tenant differ for
+# everyone, so neither an access denial nor a missing kubeconfig fail the lab — the cache's
+# work below is checked directly, with live requests, and that is the real proof.
 if [ ! -r "$COZY_KUBECONFIG" ]; then
-  warn "टेनेंट kubeconfig ${COZY_KUBECONFIG} नहीं मिला — Redis की स्थिति जाँची नहीं गई" \
-       "पथ सेट करें: export COZY_KUBECONFIG=~/.kube/config"
+  warn "tenant kubeconfig ${COZY_KUBECONFIG} not found — Redis state was not checked" \
+       "set the path: export COZY_KUBECONFIG=~/.kube/config"
 else
   REDIS_ERR="$(kubectl --kubeconfig "$COZY_KUBECONFIG" get redises.apps.cozystack.io \
     -n "$TENANT_NS" --no-headers 2>&1 >/dev/null)"
   REDIS_LIST="$(cozy get redises.apps.cozystack.io -n "$TENANT_NS" --no-headers)"
   if [ -n "$REDIS_ERR" ]; then
-    warn "टेनेंट ${TENANT_NS} में Redis अनुप्रयोग देख नहीं सके" \
-         "आपकी टेनेंट भूमिका शायद यह कमांड न देती हो — यह लैब की त्रुटि नहीं है; कैश का काम नीचे सीधे जाँचा जाता है"
+    warn "could not view Redis applications in tenant ${TENANT_NS}" \
+         "your tenant role may not allow this command — this is not a lab error; the cache's work is checked directly below"
   elif [ -z "$REDIS_LIST" ]; then
-    fail "टेनेंट ${TENANT_NS} में एक भी Redis अनुप्रयोग नहीं है" \
-         "इसे डैशबोर्ड में बनाएँ: अनुप्रयोग बनाएँ -> Redis"
+    fail "tenant ${TENANT_NS} has no Redis application at all" \
+         "create it in the dashboard: Create application -> Redis"
   else
     R_NAME="$(printf '%s' "$REDIS_LIST" | awk 'NR==1{print $1}')"
     R_READY="$(cozy get redises.apps.cozystack.io "$R_NAME" -n "$TENANT_NS" \
@@ -74,22 +74,22 @@ else
     R_REPLICAS="$(cozy get redises.apps.cozystack.io "$R_NAME" -n "$TENANT_NS" \
       -o jsonpath='{.spec.replicas}')"
     if [ "$R_READY" = "True" ]; then
-      ok "managed Redis «${R_NAME}» तैयार है, डेटा प्रतियाँ: ${R_REPLICAS:-डिफ़ॉल्ट}"
+      ok "managed Redis «${R_NAME}» is ready, data copies: ${R_REPLICAS:-default}"
     else
-      warn "Redis «${R_NAME}» मौजूद है, पर तैयार होने की सूचना नहीं देता" \
-           "इसकी स्थिति डैशबोर्ड में देखें; तीन-से-पाँच मिनट में खड़ा होता है"
+      warn "Redis «${R_NAME}» exists, but does not report readiness" \
+           "check its state in the dashboard; it comes up in three-to-five minutes"
     fi
-    evidence "टेनेंट में Redis" "$REDIS_LIST"
+    evidence "Redis in the tenant" "$REDIS_LIST"
   fi
 fi
 
-# --- धीमी निर्देशिका मौजूद है और वाकई धीमी है --------------------------------
-# इस जाँच के बिना «पहले और बाद» की तुलना का कोई मतलब नहीं: अगर निर्देशिका तुरंत
-# जवाब देती है, तो तेज़ करने को कुछ नहीं है और कैश के मापने को कुछ नहीं।
+# --- the slow directory is in place and actually slow ------------------------
+# Without this check the «before and after» comparison means nothing: if the directory
+# responds instantly, there is nothing to speed up and nothing for the cache to measure.
 HR_RUNNING="$(kget pods -l app=hr-legacy --no-headers | awk '$3=="Running"' | grep -c .)"
 if [ "$HR_RUNNING" -lt 1 ]; then
-  fail "निर्देशिका ${HR} नहीं चल रही" \
-       "hr-legacy.yaml लागू करें और kubectl describe pod -l app=hr-legacy देखें"
+  fail "directory ${HR} is not running" \
+       "apply hr-legacy.yaml and check kubectl describe pod -l app=hr-legacy"
 else
   HR_SEC="$(in_cluster_curl "http://${HR}.default.svc.cluster.local/employee?id=1" \
     "-o /dev/null -w %{time_total}")"
@@ -97,21 +97,21 @@ else
 try: print(int(float(sys.argv[1])*1000))
 except Exception: print(-1)' "${HR_SEC:-0}" 2>/dev/null)"
   if [ "${HR_MS:-0}" -ge 300 ] 2>/dev/null; then
-    ok "निर्देशिका ${HR_MS} मि.से. में जवाब देती है — तेज़ करने को कुछ है"
-    evidence "निर्देशिका की विलंबता" "${HR_MS} मि.से. प्रति /employee अनुरोध"
+    ok "the directory responds in ${HR_MS} ms — there is something to speed up"
+    evidence "Directory latency" "${HR_MS} ms per /employee request"
   elif [ "${HR_MS:-0}" -lt 0 ] 2>/dev/null; then
-    fail "निर्देशिका ${HR} ने अनुरोध का जवाब नहीं दिया" \
-         "kubectl logs -l app=hr-legacy देखें"
+    fail "directory ${HR} did not respond to the request" \
+         "check kubectl logs -l app=hr-legacy"
   else
-    warn "निर्देशिका ${HR_MS} मि.से. में जवाब देती है, यह मापने के लिए बहुत तेज़ है" \
-         "सुनिश्चित करें कि hr-legacy.yaml में MODE=hr और HR_DELAY=800ms सेट है"
+    warn "the directory responds in ${HR_MS} ms, that is too fast to measure" \
+         "make sure hr-legacy.yaml sets MODE=hr and HR_DELAY=800ms"
   fi
 fi
 
-# --- अनुप्रयोग कैशिंग के लिए कॉन्फ़िगर किया गया है ---------------------------
-# हम कंटेनर का पर्यावरण python से पार्स करते हैं, jsonpath से नहीं: नेस्टेड सूचियों पर
-# jsonpath फ़िल्टर अलग-अलग kubectl संस्करणों में अलग व्यवहार करते हैं, और हमारे लिए
-# यह मायने रखता है कि जाँच सबके लिए एक-सी काम करे।
+# --- the application is configured for caching -------------------------------
+# We parse the container's environment with python, not jsonpath: jsonpath filters over
+# nested lists behave differently in different kubectl versions, and it matters to us that
+# the check works the same for everyone.
 DEPLOY_JSON="$(kget deployment "$APP" -o json)"
 readenv() {
   printf '%s' "$DEPLOY_JSON" | python3 -c 'import sys,json
@@ -134,44 +134,46 @@ ENVS="$(readenv --names)"
 REDIS_ADDR="$(readenv REDIS_ADDR)"
 TTL="$(readenv CACHE_TTL)"
 
-# शिकायतें क्रम में संभाली जाती हैं — सबसे सामान्य से सबसे विशिष्ट तक: कोई
-# अनुप्रयोग नहीं, कोई चर नहीं, पते के बजाय बचा हुआ प्लेसहोल्डर। यहाँ का क्रम
-# सजावटी नहीं है: वरना प्रतिभागी को «Redis का पता भरें» सलाह उस समय मिलेगी जब
-# सेवा खुद ही अभी तैनात नहीं है, और वह गलत जगह त्रुटि ढूँढेगा।
+# The complaints are handled in order — from the most general to the most specific: no
+# application, no variable, a placeholder left instead of an address. The order here is not
+# cosmetic: otherwise a participant would get the advice «fill in the Redis address» at a
+# moment when the service itself is not yet deployed, and would look for the error in the
+# wrong place.
 if [ -z "$(kget deployment "$APP" -o name)" ]; then
-  fail "lab क्लस्टर में ${APP} अनुप्रयोग नहीं है" \
-       "passes-api.yaml लागू करें, अपना Harbor पता भरते हुए"
+  fail "the lab cluster has no application ${APP}" \
+       "apply passes-api.yaml, filling in your Harbor address"
 elif [ -z "$REDIS_ADDR" ]; then
-  fail "${APP} में REDIS_ADDR चर सेट नहीं है — कैश बंद है" \
-       "पैच लागू करें: kubectl patch deployment ${APP} --patch-file cache-patch.yaml"
+  fail "the REDIS_ADDR variable is not set in ${APP} — the cache is off" \
+       "apply the patch: kubectl patch deployment ${APP} --patch-file cache-patch.yaml"
 elif printf '%s' "$REDIS_ADDR" | grep -q 'REDIS-ADDR'; then
-  fail "पैच में प्लेसहोल्डर पता REDIS-ADDR अब भी है" \
-       "अपना Redis पता भरें, उदाहरण के लिए rfrm-redis-cache.${TENANT_NS}.svc.cozy.local"
+  fail "the placeholder address REDIS-ADDR is still in the patch" \
+       "fill in your Redis address, for example rfrm-redis-cache.${TENANT_NS}.svc.cozy.local"
 else
-  ok "अनुप्रयोग ${REDIS_ADDR} पर कैश के लिए कॉन्फ़िगर है, प्रविष्टि जीवनकाल ${TTL:-डिफ़ॉल्ट} से."
+  ok "the application is configured for the cache at ${REDIS_ADDR}, entry lifetime ${TTL:-default} s"
 fi
 
-# हम केवल यह देखते हैं कि चर का नाम मौजूद है या नहीं, उसका मान कहीं पढ़ते या छापते नहीं।
-# लोग लैब रिपोर्ट एक-दूसरे को भेजते हैं और टिकटों में जोड़ते हैं — वहाँ पहुँचा पासवर्ड
-# हमेशा के लिए वहीं रह जाएगा।
+# We only look at whether the variable name is present, we do not read or print its value
+# anywhere. People forward the lab report to each other and attach it to tickets — a password
+# that ends up there will stay there forever.
 if printf '%s' "$ENVS" | grep -q '^REDIS_PASSWORD$'; then
-  ok "Redis पासवर्ड अनुप्रयोग तक पहुँचता है (मान: <छिपा हुआ>)"
+  ok "the Redis password reaches the application (value: <hidden>)"
 else
-  fail "${APP} में REDIS_PASSWORD चर सेट नहीं है" \
-       "Redis को प्रमाणीकरण चाहिए; redis-password सीक्रेट बनाएँ और cache-patch.yaml लागू करें"
+  fail "the REDIS_PASSWORD variable is not set in ${APP}" \
+       "Redis requires authentication; create the redis-password secret and apply cache-patch.yaml"
 fi
 
-# लापता सीक्रेट चेतावनी है, विफलता नहीं: पासवर्ड को पॉड तक और तरीके से भी पहुँचाया जा
-# सकता है। यहाँ जाँचा गया गुण अलग है — मैनिफ़ेस्ट में एक संदर्भ है, मान नहीं।
+# A missing secret is a warning, not a failure: the password can be delivered to the pod
+# another way too. The property checked here is different — the manifest holds a reference,
+# not a value.
 if [ -n "$(kget secret redis-password -o name)" ]; then
-  ok "Redis पासवर्ड वाला redis-password सीक्रेट मौजूद है"
+  ok "the redis-password secret with the Redis password exists"
 else
-  warn "क्लस्टर में redis-password सीक्रेट नहीं है" \
-       "बनाएँ: read -rs P && kubectl create secret generic redis-password --from-literal=password=\"\$P\""
+  warn "there is no redis-password secret in the cluster" \
+       "create it: read -rs P && kubectl create secret generic redis-password --from-literal=password=\"\$P\""
 fi
 
-# --- मुख्य जाँच: कैश वाकई तेज़ करता है --------------------------------------
-# हम जानबूझकर नया पहचानकर्ता लेते हैं ताकि पहला अनुरोध निश्चित रूप से मिस हो।
+# --- the main check: the cache really speeds things up -----------------------
+# We take a deliberately new identifier so that the first request is guaranteed to be a miss.
 PROBE_ID="check$$$RANDOM"
 R1="$(in_cluster_curl "${SVC}/employee?id=${PROBE_ID}")"
 R2="$(in_cluster_curl "${SVC}/employee?id=${PROBE_ID}")"
@@ -183,37 +185,37 @@ T2="$(printf '%s' "$R2" | jfield took_ms)"
 MODE="$(printf '%s' "$R2" | jfield cache)"
 
 if [ -z "$C1" ] || [ -z "$C2" ]; then
-  fail "सेवा ${APP} ने अपेक्षित JSON नहीं लौटाया" \
-       "kubectl logs -l app=passes-api देखें; सुनिश्चित करें कि इमेज इस लैब के app/ से बनी है (टैग v2)"
-  evidence "सेवा ने क्या जवाब दिया" "पहला अनुरोध: ${R1:-खाली}
-दूसरा अनुरोध: ${R2:-खाली}"
+  fail "service ${APP} did not return the expected JSON" \
+       "check kubectl logs -l app=passes-api; make sure the image is built from this lab's app/ (tag v2)"
+  evidence "What the service responded" "first request: ${R1:-empty}
+second request: ${R2:-empty}"
 elif [ "$MODE" != "redis" ]; then
-  fail "अनुप्रयोग सूचित करता है कि कैश बंद है (cache: ${MODE})" \
-       "REDIS_ADDR चर चल रहे पॉड तक नहीं पहुँचा — kubectl rollout status deployment/${APP} देखें"
+  fail "the application reports that the cache is off (cache: ${MODE})" \
+       "the REDIS_ADDR variable did not reach the running pods — check kubectl rollout status deployment/${APP}"
 elif [ "$C1" = "True" ]; then
-  warn "पहला अनुरोध पहले ही कैश से आया — तुलना के लिए कुछ नहीं" \
-       "पहचानकर्ता का असंभावित टकराव; जाँच फिर से चलाएँ"
+  warn "the first request already came from the cache — nothing to compare with" \
+       "an unlikely identifier collision; run the check again"
 elif [ "$C2" != "True" ]; then
-  fail "उसी पहचानकर्ता का दूसरा अनुरोध फिर कैश में नहीं मिला" \
-       "अनुप्रयोग Redis में लिख नहीं सकता: kubectl logs -l app=passes-api देखें, आमतौर पर वहाँ NOAUTH या टाइमआउट होता है"
-  evidence "सेवा के जवाब" "पहला:  ${R1}
-दूसरा: ${R2}"
+  fail "the second request for the same identifier missed the cache again" \
+       "the application cannot write to Redis: check kubectl logs -l app=passes-api, usually there is NOAUTH or a timeout there"
+  evidence "Service responses" "first:  ${R1}
+second: ${R2}"
 else
-  ok "कैश काम करता है: मिस ${T1} मि.से., हिट ${T2} मि.से."
+  ok "the cache works: miss ${T1} ms, hit ${T2} ms"
   SPEEDUP="$(python3 -c 'import sys
 try:
     a, b = float(sys.argv[1]), float(sys.argv[2])
-    print(f"{a/b:.0f}" if b > 0 else "1000 से अधिक")
+    print(f"{a/b:.0f}" if b > 0 else "more than 1000")
 except Exception:
     print("?")' "${T1:-0}" "${T2:-0}" 2>/dev/null)"
-  evidence "जीवंत सेवा पर माप" "पहचानकर्ता: ${PROBE_ID}
-पहला अनुरोध (मिस):   ${T1} मि.से.
-दूसरा अनुरोध (हिट): ${T2} मि.से.
-लाभ: लगभग ${SPEEDUP} गुना
-प्रविष्टि जीवनकाल: ${TTL:-डिफ़ॉल्ट} से."
+  evidence "Measurement on a live service" "identifier: ${PROBE_ID}
+first request (miss):   ${T1} ms
+second request (hit): ${T2} ms
+gain: roughly ${SPEEDUP}x
+entry lifetime: ${TTL:-default} s"
 
-  # सख़्त हिस्सा: हिट मिस से एक क्रम अधिक तेज़ होना चाहिए। वरना «कैश काम करता है»
-  # का केवल यह मतलब है कि कुंजी लिखी गई, पर कोई लाभ नहीं।
+  # The strict part: the hit must be an order of magnitude faster than the miss. Otherwise
+  # «the cache works» only means the key was written, but there is no benefit.
   FASTER="$(python3 -c 'import sys
 try:
     a, b = float(sys.argv[1]), float(sys.argv[2])
@@ -221,23 +223,23 @@ try:
 except Exception:
     print("no")' "${T1:-0}" "${T2:-0}" 2>/dev/null)"
   if [ "$FASTER" = "yes" ]; then
-    ok "लाभ मापने योग्य है: हिट मिस से लगभग ${SPEEDUP} गुना तेज़ है"
+    ok "the gain is measurable: the hit is roughly ${SPEEDUP}x faster than the miss"
   else
-    warn "कैश हिट कोई ध्यान देने योग्य लाभ नहीं देता (${T1} मि.से. बनाम ${T2} मि.से.)" \
-         "सुनिश्चित करें कि निर्देशिका वाकई धीमी है, और Redis उसी पॉड पर नहीं है"
+    warn "the cache hit gives no noticeable gain (${T1} ms versus ${T2} ms)" \
+         "make sure the directory is really slow, and Redis is not on the same pod"
   fi
 fi
 
-# --- सेवा की कितनी प्रतियाँ एक कैश साझा करती हैं ----------------------------
-# कैश सभी प्रतियों में साझा है — यह रिपोर्ट में देखने लायक है: हिट मिस वाले पॉड से
-# अलग पॉड से आ सकता है, और यह सही है।
+# --- how many copies of the service share one cache --------------------------
+# The cache is shared across all copies — this is worth seeing in the report: the hit could
+# have come from a different pod than the miss, and that is correct.
 API_PODS="$(kget pods -l app=passes-api --no-headers | awk '$3=="Running"' | grep -c .)"
 if [ "$API_PODS" -ge 1 ]; then
-  ok "सेवा की चल रही प्रतियाँ: ${API_PODS} (वे कैश साझा करती हैं)"
-  evidence "सेवा की प्रतियाँ" "$(kget pods -l app=passes-api -o wide)"
+  ok "copies of the service running: ${API_PODS} (they share the cache)"
+  evidence "Service copies" "$(kget pods -l app=passes-api -o wide)"
 else
-  fail "${APP} की एक भी चल रही प्रति नहीं" \
-       "kubectl describe pod -l app=passes-api देखें"
+  fail "not a single running copy of ${APP}" \
+       "check kubectl describe pod -l app=passes-api"
 fi
 
 finish

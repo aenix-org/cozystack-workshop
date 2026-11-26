@@ -34,10 +34,10 @@
 ## Что лежит в папке лабы
 
 Все файлы уже у вас — вы забрали их вместе с репозиторием. Создавать и печатать заново
-ничего не нужно: там, где ниже написано `kubectl apply -f имя.yaml`, файл берётся отсюда.
+ничего не нужно: там, где ниже написано `kubectl apply -f name.yaml`, файл берётся отсюда.
 
 ```bash
-# Дальше все команды выполняются отсюда: пути в `kubectl apply -f` отсчитываются от этой папки.
+# From here on, all commands are run from this folder: paths in `kubectl apply -f` are counted from it.
 cd labs/04-rollout
 ```
 
@@ -63,28 +63,28 @@ cd labs/04-rollout
 под, стал другой» и не увидите, в каком порядке кластер их меняет.
 
 ```bash
-# KUBECONFIG — файл с адресом кластера и данными для входа в него. Пока переменная задана,
-# каждая команда kubectl идёт в кластер `lab`, а не в тот, откуда его выдали.
+# KUBECONFIG — the file with the cluster's address and the credentials to log into it. While the
+# variable is set, every kubectl command goes to the `lab` cluster, not the one it was issued from.
 export KUBECONFIG=~/lab.kubeconfig
 
-# hpa — автомасштабирование, заведённое в лабе про масштабирование. Удаляем его,
-# чтобы количество копий менялось только по нашей команде.
-#   --ignore-not-found  не считать ошибкой, если его в кластере уже нет
+# hpa — the autoscaler set up in the scaling lab. We delete it
+# so the number of copies changes only on our command.
+#   --ignore-not-found  don't treat it as an error if it's no longer in the cluster
 kubectl delete hpa rickroll --ignore-not-found
 
-# scale = «держи столько копий». Число уезжает в описание приложения,
-# дальше кластер сам поднимает недостающие.
+# scale = "keep this many copies". The number goes into the application's description,
+# and the cluster then brings up the missing ones itself.
 kubectl scale deployment rickroll --replicas=3
 
-# rollout status = «дождись, пока заказанное станет фактическим». Команда держит окно
-# занятым, пока все три копии не станут готовы, и только потом вернёт приглашение.
+# rollout status = "wait until the requested becomes actual". The command keeps the window
+# busy until all three copies are ready, and only then returns the prompt.
 kubectl rollout status deployment/rickroll
 ```
 
 Проверьте, что генератор нагрузки Fortio на месте:
 
 ```bash
-# get = «покажи, что есть». Ответ `Error from server (NotFound)` означает, что его нет.
+# get = "show what's there". The reply `Error from server (NotFound)` means it isn't there.
 kubectl get deployment fortio
 ```
 
@@ -109,10 +109,10 @@ metadata:
 data:
   index.html: |
     ...
-    <div class="tag">ВЕРСИЯ 2</div>
+    <div class="tag">VERSION 2</div>
     <h1>We're No Strangers To Love</h1>
     ...
-    <div class="pod">вас обслужил под<b>__POD__</b></div>
+    <div class="pod">served by pod<b>__POD__</b></div>
 ```
 
 Внутри одна страница: другой заголовок, другая цветовая гамма, заметная плашка «ВЕРСИЯ 2».
@@ -150,8 +150,8 @@ data:
 что на него пока никто не ссылается:
 
 ```bash
-# apply = «приведи кластер к тому, что описано в файле».
-#   -f имя.yaml   откуда брать описание; файл лежит в этой же папке
+# apply = "bring the cluster to what's described in the file".
+#   -f name.yaml   where to take the description from; the file is in this same folder
 kubectl apply -f rickroll-page-v2.yaml
 ```
 
@@ -160,10 +160,10 @@ kubectl apply -f rickroll-page-v2.yaml
 Теперь откройте приложение и убедитесь, что **ничего не изменилось**:
 
 ```bash
-# port-forward = временный туннель с виртуалки внутрь кластера.
-#   svc/rickroll  куда ведём: в Service, то есть с раскладкой запросов по копиям
-#   8080:80       слева порт на виртуалке, справа порт сервиса внутри кластера
-# Пока туннель открыт, окно занято; закрывается по Ctrl+C.
+# port-forward = a temporary tunnel from the bastion into the cluster.
+#   svc/rickroll  where it leads: into the Service, that is, with requests spread across the copies
+#   8080:80       on the left the port on the bastion, on the right the service's port inside the cluster
+# While the tunnel is open the window is busy; it closes on Ctrl+C.
 kubectl port-forward svc/rickroll 8080:80
 ```
 
@@ -179,9 +179,9 @@ kubectl port-forward svc/rickroll 8080:80
 лежат в самом описании приложения:
 
 ```bash
-# -o jsonpath=... — вместо таблицы напечатать одно поле объекта, указав путь к нему.
-#   {.spec.strategy}  блок правил, по которым кластер заменяет копии
-#   {"\n"}            перевод строки в конце, иначе вывод слипнется с приглашением
+# -o jsonpath=... — instead of a table, print a single field of the object by giving the path to it.
+#   {.spec.strategy}  the block of rules by which the cluster replaces copies
+#   {"\n"}            a newline at the end, otherwise the output runs into the prompt
 kubectl get deployment rickroll -o jsonpath='{.spec.strategy}{"\n"}'
 ```
 
@@ -235,10 +235,10 @@ kubectl get deployment rickroll -o jsonpath='{.spec.strategy}{"\n"}'
 📍 **Окно 1** — туннель до Fortio:
 
 ```bash
-# Новое окно терминала не помнит переменные предыдущего — задаём KUBECONFIG заново.
+# A new terminal window doesn't remember the previous one's variables — we set KUBECONFIG again.
 export KUBECONFIG=~/lab.kubeconfig
-# Туннель до генератора нагрузки: порт 8081 на виртуалке → порт 8080 сервиса fortio.
-# Слева взят 8081, чтобы не столкнуться с туннелем до самого приложения на 8080.
+# A tunnel to the load generator: port 8081 on the bastion → port 8080 of the fortio service.
+# 8081 was chosen on the left so as not to collide with the tunnel to the application itself on 8080.
 kubectl port-forward svc/fortio 8081:8080
 ```
 
@@ -256,13 +256,13 @@ kubectl port-forward svc/fortio 8081:8080
 Ту же нагрузку можно дать командой, если с формой не сложилось:
 
 ```bash
-# exec = выполнить команду внутри уже работающего пода. Нагрузку даёт не ваш виртуалку,
-# а сам Fortio изнутри кластера, поэтому туннель для этого не нужен.
-#   deploy/fortio  в любой копии приложения fortio
-#   --             всё, что правее, — команда для контейнера, а не для kubectl
-#   -qps 300       триста запросов в секунду
-#   -c 20          двадцать одновременных соединений
-#   -t 180s        держать нагрузку три минуты
+# exec = run a command inside an already-running Pod. The load is generated not by your bastion,
+# but by Fortio itself from inside the cluster, so no tunnel is needed for this.
+#   deploy/fortio  in any copy of the fortio application
+#   --             everything to the right is a command for the container, not for kubectl
+#   -qps 300       three hundred requests per second
+#   -c 20          twenty simultaneous connections
+#   -t 180s        hold the load for three minutes
 kubectl exec deploy/fortio -- fortio load -qps 300 -c 20 -t 180s http://rickroll/
 ```
 
@@ -270,9 +270,9 @@ kubectl exec deploy/fortio -- fortio load -qps 300 -c 20 -t 180s http://rickroll
 
 ```bash
 export KUBECONFIG=~/lab.kubeconfig
-# -l app=rickroll — показывать только поды с этой меткой, чужие в вывод не попадут.
-# -w = «следи и дописывай»: окно остаётся занятым и печатает новую строку каждый раз,
-# когда состояние какой-нибудь копии меняется. Выход — Ctrl+C.
+# -l app=rickroll — show only Pods with this label; others won't get into the output.
+# -w = "watch and append": the window stays busy and prints a new line every time
+# the state of some copy changes. Exit — Ctrl+C.
 kubectl get pods -l app=rickroll -w
 ```
 
@@ -282,7 +282,7 @@ kubectl get pods -l app=rickroll -w
 за подами, поэтому патч выполняем в третьем. Доступ в нём нужно задать заново:
 
 ```bash
-# Новое окно терминала не помнит переменные предыдущего — задаём KUBECONFIG заново.
+# A new terminal window doesn't remember the previous one's variables — we set KUBECONFIG again.
 export KUBECONFIG=~/lab.kubeconfig
 ```
 
@@ -292,11 +292,11 @@ export KUBECONFIG=~/lab.kubeconfig
 Расхождение с фактическим состоянием кластер заметит сам и начнёт замену копий.
 
 ```bash
-# patch = точечно поменять поле в объекте, не переписывая объект целиком.
-#   --type=json  формат правки: «операция + путь + значение»
-#   op: replace  заменить то, что лежит по этому пути
-#   path         адрес поля внутри объекта; volumes/0 — первый том в списке (см. ниже)
-#   value        новое имя ConfigMap, откуда том возьмёт страницу
+# patch = change a field in an object pinpoint-style, without rewriting the whole object.
+#   --type=json  the edit format: "operation + path + value"
+#   op: replace  replace what sits at this path
+#   path         the address of the field inside the object; volumes/0 — the first volume in the list (see below)
+#   value        the new ConfigMap name from which the volume will take the page
 kubectl patch deployment rickroll --type=json \
   -p='[{"op":"replace","path":"/spec/template/spec/volumes/0/configMap/name","value":"rickroll-page-v2"}]'
 ```
@@ -323,9 +323,9 @@ JSON Patch взят потому, что он показывает механи�
 ключу, и у `volumes` этот ключ — `name`:
 
 ```bash
-# Без --type=json это патч-слияние: вы описываете кусок объекта в том же виде, в каком он
-# лежит в манифесте, а кластер сливает его с тем, что уже есть. Список volumes сливается
-# по ключу `name`, поэтому здесь адресуется том `page`, а не «том номер такой-то».
+# Without --type=json this is a merge patch: you describe a piece of the object in the same form
+# it has in the manifest, and the cluster merges it with what's already there. The volumes list merges
+# by the `name` key, so here the `page` volume is addressed, not "the volume at such-and-such index".
 kubectl patch deployment rickroll -p \
   '{"spec":{"template":{"spec":{"volumes":[{"name":"page","configMap":{"name":"rickroll-page-v2"}}]}}}}'
 ```
@@ -345,9 +345,9 @@ kubectl patch deployment rickroll -p \
 Смотрим, как идёт замена:
 
 ```bash
-# rollout status печатает ход замены построчно и завершается, когда обновлены все копии.
-# Если выкатка не сошлась, команда вернёт ненулевой код возврата — по нему её удобно
-# останавливать в скриптах.
+# rollout status prints the progress of the replacement line by line and finishes when all copies are updated.
+# If the rollout doesn't converge, the command returns a non-zero exit code — convenient for
+# stopping it in scripts.
 kubectl rollout status deployment/rickroll
 ```
 
@@ -365,8 +365,8 @@ ReplicaSet. Deployment не переделывал старый, он созда
 одного в другой. Старый никуда не делся, в нём ноль копий, и он ждёт своего часа:
 
 ```bash
-# rs — сокращение для ReplicaSet, набора копий одной версии описания.
-# DESIRED — сколько копий заказано в этом наборе, READY — сколько из них готовы отвечать.
+# rs — shorthand for ReplicaSet, a set of copies of one version of the description.
+# DESIRED — how many copies are requested in this set, READY — how many of them are ready to answer.
 kubectl get rs -l app=rickroll
 ```
 
@@ -383,7 +383,7 @@ rickroll-7c5d4f9b21   3         3         3       40s
 Открываем туннель до приложения:
 
 ```bash
-# Тот же туннель, что и в начале лабы: порт 8080 на виртуалке → порт 80 сервиса rickroll.
+# The same tunnel as at the start of the lab: port 8080 on the bastion → port 80 of the rickroll service.
 kubectl port-forward svc/rickroll 8080:80
 ```
 
@@ -421,8 +421,8 @@ All done 54000 calls (plus 0 warmup) 0.412 ms avg, 300.0 qps
 изменений:
 
 ```bash
-# history = список сохранённых ревизий описания. Каждая строка — состояние, к которому
-# можно вернуться одной командой. CHANGE-CAUSE — необязательная подпись, зачем меняли.
+# history = the list of saved revisions of the description. Each line is a state you can
+# return to with a single command. CHANGE-CAUSE — an optional note on why it was changed.
 kubectl rollout history deployment/rickroll
 ```
 
@@ -439,11 +439,11 @@ REVISION  CHANGE-CAUSE
 Откат:
 
 ```bash
-# undo без дополнительных параметров = вернуться к предыдущей ревизии. Это не «отмотать
-# время назад», а обычная выкатка старого описания: копии меняются по одной, по тем же
-# правилам maxSurge и maxUnavailable.
+# undo with no extra parameters = return to the previous revision. This isn't "rewinding
+# time", it's an ordinary rollout of the old description: copies are replaced one at a time, by the same
+# maxSurge and maxUnavailable rules.
 kubectl rollout undo deployment/rickroll
-# Ждём, пока состав копий сойдётся с описанием.
+# We wait until the makeup of the copies converges with the description.
 kubectl rollout status deployment/rickroll
 ```
 
@@ -475,14 +475,14 @@ ReplicaSet — тот, что висел с нулём.
 нет. Воспроизведём ровно это:
 
 ```bash
-# Тот же патч, что и при переключении на вторую версию, но имя ConfigMap с ошибкой:
-# объекта `rickroll-page-v3` в кластере нет. Существование ссылки при приёме не проверяется,
-# поэтому команда отработает успешно.
+# The same patch as when switching to the second version, but with a mistake in the ConfigMap name:
+# there is no object `rickroll-page-v3` in the cluster. The reference's existence isn't checked on acceptance,
+# so the command will finish successfully.
 kubectl patch deployment rickroll --type=json \
   -p='[{"op":"replace","path":"/spec/template/spec/volumes/0/configMap/name","value":"rickroll-page-v3"}]'
 
-# --timeout=90s — не ждать бесконечно: не дождавшись готовых копий, команда через полторы
-# минуты сдастся и вернёт ошибку. Сама выкатка при этом никуда не денется и останется висеть.
+# --timeout=90s — don't wait forever: not having gotten ready copies, the command gives up after a
+# minute and a half and returns an error. The rollout itself won't go anywhere and will stay hanging.
 kubectl rollout status deployment/rickroll --timeout=90s
 ```
 
@@ -496,8 +496,8 @@ error: timed out waiting for the condition
 Смотрим на состав копий: три прежние работают, новая застряла на запуске.
 
 ```bash
-# Колонка READY считает готовые контейнеры внутри пода: 1/1 — готов, 0/1 — нет.
-# STATUS говорит, на чём именно остановился запуск.
+# The READY column counts the ready containers inside the Pod: 1/1 — ready, 0/1 — not.
+# STATUS says exactly where the startup stalled.
 kubectl get pods -l app=rickroll
 ```
 
@@ -521,10 +521,10 @@ rickroll-8b6a1e5c39-wr4tz   0/1     ContainerCreating   0          90s
 кластере нет. Спросите у кластера напрямую:
 
 ```bash
-# events — журнал происшествий кластера, ближайший аналог вкладки Tasks & Events в vCenter.
-#   --field-selector reason=FailedMount  оставить только записи о неудачном подключении тома
-#   --sort-by=.lastTimestamp             отсортировать по времени, свежие окажутся внизу
-#   | tail -3                            показать три последние строки, остальное отбросить
+# events — the cluster's log of occurrences, the nearest analogue of the Tasks & Events tab in vCenter.
+#   --field-selector reason=FailedMount  keep only the records about a failed volume mount
+#   --sort-by=.lastTimestamp             sort by time, the freshest end up at the bottom
+#   | tail -3                            show the last three lines, discard the rest
 kubectl get events --field-selector reason=FailedMount --sort-by=.lastTimestamp | tail -3
 ```
 
@@ -542,8 +542,8 @@ ConfigMap при приёме манифеста нет — она была бы
 застрявшей выкатки:
 
 ```bash
-# Тот же туннель. Трафик пойдёт только на те копии, что прошли проверку готовности,
-# то есть на три старые: застрявшая в балансировку не попала.
+# The same tunnel. Traffic will go only to the copies that passed the readiness check,
+# that is, to the three old ones: the stuck one didn't make it into balancing.
 kubectl port-forward svc/rickroll 8080:80
 ```
 
@@ -575,9 +575,9 @@ Fortio — в отчёте по-прежнему сто процентов дв�
 Выбираемся:
 
 ```bash
-# Возвращаем предыдущую ревизию — ту, где имя ConfigMap написано верно.
+# We return the previous revision — the one where the ConfigMap name is written correctly.
 kubectl rollout undo deployment/rickroll
-# Дожидаемся, пока застрявшая копия исчезнет, а состав копий сойдётся с описанием.
+# We wait until the stuck copy disappears and the makeup of the copies converges with the description.
 kubectl rollout status deployment/rickroll
 ```
 
@@ -588,7 +588,7 @@ kubectl rollout status deployment/rickroll
 📍 **Где:** на виртуалке, в том же окне терминала, где вы работали с `kubectl`.
 
 ```bash
-# Скрипт ничего не меняет в кластере: только читает состояние и печатает отчёт.
+# The script changes nothing in the cluster: it only reads the state and prints a report.
 ./check.sh
 ```
 
@@ -606,15 +606,15 @@ ConfigMap второй версии, приложение отвечает по 
 Приложение `rickroll` понадобится дальше — не удаляем. Верните ему одну копию:
 
 ```bash
-# Две лишние копии освободят память узла — дальше по лабам нагрузки не будет.
+# Two extra copies will free up the node's memory — there won't be any load in the labs ahead.
 kubectl scale deployment rickroll --replicas=1
 ```
 
 Генератор нагрузки больше не нужен:
 
 ```bash
-# delete -f = удалить ровно те объекты, что перечислены в файле, и ничего кроме них.
-# Путь ведёт в соседнюю папку, потому что файл лежит там же, где лаба про масштабирование.
+# delete -f = delete exactly the objects listed in the file, and nothing besides them.
+# The path leads to the neighboring folder, because the file is where the scaling lab is.
 kubectl delete -f ../03-scale/fortio.yaml
 ```
 

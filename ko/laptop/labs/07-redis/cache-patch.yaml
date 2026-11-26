@@ -1,48 +1,48 @@
 ---
-# 랩 7 · 캐시를 실제로 켜기. 이미 배포된 passes-api 위에 적용합니다
-# `lab` 클러스터에서 (export KUBECONFIG=~/lab.kubeconfig):
+# Lab 7 · turning the cache on for real. Applied on top of the already-deployed passes-api
+# in your `lab` cluster (export KUBECONFIG=~/lab.kubeconfig):
 #   kubectl patch deployment passes-api --patch-file cache-patch.yaml
 #
-# 이것은 전체 매니페스트가 아니라 패치입니다: 바뀌는 부분만 기술합니다. 나머지 전부 —
-# 이미지, 레이블, 프로브, 리소스 — 는 passes-api.yaml에서 그대로 손대지 않고 남습니다. 그래서 파일은
-# 바로 spec부터 시작합니다: 컨테이너까지 내려가는 경로가 Deployment 구조를 그대로 따라가므로
-# 클러스터가 정확히 어디에 수정을 적용해야 하는지 이해합니다.
+# This is a patch, not a full manifest: it describes only what changes. Everything else —
+# the image, labels, probes, resources — stays untouched from passes-api.yaml. That is why the
+# file starts straight from spec: the path down to the container mirrors the Deployment
+# structure so the cluster understands exactly where to apply the edit.
 #
-# 컨테이너 이름 `api`는 장식이 아니라 주소입니다: 클러스터는 이것으로 목록에서 올바른 컨테이너를
-# 찾습니다. 이름을 틀리면 수정 대신 두 번째 컨테이너가 생깁니다.
+# The container name `api` is not decoration but an address: the cluster uses it to find the
+# right container in the list. Get the name wrong and instead of an edit you get a second container.
 #
-# REDIS-ADDR 자리에 자신의 Redis 주소를 넣으세요 — 이것은 호스트 이름이 아니라 플레이스홀더입니다.
-# 주소는 대시보드의 managed Redis 애플리케이션 카드에서 가져옵니다.
+# Substitute the address of your own Redis in place of REDIS-ADDR — it is a placeholder, not a hostname.
+# You take the address from the dashboard, in the card of your managed Redis application.
 spec:
   template:
     spec:
       containers:
         - name: api
-          # Kubernetes의 env 목록은 name 필드로 병합되므로, 아래 세 항목은
-          # Deployment에 이미 있는 것들을 대체하지 않고 그것들에 추가됩니다.
+          # env lists in Kubernetes are merged by the name field, so the three entries below
+          # are added to those already in the Deployment rather than replacing them.
           env:
-            # 이 변수가 나타나는 것이 바로 "캐시를 켠다"는 뜻입니다: 애플리케이션은 시작 시
-            # 이것을 확인하고, 설정되어 있으면 먼저 Redis로 갑니다. 비어 있거나
-            # 없으면 — 이전처럼 매 요청마다 디렉터리를 조회하며 동작합니다.
+            # The appearance of this variable is what "turn the cache on" means: the application checks
+            # it at startup and, if it is set, goes to Redis first. Empty or
+            # missing — it works as before, hitting the directory on every request.
             - name: REDIS_ADDR
               value: "REDIS-ADDR:6379"
-            # 비밀번호는 텍스트로 쓰지 않습니다: 별도의 명령으로 만들 시크릿에서
-            # 전달됩니다. Git에 저장되는 매니페스트에는
-            # 비밀번호가 있을 자리가 없습니다.
+            # We do not write the password as text: it arrives from a secret that you
+            # will create with a separate command. In a manifest that lives in Git,
+            # a password has no place.
             #
-            # secretKeyRef는 참조입니다: name — 같은 클러스터의 시크릿 객체 이름,
-            # key — 그 안의 어떤 필드를 가져올지. 값은 파드가 시작될 때
-            # 치환되며 파일에는 결코 나타나지 않습니다.
+            # secretKeyRef is a reference: name — the name of the secret object in the same cluster,
+            # key — which field inside it to take. The value is substituted when the
+            # pod starts and never appears in the file.
             - name: REDIS_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: redis-password
                   key: password
-            # 레코드가 캐시에 몇 초 동안 사는지. 육십 — 왜냐하면
-            # 직원 디렉터리는 초당 한 번이 아니라 하루에 한 번 바뀌기 때문입니다.
+            # How many seconds a record lives in the cache. Sixty — because the
+            # employee directory changes once a day, not once a second.
             #
-            # 기간이 길수록 — 디렉터리를 덜 조회하지만, 오래된 성(姓)을
-            # 더 오래 내보냅니다. 짧을수록 — 데이터가 더 신선하고, 이득은 적습니다. 이것은 절충이지,
-            # 올바른 값이 있는 설정이 아닙니다.
+            # A longer term — we hit the directory less often, but serve a stale
+            # surname for longer. A shorter one — the data is fresher, the gain is smaller. This is a trade-off,
+            # not a setting with a correct value.
             - name: CACHE_TTL
               value: "60"

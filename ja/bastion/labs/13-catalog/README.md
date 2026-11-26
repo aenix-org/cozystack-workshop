@@ -34,12 +34,12 @@
 に尋ねることができます。
 
 ```bash
-# KUBECONFIG — kubectl がクラスターのアドレスとあなたの認証情報を見つけるために読む変数。
-# ここではテナントアクセス、他のすべての lab と同じファイルです。
+# KUBECONFIG — the variable kubectl reads to find the cluster's address and your credentials.
+# Here it is the tenant access, the same file as in every other lab.
 export KUBECONFIG=~/.kube/config
-# auth can-i = 「私は許可されている?」。クラスターは yes か no を答え、何も変えません:
-#   create                   どのアクションを確認するか
-#   applicationdefinitions   どの種類のオブジェクトに対して
+# auth can-i = "am I allowed to?". The cluster answers yes or no and changes nothing:
+#   create                   which action we are checking
+#   applicationdefinitions   on which type of object
 kubectl auth can-i create applicationdefinitions
 ```
 
@@ -159,10 +159,10 @@ Cozystack のジェネレーター（`cozyvalues-gen`）が `values.schema.json`
 確かめてみましょう。数値パラメーターに文字列を差し込みます。
 
 ```bash
-# template = 「チャートからマニフェストを組み立てて出力する」、クラスターには触れません:
-#   gp                    チャートが名目上デプロイされるリリース名
-#   chart                 チャートの入ったフォルダー
-#   --set replicas=abc    単一のパラメーターをコマンドラインで直接上書きする
+# template = "assemble the manifests from the chart and print them", the cluster is not touched:
+#   gp                    the release name the chart is notionally deployed under
+#   chart                 the folder with the chart
+#   --set replicas=abc    override a single parameter right on the command line
 helm template gp chart --set replicas=abc
 ```
 
@@ -234,9 +234,9 @@ Kubernetes は **ConfigMap が変わっても Pod を再起動しません**。�
 
 ```bash
 cd labs/13-catalog
-# lint = 「パッケージを書式エラーと必須フィールドについてチェックする」
-#   chart   チャートフォルダーへのパス。その中に Helm は Chart.yaml、values.yaml
-#           と templates/ フォルダーを期待する
+# lint = "check the package for formatting errors and required fields"
+#   chart   path to the chart folder; inside it Helm expects Chart.yaml, values.yaml
+#           and the templates/ folder
 helm lint chart
 ```
 
@@ -258,8 +258,8 @@ helm lint chart
 に変えることです。Helm は `values.yaml` から値を取り、テキストに差し込み、結果を出力します。
 
 ```bash
-# main — リリース名、つまりこのチャートのこの具体的なデプロイの名前。これは
-# 作成されるオブジェクトの名前に入るので、隣り合う2つのインストールが衝突しません。
+# main — the release name, that is, of this specific deployment of the chart. It goes
+# into the names of the objects created, so two installations side by side will not clash.
 helm template main chart
 ```
 
@@ -270,10 +270,10 @@ helm template main chart
 し、変わるはずだった行だけを出力から残します。
 
 ```bash
-# --set replicas=5 は1回の実行の間だけ values.yaml の値を上書きします。
-# | grep 'replicas:' — 出力全体からこの語を含む行だけを残します。
+# --set replicas=5 overrides the value from values.yaml for the duration of one run.
+# | grep 'replicas:' — from the whole output keep only the lines with this word.
 helm template main chart --set replicas=5 | grep 'replicas:'
-# ブール値パラメーターも同様に: external はマニフェストにどの Service タイプが入るかを決めます
+# the same for the boolean parameter: external decides which Service type ends up in the manifest
 helm template main chart --set external=true | grep 'type:'
 ```
 
@@ -328,11 +328,11 @@ metadata:
 管理者が定義を適用した瞬間に、どのテナントでも動きます。
 
 ```bash
-# get = 「そこに何があるか見せて」。guestpasses は下の plural フィールドのまさにあの名前:
-#   -n tenant-workshopXX   どの namespace を見るか。XX は自分の番号に置き換える
+# get = "show me what's there". guestpasses is that very name from the plural field below:
+#   -n tenant-workshopXX   which namespace to look in; replace XX with your own number
 kubectl get guestpasses -n tenant-workshopXX
-# describe = 「1つのオブジェクトについてすべて見せて」: パラメーター、状態、最近のイベント。
-# ここでの main は型の名前ではなく、注文された具体的なアプリケーションの名前です。
+# describe = "show me everything about one object": parameters, state, recent events.
+# main here is the name of a specific ordered application, not the name of the type.
 kubectl describe guestpass main -n tenant-workshopXX
 ```
 
@@ -430,9 +430,9 @@ Cozystack のサービスラベルです。これによって、テナントの�
 ステップで取り除かれます。
 
 ```bash
-# base64 = バイナリファイルを、英字・数字・記号 + / = の文字列に変える
-#   -i icon.svg   何をエンコードするか（macOS と BSD のフラグ表記）
-# tr -d '\n' = 出力からすべての改行を落とし、1本に貼り合わせる
+# base64 = turn a binary file into a string of letters, digits and the signs + / =
+#   -i icon.svg   what to encode (the flag spelling for macOS and BSD)
+# tr -d '\n' = drop every line break from the output, gluing it into one
 base64 -i icon.svg | tr -d '\n'
 ```
 
@@ -461,9 +461,9 @@ Linux では同じコマンドのフラグが異なります: `base64 -w0 icon.s
 `kubectl` からではなくクラスターから来て、拒否の文言は何が足りなかったかをはっきり述べます。
 
 ```bash
-# テナントアクセス — ワークショップを通してずっと扱ってきたのと同じもの
+# tenant access — the same one you have worked with throughout the workshop
 export KUBECONFIG=~/.kube/config
-# apply = 「クラスターをファイルに書かれたものに合わせる」; -f — ファイルから読む
+# apply = "bring the cluster into line with what's written in the file"; -f — read from a file
 kubectl apply -f applicationdefinition.yaml
 ```
 
@@ -511,10 +511,10 @@ resource "applicationdefinitions" in API group "cozystack.io" at the cluster sco
 権限について尋ね、次に `kubectl` にファイル全体をパースさせ、どこにも送らせません。
 
 ```bash
-# auth can-i = 「私は許可されている?」。答えは yes か no で、クラスターは変わりません。
+# auth can-i = "am I allowed to?". The answer is yes or no, and the cluster is not changed.
 kubectl auth can-i create applicationdefinitions
-# --dry-run=client = 「ファイルをパースして何が出てくるか見せる、ただしクラスターへは行かない」。
-# client は、チェック全体が bastion 上で走り、クラスターはそれについて一切耳にしないという意味です。
+# --dry-run=client = "parse the file and show what would come out, but do not go to the cluster".
+# client means the whole check runs on the bastion and the cluster never even hears about it.
 kubectl apply -f applicationdefinition.yaml --dry-run=client
 ```
 
@@ -586,7 +586,7 @@ spec:
 最も重要なこととして、定義のスキーマがチャートのスキーマと一致することをチェックします。
 
 ```bash
-# 名前の前の ./ は「現在のフォルダーからのファイル」、つまり labs/13-catalog からを意味します
+# ./ before the name means "the file from the current folder", that is, from labs/13-catalog
 ./check.sh
 ```
 

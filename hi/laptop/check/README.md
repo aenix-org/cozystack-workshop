@@ -43,7 +43,7 @@ export KUBECONFIG=~/lab.kubeconfig
 जहाँ आपने इसे सेव किया:
 
 ```bash
-export KUBECONFIG=/mnt/c/Users/<आपका-नाम>/lab.kubeconfig
+export KUBECONFIG=/mnt/c/Users/<your-name>/lab.kubeconfig
 ```
 
 ⚠️ **अगर WSL इंस्टॉल नहीं हो सकता** — कॉर्पोरेट लैपटॉप पर यह आम स्थिति है — तब भी आप लैब्स

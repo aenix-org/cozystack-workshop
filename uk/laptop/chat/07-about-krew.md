@@ -29,9 +29,9 @@ tar zxvf "krew-${OS}_${ARCH}.tar.gz" &&
 Потім додайте krew у PATH — рядок треба дописати у свій профіль, інакше він забудеться
 під час наступного запуску термінала:
 ```bash
-echo 'export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"' >> ~/.zshrc   # для zsh, це за замовчуванням у macOS
-echo 'export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"' >> ~/.bashrc  # для bash, зазвичай Linux
-source ~/.zshrc    # або source ~/.bashrc
+echo 'export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"' >> ~/.zshrc   # for zsh, the default on macOS
+echo 'export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"' >> ~/.bashrc  # for bash, usually Linux
+source ~/.zshrc    # or source ~/.bashrc
 ```
 
 **Windows** (PowerShell)

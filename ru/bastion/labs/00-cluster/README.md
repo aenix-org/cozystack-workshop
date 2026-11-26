@@ -50,8 +50,8 @@
 PowerShell, запущенном от имени администратора:
 
 ```powershell
-# ставит подсистему Linux внутрь Windows: ядро, службу и дистрибутив Ubuntu
-# по умолчанию. После установки Windows попросит перезагрузиться.
+# installs the Linux subsystem inside Windows: the kernel, the service and the default
+# Ubuntu distribution. After installation Windows will ask you to reboot.
 wsl --install
 ```
 
@@ -60,15 +60,15 @@ wsl --install
 к кластеру:
 
 ```bash
-# snap — менеджер пакетов Ubuntu. --classic ставит пакет без изоляции:
-# в изолированном виде kubectl не увидит файл доступа в вашей домашней папке.
+# snap is Ubuntu's package manager. --classic installs the package without isolation:
+# in isolated mode kubectl won't see the access file in your home folder.
 sudo snap install kubectl --classic
 ```
 
 Диски Windows видны из WSL по пути `/mnt/c/...`, поэтому файлы, скачанные обычным
 браузером, доступны и внутри — копировать их никуда не нужно. Пригодится это чуть дальше,
 когда вы получите файл доступа к кластеру: если сохраните его в Windows, из WSL он будет
-лежать по адресу вида `/mnt/c/Users/Иван/Downloads/имя-файла`.
+лежать по адресу вида `/mnt/c/Users/Ivan/Downloads/filename`.
 
 ⚠️ **Если WSL запрещён политикой безопасности** — на корпоративном виртуалке это обычное
 дело — лабы всё равно проходятся: всё, что делается в дашборде, от операционной системы не
@@ -78,10 +78,10 @@ sudo snap install kubectl --classic
 ## Что лежит в папке лабы
 
 Все файлы уже у вас — вы забрали их вместе с репозиторием. Создавать и печатать заново
-ничего не нужно: там, где ниже написано `kubectl apply -f имя.yaml`, файл берётся отсюда.
+ничего не нужно: там, где ниже написано `kubectl apply -f name.yaml`, файл берётся отсюда.
 
 ```bash
-# путь отсчитывается от корня репозитория — его вы забираете на следующем шаге
+# the path is counted from the repository root — you fetch it in the next step
 cd labs/00-cluster
 ```
 
@@ -117,8 +117,8 @@ ls manifests scripts labs
 Этот путь используется во всех лабах. Проверим, что доступ рабочий:
 
 ```bash
-# Спрашиваем у управляющего кластера список ваших кластеров Kubernetes.
-# --kubeconfig явно указывает файл доступа (здесь это и есть файл по умолчанию).
+# Ask the management cluster for the list of your Kubernetes clusters.
+# --kubeconfig explicitly points to the access file (here it's the default file too).
 kubectl --kubeconfig ~/.kube/config get kubernetes.apps.cozystack.io -n tenant-workshopXX
 ```
 
@@ -199,18 +199,19 @@ spec:
 появится только после того, как кластер поднимется.
 
 ```bash
-# переходим в папку лабы — дальше все файлы берутся отсюда
+# move into the lab folder — from here on all files are taken from here
 cd labs/00-cluster
-# перед применением подставьте в файле свой номер тенанта вместо XX.
-# apply = «приведи кластер к тому, что описано в файле». Кластер команда не поднимает
-# сама — она передаёт заказ платформе, а та решает, что и в каком порядке создать.
-#   -f   взять описание из файла
+# before applying, substitute your own tenant number in the file in place of XX.
+# apply = "bring the cluster to what's described in the file". The command doesn't bring
+# the cluster up itself — it hands the order to the platform, which decides what to
+# create and in what order.
+#   -f   take the description from the file
 kubectl apply -f cluster.yaml
-# get = «покажи, что есть». kubernetes.apps.cozystack.io — полное имя типа объекта,
-# того самого, что описан в файле (kind: Kubernetes), lab — имя вашего заказа.
-#   -n   в каком namespace искать; без флага kubectl смотрит в namespace по умолчанию
-#   -w   следить и печатать изменения. Выйти — Ctrl+C, установка от этого не прервётся
-# Ждём, пока в колонке READY появится True.
+# get = "show what's there". kubernetes.apps.cozystack.io is the full name of the object
+# type, the very one described in the file (kind: Kubernetes), lab is the name of your order.
+#   -n   which namespace to look in; without the flag kubectl looks in the default namespace
+#   -w   watch and print changes. To exit — Ctrl+C, the installation won't be interrupted by it
+# Wait until True appears in the READY column.
 kubectl -n tenant-workshopXX get kubernetes.apps.cozystack.io lab -w
 ```
 
@@ -225,9 +226,9 @@ kubectl -n tenant-workshopXX get kubernetes.apps.cozystack.io lab -w
 стоит чья-то долгая операция, ваш кластер ждёт своей. Посмотреть, взяли ли его в работу:
 
 ```bash
-# Смотрим на сам заказ и на то, что платформа о нём пишет.
-# Раздел status.conditions в конце вывода — это её отчёт: взяли ли в работу,
-# что мешает, чего ждёт.
+# Look at the order itself and at what the platform writes about it.
+# The status.conditions section at the end of the output is its report: whether it's been
+# picked up for work, what's blocking, what it's waiting for.
 kubectl --kubeconfig ~/.kube/config -n tenant-workshopXX \
   get kubernetes.apps.cozystack.io lab -o yaml
 ```
@@ -236,7 +237,7 @@ kubectl --kubeconfig ~/.kube/config -n tenant-workshopXX \
 делала с вашими объектами:
 
 ```bash
-# events = журнал происшествий. Сортируем по времени, чтобы свежее было внизу.
+# events = a log of incidents. We sort by time so the freshest is at the bottom.
 kubectl --kubeconfig ~/.kube/config -n tenant-workshopXX \
   get events --sort-by=.lastTimestamp | tail -20
 ```
@@ -265,8 +266,8 @@ kubectl --kubeconfig ~/.kube/config -n tenant-workshopXX \
 **Что мы забираем.** Кубконфиг кластера `lab` — текстовый файл, в котором записаны адрес
 его API-сервера и ваши данные доступа к нему. Без такого файла `kubectl` не знает, куда
 обращаться и кем представляться. Файл вы создаёте у себя на виртуалке сами, под именем
-`~/lab.kubeconfig`; `~` в путях — ваша домашняя папка: `/Users/имя` на macOS,
-`/home/имя` в Linux и WSL.
+`~/lab.kubeconfig`; `~` в путях — ваша домашняя папка: `/Users/name` на macOS,
+`/home/name` в Linux и WSL.
 
 ⚠️ **Это второй файл доступа, а не замена первому.** Тот, что вам выдали вместе
 с тенантом (в лабах он лежит по пути `~/.kube/config`), ведёт на управляющий кластер —
@@ -289,12 +290,12 @@ kubectl --kubeconfig ~/.kube/config -n tenant-workshopXX \
 а результат кладётся в файл на виртуалке:
 
 ```bash
-# get secret = показать секрет; -o go-template — не печатать его целиком,
-# а достать из него одно поле и вывести как текст:
-#   index .data "admin.conf"   взять из секрета ключ admin.conf
-#   base64decode               содержимое секретов хранится закодированным в base64,
-#                              эта функция возвращает исходный текст
-#   > ~/lab.kubeconfig         записать вывод в файл вместо экрана
+# get secret = show the Secret; -o go-template — don't print it whole,
+# but pull one field out of it and output it as text:
+#   index .data "admin.conf"   take the admin.conf key from the Secret
+#   base64decode               the contents of Secrets are stored base64-encoded,
+#                              this function returns the original text
+#   > ~/lab.kubeconfig         write the output to a file instead of the screen
 kubectl -n tenant-workshopXX get secret kubernetes-lab-admin-kubeconfig \
   -o go-template='{{ printf "%s\n" (index .data "admin.conf" | base64decode) }}' > ~/lab.kubeconfig
 ```
@@ -314,18 +315,18 @@ kubectl -n tenant-workshopXX get secret kubernetes-lab-admin-kubeconfig \
 macOS и Linux:
 
 ```bash
-# KUBECONFIG — переменная, из которой kubectl узнаёт, какой файл доступа брать.
-# export делает её видимой всем командам, запущенным дальше в этом окне терминала.
+# KUBECONFIG is the variable from which kubectl learns which access file to take.
+# export makes it visible to all commands run further in this terminal window.
 export KUBECONFIG=~/lab.kubeconfig
-# nodes — узлы кластера, те самые виртуальные машины, на которых пойдут ваши
-# приложения. Ответ заодно доказывает, что файл доступа рабочий.
+# nodes are the cluster's nodes, the very virtual machines your applications will run on.
+# The answer also proves the access file works.
 kubectl get nodes
 ```
 
 Windows PowerShell — только если WSL поставить не удалось:
 
 ```powershell
-# в PowerShell переменные окружения задаются через $env: и живут до закрытия окна
+# in PowerShell environment variables are set via $env: and live until the window closes
 $env:KUBECONFIG="$HOME\lab.kubeconfig"
 kubectl get nodes
 ```
@@ -354,10 +355,10 @@ kubernetes-lab-md0-xxxxx    Ready    <none>   3m    v1.35.6
 📍 **Где:** на виртуалке, в том же окне терминала, где вы работали с `kubectl`.
 
 ```bash
-# скрипт запускается из папки лабы: файлы он ищет рядом с собой
+# the script runs from the lab folder: it looks for files next to itself
 cd labs/00-cluster
-# ./ перед именем означает «запусти файл вот отсюда»; без этого оболочка
-# будет искать команду check.sh среди системных папок и не найдёт
+# ./ before the name means "run the file right from here"; without it the shell
+# will look for the check.sh command among the system folders and won't find it
 ./check.sh
 ```
 

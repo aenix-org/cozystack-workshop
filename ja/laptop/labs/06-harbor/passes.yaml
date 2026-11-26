@@ -1,23 +1,23 @@
 ---
-# ラボ6 · 自分専用のプライベートイメージレジストリ。マニフェストの「動作する」版。
+# Lab 6 · Your own private image registry. The WORKING version of the manifest.
 #
-# これは passes-broken.yaml と同じファイルに、そこで欠けていた一箇所を加えたものです —
-# その箇所は下の「これが欠けていた」という言葉で示してあります。壊れた版で失敗を
-# 目にし、なぜそれが起きたのかを理解してから、これを適用してください。
+# This is the same file as passes-broken.yaml, plus one place that was missing there —
+# it is marked below with the words "THIS IS WHAT WAS MISSING". Apply it after you have
+# seen the failure on the broken version and figured out why it happened.
 #
-# あなたの `lab` クラスタで適用します（Cozystack の管理クラスタではありません — そこには
-# Harbor 本体だけが居ます）、デフォルトの名前空間で:
+# Applied on your `lab` cluster (not on the Cozystack management cluster — only Harbor
+# itself lives there), in the default namespace:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl delete -f passes-broken.yaml
 #     kubectl apply -f passes.yaml
 #
-# 注意: HARBOR-HOST はプレースホルダであり、実際に動くアドレスではありません。適用する前に、
-# 自分の Harbor のアドレスに差し替えてください。文字列 HARBOR-HOST はファイル内に2回現れ、sed は両方を置換します:
+# ATTENTION: HARBOR-HOST is a placeholder, not a working address. Before applying, substitute
+# the address of your own Harbor; the string HARBOR-HOST appears in the file twice, sed will replace both:
 #   sed -i    's|HARBOR-HOST|harbor.workshop03.example.org|g' passes.yaml   # Linux
 #   sed -i '' 's|HARBOR-HOST|harbor.workshop03.example.org|g' passes.yaml   # macOS
 #
-# 以下のオブジェクトにおいて: apiVersion は記述スキーマのバージョン、kind は何を作るか、
-# metadata.name はオブジェクトの名前です。これ以降は個別には説明しません。
+# In the objects below: apiVersion is the version of the description schema, kind is what we create,
+# metadata.name is the object's name. They are not explained separately further on.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -25,67 +25,67 @@ metadata:
   labels:
     app: passes-api
 spec:
-  # 1つではなく2つのコピー: こうすることで、サービスの応答から、リクエストが異なるポッドで
-  # 処理されていること、そしてイメージはノードに1回ダウンロードされたが2回起動されたことが分かります。
+  # Two copies, not one: this way the service's response will show that requests are served
+  # by different pods, and that the image was downloaded to the node once but started twice.
   replicas: 2
-  # 「私のコピーとは、ラベル app: passes-api を持つポッドである」という条件。下のポッドの雛形にあるラベルは
-  # これと一致していなければならず、そうでなければクラスタはマニフェストを拒否します。
+  # The condition "my copies are pods with the label app: passes-api". The label in the pod template below
+  # must match this one, otherwise the cluster will reject the manifest.
   selector:
     matchLabels:
       app: passes-api
-  # コピーを打ち出すための雛形。内側にあるものすべてが1つのポッドを記述します。
+  # The template from which the copies are stamped. Everything inside describes a single pod.
   template:
     metadata:
       labels:
         app: passes-api
     spec:
-      # ポッド全体に対するセキュリティ制約: root で実行しない、非特権ユーザー 10001 として
-      # 動作する、システムコールの集合を標準プロファイルに制限する。イメージはまさにこれに合わせて
-      # ビルドされています（app/Dockerfile の USER 行を参照）。
+      # Security constraints for the whole pod: do not run as root, work as an
+      # unprivileged user 10001, restrict the set of system calls to the
+      # standard profile. The image is built for exactly this (see app/Dockerfile, the USER line).
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
         seccompProfile:
           type: RuntimeDefault
-      # これが passes-broken.yaml に欠けていたものです — この2行だけで、それ以外は何もありません。
+      # THIS IS WHAT WAS MISSING in passes-broken.yaml — these two lines, and nothing else.
       #
-      # 閉じたレジストリは誰にでもイメージを渡すわけではありません: まず名乗る必要があります。シークレット `harbor`
-      # （kubernetes.io/dockerconfigjson 型）はレジストリのアドレス、ログイン、パスワードを保持します。あなたは
-      # kubectl create secret docker-registry コマンドでそれを作成しました。ここでシークレットは名前で
-      # 参照されるだけです — そして、それを取り出すのはアプリケーションではなく、ノード上の kubelet であり、
-      # イメージをダウンロードしに行くその瞬間に取り出します。だからこそシークレットはポッドと同じ
-      # 名前空間に置かれていなければなりません: kubelet はまさにそこを探し、他のどこも探しません。
+      # A closed registry does not hand out the image to just anyone: first you have to identify yourself. The secret `harbor`
+      # (of type kubernetes.io/dockerconfigjson) stores the registry address, login and password; you
+      # created it with the kubectl create secret docker-registry command. Here the secret is only
+      # REFERENCED by name — and it is taken from there not by the application but by the kubelet on the node, at the
+      # moment it goes to download the image. That is why the secret must be in the same
+      # namespace as the pod: the kubelet looks for it exactly there and nowhere else.
       imagePullSecrets:
         - name: harbor
       containers:
         - name: api
-          # コンテナレベルの権限: 自分に余分な特権を付け足さず、すべての特別な
-          # カーネル権限（capability）を手放す。アプリケーションには1つのネットワークポートが必要で、残りは不要です。
+          # Container-level permissions: do not grab extra privileges and drop all special
+          # kernel capabilities. The application needs a single network port, the rest is unnecessary.
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # イメージ名の最初の部分はレジストリのアドレスであり、まさにこのために自分専用の
-          # レジストリへの移行はマニフェストを変えます: イメージ名が別のものになります。もし先頭にアドレスが
-          # 無ければ、クラスタはイメージを Docker Hub へ取りに行き、それこそセキュリティが禁じたことです。
+          # The first part of the image name is the registry address, and that is exactly why moving to your own
+          # registry changes the manifests: the image name becomes different. Were there no address at the
+          # start, the cluster would go for the image to Docker Hub, and that is what security forbade.
           image: HARBOR-HOST/passes/passes-api:v1
-          # アプリケーションのポート。名前 `http` は以降でレディネスチェックと Service が使うので、
-          # ポート番号は3箇所ではなく1箇所で指定されています。
+          # The application port. The name `http` is used further on by the readiness probe and the Service,
+          # so the port number is set in one place, not in three.
           ports:
             - containerPort: 8080
               name: http
-          # 環境変数。ここからアプリケーションは、自分が誰でどこから来たのかを知ります。
-          # まさにそれを応答に出力します（app/main.go の identity 構造体を参照）。
-          # APP_VERSION と IMAGE_REGISTRY はテキストで指定されています — これらは私たち自身が書き込みます。
+          # Environment variables from which the application learns who it is and where it came from.
+          # These are exactly what it prints in the response (see app/main.go, the identity struct).
+          # APP_VERSION and IMAGE_REGISTRY are set as text — we write them ourselves.
           env:
             - name: APP_VERSION
               value: "v1"
             - name: IMAGE_REGISTRY
               value: HARBOR-HOST
-            # 次は Downward API: クラスタ自身が、ポッドについて知っていることを変数に入れてくれます。
-            # アプリケーションは自分の名前を推測する必要も、それをクラスタの API に取りに行く必要も、
-            # そのようなリクエストのための権限を持ち歩く必要もありません。値はコピーの起動の
-            # 瞬間に差し込まれるので、各コピーがそれぞれ固有の値を持ちます。
+            # Next — the Downward API: the cluster itself puts into the variables what it knows about the pod.
+            # The application does not need to guess its own name, nor go for it to the cluster API,
+            # nor carry with it the rights for such a request. The values are substituted at the moment
+            # a copy starts, so each copy has its own.
             - name: POD_NAME
               valueFrom:
                 fieldRef:
@@ -98,11 +98,11 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
-          # requests — コピーのために何を確保するか: この数値によってスケジューラはノードを選びます。
-          # limits —上限: メモリが上限を超えるとコンテナは kill され、CPU については
-          # スロットルされます。16Mi で足りるのは、アプリケーションが依存関係のない Go 製で、メモリに
-          # ほとんど何も保持しないからです。JVM なら2桁多く必要でしょう。20m は CPU コアの
-          # 千分の二十です。
+          # requests — what to reserve for a copy: the scheduler picks a node by these numbers.
+          # limits — the ceiling: for memory above the ceiling the container is killed, for
+          # CPU it is throttled. 16Mi is enough because the application is written in Go without
+          # dependencies and holds almost nothing in memory; a JVM would need two orders of magnitude
+          # more. 20m is twenty thousandths of a CPU core.
           resources:
             requests:
               cpu: 20m
@@ -110,10 +110,10 @@ spec:
             limits:
               cpu: 300m
               memory: 64Mi
-          # レディネスチェック: アプリケーションが /healthz に応答するまで、Service は
-          # このコピーにトラフィックを流しません。新しいバージョンのロールアウト時には、古いコピーは
-          # 新しいものが応答した後で初めて負荷分散から外されます — だからリクエストは
-          # まだ立ち上がっていないプロセスに当たって落ちることがありません。
+          # Readiness probe: until the application answers on /healthz, the Service will not
+          # send traffic to this copy. During a rollout of a new version the old copy is removed
+          # from load balancing only after the new one has answered — so requests
+          # do not fail on a process that has not yet come up.
           readinessProbe:
             httpGet:
               path: /healthz
@@ -121,21 +121,21 @@ spec:
             initialDelaySeconds: 2
             periodSeconds: 5
 ---
-# 両方のコピーの背後に立つ恒久的な名前。ポッドは作り直され、アドレスを変えますが、
-# 名前 passes-api.default.svc.cluster.local は変わりません。このオブジェクトが無ければアプリケーションは
-# 動きますが、クラスタ内でそこに到達する手立てがありません — そして check.sh のチェックは
-# ポッドではなく、まさにここに来ます。
+# A permanent name behind which both copies stand. Pods are recreated and change addresses,
+# the name passes-api.default.svc.cluster.local does not change. Without this object the application
+# works, but there is nothing to reach it by inside the cluster — and the check in check.sh
+# goes exactly here, not to the pod.
 apiVersion: v1
 kind: Service
 metadata:
   name: passes-api
 spec:
-  # ポッドとの結びつきは、アドレスのリストではなくラベルによる条件です。ラベル app: passes-api を持つ
-  # 新しいコピーは自分で負荷分散の対象になり、登録する必要はありません。
+  # The link to the pods is not a list of addresses but a condition on a label. A new copy with the label
+  # app: passes-api falls under load balancing on its own, there is no need to register it.
   selector:
     app: passes-api
-  # port — Service 自身がどのポートで応答するか; targetPort は上の ports ブロックにある名前 `http`
-  # を参照し、番号を参照しないので、番号が変わっても結びつきは壊れません。
+  # port — on which port the Service itself answers; targetPort refers to the name `http`
+  # from the ports block above, not to the number, so the link will not break when the number changes.
   ports:
     - port: 80
       targetPort: http

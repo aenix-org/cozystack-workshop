@@ -1,42 +1,41 @@
 ---
-# Lab 11. Bucket für die gebauten APKs.
+# Lab 11. Bucket for built APKs.
 #
-# Ein Bucket ist ein benannter Bereich im Objektspeicher: Dateien werden als ganze
-# Objekte abgelegt und abgeholt, über HTTP, und werden nirgends gemountet. Verzeichnisse
-# gibt es darin nicht; ein Schrägstrich im Objektnamen wird nur in der Oberfläche als
-# Baum dargestellt.
+# A bucket is a named area in object storage: files are put and fetched as whole
+# objects, over HTTP, and are never mounted anywhere. There are no directories inside;
+# a slash in an object name is drawn as a tree only in the interface.
 #
-# Dies ist ein Tenant-Objekt: Es lebt NICHT im Cluster `lab`, sondern in eurem Namespace
-# auf dem Management-Cluster. Deshalb muss die kubeconfig hier die des Tenants sein,
-# nicht die, mit der ihr am Cluster `lab` arbeitet. Das ist so gewollt: Build-Artefakte
-# müssen den Cluster überleben, in dem sie gebaut wurden.
+# This is a tenant object: it lives NOT in the `lab` cluster, but in your namespace
+# on the management cluster. That is why the kubeconfig here must be the tenant one,
+# not the one you use to work with the `lab` cluster. This is by design: build artifacts
+# must outlive the cluster they were built in.
 #
-# Ersetzt vor dem Anwenden tenant-workshopXX durch euren eigenen Namespace, sonst geht
-# die Bestellung an den falschen Tenant und besteht höchstwahrscheinlich die Rechteprüfung nicht.
+# Before applying, replace tenant-workshopXX with your own namespace, otherwise the order
+# will go to the wrong tenant and most likely will not pass the permission checks.
 #
 #     export KUBECONFIG=~/.kube/config
 #     kubectl apply -f bucket.yaml
 #
-# Dasselbe lässt sich mit der Maus im Tenant-Dashboard erledigen (Anwendung erstellen -> Bucket).
-# Das Ergebnis ist identisch; der Unterschied ist, dass Text reviewt und in Git abgelegt werden kann.
+# The same thing can be done with the mouse in the tenant dashboard (Create application -> Bucket).
+# The result is identical; the difference is that text can be reviewed and put into Git.
 #
-# Was nach dem Anwenden passiert: Die Plattform startet den Bucket in wenigen Sekunden
-# und stellt Zugangsschlüssel aus, die sie im Secret bucket-builds-ci-credentials im selben
-# Namespace ablegt. Vier Werte daraus (endpoint, bucketName, accessKey, secretKey)
-# werden von Hand in den Cluster `lab` übertragen — die Cluster sind verschieden, von selbst wandert nichts.
+# What happens after applying: the platform will bring up the bucket in a few seconds
+# and issue access keys, storing them in the secret bucket-builds-ci-credentials in the same
+# namespace. Four values from there (endpoint, bucketName, accessKey, secretKey)
+# are transferred into the `lab` cluster by hand — the clusters are different, nothing moves on its own.
 apiVersion: apps.cozystack.io/v1alpha1
 kind: Bucket
 metadata:
-  # Der Name des Cozystack-Objekts, und nur dieser. Den echten Bucket-Namen im Speicher
-  # vergibt die Plattform selbst — lang, in der Form bucket-a9209f83-... Er landet im Feld
-  # bucketName des ausgestellten Secrets, und genau dieser muss in den Build eingesetzt werden, nicht `builds`.
+  # The name of the Cozystack object, and only that. The real bucket name in storage is
+  # issued by the platform itself — long, of the form bucket-a9209f83-... It will end up in the
+  # bucketName field of the issued secret, and that is exactly what must be plugged into the build, not `builds`.
   name: builds
   namespace: tenant-workshopXX
 spec:
   users:
-    # Jeder Schlüssel dieser Map ist ein eigener S3-Benutzer mit eigenem Schlüsselpaar.
-    # Ein leeres Objekt bedeutet «voller Lese- und Schreibzugriff».
-    # So könnt ihr dem Builder Schreibzugriff geben und dem Mobile-Team nur Lesezugriff:
+    # Each key of this map is a separate S3 user with its own key pair.
+    # An empty object means "full read and write access".
+    # This way you can grant the builder write access, and the mobile team — read-only:
     #   ci: {}
     #   mobile:
     #     readonly: true

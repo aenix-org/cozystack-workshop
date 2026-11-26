@@ -10,7 +10,7 @@
 
 Забираємо скрипт з GitHub прямо в машину:
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/laptop/scripts/convert.sh
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/laptop/scripts/convert.sh
 ```
 
 Відкриваємо його:
@@ -34,7 +34,7 @@ SECRET_KEY="your-secretKey"
 Зберегти в nano: `Ctrl+O`, потім `Enter`, потім `Ctrl+X` для виходу. Перевірити, що
 заглушок не залишилося:
 ```bash
-grep ВСТАВЬТЕ convert.sh || echo "all filled in, ready to run"
+grep PASTE_ convert.sh || echo "all filled in, ready to run"
 ```
 
 Запускаємо — обов'язково через `sudo`, скрипту потрібні права root:
@@ -57,7 +57,7 @@ sudo bash convert.sh
 
 **Що з ним робити:** скопіюйте його в той самий блокнот. На наступному кроці ви повернетеся
 на ноутбук, відкриєте `manifests/03-app-vm.yaml` і вставите його в поле `url` — туди, де
-зараз стоїть заглушка `ВСТАВЬТЕ_PRESIGNED_URL`. Та сама, про яку я попереджав,
+зараз стоїть заглушка `PASTE_PRESIGNED_URL`. Та сама, про яку я попереджав,
 коли ми підставляли номери.
 
 Це тимчасове підписане посилання: сховище назовні не відкрите, а посилання ви зробили

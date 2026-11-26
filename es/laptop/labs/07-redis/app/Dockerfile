@@ -1,59 +1,59 @@
-# Lab 7 · receta de construcción de la imagen del servicio «Pase de invitado», versión v2.
+# Lab 7 · build recipe for the «Guest Pass» service image, version v2.
 #
-# Un Dockerfile es una lista de pasos que convierten las fuentes en una imagen: una instantánea
-# inmutable de un sistema de archivos junto con un comando de arranque. La analogía más familiar es
-# una plantilla de máquina virtual, salvo que no se construye con el ratón sino con este mismo texto, vive
-# en un registro y se versiona mediante una etiqueta.
+# A Dockerfile is a list of steps that turn sources into an image: an immutable
+# snapshot of a filesystem together with a startup command. The closest familiar analogy is
+# a virtual machine template, except it is built not with a mouse but with this very text, it lives
+# in a registry and is versioned by a tag.
 #
-# Se construye en el portátil, no en el clúster (véase el paso de construcción en el README):
-#   docker build --platform linux/amd64 -t <tu-harbor>/passes/passes-api:v2 app/
-#   docker push  <tu-harbor>/passes/passes-api:v2
+# It is built on the laptop, not in the cluster (see the build step in the README):
+#   docker build --platform linux/amd64 -t <your-harbor>/passes/passes-api:v2 app/
+#   docker push  <your-harbor>/passes/passes-api:v2
 #
-# --platform linux/amd64 es obligatorio en un Mac con Apple Silicon: sin él la imagen se construirá
-# para ARM, se subirá sin una sola queja y se caerá en el clúster con «exec format error».
+# --platform linux/amd64 is mandatory on a Mac with Apple Silicon: without it the image will be built
+# for ARM, will push without a single complaint, and will crash in the cluster with «exec format error».
 #
-# Una construcción en dos etapas.
+# A two-stage build.
 #
-# La primera etapa es la de construcción: necesita todo el compilador de Go, y eso son unos 350 MB.
-# La segunda etapa es lo que irá al clúster: allí solo llega el binario terminado.
-# Así la imagen final acaba en torno a los 10 MB en lugar de 350, y dentro de ella no hay ni
-# compilador, ni fuentes, ni gestor de paquetes — es decir, no hay nada de lo que
-# aprovecharse para quien sí logró entrar en el contenedor.
+# The first stage is the build stage: it needs the whole Go compiler, and that is about 350 MB.
+# The second stage is what will go to the cluster: only the finished binary lands there.
+# This way the final image ends up around 10 MB instead of 350, and inside it there is neither
+# a compiler, nor sources, nor a package manager — meaning there is nothing for
+# whoever did get into the container to make use of.
 
-# FROM — de qué imagen preconstruida partimos. Aquí tomamos la imagen oficial con el compilador
-# de Go basada en Alpine. AS build da a esta etapa un nombre para que la segunda etapa pueda sacar de ella
-# el resultado. La versión está fijada (1.23), no latest: de lo contrario la construcción de mañana de la misma
-# fuente puede producir un binario diferente.
+# FROM — which prebuilt image we start from. Here we take the official image with the Go
+# compiler based on Alpine. AS build gives this stage a name so that the second stage can take the
+# result out of it. The version is pinned (1.23), not latest: otherwise tomorrow's build of the same
+# source may produce a different binary.
 FROM golang:1.23-alpine AS build
-# WORKDIR — el directorio de trabajo dentro de la imagen. Todos los comandos siguientes se ejecutan en él.
+# WORKDIR — the working directory inside the image. All the following commands run in it.
 WORKDIR /src
-# COPY coloca archivos del portátil dentro de la imagen. En dos líneas, no en una: go.mod cambia
-# rara vez, main.go — a menudo, y docker cachea cada paso por separado. Tocaste solo main.go —
-# el paso de go.mod se toma de la caché.
+# COPY puts files from the laptop inside the image. In two lines, not one: go.mod changes
+# rarely, main.go — often, and docker caches each step separately. Touched only main.go —
+# the go.mod step is taken from the cache.
 COPY go.mod ./
 COPY main.go ./
-# RUN — ejecutar un comando justo durante la construcción; su resultado permanece en la imagen.
-# CGO_ENABLED=0 — construir estáticamente, sin vincularse a las bibliotecas del sistema.
-# Sin esto el binario requeriría glibc, que no estará en la imagen final.
-# -trimpath elimina del binario las rutas de tu portátil, -ldflags="-s -w" descarta
-# la información de depuración — la imagen es más pequeña, y los nombres de tus carpetas no se filtran al log.
+# RUN — run a command right during the build; its result stays in the image.
+# CGO_ENABLED=0 — build statically, without binding to system libraries.
+# Without this the binary would require glibc, which won't be in the final image.
+# -trimpath removes paths from your laptop out of the binary, -ldflags="-s -w" drops
+# debug information — the image is smaller, and your folder names don't leak into the log.
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/passes-api .
 
-# El segundo FROM empieza la imagen de nuevo, desde cero. Todo lo que hubo en la etapa build
-# se descarta en este punto, y en la imagen final solo llegará lo que copiemos explícitamente
-# con el siguiente comando COPY --from=build.
+# The second FROM starts the image over, from a clean slate. Everything that was in the build stage
+# is discarded at this point, and only what we explicitly copy with the next
+# COPY --from=build command will land in the final image.
 FROM alpine:3.21
-# La aplicación no se ejecuta como root. En un clúster correctamente configurado un pod que corre como root
-# no será admitido en absoluto, y esto no es una nimiedad sino un requisito de seguridad estándar.
+# The application runs not as root. In a properly configured cluster a pod running as root
+# won't be admitted at all, and this is not nitpicking but a standard security requirement.
 RUN adduser -D -u 10001 app
-# Lo único que se traslada de la etapa de construcción es un solo archivo: el binario terminado.
+# The only thing that moves over from the build stage is a single file: the finished binary.
 COPY --from=build /out/passes-api /usr/local/bin/passes-api
-# USER — con qué usuario ejecutar el proceso. Se da un número, no un nombre: kubernetes comprueba
-# exactamente el número en el manifiesto (runAsNonRoot mira el uid), y deben coincidir.
+# USER — which user to run the process as. A number is given, not a name: kubernetes checks
+# exactly the number in the manifest (runAsNonRoot looks at the uid), and they must match.
 USER 10001
-# EXPOSE — una nota de que «este puerto se escucha dentro». No abre nada ni reenvía nada,
-# esto es documentación para quien vaya a escribir el manifiesto.
+# EXPOSE — a note that «this port is listened on inside». It opens nothing and forwards nothing,
+# this is documentation for whoever will write the manifest.
 EXPOSE 8080
-# ENTRYPOINT — qué se ejecuta cuando arranca el contenedor. Aquí hay un único proceso y es
-# el principal: cuando termina, termina el contenedor, y el clúster levanta una nueva copia.
+# ENTRYPOINT — what runs when the container starts. There is a single process here and it is
+# the main one: when it ends the container ends, and the cluster brings up a new copy.
 ENTRYPOINT ["/usr/local/bin/passes-api"]

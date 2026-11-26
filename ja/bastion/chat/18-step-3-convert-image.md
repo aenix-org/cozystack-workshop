@@ -8,7 +8,7 @@
 
 スクリプトを GitHub からマシンへ直接取得します:
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/bastion/scripts/convert.sh
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/bastion/scripts/convert.sh
 ```
 
 開きます:
@@ -28,15 +28,15 @@ SECRET_KEY="your-secretKey"
 
 nano での保存: `Ctrl+O`、次に `Enter`、続いて `Ctrl+X` で終了します。プレースホルダーが残っていないか確認します:
 ```bash
-grep ВСТАВЬТЕ convert.sh || echo "all filled in, ready to run"
+grep PASTE_ convert.sh || echo "all filled in, ready to run"
 ```
 
 実行します。必ず `sudo` を付けてください。スクリプトには root 権限が必要です。そして必ず **`screen` の中で** 実行してください。変換には5分ほどかかりますが、いまあなたは2本の接続の連鎖の上にいます(あなたのノートパソコン → SSH で bastion へ → 変換用マシンのコンソール)。どこか1つの接続が切れると、通常の実行は途中で中断してしまいます。`screen` は接続が切れてもプロセスを生かし続けます:
 
 ```bash
-screen -S convert          # 別のセッションを開始する
-sudo bash convert.sh       # そのセッションの中で実行する
-#  接続が切れた? 同じマシンにログインし直して、次を実行:  screen -r convert
+screen -S convert          # start a separate session
+sudo bash convert.sh       # run it inside that session
+#  connection dropped? log back in to this same machine, then:  screen -r convert
 ```
 
 中で何が起きるか: スクリプトは元イメージをダウンロードし、`virt-v2v` を実行し、結果を圧縮して、あなたの bucket にアップロードします。
@@ -47,6 +47,6 @@ sudo bash convert.sh       # そのセッションの中で実行する
 
 最後に、スクリプトはあなたのイメージへの **presigned リンク** を表示します。出力の中から `Share:` という語で始まる行を探してください。リンクはそのすぐ後に続きます。
 
-**これで何をするか:** 同じメモ帳にコピーしてください。次のステップで bastion に戻り、`manifests/03-app-vm.yaml` を開いて、`url` フィールドに貼り付けます。いま `ВСТАВЬТЕ_PRESIGNED_URL` というプレースホルダーが入っているところです。番号を入力していたときに私が注意しておいた、まさにあれです。
+**これで何をするか:** 同じメモ帳にコピーしてください。次のステップで bastion に戻り、`manifests/03-app-vm.yaml` を開いて、`url` フィールドに貼り付けます。いま `PASTE_PRESIGNED_URL` というプレースホルダーが入っているところです。番号を入力していたときに私が注意しておいた、まさにあれです。
 
 これは一時的な署名付きリンクです。ストレージは外部に公開されておらず、リンクはあなた自身のキーで作られたものです。有効期間は1週間です。ワークショップにも、その後の実験にも十分に足ります。

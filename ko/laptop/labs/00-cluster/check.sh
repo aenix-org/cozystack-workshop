@@ -1,100 +1,100 @@
 #!/usr/bin/env bash
-# 랩 0 점검: 학습용 클러스터가 올라왔고 여러분이 거기에 연결되어 있다.
+# Check for lab 0: the training cluster is up and you are connected to it.
 #
-# 「객체가 생성됨」이 아니라, 클러스터가 실질적으로 동작하는지를 확인한다:
-#   1) lab 클러스터가 여러분의 접속 파일로 응답한다 (KUBECONFIG=~/lab.kubeconfig),
-#   2) 최소 한 개의 노드가 Ready 상태다,
-#   3) 노드에 앞으로 쓸 애플리케이션을 위한 여유 리소스가 있다.
-# COZY_TENANT가 설정되어 있으면 — 추가로 관리(management) 클러스터 쪽에서 Kubernetes/lab
-# 주문이 Ready에 도달했는지, 메트릭 수집이 켜져 있는지(없으면 랩 14가 빈 채로 남는다) 본다.
+# We verify not that "an object was created", but that the cluster works in substance:
+#   1) the lab cluster responds via your access file (KUBECONFIG=~/lab.kubeconfig),
+#   2) at least one node is in the Ready state,
+#   3) the nodes have free resources for future applications.
+# If COZY_TENANT is set — additionally look at the MANAGEMENT cluster to check that the
+# Kubernetes/lab order reached Ready and that metrics collection is enabled (without it lab 14 is empty).
 #
-# 가상 머신에서, 이 랩의 폴더에서 실행:
+# Runs on the VM, from this lab's folder:
 #     export KUBECONFIG=~/lab.kubeconfig
-#     export COZY_TENANT=workshopXX      # 테넌트 쪽 점검용 (선택 사항)
+#     export COZY_TENANT=workshopXX      # for checks from the tenant side (optional)
 #     cd labs/00-cluster && ./check.sh
 #
-# 스크립트는 읽기만 한다 — 클러스터 상태를 바꾸지 않는다.
+# The script only reads — it does not change the cluster state.
 LAB_NAME="00-cluster"
-LAB_TITLE="랩 0 · 나만의 Kubernetes 클러스터"
+LAB_TITLE="Lab 0 · Your own Kubernetes cluster"
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
-# lab 클러스터 자체에 접근하지 못하면 점검할 것이 없다 — 이것이 바로 랩의 핵심
-# 증거다. KUBECONFIG가 설정되지 않았거나 클러스터가 응답하지 않으면
-# need_kubeconfig가 명확한 힌트와 함께 스크립트를 멈춘다.
+# Without access to the lab cluster itself there is nothing to check — this is the main
+# proof of the lab. need_kubeconfig will stop the script with a clear hint
+# if KUBECONFIG is not set or the cluster does not respond.
 need_kubeconfig
 
 COZY_KUBECONFIG="${COZY_KUBECONFIG:-$HOME/.kube/workshop}"
 cozy() { kubectl --kubeconfig "$COZY_KUBECONFIG" "$@" 2>/dev/null; }
 
-# --- 1) lab 클러스터 연결 -----------------------------------------------------
-# need_kubeconfig가 이미 서버 응답을 확인했다. 이것을 별도 결과로 기록하고
-# 서버 버전을 보고서에 담는다.
+# --- 1) Connection to the lab cluster ----------------------------------------
+# need_kubeconfig already confirmed the server responds. We record this as a separate
+# result and put the server version into the report.
 KVER="$(server_version)"
-ok "lab 클러스터가 응답한다 — 접속 파일이 정상이다"
-[ -n "$KVER" ] && evidence "lab 클러스터 서버 버전" "$KVER"
+ok "the lab cluster responds — the access file works"
+[ -n "$KVER" ] && evidence "lab cluster server version" "$KVER"
 
-# --- 2) 노드 가동 상태 -------------------------------------------------------
-# Ready 상태인 노드 수를 센다. 목록이 비어 있으면 클러스터는 올라왔지만
-# md0 노드 그룹이 아직 배포 중이라는 뜻이다.
+# --- 2) Nodes in service -----------------------------------------------------
+# Count how many nodes are in the Ready state. An empty list means the cluster
+# came up, but the md0 node group is still deploying.
 NODES_WIDE="$(kubectl get nodes -o wide 2>/dev/null)"
 READY_NODES="$(kubectl get nodes \
   -o jsonpath='{range .items[*]}{range .status.conditions[?(@.type=="Ready")]}{.status}{"\n"}{end}{end}' 2>/dev/null \
   | grep -c '^True')"
 TOTAL_NODES="$(kubectl get nodes --no-headers 2>/dev/null | grep -c .)"
 if [ "${READY_NODES:-0}" -ge 1 ]; then
-  ok "노드 가동 중: ${TOTAL_NODES} 중 ${READY_NODES} 개가 Ready 상태"
-  [ -n "$NODES_WIDE" ] && evidence "클러스터 노드" "$NODES_WIDE"
+  ok "nodes in service: ${READY_NODES} of ${TOTAL_NODES} in the Ready state"
+  [ -n "$NODES_WIDE" ] && evidence "Cluster nodes" "$NODES_WIDE"
 else
-  fail "Ready 상태인 노드가 하나도 없다 (전체 노드 수: ${TOTAL_NODES:-0})" \
-       "md0 노드 그룹이 배포될 때까지 몇 분 기다리세요; 상태는 lab 애플리케이션의 대시보드에서, 또는: kubectl get nodes"
-  evidence "클러스터 노드" "${NODES_WIDE:-노드 없음}"
+  fail "no node is in the Ready state (nodes in total: ${TOTAL_NODES:-0})" \
+       "wait a couple of minutes for the md0 node group to deploy; the status is in the dashboard on the lab application, or: kubectl get nodes"
+  evidence "Cluster nodes" "${NODES_WIDE:-no nodes}"
 fi
 
-# --- 3) 앞으로 쓸 애플리케이션을 위한 여유 공간이 있는가 ----------------------
-# 첫 번째 노드의 allocatable: 리소스가 없으면 이후 아무것도 실행되지 않는다.
+# --- 3) Is there room for future applications --------------------------------
+# allocatable of the first node: if there are no resources, nothing further will run.
 ALLOC_CPU="$(kubectl get nodes -o jsonpath='{.items[0].status.allocatable.cpu}' 2>/dev/null)"
 ALLOC_MEM="$(kubectl get nodes -o jsonpath='{.items[0].status.allocatable.memory}' 2>/dev/null)"
 if [ -n "$ALLOC_MEM" ]; then
-  ok "노드에 애플리케이션용 리소스가 있다 (노드 기준: ${ALLOC_CPU} CPU, $(human_bytes "$ALLOC_MEM") RAM)"
-  evidence "노드 여유 리소스 (allocatable)" "cpu: ${ALLOC_CPU}, memory: $(human_bytes "$ALLOC_MEM")"
+  ok "the nodes have resources for applications (on the node: ${ALLOC_CPU} CPU, $(human_bytes "$ALLOC_MEM") RAM)"
+  evidence "Free node resources (allocatable)" "cpu: ${ALLOC_CPU}, memory: $(human_bytes "$ALLOC_MEM")"
 else
-  warn "노드의 여유 리소스를 읽지 못했다" \
-       "보통 일시적입니다 — 1분 뒤 다시 시도하세요"
+  warn "could not read the free node resources" \
+       "usually this is temporary — retry in a minute"
 fi
 
-# --- 4) 관리 클러스터 쪽에서 (테넌트가 설정된 경우) --------------------------
-# 랩 0에는 필수가 아니다: 위에서 클러스터 자체에 연결한 것으로 이미 모두 증명됐다.
-# 다만 테넌트 접근이 있으면 — 주문을 확인하고 메트릭 수집을 점검한다.
+# --- 4) From the management cluster side (if a tenant is set) -----------------
+# Not required for lab 0: the connection to the cluster itself above already proved everything.
+# But if tenant access is available — we confirm the order and check metrics collection.
 if [ -n "${COZY_TENANT:-}" ]; then
   TENANT_NS="tenant-${COZY_TENANT}"
   if [ ! -r "$COZY_KUBECONFIG" ]; then
-    warn "테넌트 접근 ${COZY_KUBECONFIG} 을(를) 찾을 수 없다 — 관리 쪽 클러스터 주문은 점검하지 않았다" \
-         "랩 실패는 아닙니다; 경로 지정: export COZY_KUBECONFIG=~/.kube/workshop"
+    warn "tenant access ${COZY_KUBECONFIG} not found — the cluster order on the management side was not checked" \
+         "this is not a lab failure; set the path with: export COZY_KUBECONFIG=~/.kube/workshop"
   else
     LAB_READY="$(cozy get kubernetes.apps.cozystack.io lab -n "$TENANT_NS" \
       -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')"
     if [ "$LAB_READY" = "True" ]; then
-      ok "관리 클러스터에서 Kubernetes/lab 주문이 Ready 상태다"
+      ok "on the management cluster the Kubernetes/lab order is in the Ready state"
     elif [ -n "$LAB_READY" ]; then
-      warn "Kubernetes/lab 주문이 아직 Ready가 아니다 (현재: ${LAB_READY})" \
-           "클러스터는 이미 응답합니다, 플랫폼이 아직 원하는 상태로 조정 중입니다; 확인: kubectl --kubeconfig ~/.kube/workshop -n ${TENANT_NS} get kubernetes.apps.cozystack.io lab"
+      warn "the Kubernetes/lab order is not Ready yet (currently: ${LAB_READY})" \
+           "the cluster already responds, the platform is still reconciling it to the desired state; look at: kubectl --kubeconfig ~/.kube/workshop -n ${TENANT_NS} get kubernetes.apps.cozystack.io lab"
     else
-      warn "테넌트 ${TENANT_NS} 에서 Kubernetes/lab 주문을 찾지 못했다" \
-           "클러스터를 다른 이름으로 지었다면 — 자신의 이름으로 바꾸세요; 또는 테넌트 내 역할이 이 명령을 허용하지 않습니다 (랩 오류 아님)"
+      warn "did not find the Kubernetes/lab order in tenant ${TENANT_NS}" \
+           "if you named the cluster differently — substitute your own name; or your role in the tenant does not allow this command (not a lab error)"
     fi
-    # 메트릭 수집: 랩 14는 켜진 시점부터 쌓이는 데이터에 의존한다.
+    # Metrics collection: lab 14 relies on data that accumulates from the moment it is enabled.
     MON="$(cozy get kubernetes.apps.cozystack.io lab -n "$TENANT_NS" \
       -o jsonpath='{.spec.addons.monitoringAgents.enabled}')"
     if [ "$MON" = "true" ]; then
-      ok "메트릭 수집이 켜져 있다 (랩 14에서 필요함)"
+      ok "metrics collection is enabled (needed in lab 14)"
     elif [ -n "$LAB_READY" ]; then
-      warn "메트릭 수집이 꺼져 있다 — 랩 14가 데이터 없이 남는다" \
-           "켜기: 대시보드 → lab 애플리케이션 → Addons → Monitoring agents (메트릭은 소급해서 생기지 않습니다)"
+      warn "metrics collection is disabled — lab 14 will be left without data" \
+           "to enable: dashboard → lab application → Addons → Monitoring agents (metrics will not appear retroactively)"
     fi
   fi
 else
-  warn "COZY_TENANT가 설정되지 않았다 — 관리 클러스터 쪽 점검은 건너뛴다" \
-       "랩 0에는 필수가 아닙니다; 켜려면: export COZY_TENANT=workshopXX"
+  warn "COZY_TENANT is not set — checks from the management cluster side are skipped" \
+       "not required for lab 0; to enable: export COZY_TENANT=workshopXX"
 fi
 
 finish

@@ -1,11 +1,11 @@
-# ラボ13。Serviceテンプレート: アプリケーションの安定したアドレス。
+# Lab 13. Service template: a stable address for the application.
 #
-# アプリケーションのコピーは現れては消え、そのアドレスは毎回新しくなります。Serviceは変わらない名前を
-# 与え、リクエストを稼働中のコピーへ振り分けます。隣のPodからは
-# リリース名でアプリケーションにアクセスします。
+# Copies of the application come and go, and their addresses are new every time. Service gives a name
+# that does not change and spreads requests across the live copies. From a neighboring pod
+# the application is reached by the release name.
 #
-# 二重波括弧内の置換と、オブジェクト名がどこから来るかについては
-# templates/deployment.yaml に書かれています。ここでもすべて同じ仕組みです。
+# Substitution inside double curly braces and where object names come from is
+# described in templates/deployment.yaml — here everything works the same way.
 apiVersion: v1
 kind: Service
 metadata:
@@ -14,20 +14,20 @@ metadata:
     app.kubernetes.io/name: guest-pass
     app.kubernetes.io/instance: {{ .Release.Name }}
 spec:
-  # values内の1つのフラグで、アプリケーションがクラスター外のアドレスを得るかどうかが決まります。
-  # Cozystackの標準アプリケーションも同じ仕組みです: external フィールド。
-  # if/else 構文はレンダリング時に2つの値のうち1つを選びます。完成したマニフェストには
-  # LoadBalancer か ClusterIP のどちらかが入り、分岐はもう残りません。
+  # A single flag in values decides whether the application gets an address outside the cluster or not.
+  # Cozystack's built-in applications work the same way: the external field.
+  # The if/else construct picks one of the two values at render time — the finished manifest
+  # gets either LoadBalancer or ClusterIP, with no branching left in it.
   type: {{ if .Values.external }}LoadBalancer{{ else }}ClusterIP{{ end }}
-  # どこにトラフィックを送るか。Serviceは名前ではなくラベルでPodを選びます。だから
-  # コピーがいくつあるか、何という名前かは問いません。ラベルはDeploymentが
-  # コピーに付けるものと同じです。
+  # Whom to send traffic to. Service selects pods by labels, not by names, so
+  # it does not care how many copies there are or what they are called. The labels are the same ones the Deployment
+  # puts on its copies.
   selector:
     app.kubernetes.io/name: guest-pass
     app.kubernetes.io/instance: {{ .Release.Name }}
-  # port はService自身がリッスンするポート、targetPort はPod内部のどこへ接続するか。
-  # targetPort は名前で記述されます: http という名前のポートはDeploymentテンプレートで宣言されています。
-  # そこで番号が変わっても、ここを直す必要はありません。
+  # port — which port the Service itself listens on, targetPort — where it knocks inside the pod.
+  # targetPort is written as a name: the port named http is declared in the Deployment template.
+  # If the number changes there, nothing needs fixing here.
   ports:
     - name: http
       port: 80

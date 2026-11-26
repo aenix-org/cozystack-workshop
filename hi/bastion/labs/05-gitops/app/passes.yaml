@@ -1,60 +1,62 @@
 ---
-# लैब 5 · Git में इंफ्रास्ट्रक्चर। खुद «गेस्ट पास» सेवा: एक ही फ़ाइल में चार ऑब्जेक्ट।
+# Lab 5 · Infrastructure in Git. The "Pass" service itself: four objects in one file.
 #
-# इसे हाथ से क्लस्टर में लागू नहीं किया जाता। फ़ाइल को GitHub पर अपने रिपॉज़िटरी में, apps/
-# फ़ोल्डर में, namespace.yaml के बगल में रखा जाता है, और `lab` क्लस्टर में इसे Flux खुद ले जाता है:
+# It is not applied to the cluster by hand. The file is placed into its own repository on
+# GitHub, into the apps/ folder, next to namespace.yaml, and Flux carries it into the `lab`
+# cluster on its own:
 #     cp app/*.yaml ~/passes-gitops/apps/
 #     cd ~/passes-gitops && git add apps && git commit -m "add passes service v1" && git push
 #
-# --- पंक्ति ऑब्जेक्ट्स को अलग करती है: एक फ़ाइल, चार स्वतंत्र ऑब्जेक्ट। फ़ाइल में क्रम
-# बनाने के क्रम को प्रभावित नहीं करता — क्लस्टर खुद समझ लेगा।
+# The --- line separates objects: one file, four independent objects. The order in the file
+# does not affect the order of creation — the cluster figures it out on its own.
 #
-# हर ऑब्जेक्ट में: apiVersion — विवरण स्कीमा का संस्करण, kind — हम क्या बना रहे हैं,
-# metadata.name — ऑब्जेक्ट का नाम, metadata.namespace — क्लस्टर के किस विभाजन में यह
-# रहता है। आगे इन फ़ील्ड्स को अलग से नहीं समझाया जाता।
+# In each object: apiVersion — the version of the description schema, kind — what we are
+# creating, metadata.name — the object's name, metadata.namespace — which partition of the
+# cluster it lives in. These fields are not explained separately further on.
 #
-# चारों ऑब्जेक्ट्स में से किसी में न कोई पासवर्ड है, न कुंजी, न टोकन, और यह
-# संयोग नहीं है: जो Git में पहुँच गया वह वहाँ हमेशा के लिए रहता है — इतिहास को फिर से लिखा जा सकता है, पर
-# जिन सभी ने क्लोन कर लिया, उनके पास पुरानी प्रति बनी रहती है। रहस्यों (secrets) की यहाँ जगह नहीं।
+# None of the four objects contains a password, a key, or a token, and that is not an
+# accident: whatever ends up in Git stays there forever — history can be rewritten, but
+# everyone who managed to clone it keeps the old copy. Secrets have no place here.
 
-# --- 4 में से 1. वेब-सर्वर की सेटिंग्स --------------------------------------------------
-# ConfigMap क्लस्टर में एक टेक्स्ट फ़ाइल को एप्लिकेशन से अलग रखता है, और नीचे (volumes
-# खंड में) इस फ़ाइल को कंटेनर के अंदर रख दिया जाता है। मतलब — इमेज को दोबारा बनाए बिना
-# सेटिंग्स बदलना: यहाँ बदलिए, कमिट कीजिए, और एक मिनट में क्लस्टर में नया संस्करण आ जाता है।
+# --- 1 of 4. Web server settings ----------------------------------------------------
+# A ConfigMap places a text file into the cluster separately from the application, and below
+# (in the volumes section) this file is mounted inside the container. The point is to change
+# settings without rebuilding the image: you edit here, commit, and within a minute the
+# cluster has the new version.
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: passes-conf
   namespace: passes
-# data के अंदर की कुंजी कंटेनर में फ़ाइल का नाम बन जाती है: default.conf उस फ़ोल्डर में
-# जाएगा जिसे nginx शुरू होने पर पढ़ता है। नाम के बाद की ऊर्ध्वाधर रेखा — YAML में
-# बहु-पंक्ति टेक्स्ट को ज्यों-का-त्यों, पंक्ति-विरामों समेत लिखने का तरीका है।
+# A key inside data becomes the file name in the container: default.conf lands in the folder
+# that nginx reads at startup. The vertical bar after the name is the way to write
+# multi-line text in YAML as is, preserving line breaks.
 data:
   default.conf: |
     server {
       listen 8080;
       root /usr/share/nginx/html;
 
-      # तैयारी जाँच के लिए पता। क्लस्टर यहाँ दस्तक देता है और
-      # जवाब मिलने तक किसी प्रति पर ट्रैफ़िक नहीं जाने देता।
+      # Address for the readiness check. The cluster knocks here and does not let
+      # traffic onto a copy until it gets an answer.
       location /healthz {
         access_log off;
         return 200 "ok\n";
       }
 
       location / {
-        # दी जाने वाली पेज में __POD__ को उस मशीन के नाम से बदलते हैं जहाँ
-        # nginx चल रहा है। पॉड के अंदर मशीन का नाम खुद पॉड का नाम ही है।
+        # In the page being served we replace __POD__ with the name of the machine where
+        # nginx is running. Inside the pod the machine name is the pod's own name.
         sub_filter '__POD__' '$hostname';
         sub_filter_once off;
       }
     }
 ---
-# --- 4 में से 2. वह पेज जो सेवा देती है ----------------------------------------
-# इस लैब में पेज एक स्टब है: असली एप्लिकेशन बाद में आएगा। अभी महत्वपूर्ण यह
-# नहीं कि सेवा क्या दिखाती है, बल्कि यह कि वह क्लस्टर में कहाँ से आई। मार्कअप में __POD__ टेक्स्ट —
-# प्रतिस्थापन के लिए एक चिह्न है: nginx इसे पेज देने वाले पॉड के नाम से बदल देगा, और इस
-# नाम से आप आगे देखेंगे कि प्रतियाँ एक से अधिक हो गई हैं।
+# --- 2 of 4. The page that the service serves ----------------------------------------
+# In this lab the page is a stub: the real application appears later. Right now what matters
+# is not what the service shows, but where it came from in the cluster. The text __POD__ in
+# the markup is a placeholder for substitution: nginx replaces it with the name of the pod
+# that served the page, and by that name you will later see that there is more than one copy.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -66,7 +68,7 @@ data:
     <html lang="ru">
     <head>
       <meta charset="utf-8">
-      <title>गेस्ट पास</title>
+      <title>Guest Pass</title>
       <style>
         body { font-family: system-ui, sans-serif; margin: 4rem auto; max-width: 40rem;
                color: #222; }
@@ -78,18 +80,19 @@ data:
       </style>
     </head>
     <body>
-      <h1>«गेस्ट पास» सेवा</h1>
-      <p>अतिथि के लिए पास का अनुरोध. संस्करण <span class="v">v1</span></p>
-      <p>Git से तैनात. यहाँ कोई हाथ से नहीं आया.</p>
-      <div class="pod">सेवा प्रदान करने वाला Pod <b>__POD__</b></div>
+      <h1>Guest Pass service</h1>
+      <p>Requesting a guest pass. Version <span class="v">v1</span></p>
+      <p>Deployed from Git. No one touched it by hand.</p>
+      <div class="pod">served by pod <b>__POD__</b></div>
     </body>
     </html>
 ---
-# --- 4 में से 3. खुद एप्लिकेशन का विवरण ---------------------------------------------
-# Deployment यह «कंटेनर चलाओ» नहीं है, बल्कि «ऐसे कंटेनर की इतनी-इतनी प्रतियाँ
-# चालू रखो» है। अंतर तब दिखता है जब कोई प्रति मर जाती है: क्लस्टर बिना पूछे और बिना
-# सूचित किए नई बना देता है। vSphere में सबसे नज़दीक HA है, पर वहाँ मशीन फिर से चालू होती है,
-# जबकि यहाँ एप्लिकेशन की प्रति फिर से बनाई जाती है, और यह लगातार होता है, न कि केवल खराबी पर।
+# --- 3 of 4. Description of the application itself ---------------------------------------
+# A Deployment is not "run a container", but "keep so many copies of such-and-such container
+# running". The difference shows when a copy dies: the cluster creates a new one, without
+# asking and without notifying. In vSphere the closest thing is HA, but there a machine is
+# restarted, whereas here a copy of the application is recreated, and it is done constantly,
+# not only on failure.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -98,31 +101,31 @@ metadata:
   labels:
     app: passes
 spec:
-  # कितनी प्रतियाँ चालू रखनी हैं। शब्दांकन महत्वपूर्ण है: «एक चलाओ» नहीं, बल्कि
-  # «एक रखो»। इस संख्या को आप Git के ज़रिए बदलेंगे और देखेंगे कि क्या होता है।
+  # How many copies to keep running. The wording matters: not "run one", but "keep one".
+  # This is the number you will change through Git and watch what happens.
   replicas: 1
-  # Deployment किस संकेत से अपनी प्रतियों को पहचानता है। यह पॉड नामों की सूची नहीं है —
-  # हर बार फिर से बनाने पर नाम बदलते हैं — बल्कि शर्त «app: passes लेबल वाले सभी पॉड» है।
-  # नीचे template.metadata.labels में लेबल इस शर्त से मेल खाना चाहिए: अगर अलग हुए
-  # — क्लस्टर मैनिफ़ेस्ट स्वीकार करने से मना कर देगा, क्योंकि प्रतियाँ किसी की नहीं रहेंगी।
+  # By what sign the Deployment recognizes its copies. This is not a list of pod names —
+  # names change on every recreation — but the condition "all pods with the label app: passes".
+  # The label below, in template.metadata.labels, must match this condition: if they diverge,
+  # the cluster refuses to accept the manifest, because the copies would belong to no one.
   selector:
     matchLabels:
       app: passes
-  # template — वह नमूना जिससे प्रतियाँ छापी जाती हैं। इसके अंदर की हर चीज़ एक पॉड का
-  # वर्णन करती है। नमूने में बदलाव का मतलब नया संस्करण जारी करना: पुरानी प्रतियाँ नई से बदल जाती हैं।
+  # template — the pattern from which copies are stamped out. Everything inside describes one
+  # pod. Editing the pattern means rolling out a new version: old copies are replaced with new.
   template:
     metadata:
       labels:
         app: passes
     spec:
-      # पूरे पॉड के स्तर पर सुरक्षा प्रतिबंध। vSphere में इसका समकक्ष नहीं है: वहाँ
-      # आइसोलेशन हाइपरवाइज़र देता है, जबकि कंटेनर नोड के साथ कर्नेल साझा करते हैं, इसलिए अधिकारों
-      # को स्पष्ट रूप से घटाना पड़ता है।
-      #   runAsNonRoot   न चलाओ, अगर इमेज root के रूप में काम करना चाहती है
-      #   runAsUser      किस संख्यात्मक उपयोगकर्ता के रूप में चलना है; 65532 — न्यूनतम इमेज में
-      #                  स्वीकृत «अनधिकृत» पहचानकर्ता है
-      #   seccompProfile कौन-सी सिस्टम कॉल्स की अनुमति है; RuntimeDefault — एक सेट,
-      #                  जो स्पष्ट रूप से खतरनाक को काट देता है और कुछ नहीं तोड़ता
+      # Security restrictions at the level of the whole pod. In vSphere there is no analogue:
+      # there isolation is provided by the hypervisor, whereas containers share the kernel
+      # with the node, so privileges have to be trimmed explicitly.
+      #   runAsNonRoot   do not run if the image wants to work as root
+      #   runAsUser      which numeric user to run as; 65532 is the accepted
+      #                  "unprivileged" identifier in minimal images
+      #   seccompProfile which system calls are allowed; RuntimeDefault is a set that
+      #                  cuts off the obviously dangerous ones and breaks nothing
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
@@ -130,34 +133,34 @@ spec:
           type: RuntimeDefault
       containers:
         - name: web
-          # वही प्रतिबंध, पर अब किसी विशिष्ट कंटेनर पर।
-          #   allowPrivilegeEscalation: false  प्रक्रिया खुद को और अधिकार नहीं दिला सकेगी
-          #   capabilities.drop: ["ALL"]       कर्नेल की सभी विशेष क्षमताएँ छीन लो
-          #                                    (नेटवर्क बदलना, माउंट करना, समय बदलना);
-          #                                    वेब-सर्वर को उनमें से एक की भी ज़रूरत नहीं
+          # The same restrictions, but now for a specific container.
+          #   allowPrivilegeEscalation: false  the process cannot gain more privileges for itself
+          #   capabilities.drop: ["ALL"]       strip all special kernel capabilities
+          #                                    (change the network, mount, change the time);
+          #                                    a web server needs none of them
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # इमेज एक सार्वजनिक रजिस्ट्री से ली जाती है — अगली लैब में सूचना-सुरक्षा इसे मना कर देगी, और
-          # पता बदलकर अपना Harbor हो जाएगा। unprivileged वैरिएंट सुंदरता के लिए नहीं चुना गया:
-          # सामान्य nginx इमेज पोर्ट 80 सुनती है और इसके लिए root अधिकार चाहती है, और
-          # ऊपर runAsNonRoot के साथ वह बिल्कुल भी शुरू नहीं होती।
-          # संस्करण तय किया गया है (1.27-alpine), न कि latest: वरना वही एक
-          # मैनिफ़ेस्ट कल कोई और एप्लिकेशन तैनात कर देगा, और आपको इसका पता नहीं चलेगा।
+          # The image is taken from a public registry — in the next lab InfoSec will forbid
+          # this, and the address will change to our own Harbor. The unprivileged variant was
+          # chosen not for looks: the ordinary nginx image listens on port 80 and wants root
+          # for that, and with runAsNonRoot above it would not start at all.
+          # The version is pinned (1.27-alpine), not latest: otherwise the same manifest would
+          # deploy a different application tomorrow, and you would not know about it.
           image: nginxinc/nginx-unprivileged:1.27-alpine
-          # वह पोर्ट जिसे एप्लिकेशन सुनता है। नाम `http` — सजावट नहीं: इसका
-          # संदर्भ नीचे तैयारी जाँच और फ़ाइल के अंत में Service देते हैं। पोर्ट
-          # नंबर बदलेंगे — इसे एक ही जगह बदलना होगा, तीन जगह नहीं।
+          # The port the application listens on. The name `http` is not decoration: the
+          # readiness check below and the Service at the end of the file refer to it. Change
+          # the port number and you will change it in one place, not in three.
           ports:
             - containerPort: 8080
               name: http
-          # requests — कितने संसाधन निश्चित रूप से आरक्षित करने हैं; इसी संख्या से
-          # शेड्यूलर नोड चुनता है। limits — वह सीमा, जिससे ऊपर नहीं जाने दिया जाता।
-          # requests को कम आँकने का मतलब है कि नोड पर उससे ज़्यादा समा जाएगा जितना वह सँभाल सकता है;
-          # मेमोरी पर limits से अधिक — कंटेनर मार दिया जाता है, प्रोसेसर पर — धीमा कर दिया जाता है।
-          # 20m = कोर का बीस हज़ारवाँ हिस्सा, Mi = मेगाबाइट। यहाँ मान छोटे हैं,
-          # क्योंकि लैब में नोड एक ही है और वह बड़ा नहीं।
+          # requests — how many resources are guaranteed to be reserved; the scheduler picks a
+          # node by this number. limits — the ceiling above which it will not be let past.
+          # Understating requests means more will fit onto a node than it can handle;
+          # exceeding limits on memory — the container is killed, on CPU — it is throttled.
+          # 20m = twenty thousandths of a core, Mi = megabytes. The values here are small,
+          # because there is a single node in the lab and it is not large.
           resources:
             requests:
               cpu: 20m
@@ -165,30 +168,30 @@ spec:
             limits:
               cpu: 300m
               memory: 64Mi
-          # तैयारी जाँच: क्लस्टर इस पते पर दस्तक देता है और जवाब मिलने तक किसी प्रति पर
-          # ट्रैफ़िक नहीं जाने देता। इसके बिना Service अभी तक न उठे nginx को
-          # अनुरोध भेज देता, और उपयोगकर्ता हर रोलआउट पर एक त्रुटि देखता।
-          # इसका इंतज़ार Flux भी करता है — kustomization.yaml में हमने wait: true माँगा था।
-          #   initialDelaySeconds  पहली दस्तक से पहले रुको, प्रक्रिया को शुरू होने का समय दो
-          #   periodSeconds        आगे कितनी बार दस्तक देनी है
+          # Readiness check: the cluster knocks at this address and does not let traffic onto
+          # a copy until it gets an answer. Without it the Service would send requests to an
+          # nginx that has not yet come up, and the user would see an error on every rollout.
+          # Flux waits for it too — in kustomization.yaml we asked for wait: true.
+          #   initialDelaySeconds  wait before the first knock, give the process time to start
+          #   periodSeconds        how often to knock afterwards
           readinessProbe:
             httpGet:
               path: /healthz
               port: http
             initialDelaySeconds: 2
             periodSeconds: 5
-          # फ़ाइल की शुरुआत के दो ConfigMap की सामग्री को कंटेनर के अंदर कहाँ रखना है।
-          # /etc/nginx/conf.d — वह फ़ोल्डर जहाँ से nginx शुरू होने पर सेटिंग्स पढ़ता है,
-          # /usr/share/nginx/html — वह फ़ोल्डर जहाँ से वह फ़ाइलें देता है।
-          # इसमें इमेज नहीं बदलती: फ़ाइलें उसमें शुरू होने के क्षण पर प्रकट होती हैं।
+          # Where inside the container to place the contents of the two ConfigMaps from the
+          # start of the file. /etc/nginx/conf.d — the folder nginx reads settings from at
+          # startup, /usr/share/nginx/html — the folder it serves files from.
+          # The image itself does not change: the files appear in it at the moment of launch.
           volumeMounts:
             - name: conf
               mountPath: /etc/nginx/conf.d
             - name: page
               mountPath: /usr/share/nginx/html
-      # वास्तव में क्या रखना है। conf और page नाम आंतरिक हैं, वे इस
-      # ब्लॉक को ऊपर के volumeMounts से जोड़ते हैं; configMap के अंदर name — पहले से ही क्लस्टर में
-      # असली ऑब्जेक्ट का नाम है। इसमें गलती करेंगे — पॉड लटका रहेगा और एक गैर-मौजूद ConfigMap का इंतज़ार करेगा।
+      # What exactly to mount. The names conf and page are internal, they link this block with
+      # the volumeMounts above; name inside configMap is already the name of the real object
+      # in the cluster. Get it wrong and the pod will hang waiting for a nonexistent ConfigMap.
       volumes:
         - name: conf
           configMap:
@@ -197,24 +200,24 @@ spec:
           configMap:
             name: passes-page
 ---
-# --- 4 में से 4. स्थायी नाम, जिसके पीछे सभी प्रतियाँ खड़ी हैं -----------------------------
-# पॉड फिर से बनाए जाते हैं, और उनके पते हर बार नए होते हैं। Service एक अपरिवर्तनीय नाम देता है —
-# passes.passes.svc.cluster.local, — जिससे क्लस्टर के अंदर हमेशा जीवित प्रतियों तक
-# पहुँचा जा सकता है। यह आंतरिक संतुलन है, क्लस्टर के बाहर से यहाँ अभी नहीं पहुँचा जा सकता।
+# --- 4 of 4. A permanent name behind which all the copies stand -----------------------------
+# Pods are recreated, and their addresses are new every time. A Service gives an unchanging
+# name — passes.passes.svc.cluster.local — by which the live copies can always be reached
+# inside the cluster. This is internal balancing; from outside the cluster you cannot get here yet.
 apiVersion: v1
 kind: Service
 metadata:
   name: passes
   namespace: passes
 spec:
-  # Service का पॉड्स से संबंध — पतों की सूची नहीं, बल्कि शर्त «app: passes लेबल वाले सभी पॉड»।
-  # ऐसे लेबल वाली नई प्रति आई — वह खुद संतुलन के अंतर्गत आ गई, कुछ भी
-  # पंजीकृत करने की ज़रूरत नहीं। गायब हुई — उसे आउटपुट से हटा दिया गया।
+  # The link between the Service and the pods is not a list of addresses, but the condition
+  # "all pods with the label app: passes". A new copy with such a label appeared — it came
+  # under balancing by itself, nothing needs to be registered. It disappeared — it is removed from the pool.
   selector:
     app: passes
-  # port — खुद Service किस पोर्ट पर जवाब देता है, targetPort — वह कंटेनर के अंदर कहाँ
-  # पुनर्निर्देशित करता है। यहाँ targetPort ऊपर ports ब्लॉक के `http` नाम को संदर्भित करता है,
-  # न कि किसी नंबर को: नंबर को एक जगह बदला जा सकता है, और संबंध नहीं टूटेगा।
+  # port — the port the Service itself answers on, targetPort — where it forwards inside the
+  # container. Here targetPort refers to the name `http` from the ports block above, not to a
+  # number: the number can be changed in one place, and the link will not break.
   ports:
     - port: 80
       targetPort: http

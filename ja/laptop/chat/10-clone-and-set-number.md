@@ -64,4 +64,4 @@ Get-ChildItem -Recurse manifests,scripts -File | ForEach-Object {
 grep -rn tenant-workshopXX manifests scripts || echo "clean, you can continue"
 ```
 
-コマンドが触らない箇所が1つあります。`manifests/03-app-vm.yaml` の `url: "ВСТАВЬТЕ_PRESIGNED_URL"` という行です。この URL は、イメージを変換したときに得られます。今のところは、そこであなたを待っているとだけ覚えておいてください。
+コマンドが触らない箇所が1つあります。`manifests/03-app-vm.yaml` の `url: "PASTE_PRESIGNED_URL"` という行です。この URL は、イメージを変換したときに得られます。今のところは、そこであなたを待っているとだけ覚えておいてください。

@@ -7,9 +7,9 @@
 **Ваші доступи** (логін і пароль однакові в усіх трьох місцях):
 ```
 dashboard: https://dashboard.workshop.aenix.io
-бастіон:   ssh workshopXX@<bastion-address>
-login:     workshopXX      ← ваш номер, скажу особисто
-password:  ...             ← скажу особисто
+bastion:   ssh workshopXX@<bastion-address>
+login:     workshopXX      ← your number, I'll tell you in person
+password:  ...             ← I'll tell you in person
 ```
 
 Заходимо на бастіон — пароль той самий, що й від дашборда, **SSH-ключ не потрібен**:

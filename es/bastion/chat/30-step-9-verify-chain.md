@@ -27,14 +27,14 @@ en cuanto la aplicación dentro de la máquina escucha en `8080`, la tienda qued
 laptop — o compruébala con `curl` directamente en el bastion:
 
 ```bash
-# salud
+# health
 curl -s https://app.workshopXX.workshop.aenix.io/actuator/health
 
-# creamos un pedido
+# create an order
 curl -s -X POST https://app.workshopXX.workshop.aenix.io/api/orders \
   -H 'Content-Type: application/json' -d '{"item":"test"}'
 
-# vemos que quedó registrado
+# see that it was recorded
 curl -s https://app.workshopXX.workshop.aenix.io/api/orders
 ```
 

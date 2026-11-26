@@ -1,61 +1,62 @@
 ---
-# ラボ 13。Cozystack カタログ用のアプリケーション定義 — まさに「カタログの項目」。
+# Lab 13. Application definition for the Cozystack catalog — that very "catalog entry".
 #
-# このオブジェクト自体は何もデプロイしません。次の三つを結びつけます。あなたのチャート
-#（何をデプロイするか）、API 内の新しいオブジェクト型（アプリケーションをどう注文するか）、そして
-# ダッシュボードのカード（その過程で人が何を見るか）。これが存在しない間、チャートはプラット
-# フォームが何も知らないファイルのフォルダのままで、Postgres や Redis の隣のアプリケーション一覧は空です。
+# On its own this object deploys nothing. It ties together three things: your chart
+# (what to deploy), a new object type in the API (how the application is ordered) and a card
+# in the dashboard (what a person sees along the way). Until it exists, the chart stays a folder
+# of files that the platform knows nothing about, and the application list next to Postgres and
+# Redis is empty.
 #
-# namespace なしで、単一のコマンドで適用します:
+# Applied with a single command, without a namespace:
 #   kubectl apply -f applicationdefinition.yaml
 #
-# 重要: このオブジェクトは CLUSTER-SCOPED です — namespace を持たず、クラスタ全体で一つ
-# だけ存在します。テナントはこれを適用できません。これは検証済みです:
+# IMPORTANT: this object is CLUSTER-SCOPED — it has no namespace, there is one per whole
+# cluster. A tenant CANNOT apply it, this has been verified:
 #   kubectl auth can-i create applicationdefinitions   ->   no
-# あなたの作業はファイルを書いてローカルで確認したところで終わります。
-# 適用はプラットフォーム管理者が行います。README の「あなたの権限が
-# どこで終わるか」の節を参照してください。
+# Your job ends when the file is written and checked locally.
+# It is applied by the platform admin. See README, section "Where your
+# permissions end".
 apiVersion: cozystack.io/v1alpha1
 kind: ApplicationDefinition
 metadata:
   name: guest-pass
 spec:
-  # --- API ではどう見えるか ----------------------------------------------
+  # --- HOW IT LOOKS IN THE API ----------------------------------------------
   application:
-    # 新しいオブジェクト型の Kind。適用後、クラスタに
-    # kind: GuestPass が現れ、通常の kubectl でそれを扱えるようになります。
+    # Kind of the new object type. After applying, a
+    # kind: GuestPass appears in the cluster, and you can work with it via the usual kubectl.
     kind: GuestPass
     plural: guestpasses
     singular: guestpass
-    # 値のスキーマ — チャート内に values.schema.json というファイルとして置かれているのと
-    # 同じもので、一行で書かれているだけです。API はこれを使って不正な値を
-    # 拒否し、ダッシュボードは作成フォームを描画します。
+    # The values schema — the same one that sits in the chart as the file values.schema.json,
+    # only written on a single line. The API uses it to reject invalid
+    # values, and the dashboard uses it to render the creation form.
     openAPISchema: |-
       {"title":"Chart Values","type":"object","properties":{"replicas":{"description":"Number of application replicas.","type":"integer","default":2},"greeting":{"description":"Text shown on the main page.","type":"string","default":"Order a pass for your guest"},"external":{"description":"Enable external access from outside the cluster.","type":"boolean","default":false},"resources":{"description":"Explicit CPU and memory configuration.","type":"object","default":{},"properties":{"cpu":{"description":"CPU available to each replica.","pattern":"^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$","anyOf":[{"type":"integer"},{"type":"string"}],"x-kubernetes-int-or-string":true},"memory":{"description":"Memory (RAM) available to each replica.","pattern":"^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$","anyOf":[{"type":"integer"},{"type":"string"}],"x-kubernetes-int-or-string":true}}}}}
 
-  # --- 何をデプロイするか ----------------------------------------------
+  # --- WHAT TO DEPLOY ----------------------------------------------
   release:
-    # リリース名 = prefix + オブジェクト名。`main` という名前の GuestPass オブジェクトは
-    # リリース `guest-pass-main` としてデプロイされます。prefix は必須で、
-    # 異なるアプリケーションのリリースが名前で衝突しないために必要です。
+    # Release name = prefix + object name. A GuestPass object named `main`
+    # deploys as release `guest-pass-main`. The prefix is mandatory and needed
+    # so that releases of different applications do not collide by name.
     prefix: guest-pass-
     labels:
-      # 同じキーで Cozystack はテナントのリリースを Flux のシャードに分配します。
-      # これがないとリリースを reconcile する担当がいなくなります。
+      # With the same key Cozystack distributes tenant releases across Flux shards.
+      # Without it there is no one to reconcile the release.
       sharding.fluxcd.io/key: tenants
     chartRef:
-      # チャートをどこから取るか。許可される kind: OCIRepository, HelmChart,
-      # ExternalArtifact。外部カタログは通常
-      # GitRepository -> HelmChart を経由して届き、その namespace は cozy-public です。
+      # Where to take the chart from. Allowed kinds: OCIRepository, HelmChart,
+      # ExternalArtifact. External catalogs usually arrive via
+      # GitRepository -> HelmChart, and their namespace is cozy-public.
       kind: HelmChart
       name: cozystack-guest-pass
       namespace: cozy-public
 
-  # --- ダッシュボードではどう見えるか ------------------------------------------
+  # --- HOW IT LOOKS IN THE DASHBOARD ------------------------------------------
   dashboard:
-    # カタログのセクション。使われる値は PaaS, IaaS, NaaS, Administration,
-    # Networking です — 自分で考え出すのではなく既存のものを使ってください。
-    # さもないとアプリケーションが項目一つだけのセクションに入ってしまいます。
+    # Catalog section. Used values are PaaS, IaaS, NaaS, Administration,
+    # Networking — take an existing one rather than inventing your own,
+    # otherwise the application ends up in a section with a single item.
     category: PaaS
     singular: Guest Pass
     plural: Guest Passes
@@ -63,9 +64,9 @@ spec:
     tags:
       - internal
       - web
-    # アイコン — base64 の SVG。パスや URL ではなく、まさに base64 です: ダッシュボードは
-    # どこかへ何かをダウンロードしに行ったりしません。ソースは隣の icon.svg にあります。
+    # Icon — SVG in base64. Exactly base64, not a path and not a URL: the dashboard
+    # does not go anywhere to download anything. The source sits next to it in icon.svg.
     icon: PHN2ZyB3aWR0aD0iMTQ0IiBoZWlnaHQ9IjE0NCIgdmlld0JveD0iMCAwIDE0NCAxNDQiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxNDQiIGhlaWdodD0iMTQ0IiByeD0iMjQiIGZpbGw9IiMyRjZGRUQiLz4KPHJlY3QgeD0iMzAiIHk9IjQwIiB3aWR0aD0iODQiIGhlaWdodD0iNjQiIHJ4PSI4IiBmaWxsPSJ3aGl0ZSIvPgo8Y2lyY2xlIGN4PSI1NCIgY3k9IjY0IiByPSIxMSIgZmlsbD0iIzJGNkZFRCIvPgo8cGF0aCBkPSJNMzggOTJjMC05IDcuMi0xNCAxNi0xNHMxNiA1IDE2IDE0djRIMzh2LTR6IiBmaWxsPSIjMkY2RkVEIi8+CjxyZWN0IHg9Ijc4IiB5PSI1OCIgd2lkdGg9IjI2IiBoZWlnaHQ9IjYiIHJ4PSIzIiBmaWxsPSIjOURCQkY3Ii8+CjxyZWN0IHg9Ijc4IiB5PSI3MiIgd2lkdGg9IjI2IiBoZWlnaHQ9IjYiIHJ4PSIzIiBmaWxsPSIjOURCQkY3Ii8+CjxyZWN0IHg9Ijc4IiB5PSI4NiIgd2lkdGg9IjE4IiBoZWlnaHQ9IjYiIHJ4PSIzIiBmaWxsPSIjOURCQkY3Ii8+CjxyZWN0IHg9IjYyIiB5PSIyNCIgd2lkdGg9IjIwIiBoZWlnaHQ9IjIwIiByeD0iNiIgZmlsbD0iIzFCNENDMCIvPgo8L3N2Zz4K
-    # オブジェクトの YAML 表現でのフィールドの順序。装飾的なものですが、これがないと
-    # フィールドが無秩序に並び、フォームが読みにくくなります。
+    # Field order in the YAML representation of the object. Cosmetic, but without it
+    # the fields line up haphazardly and the form reads worse.
     keysOrder: [["apiVersion"], ["kind"], ["metadata"], ["metadata", "name"], ["spec", "replicas"], ["spec", "greeting"], ["spec", "external"], ["spec", "resources"]]

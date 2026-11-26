@@ -20,13 +20,13 @@ password:  ...             ← I'll tell you in person
 **macOS 및 Linux**
 ```bash
 mkdir -p ~/.kube
-nano ~/.kube/workshop      # 복사한 내용을 붙여넣고 저장하세요
+nano ~/.kube/workshop      # paste what you copied, then save
 export KUBECONFIG=~/.kube/workshop
 ```
 
 **Windows** (PowerShell)
 ```powershell
-notepad $HOME\.kube\workshop   # 붙여넣고 저장하세요
+notepad $HOME\.kube\workshop   # paste, then save
 $env:KUBECONFIG = "$HOME\.kube\workshop"
 ```
 
@@ -50,13 +50,13 @@ kubectl get vminstance -n tenant-workshopXX
 PowerShell에서 단계별로 짚어 봅니다:
 ```powershell
 $env:KUBECONFIG
-# 비어 있음 — 발급받은 파일이 아니라 기본 파일을 사용하고 있다는 뜻입니다
+# empty — means it's using the default file, not the one you were given
 
 Select-String -Path "$HOME\.kube\workshop" -Pattern "certificate-authority-data" -Quiet
-# False — 파일이 불완전하게 저장되었습니다. 대시보드에서 시크릿을 다시 다운로드하세요
+# False — the file was saved incompletely; download the secret from the dashboard again
 
 Get-Content "$HOME\.kube\workshop" -TotalCount 1
-# apiVersion으로 시작해야 합니다. 작은 네모나 빈 내용이 보이면 파일이 UTF-16입니다
+# should start with apiVersion; little squares or emptiness mean the file is in UTF-16
 ```
 
 세 번째 항목은 Windows에서 가장 고약한 함정입니다. 메모장과 `>` 리디렉션은 파일을 **UTF-16**으로

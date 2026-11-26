@@ -27,7 +27,7 @@ En tu laptop no los necesitas para nada.
 La **máquina conversora** tiene red, así que descarga el archivo ella misma. El repositorio es
 público, no hacen falta claves:
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/laptop/scripts/convert.sh
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/laptop/scripts/convert.sh
 ```
 
 **Tu app-VM al principio no tiene red en absoluto** — ese estado roto es justo lo que arreglamos

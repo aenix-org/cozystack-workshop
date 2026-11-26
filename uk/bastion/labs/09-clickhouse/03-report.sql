@@ -1,42 +1,42 @@
--- Лаба 9 · звіт, за яким прийшло керівництво: скільки гостей у кожному місяці,
--- скільки в середньому триває візит, о якій годині приходять найчастіше і яка прохідна
--- завантажена більше.
+-- Lab 9 · the report management came asking for: how many guests each month,
+-- how long a visit lasts on average, at which hour they arrive most often, and which
+-- entrance is busier.
 --
--- Де виконується: на віртуалці, у лабораторному кластері, короткою командою `ch`
--- з README:
+-- Where it runs: on the VM, in the lab cluster, with the short command `ch`
+-- from the README:
 --     cd labs/09-clickhouse && ch < 03-report.sql
--- Перед цим мають бути виконані 01-schema.sql і 02-generate.sql.
+-- Before this, 01-schema.sql and 02-generate.sql must have been run.
 --
--- Як читати результат: по рядку на кожен місяць, що зустрівся в даних (їх
--- вісім), місяці за зростанням, число гостей від місяця до місяця зростає.
+-- How to read the result: one row per month present in the data (there are
+-- eight of them), months in ascending order, the guest count growing month over month.
 --
--- Чому мільйон рядків рахується за мілісекунди. ClickHouse зберігає кожну колонку
--- окремим файлом. Цей запит зачіпає три колонки із семи — решту чотири,
--- включно з найважчою guest_name, з диска не читає взагалі. У базі, де рядок
--- лежить на диску цілком, довелося б підняти всі мільйон рядків з усіма полями,
--- щоб порахувати по трьох із них. Звідси й різниця в часі.
--- Побачити це в цифрах: допишіть у кінець запиту рядок FORMAT JSON — у відповіді
--- з'явиться блок статистики з витраченим часом і обсягом прочитаного.
+-- Why a million rows are counted in milliseconds. ClickHouse stores each column
+-- as a separate file. This query touches three columns out of seven — the other four,
+-- including the heaviest guest_name, are not read from disk at all. In a database where a row
+-- sits on disk in one piece, you would have to lift all million rows with all their fields
+-- just to count over three of them. Hence the difference in time.
+-- To see it in numbers: append the line FORMAT JSON to the end of the query — the response
+-- will include a statistics block with the elapsed time and the volume read.
 --
--- Один рядок звіту на кожен місяць, який зустрівся в даних.
+-- One report row per month that appeared in the data.
 SELECT
-    -- До якого місяця віднести прохід. toStartOfMonth перетворює точний час
-    -- на перше число місяця: одне значення, за яким і групуємо, і сортуємо,
-    -- замість пари «рік плюс місяць».
+    -- Which month to attribute the pass to. toStartOfMonth turns the exact time
+    -- into the first day of the month: a single value to both group and sort by,
+    -- instead of a "year plus month" pair.
     toStartOfMonth(created_at)          AS month,
-    -- Скільки рядків потрапило в групу — це і є «скільки гостей за місяць».
+    -- How many rows fell into the group — that is "how many guests per month".
     count()                             AS guests,
-    -- Середня тривалість візиту, округлена до цілих хвилин.
+    -- Average visit duration, rounded to whole minutes.
     round(avg(duration_min))            AS avg_minutes,
-    -- Найчастіша година приходу — та сама година пік. topK(1)(x) повертає масив
-    -- з одного найчастішого значення, [1] дістає його звідти (лік з одиниці).
+    -- The most frequent arrival hour — the very rush hour. topK(1)(x) returns an array
+    -- of the single most frequent value, [1] pulls it out of there (counting from one).
     topK(1)(toHour(created_at))[1]      AS peak_hour,
-    -- Найзавантаженіша прохідна цього місяця, тим самим прийомом.
+    -- The busiest entrance of this month, by the same technique.
     topK(1)(entrance)[1]                AS busiest_entrance
--- Зверніть увагу, чого в запиті немає: підзапитів, тимчасових таблиць і join'ів.
--- Усе рахується за один прохід по даних.
+-- Note what the query does not have: subqueries, temporary tables, or joins.
+-- Everything is computed in a single pass over the data.
 FROM passes
--- Схлопнути всі рядки одного місяця в один рядок відповіді.
+-- Collapse all rows of one month into a single response row.
 GROUP BY month
--- Вивести місяці за зростанням, щоб зростання читалося згори вниз.
+-- Output months in ascending order so the growth reads top to bottom.
 ORDER BY month

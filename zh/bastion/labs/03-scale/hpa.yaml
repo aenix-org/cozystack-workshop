@@ -1,75 +1,75 @@
 ---
-# 实验 3。按 CPU 负载扩展副本。
-# 目标为 requests.cpu（20m）的 50%，即每个 Pod 的阈值为 10m。
-# 特意取得很低：负载必须在几秒内触发，
-# 我们这节实验只有半小时，而不是半天。
+# Lab 3. Scaling replicas by CPU load.
+# Target is 50% of requests.cpu (20m), i.e. the threshold is 10m per pod.
+# Chosen deliberately low: the load must trigger within seconds,
+# we have half an hour for the lab, not half a day.
 #
-# 一个对象。应用在你的学习集群 `lab` 上，而不是管理集群上的
-# 租户里：
+# A single object. Applied on your training cluster `lab`, not in the tenant
+# on the management cluster:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl apply -f hpa.yaml
-# 这里没有类似 tenant-workshopXX 的占位符——不需要在任何地方替换你的编号。
+# There are no placeholders like tenant-workshopXX here — no need to substitute your number anywhere.
 #
-# 有两个条件，缺了它们对象会被创建但无法工作：
-#   1. rickroll 容器设置了 requests.cpu——否则没有依据可用来计算百分比，
-#      并且 `kubectl get hpa` 的 TARGETS 列会永远停留在 <unknown>。
-#   2. 集群中运行着 metrics-server——即 Pod 当前用量的来源。
-# 本文件夹中的 check.sh 会检查这两个条件。
+# Two conditions without which the object will be created but won't work:
+#   1. The rickroll container has requests.cpu set — otherwise there is nothing to compute the percentage from,
+#      and the TARGETS column of `kubectl get hpa` will forever stay <unknown>.
+#   2. metrics-server is running in the cluster — the source of pods' current consumption.
+# check.sh in this folder verifies both conditions.
 #
-# 只要 HPA 存在，Deployment 的 replicas 字段就归它所有。你可以通过
-# `kubectl scale` 手动修改副本数，但 HPA 会在几秒内恢复它自己的值。
-# 因此在实验 4 中，发布之前会删除这个对象：两个机制作用于同一个字段——
-# 是保证你搞不清发生了什么的可靠方法。
+# As long as the HPA exists, the Deployment's replicas field belongs to it. You can change the number
+# of copies by hand via `kubectl scale`, but the HPA will restore its own value within seconds.
+# That is why in lab 4, before the rollout, this object is deleted: two mechanisms on one field —
+# a guaranteed way to not understand what happened.
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  # HPA 的名字不必与应用名一致——这里一致只是为了方便。
-  # 管理谁由下面的 scaleTargetRef 决定，而不是这个名字。
+  # The HPA name doesn't have to match the application name — the match here is for convenience.
+  # What to manage is determined by scaleTargetRef below, not by this name.
   name: rickroll
 spec:
-  # 看谁、改谁的 replicas 字段。三个字段一起写，是因为只有名字
-  # 没有类型会有歧义：Deployment 和 StatefulSet 可以同名。
+  # Whom to watch and whose replicas field to change. Three fields together, because a name
+  # without a type is ambiguous: a Deployment and a StatefulSet can be named the same.
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
     name: rickroll
-  # HPA 在任何负载下都不会越过的区间。下限就是实验开始时的那
-  # 一个副本。上限是六个：在 limits.cpu 为 300m 时学习节点上能
-  # 容纳这么多，同时在 Pod 列表里也肉眼可见。
-  # 如果设成 maxReplicas: 1，对象会被创建但什么也不做。
+  # The corridor the HPA won't leave under any load. The lower bound is the same
+  # single copy the lab started with. The upper is six: that many fit
+  # on a training node at limits.cpu 300m and are still noticeable to the eye in the pod list.
+  # Set maxReplicas: 1 and the object will be created and do nothing.
   minReplicas: 1
   maxReplicas: 6
-  # 依据什么做决策。指标可以有多个，那时 HPA 取需要更多副本
-  # 的那一个。这里只有一个——CPU。
+  # What to base the decision on. There can be several metrics, then the HPA takes the one
+  # that requires the larger number of copies. Here there is one — the CPU.
   metrics:
     - type: Resource
       resource:
         name: cpu
-        # Utilization 是容器 requests.cpu 的占比，而不是节点算力的占比。
-        # 由此有个不直观的结果：这个值完全可能是 600%，而这
-        # 不是错误：Pod 吃掉的是它预留量的六倍。
-        # 另一种方式是 AverageValue，其阈值直接以毫核设定。
+        # Utilization is the fraction of the container's requests.cpu, not of the node's capacity.
+        # Hence a non-intuitive consequence: the value can calmly be 600%, and that is
+        # not an error: the pod eats six times more than it reserved.
+        # An alternative is AverageValue, where the threshold is set in millicores directly.
         target:
           type: Utilization
           averageUtilization: 50
-  # 反应多快。这个块是可选的：没有它就采用默认值，
-  # 那些默认值是为生产运行设计的，而不是为演示。
+  # How briskly to react. The block is optional: without it the default values are used,
+  # designed for production operation, not for a demonstration.
   behavior:
     scaleUp:
-      # 默认情况下 Kubernetes 会等待稳定，增长缓慢。
-      # 在实验里这看起来像「什么都没发生」，所以我们加快它。
+      # By default Kubernetes waits for stabilization and grows slowly.
+      # In a lab this looks like "nothing is happening", so we speed it up.
       stabilizationWindowSeconds: 0
-      # 每十五秒不超过两个新副本。这个步长是经验挑选的：
-      # 增长看起来像增长，而不是从一个瞬间跳到六个，
-      # 那样参与者就没什么可看的了。
+      # No more than two new copies every fifteen seconds. The step was chosen empirically:
+      # growth is seen as growth, and not as an instant jump from one straight to six,
+      # in which the participant has nothing to observe.
       policies:
         - type: Pods
           value: 2
           periodSeconds: 15
     scaleDown:
-      # 而向下相反——不瞬时，否则 Pod 会在参与者
-      # 来得及看清之前就消失。
-      # 一分钟而不是默认的五分钟：实验只有半小时，等待缩容
-      # 那五分钟没有别的事可做。在生产集群里长窗口恰恰有用——
-      # 它能抑制不均匀负载下的来回震荡。
+      # And downward, on the contrary — not instantly, otherwise the pods will disappear
+      # before the participant manages to observe them.
+      # A minute instead of the default five: the lab runs for half an hour, there's nothing
+      # to fill five of them with while waiting for the scale-down. In a production cluster a long window is actually useful —
+      # it dampens the swings on uneven load.
       stabilizationWindowSeconds: 60

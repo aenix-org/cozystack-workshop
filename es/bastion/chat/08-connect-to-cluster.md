@@ -8,8 +8,8 @@
 ```
 dashboard: https://dashboard.workshop.aenix.io
 bastion:   ssh workshopXX@<bastion-address>
-login:     workshopXX      ← tu número, te lo diré en persona
-password:  ...             ← te lo diré en persona
+login:     workshopXX      ← your number, I'll tell you in person
+password:  ...             ← I'll tell you in person
 ```
 
 Inicia sesión en el bastion — la contraseña es la misma que la del panel, **no hace falta ninguna clave SSH**:

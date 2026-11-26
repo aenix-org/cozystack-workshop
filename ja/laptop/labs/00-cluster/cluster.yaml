@@ -1,9 +1,9 @@
-# ラボ 1〜14 用の学習用 Kubernetes クラスタ。
-# 適用する前に、tenant-workshopXX を自分の namespace に置き換えてください。
+# Training Kubernetes cluster for labs 1-14.
+# Before applying, replace tenant-workshopXX with your own namespace.
 #
-# 管理クラスタ上で、テナントと一緒に発行されたアクセス権を使って適用します。
-# このクラスタ自体の kubeconfig はまだ存在しません。クラスタが起動して
-# 初めて生成されます。
+# Applied on the MANAGEMENT cluster — with the access that was issued together
+# with the tenant. The kubeconfig for this cluster itself does not exist yet: it
+# appears only after the cluster comes up.
 #
 #   kubectl apply -f cluster.yaml
 #
@@ -16,18 +16,18 @@ spec:
   version: v1.35
   storageClass: replicated
   controlPlane:
-    # 管理層のコピーは 1 つだけ。これは学習用スタンドなので、耐障害性よりも
-    # リソースの節約を優先します。
+    # A single copy of the control plane: this is a training stand, saving
+    # resources matters more than fault tolerance.
     replicas: 1
   addons:
     monitoringAgents:
-      # すぐに有効にしてください。メトリクス収集は後からさかのぼって有効に
-      # できません。チェックを入れる前に起きたことはすべて失われます。ラボ 14 はこのデータに依存しています。
+      # Enable right away. Metrics collection cannot be enabled retroactively:
+      # everything that happened before the checkbox was set is lost. Lab 14 relies on this data.
       enabled: true
   nodeGroups:
     md0:
-      # このグループは、コピーの空き容量が足りなくなると自分でノードを追加できます。
-      # スケーリングのラボではそこまでは至りません。そこで増えるのはコピーであってノードではありません。
+      # The group can add nodes on its own if the copies start running out of space.
+      # In the scaling lab it won't get that far: there the copies grow, not the nodes.
       minReplicas: 1
       maxReplicas: 3
       instanceType: u1.medium

@@ -78,7 +78,7 @@
 ## Що лежить у теці лаби
 
 Усі файли вже у вас — ви забрали їх разом із репозиторієм. Створювати і друкувати заново
-нічого не потрібно: там, де нижче написано `kubectl apply -f ім'я.yaml`, файл береться звідси.
+нічого не потрібно: там, де нижче написано `kubectl apply -f name.yaml`, файл береться звідси.
 
 ```bash
 cd labs/10-mongodb
@@ -151,7 +151,7 @@ spec:
   sharding: false
   users:
     passapp:
-      password: ТутВашПароль
+      password: YourPasswordHere
   databases:
     passes:
       roles:
@@ -184,10 +184,10 @@ spec:
 платформі, а та піднімає в себе все потрібне.
 
 ```bash
-# apply = «приведи кластер до того, що описано у файлі».
-#   --kubeconfig ~/.kube/config  яким файлом доступу користуватися. Без нього kubectl
-#                                  візьме доступ за замовчуванням і поїде не в той кластер
-#   -f mongodb.yaml                який файл застосувати (-f = file)
+# apply = "bring the cluster to what's described in the file".
+#   --kubeconfig ~/.kube/config  which access file to use. Without it kubectl
+#                                  will take the default access and wander off to the wrong cluster
+#   -f mongodb.yaml                which file to apply (-f = file)
 kubectl --kubeconfig ~/.kube/config apply -f mongodb.yaml
 ```
 
@@ -198,9 +198,9 @@ kubectl --kubeconfig ~/.kube/config apply -f mongodb.yaml
 заводяться користувачі. Дивитися, як ідуть справи, можна так:
 
 ```bash
-# get = «покажи, що є». Колонка READY скаже, чи дійшло замовлення до робочого стану.
-#   -n tenant-workshopXX  у якому namespace шукати (namespace — перегородка всередині
-#                         кластера; ваш тенант це і є окремий namespace)
+# get = "show me what's there". The READY column will tell you whether the order reached a working state.
+#   -n tenant-workshopXX  which namespace to look in (a namespace is a partition inside
+#                         the cluster; your tenant is exactly such a separate namespace)
 kubectl --kubeconfig ~/.kube/config get mongodb passes -n tenant-workshopXX
 ```
 
@@ -249,7 +249,7 @@ mongodb-passes-rs0.tenant-workshopXX.svc.cozy.local:27017
 <summary><b>Розбираємо рядок підключення</b></summary>
 
 ```
-mongodb://passapp:пароль@хост:27017/passes?authSource=admin&directConnection=true
+mongodb://passapp:password@host:27017/passes?authSource=admin&directConnection=true
 ```
 
 `mongodb://` — схема. Далі ім'я користувача, пароль, адреса, порт.
@@ -286,28 +286,28 @@ namespace, воно лежить у базі кластера і потрапл�
 `ТутВашПароль`:
 
 ```bash
-# KUBECONFIG — яким файлом доступу користується kubectl. Тут лабораторний кластер
-# з лаби 0: свої Pod ви запускаєте лише в ньому, у тенант вас із цим не пустять.
+# KUBECONFIG — which access file kubectl uses. Here it's the lab cluster
+# from lab 0: you launch your own Pods only in it, the tenant won't let you in with this.
 export KUBECONFIG=~/lab.kubeconfig
 
-# run = «створи один Pod і запусти в ньому цей образ». Значущі прапорці:
-#   --image=mongo:8.0        що запускати. В образі є оболонка mongosh
-#   --restart=Never          створити саме одиночний Pod, а не Deployment. Інакше
-#                            кластер піднімав би його заново щоразу, як він завершиться
-#   --env=MONGO_URI=...      змінна оточення всередині Pod. Пароль залишається в ній,
-#                            а не повторюється в кожній наступній команді
-#   --command -- sleep 86400 чим зайняти контейнер. Образ mongo за замовчуванням запустив би
-#                            сервер бази — він нам не потрібен, потрібен живий контейнер, у
-#                            який можна зайти. 86400 секунд — це доба
+# run = "create a single Pod and run this image in it". The flags that matter:
+#   --image=mongo:8.0        what to run. The image contains the mongosh shell
+#   --restart=Never          create exactly a single Pod, not a Deployment. Otherwise
+#                            the cluster would bring it back up every time it finished
+#   --env=MONGO_URI=...      an environment variable inside the Pod. The password stays in it,
+#                            rather than being repeated in every following command
+#   --command -- sleep 86400 what to keep the container busy with. The mongo image would by default start
+#                            the database server — we don't need it, we need a live container
+#                            you can step into. 86400 seconds is a day
 kubectl run mongo-workbench \
   --image=mongo:8.0 \
   --restart=Never \
-  --env=MONGO_URI="mongodb://passapp:ТутВашПароль@mongodb-passes-rs0.tenant-workshopXX.svc.cozy.local:27017/passes?authSource=admin&directConnection=true" \
+  --env=MONGO_URI="mongodb://passapp:YourPasswordHere@mongodb-passes-rs0.tenant-workshopXX.svc.cozy.local:27017/passes?authSource=admin&directConnection=true" \
   --command -- sleep 86400
 
-# wait = «не віддавай керування, поки умова не виконається»
-#   --for=condition=Ready  чекаємо, поки Pod сам повідомить про готовність
-#   --timeout=180s         скільки чекати, перш ніж повернути помилку і не висіти вічно
+# wait = "don't return control until the condition is met"
+#   --for=condition=Ready  we wait until the Pod reports readiness itself
+#   --timeout=180s         how long to wait before returning an error rather than hanging forever
 kubectl wait --for=condition=Ready pod/mongo-workbench --timeout=180s
 ```
 
@@ -318,18 +318,18 @@ kubectl wait --for=condition=Ready pod/mongo-workbench --timeout=180s
 із базою:
 
 ```bash
-# mo — скорочення, яке живе до закриття вікна термінала: так в оболонці
-# оголошують власну команду.
-#   exec        виконати щось усередині вже працюючого Pod
-#   -i          прокинути всередину стандартний ввід: без нього подати програму не вийде
-#   sh -c '...' запускаємо в Pod оболонку, щоб вона сама підставила $MONGO_URI.
-#               Лапки одинарні навмисне: підставити змінну має Pod, а не
-#               ваш термінал, — інакше пароль потрапить в історію команд
-#   --quiet     не друкувати привітання mongosh, залишити лише відповідь
+# mo — a shortcut that lives until you close the terminal window: this is how you
+# declare your own command in the shell.
+#   exec        run something inside an already-running Pod
+#   -i          forward standard input inside: without it you can't feed in a program
+#   sh -c '...' we run a shell in the Pod so that it substitutes $MONGO_URI itself.
+#               The quotes are single on purpose: the pod should substitute the variable, not
+#               your terminal — otherwise the password ends up in the command history
+#   --quiet     don't print the mongosh greeting, leave only the answer
 mo() { kubectl exec -i mongo-workbench -- sh -c 'mongosh --quiet "$MONGO_URI"'; }
 
-# ping — службовий запит «ти живий?». Нічого не читає і не пише, перевіряє зв'язок
-# і те, що реквізити прийнято. Знак | відправляє цей рядок на вхід mongosh
+# ping — a service request, "are you alive?". It reads and writes nothing, it checks the connection
+# and that the credentials were accepted. The | sign sends this line to mongosh's input
 echo 'db.runCommand({ ping: 1 })' | mo
 ```
 
@@ -351,8 +351,8 @@ echo 'db.runCommand({ ping: 1 })' | mo
 відкритою, і запити в ній набираються один за одним:
 
 ```bash
-# -it замість -i: додається t — «видай мені термінал». Звідси запрошення до вводу,
-# історія команд по стрілці вгору і підсвічування. Без t оболонка мовчки чекала б вводу.
+# -it instead of -i: a t is added — "give me a terminal". Hence the input prompt,
+# command history on the up arrow, and highlighting. Without t the shell would silently wait for input.
 kubectl exec -it mongo-workbench -- sh -c 'mongosh "$MONGO_URI"'
 ```
 
@@ -370,8 +370,8 @@ kubectl exec -it mongo-workbench -- sh -c 'mongosh "$MONGO_URI"'
 
 ```bash
 cd labs/10-mongodb
-# Знак < подає вміст файлу на вхід команди — те саме, як якби ви
-# набрали весь текст файлу руками в оболонці mongosh.
+# The < sign feeds the file's contents into the command's input — the same thing as if you
+# typed the whole text of the file by hand in the mongosh shell.
 mo < passes.js
 ```
 
@@ -466,9 +466,9 @@ BSON, де у значення є тип: дата, ціле, дробове, л
 **Усі пропуски на конкретну дату:**
 
 ```js
-// find = «покажи документи, що підходять під умову»
-// { valid_on: ISODate(...) } — у документа поле valid_on має дорівнювати рівно цій
-// даті. ISODate — це дата, а не рядок: порівняння йде за часом, а не за написанням
+// find = "show the documents that match the condition"
+// { valid_on: ISODate(...) } — the document's valid_on field must equal exactly this
+// date. ISODate is a date, not a string: the comparison is by time, not by spelling
 db.passes.find({ valid_on: ISODate("2026-09-02T07:30:00Z") })
 ```
 
@@ -477,15 +477,15 @@ db.passes.find({ valid_on: ISODate("2026-09-02T07:30:00Z") })
 **Лише автомобільні:**
 
 ```js
-// Умова за звичайним рядковим полем: збіг цілком, без урахування регістру не буває
+// A condition on an ordinary string field: a whole match, there's no case-insensitivity here
 db.passes.find({ type: "vehicle" })
 ```
 
 **Пошук за номером машини — звернення всередину вкладеного об'єкта через крапку:**
 
 ```js
-// "car.plate" — шлях усередину документа: поле plate всередині об'єкта car.
-// Лапки навколо шляху обов'язкові, інакше JavaScript прочитає крапку по-своєму
+// "car.plate" — a path into the document: the plate field inside the car object.
+// The quotes around the path are mandatory, otherwise JavaScript will read the dot its own way
 db.passes.find({ "car.plate": "AB-1174-CD" })
 ```
 
@@ -508,8 +508,8 @@ JSON усередині, пошук за номером означав би `LIK
 **Перепусткаи, що діють на кількох входах:**
 
 ```js
-// entrances — не рядок, а список: ["North", "South"]. Умова все одно пишеться
-// як для звичайного поля, MongoDB сама перевірить її на кожному елементі списку
+// entrances is not a string but a list: ["North", "South"]. The condition is still written
+// as for an ordinary field, MongoDB will check it against each element of the list itself
 db.passes.find({ entrances: "South" })
 ```
 
@@ -521,9 +521,9 @@ db.passes.find({ entrances: "South" })
 **Групові пропуски, де є неповнолітні:**
 
 ```js
-// Шлях members.age веде всередину списку об'єктів — до поля age кожного учасника.
-// $lt = less than. Умова з $ — не значення, а спосіб порівняння:
-// «поле має бути менше 16», а не «поле має дорівнювати 16»
+// The path members.age leads inside a list of objects — to the age field of each participant.
+// $lt = less than. A condition with $ is not a value but a way of comparing:
+// "the field must be less than 16", not "the field must equal 16"
 db.passes.find({ "members.age": { $lt: 16 } })
 ```
 
@@ -534,8 +534,8 @@ db.passes.find({ "members.age": { $lt: 16 } })
 **Усі пропуски, у яких взагалі вказана машина:**
 
 ```js
-// $exists питає не про значення, а про саму наявність поля в документі:
-// «у цьому документі поле car взагалі є?»
+// $exists asks not about the value but about the very presence of the field in the document:
+// "does this document have a car field at all?"
 db.passes.find({ car: { $exists: true } })
 ```
 
@@ -567,10 +567,10 @@ db.passes.find({ car: { $exists: true } })
 </details>
 
 ```js
-// aggregate = «прожени документи через ланцюжок етапів». Етапи йдуть по порядку,
-// кожен отримує те, що видав попередній:
-//   $group — розкласти документи по групах, за значенням поля type, і порахувати кожну
-//   $sort  — упорядкувати групи за кількістю, -1 значить «за спаданням»
+// aggregate = "run the documents through a chain of stages". The stages go in order,
+// each receiving what the previous one produced:
+//   $group — sort the documents into groups by the value of the type field, and count each one
+//   $sort  — order the groups by count, -1 means "descending"
 db.passes.aggregate([
   { $group: { _id: "$type", count: { $sum: 1 } } },
   { $sort: { count: -1 } }
@@ -588,11 +588,11 @@ db.passes.aggregate([
 база їх шукала.
 
 ```js
-// explain = «не віддавай документи, розкажи, як ти їх шукала»
-//   "executionStats"     режим звіту: не лише план, але й що вийшло на ділі
-//   .executionStats      беремо з відповіді саме цей розділ, щоб не читати все
-// У звіті дивимося на totalDocsExamined — скільки документів база прочитала,
-// щоб віддати один
+// explain = "don't give me the documents, tell me how you looked for them"
+//   "executionStats"     report mode: not only the plan, but what actually happened
+//   .executionStats      we take exactly this section from the answer, so as not to read all of it
+// In the report we look at totalDocsExamined — how many documents the database read,
+// to return one
 db.passes.find({ "car.plate": "AB-1174-CD" }).explain("executionStats").executionStats
 ```
 
@@ -604,13 +604,13 @@ db.passes.find({ "car.plate": "AB-1174-CD" }).explain("executionStats").executio
 всі поспіль:
 
 ```js
-// createIndex = «побудуй індекс за цим полем і підтримуй його далі сама»
-//   { "car.plate": 1 }   за яким полем. 1 — порядок «за зростанням»
-//   name: "car_plate"    як назвати індекс, щоб потім його впізнавати і видаляти
-//   sparse: true         в індекс потрапляють лише документи, у яких поле є
+// createIndex = "build an index on this field and keep maintaining it yourself from now on"
+//   { "car.plate": 1 }   on which field. 1 is "ascending" order
+//   name: "car_plate"    what to name the index, so you can recognize and delete it later
+//   sparse: true         only documents that have the field get into the index
 db.passes.createIndex({ "car.plate": 1 }, { name: "car_plate", sparse: true })
 
-// Повторюємо той самий звіт і порівнюємо з попереднім
+// We repeat the same report and compare it with the previous one
 db.passes.find({ "car.plate": "AB-1174-CD" }).explain("executionStats").executionStats
 ```
 
@@ -656,7 +656,7 @@ db.passes.find({ "car.plate": "AB-1174-CD" }).explain("executionStats").executio
 скрипт, який писали поспіхом:
 
 ```js
-// insertOne = «додай один документ». Які в ньому поля, база не питає
+// insertOne = "add one document". What fields are in it, the database doesn't ask
 db.passes.insertOne({
   tipe: "single-use",
   guest: "Nathan S. Graham",
@@ -669,16 +669,16 @@ db.passes.insertOne({
 унікальний ключ документа, база придумала його сама. Перевіримо, що документів стало п'ять:
 
 ```js
-// countDocuments = «порахуй документи, що підходять під умову».
-// Порожні фігурні дужки — умова без обмежень, тобто «всі»
+// countDocuments = "count the documents that match the condition".
+// Empty curly braces are a condition with no restrictions, that is, "all"
 db.passes.countDocuments({})
 ```
 
 П'ять. Тепер те, що щоранку робить охорона — відкриває список разових пропусків:
 
 ```js
-// Той самий відбір за типом, що й на кроці з пошуком: показати пропуски, у яких
-// поле type дорівнює "single-use"
+// The same selection by type as in the search step: show the passes whose
+// type field equals "single-use"
 db.passes.find({ type: "single-use" })
 ```
 
@@ -701,8 +701,8 @@ db.passes.find({ type: "single-use" })
 Знайдемо постраждалих — документи, у яких поля `type` немає зовсім:
 
 ```js
-// $exists: false — протилежне тому, що було на попередньому кроці: «поля в документі немає».
-// Такий запит варто тримати під рукою: він показує, що накопичилося повз схему
+// $exists: false — the opposite of the previous step: "the field is not in the document".
+// It's worth keeping such a query handy: it shows what has accumulated past the schema
 db.passes.find({ type: { $exists: false } })
 ```
 
@@ -723,8 +723,8 @@ exist`. Помилка вилізла б на тестах, а не через �
 Видаляємо документи без типу:
 
 ```js
-// deleteMany = «видали всі документи, що підходять під умову». Умова та сама,
-// що й у пошуку вище, — значить, видалиться рівно те, що ви щойно бачили
+// deleteMany = "delete all documents that match the condition". The condition is the same
+// as in the search above — which means exactly what you just saw will be deleted
 db.passes.deleteMany({ type: { $exists: false } })
 ```
 
@@ -796,8 +796,8 @@ db.runCommand({
 Застосовуємо правило:
 
 ```bash
-# Той самий прийом, що й із passes.js: вміст файлу подається на вхід mongosh.
-# Правило навішується на живу колекцію — зупиняти базу не потрібно
+# The same trick as with passes.js: the file's contents are fed to mongosh's input.
+# The rule is hung on a live collection — no need to stop the database
 mo < validator.js
 ```
 
@@ -806,8 +806,8 @@ mo < validator.js
 Пробуємо повторити ту саму одруку — тепер під наглядом правила:
 
 ```js
-// Поле tipe правилу невідоме, а обов'язкового type в документі немає.
-// Раніше такий документ мовчки лягав у колекцію
+// The tipe field is unknown to the rule, and there's no required type in the document.
+// Before, such a document would silently settle into the collection
 db.passes.insertOne({ tipe: "single-use", guest: "Check", host: "x@corp.example" })
 ```
 
@@ -840,15 +840,15 @@ db.passes.insertOne({ tipe: "single-use", guest: "Check", host: "x@corp.example"
 
 ```js
 db.passes.aggregate([
-  // $lookup = «для кожного пропуска сходи в іншу колекцію і принеси звідти запис»
+  // $lookup = "for each pass, go to another collection and bring back a record from there"
   { $lookup: {
-      from: "staff",          // куди йти — колекція співробітників
-      localField: "host",     // яке поле пропуска порівнювати
-      foreignField: "email",  // з яким полем співробітника
-      as: "host_info"         // під яким іменем покласти знайдене в документ
+      from: "staff",          // where to go — the employees collection
+      localField: "host",     // which pass field to compare
+      foreignField: "email",  // with which employee field
+      as: "host_info"         // under what name to put what's found into the document
   } },
-  // Знайдене завжди кладеться списком, навіть якщо збіг один.
-  // $unwind розгортає список назад в одне значення
+  // What's found is always put as a list, even if there's a single match.
+  // $unwind unrolls the list back into a single value
   { $unwind: "$host_info" }
 ])
 ```
@@ -887,9 +887,9 @@ db.passes.aggregate([
 Спробуйте:
 
 ```js
-// Поле host за змістом посилається на співробітника. Такого співробітника не існує —
-// чи перевірить це база? Правилу з минулого кроку документ відповідає: type на
-// місці і зі списку, host — рядок
+// The host field, by meaning, refers to an employee. No such employee exists —
+// will the database check this? The document satisfies the rule from the last step: type is
+// in place and from the list, host is a string
 db.passes.insertOne({ type: "single-use", host: "does-not-exist@corp.example", guest: "Test" })
 ```
 
@@ -906,7 +906,7 @@ db.passes.insertOne({ type: "single-use", host: "does-not-exist@corp.example", g
 Не забудьте прибрати тестовий документ:
 
 ```js
-// deleteOne = «видали один документ, що підходить під умову», а не всі одразу
+// deleteOne = "delete one document that matches the condition", not all of them at once
 db.passes.deleteOne({ host: "does-not-exist@corp.example" })
 ```
 
@@ -924,11 +924,11 @@ db.passes.deleteOne({ host: "does-not-exist@corp.example" })
 більше — відкривайте сесію і явно починайте транзакцію:
 
 ```js
-// Сесія — окрема «розмова» з базою, всередині якої можна оголосити транзакцію
+// A session is a separate "conversation" with the database, within which you can declare a transaction
 const s = db.getMongo().startSession();
-s.startTransaction();          // з цього місця зміни накопичуються, але нікому не видні
-// … операції через s.getDatabase("passes") …
-s.commitTransaction();         // застосувати все разом. Скасувати все разом — abortTransaction()
+s.startTransaction();          // from this point changes accumulate, but are visible to no one
+// … operations through s.getDatabase("passes") …
+s.commitTransaction();         // apply it all at once. To cancel it all at once — abortTransaction()
 ```
 
 **І третя правда, найпрактичніша:** транзакції в MongoDB дорожчі, ніж у реляційній
@@ -955,15 +955,15 @@ s.commitTransaction();         // застосувати все разом. Ск
 
 ```js
 db.passes.aggregate([
-  // $$ROOT — весь документ цілком. $objectToArray розбирає його на пари
-  // «ім'я поля — значення», щоб далі працювати з полями як з даними
+  // $$ROOT — the whole document in full. $objectToArray breaks it into
+  // "field name — value" pairs, so you can then work with the fields as data
   { $project: { fields: { $objectToArray: "$$ROOT" } } },
-  // Розгортаємо список пар: одна пара — один рядок на вході наступного етапу
+  // We unroll the list of pairs: one pair — one row at the input of the next stage
   { $unwind: "$fields" },
-  // Групуємо за двома ознаками одразу: ім'я поля (k) і тип його значення (t),
-  // і рахуємо, скільки разів таке поєднання трапилося
+  // We group by two attributes at once: the field name (k) and its value type (t),
+  // and count how many times such a combination occurred
   { $group: { _id: { k: "$fields.k", t: { $type: "$fields.v" } }, n: { $sum: 1 } } },
-  { $sort: { "_id.k": 1 } }   // за алфавітом, щоб одне поле йшло поряд зі своїми типами
+  { $sort: { "_id.k": 1 } }   // alphabetically, so one field sits next to its own types
 ])
 ```
 
@@ -1001,13 +1001,13 @@ db.passes.aggregate([
 
 ```bash
 cd labs/10-mongodb
-# Той самий файл доступу, що й у кроках вище: скрипт працює зсередини кластера lab
+# The same access file as in the steps above: the script works from inside the lab cluster
 export KUBECONFIG=~/lab.kubeconfig
-# Номер тенанта: з нього скрипт збере адресу бази. Підставте свій
+# The tenant number: from it the script will assemble the database address. Substitute your own
 export COZY_TENANT=workshop03
-# Пароль в одинарних лапках: у них оболонка не чіпає $, ! і & всередині рядка.
-# У звіт пароль не потрапляє
-export MONGO_PASSWORD='ваш-пароль-passapp'
+# The password in single quotes: inside them the shell doesn't touch $, ! and & within the string.
+# The password doesn't make it into the report
+export MONGO_PASSWORD='your-passapp-password'
 ./check.sh
 ```
 
@@ -1026,8 +1026,8 @@ export MONGO_PASSWORD='ваш-пароль-passapp'
 Робочий Pod більше не потрібен — він увесь цей час тримав контейнер зайнятим командою `sleep`:
 
 ```bash
-# delete = «прибери з кластера». Pod зникає разом зі своєю змінною MONGO_URI,
-# так що пароль у кластері не залишається
+# delete = "remove from the cluster". The Pod disappears along with its MONGO_URI variable,
+# so the password doesn't remain in the cluster
 kubectl delete pod mongo-workbench
 ```
 

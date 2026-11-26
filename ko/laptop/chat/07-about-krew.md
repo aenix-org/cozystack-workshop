@@ -29,9 +29,9 @@ tar zxvf "krew-${OS}_${ARCH}.tar.gz" &&
 그다음 krew를 PATH에 추가하세요 — 이 줄을 자신의 프로필에 덧붙여야 합니다, 그러지 않으면
 다음번에 터미널을 켤 때 잊혀집니다:
 ```bash
-echo 'export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"' >> ~/.zshrc   # zsh용, macOS의 기본값
-echo 'export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"' >> ~/.bashrc  # bash용, 보통 Linux
-source ~/.zshrc    # 또는 source ~/.bashrc
+echo 'export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"' >> ~/.zshrc   # for zsh, the default on macOS
+echo 'export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"' >> ~/.bashrc  # for bash, usually Linux
+source ~/.zshrc    # or source ~/.bashrc
 ```
 
 **Windows** (PowerShell)

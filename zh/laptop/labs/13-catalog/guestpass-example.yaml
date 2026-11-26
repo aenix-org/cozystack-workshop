@@ -1,26 +1,26 @@
 ---
-# 实验 13。这就是管理员应用 applicationdefinition.yaml 之后，
-# 订购你的应用时的样子。在你的租户中应用它：
+# Lab 13. This is what ordering your application will look like AFTER
+# the admin applies applicationdefinition.yaml. Apply it in your tenant:
 #   kubectl apply -f guestpass-example.yaml
 #
-# 注意：tenant-workshopXX 是占位符，不是 namespace 名称。应用之前请把 XX 替换为
-# 你自己租户的编号，否则 kubectl 会拒绝：不存在这样的 namespace，
-# 而别人的 namespace 也不会让你进入。
+# ATTENTION: tenant-workshopXX is a placeholder, not a namespace name. Replace XX with
+# your tenant number before applying, otherwise kubectl will refuse: there is no such namespace,
+# and you won't be let into someone else's.
 #
-# 请注意：apps.cozystack.io 这个 group 与 Bucket、
-# VMInstance 以及目录中其他应用所用的是同一个。你的应用会与它们
-# 并列在一起，而不是被放到某个旁边的角落。
+# Note: the apps.cozystack.io group is the same one used by Bucket,
+# VMInstance and the other catalog applications. Your application will line up
+# alongside them, not off to the side.
 #
-# 在管理员注册定义之前，无法应用这个文件：
-# kubectl 会返回 `no matches for kind "GuestPass"`。
+# You cannot apply this file before the admin has registered the definition:
+# kubectl will respond `no matches for kind "GuestPass"`.
 apiVersion: apps.cozystack.io/v1alpha1
 kind: GuestPass
 metadata:
   name: main
   namespace: tenant-workshopXX
-# spec 中的字段正是 chart/values.yaml 中描述、并由仪表盘中订购表单展示的那些参数。
-# 这里把它们以文本形式写出：与在仪表盘中点击按钮效果相同，
-# 但这样的文件可以被评审、放进 Git 并回滚。
+# The fields in spec are exactly the parameters described in chart/values.yaml and shown
+# by the order form in the dashboard. Here they are written out as text: the same as clicking
+# the button in the dashboard, but such a file can be reviewed, put in Git and rolled back.
 spec:
   replicas: 2
   greeting: "Order a pass for your guest"

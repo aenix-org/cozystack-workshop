@@ -1,175 +1,174 @@
 #!/usr/bin/env bash
-# ラボ1のチェック: アプリケーションがデプロイされ、実質的に動作していること。
+# Check for lab 1: the application is deployed and genuinely working.
 #
-# ここでの「実質的に」とは、ページが実際にHTTPで配信され、そこにPod名が
-# 差し込まれ、その名前が実際に稼働しているレプリカの名前と一致すること。
-# Deploymentオブジェクトの存在を確認するのは無意味 — 存在していても動作しないことがある。
+# "Genuinely" here means: the page is actually served over HTTP, it has the pod
+# name substituted into it, and that name matches the name of a really running replica.
+# Checking that a Deployment object exists is pointless — it can exist and not work.
 #
-# 仮想マシン上で、このラボのフォルダから、学習クラスタ `lab` へのアクセスで実行する
-# （管理クラスタ上のテナントではない）:
+# Runs on the VM, from this lab's folder, using access to the training cluster `lab`
+# (not to the tenant on the management cluster):
 #     export KUBECONFIG=~/lab.kubeconfig
 #     cd labs/01-deploy && ./check.sh
-# ここではCOZY_TENANT変数は不要: ラボ全体がクラスタ `lab` の内部で動く。
+# The COZY_TENANT variable is not needed here: the whole lab runs inside the `lab` cluster.
 #
-# スクリプトはクラスタ内で何も変更しない — 読み取りとHTTPリクエスト送信のみ。
-# クリーンアップ前に実行すること: アプリケーション削除後は確認するものがなくなる。
+# The script changes nothing in the cluster — it only reads and sends HTTP requests.
+# Run it before cleanup: after deleting the application there will be nothing to check.
 
-# この2つの変数はlib.shが拾う — レポートのヘッダーと、スクリプトが自身の隣に置く
-# ファイル名 report-<ラボ>-<日付>.md に入る。
+# These two variables are picked up by lib.sh — they go into the report header and into the
+# file name report-<lab>-<date>.md that the script writes next to itself.
 LAB_NAME="01-deploy"
-LAB_TITLE="ラボ1 · 最初のアプリケーション"
-# 共通チェックライブラリ: ここから ok / fail / warn / evidence / finish、
-# クラスタ内部からのページリクエスト、レポート書き込みが来る。パスはスクリプト自身が
-# 置かれている場所から計算されるので、どのディレクトリから実行しても同じように動く。
+LAB_TITLE="Lab 1 · First application"
+# The shared checks library: from here come ok / fail / warn / evidence / finish,
+# the in-cluster page request and writing the report. The path is computed from where
+# the script itself lives, so running from any directory works the same.
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
-# KUBECONFIGが設定されていなければ即座に停止する。設定がないとkubectlは仮想マシン
-# 自身の上でクラスタを探し、見つからず、同じエラーで全チェックを次々に落とす。
-# そのエラーからは本当の原因が見えない。
+# Stop immediately if KUBECONFIG is not set. Without it kubectl looks for a cluster
+# on the VM itself, doesn't find one, and fails every check in a row with the same error
+# that hides the real cause.
 need_kubeconfig
 
-# --- アプリケーションオブジェクト --------------------------------------------
-# 第一の防衛線: アプリケーションが実際に作成され、少なくとも1つのレプリカが準備完了に達したこと。
-# Deploymentの単なる存在ではなく .status.readyReplicas を見る: オブジェクトは
-# 即座に、常に成功して作成されるが、準備完了はレプリカが立ち上がり、
-# 準備完了プローブを通過し、応答できることを意味する。
+# --- application object -----------------------------------------------------
+# First line of defense: the application is actually set up and at least one replica reached readiness.
+# We look at .status.readyReplicas, not at the mere existence of the Deployment: the object
+# is created instantly and always successfully, whereas readiness means a replica came up,
+# passed its readiness probe and is able to respond.
 if kubectl get deployment rickroll >/dev/null 2>&1; then
   DESIRED="$(kubectl get deployment rickroll -o jsonpath='{.spec.replicas}' 2>/dev/null)"
   READY="$(kubectl get deployment rickroll -o jsonpath='{.status.readyReplicas}' 2>/dev/null)"
   READY="${READY:-0}"
   DESIRED="${DESIRED:-0}"
   if [ "$DESIRED" -eq 0 ]; then
-    # 特殊なケース: オブジェクトは存在するが、要求されたレプリカ数がゼロ。
-    # 「準備完了のレプリカが1つもない（0が必要）」というメッセージは無意味に聞こえる。
-    fail "アプリケーションが停止中 — 要求レプリカ数が0" \
-         "レプリカを戻す: kubectl scale deployment rickroll --replicas=1"
+    # Special case: the object exists but zero replicas are requested for it. The message
+    # "no replica is ready (0 needed)" would sound like nonsense.
+    fail "application stopped — 0 replicas requested" \
+         "bring a replica back: kubectl scale deployment rickroll --replicas=1"
   elif [ "$READY" -ge 1 ]; then
-    ok "アプリケーションがデプロイ済み、準備完了レプリカ ${READY} / ${DESIRED}"
-    # 詰まったロールアウトはサービスを落とさない: 古いレプリカが動き続け、
-    # readyReplicasは1のまま。このチェックがないと、参加者は緑のチェックマークと
-    # 永久にErrImagePullで詰まったデプロイメントを持って去っていく。
-    # ProgressDeadlineExceededだけでなくレプリカ自体を見る: デッドラインは
-    # 10分後に発火するが、スクリプトはすぐに実行される。その間も古いレプリカは
-    # 動き続け、readyReplicasは1のまま。このチェックがないと参加者は緑のチェックマークと
-    # ImagePullBackOffで詰まったデプロイメントを持って去っていく。
+    ok "application deployed, ${READY} of ${DESIRED} replicas ready"
+    # A stuck rollout doesn't take the service down: the old replica keeps working, and
+    # readyReplicas stays at one. Without this check the participant leaves with a green
+    # check mark and a deployment that is forever stuck in ErrImagePull.
+    # We look at the replicas themselves, not only at ProgressDeadlineExceeded: the deadline
+    # fires after ten minutes, while the script is run right away. The old replica keeps
+    # working meanwhile, readyReplicas stays at one, and without this check the participant
+    # leaves with a green check mark and a deployment stuck in ImagePullBackOff.
     STUCK="$(kubectl get pods -l app=rickroll \
       -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.status.containerStatuses[0].state.waiting.reason}{"\n"}{end}' 2>/dev/null \
       | awk '$2=="ImagePullBackOff" || $2=="ErrImagePull" || $2=="CrashLoopBackOff" || $2=="CreateContainerConfigError" {print $1" ("$2")"}')"
     PROG_REASON="$(kubectl get deployment rickroll \
       -o jsonpath='{.status.conditions[?(@.type=="Progressing")].reason}' 2>/dev/null)"
     if [ -n "$STUCK" ] || [ "$PROG_REASON" = "ProgressDeadlineExceeded" ]; then
-      fail "ロールアウトが詰まっている: 新しいレプリカが立ち上がらず、古いものだけが動いている" \
-           "kubectl get pods -l app=rickroll を見る — たいていイメージが取得できていない; 動作状態に戻す: kubectl apply -f rickroll.yaml"
-      evidence "起動しないレプリカ" "${STUCK:-原因はDeploymentのステータス内: $PROG_REASON}"
+      fail "rollout is stuck: the new replica won't come up, only the old one is working" \
+           "look at kubectl get pods -l app=rickroll — usually the image didn't pull; restore a working state: kubectl apply -f rickroll.yaml"
+      evidence "Replicas that won't start" "${STUCK:-cause in Deployment status: $PROG_REASON}"
     fi
   else
-    fail "アプリケーションは作成されたが、準備完了のレプリカが1つもない（${DESIRED} が必要）" \
-         "kubectl get pods -l app=rickroll と kubectl describe deployment rickroll を見る"
-    evidence "Podの状態" "$(kubectl get pods -l app=rickroll -o wide 2>/dev/null)"
+    fail "application created, but no replica is ready (${DESIRED} needed)" \
+         "look at kubectl get pods -l app=rickroll and kubectl describe deployment rickroll"
+    evidence "Pod state" "$(kubectl get pods -l app=rickroll -o wide 2>/dev/null)"
   fi
 else
-  fail "rickroll という名前のDeploymentが見つからない" \
-       "マニフェストを適用する: kubectl apply -f rickroll.yaml"
+  fail "no Deployment named rickroll found" \
+       "apply the manifest: kubectl apply -f rickroll.yaml"
 fi
 
-# --- 設定とページ ------------------------------------------------------------
-# 両方のConfigMapはアプリケーションと同じファイルで作成されるので、消えるのは
-# アプリケーションと一緒か、手動削除のときだけ。それぞれ別々にチェックするのは、
-# ページが壊れたときに参加者がすぐに何が欠けているかを見られるようにするため:
-# rickroll-conf がないとnginxはPod名を差し込まず、rickroll-page-v1 がないと
-# ラボ4で第2バージョンと比較するものがなく、ロールバックする先もない。
+# --- settings and page ------------------------------------------------------
+# Both ConfigMaps are created by the same file as the application, so they can only
+# disappear together with it or from manual deletion. We check them separately so that when
+# the page breaks the participant immediately sees exactly what is missing: without rickroll-conf
+# nginx won't substitute the pod name, and without rickroll-page-v1 there is nothing to compare
+# the second version against in lab 4 and nowhere to roll back to.
 for cm in rickroll-conf rickroll-page-v1; do
   if kubectl get configmap "$cm" >/dev/null 2>&1; then
-    ok "設定が揃っている: ConfigMap ${cm}"
+    ok "settings in place: ConfigMap ${cm}"
   else
-    fail "ConfigMap ${cm} が見つからない" \
-         "同じファイルで作成される: kubectl apply -f rickroll.yaml"
+    fail "ConfigMap ${cm} not found" \
+         "it's created by the same file: kubectl apply -f rickroll.yaml"
   fi
 done
 
-# --- 固定アドレス ------------------------------------------------------------
+# --- stable address ---------------------------------------------------------
 if kubectl get service rickroll >/dev/null 2>&1; then
-  # エンドポイントのないServiceは典型的で気づきにくい故障: オブジェクトは存在するが、
-  # Podのラベルがセレクタと一致せず、アドレスの後ろは空っぽ。
+  # A Service without endpoints is a typical and unnoticed breakage: the object exists,
+  # but the labels on the pods didn't match the selector, and behind the address it's empty.
   EPS="$(kubectl get endpoints rickroll -o jsonpath='{.subsets[*].addresses[*].ip}' 2>/dev/null)"
   EPS_N="$(printf '%s' "$EPS" | wc -w | tr -d ' ')"
   if [ "${EPS_N:-0}" -ge 1 ]; then
-    ok "固定アドレスが機能している、後ろのレプリカ数: ${EPS_N}"
-    evidence "サービスの後ろのアドレス" "$EPS"
+    ok "stable address works, replicas behind it: ${EPS_N}"
+    evidence "Addresses behind the service" "$EPS"
   else
-    fail "Service rickroll は存在するが、後ろにレプリカが1つもない" \
-         "たいていの原因はPodのラベルがサービスのselectorと一致しないこと — app: rickroll を照合する"
+    fail "Service rickroll exists, but there is no replica behind it" \
+         "usually the cause is that the pod labels didn't match the service selector — check app: rickroll"
   fi
 else
-  fail "rickroll という名前のServiceが見つからない" \
-       "同じファイルで作成される: kubectl apply -f rickroll.yaml"
+  fail "no Service named rickroll found" \
+       "it's created by the same file: kubectl apply -f rickroll.yaml"
 fi
 
-# --- 本題: ページが実際に配信される ------------------------------------------
-# すべてはこのチェックのために仕込まれた。これまでのチェックは、クラスタ内の
-# オブジェクトが正しく記述されていることを言うだけ; このチェックは、ユーザーが
-# ページを受け取ることを言う。リクエストはクラスタの内部から、使い捨てPodで行う:
-# 外部からはrickrollのアドレスは存在せず、port-forwardはクラスタではなく
-# あなたの仮想マシンのチェックになってしまう。
-# 複数回リクエストする: サービスの後ろに複数のレプリカがあると、単一のサンプルでは
-# 差し替えられたものに当たらず、他人のコンテンツでチェックが緑になることがある。
+# --- the main thing: the page is actually served ----------------------------
+# This is the check everything was set up for. All the previous ones only say that the objects
+# in the cluster are described correctly; this one — that the user gets the page. The request goes
+# FROM INSIDE the cluster, with a one-off pod: from outside the rickroll address doesn't exist, and
+# port-forward here would test your VM, not the cluster.
+# We request several times: with several replicas behind the service a single sample
+# may miss the substituted one, and the check goes green on someone else's content.
 BODY="$(in_cluster_curl_many 'http://rickroll/' 8)"
-# マーカーはページごとにちょうど1回だけ現れなければならない、さもないと応答カウンタが嘘をつく:
-# 「Never Gonna Give You Up」は <title> にも <h1> にもあり、二重カウントを起こしていた。
-ANSWERS="$(printf '%s' "$BODY" | grep -c '対応したPod')"
+# The marker must appear EXACTLY ONCE per page, otherwise the response counter lies:
+# "Never Gonna Give You Up" is in both <title> and <h1>, and gave a doubling.
+ANSWERS="$(printf '%s' "$BODY" | grep -c 'served by pod')"
 TOTAL_LINES="$(printf '%s' "$BODY" | grep -c '<title>')"
 if [ "${ANSWERS:-0}" -ge 1 ] && [ "${ANSWERS:-0}" -eq "${TOTAL_LINES:-0}" ]; then
-  ok "アプリケーションがHTTPで応答し、自分のページを配信している（${ANSWERS} 件のリクエストを確認）"
+  ok "application responds over HTTP and serves its page (${ANSWERS} requests checked)"
 elif [ "${ANSWERS:-0}" -ge 1 ]; then
-  fail "サービスの後ろで応答しているのはあなたのアプリケーションだけではない: 自分のページは ${TOTAL_LINES} 件中 ${ANSWERS} 件返ってきた" \
-       "誰か他の人が app=rickroll ラベルを付けている — kubectl get pods -l app=rickroll を見て余分なものを削除する"
+  fail "not only your application responds behind the service: your page came back ${ANSWERS} times out of ${TOTAL_LINES}" \
+       "someone else carries the label app=rickroll — look at kubectl get pods -l app=rickroll and remove the extras"
 else
-  fail "アプリケーションが期待したページを配信しなかった" \
-       "手動で確認する: kubectl port-forward svc/rickroll 8080:80、その後 http://localhost:8080 を開く"
-  evidence "ページの代わりに返ってきたもの" "$(printf '%s' "$BODY" | head -20)"
+  fail "the application did not serve the expected page" \
+       "check manually: kubectl port-forward svc/rickroll 8080:80, then open http://localhost:8080"
+  evidence "What came back instead of the page" "$(printf '%s' "$BODY" | head -20)"
 fi
 
-# --- Pod名の差し込み ---------------------------------------------------------
-# このラボが作られた目的: ページ内の名前が実際のPodと一致しなければならない。
+# --- pod name substitution --------------------------------------------------
+# This is what the lab was made for: the name in the page must match the real pod.
 SERVED_BY="$(printf '%s' "$BODY" | grep -o '<b>[^<]*</b>' | head -1 | sed 's/<[^>]*>//g')"
-# アプリケーションのReplicaSetが管理するPodを取る、app=rickroll ラベルを付けた
-# すべてではない。さもないとそのラベルを付けた無関係なPodが「本物」のリストに入り、
-# 自分自身を裏付けてしまう — 検証済み、偽物がそうやってチェックを通過した。
+# We take the pods managed by the application's ReplicaSet, and NOT everything that carries the
+# label app=rickroll. Otherwise a foreign pod with such a label ends up in the list of "real" ones
+# and confirms itself — verified, an impostor passed the check that way.
 REAL_PODS="$(kubectl get pods -l app=rickroll \
   -o jsonpath='{range .items[?(@.metadata.ownerReferences[0].kind=="ReplicaSet")]}{.metadata.name}{"\n"}{end}' 2>/dev/null)"
 STRAY="$(kubectl get pods -l app=rickroll \
   -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.metadata.ownerReferences[0].kind}{"\n"}{end}' 2>/dev/null \
   | awk '$2!="ReplicaSet" {print $1}')"
 if [ -n "$STRAY" ]; then
-  fail "無関係なPodが app=rickroll ラベルを付けている — それらはロードバランシングに含まれる" \
-       "余分なものを削除する: $(printf '%s' "$STRAY" | tr '\n' ' ')"
-  evidence "アプリケーションのラベルを付けた無関係なPod" "$STRAY"
+  fail "foreign pods carry the label app=rickroll — they will be included in load balancing" \
+       "remove the extras: $(printf '%s' "$STRAY" | tr '\n' ' ')"
+  evidence "Foreign pods under the application's label" "$STRAY"
 fi
 
 if [ -z "$SERVED_BY" ]; then
-  fail "ページにPod名がない" \
-       "ConfigMap rickroll-conf が差し込まれたか確認する — その中に sub_filter '__POD__' '\$hostname' の行がある"
+  fail "the page has no pod name" \
+       "check that the ConfigMap rickroll-conf was substituted — it has the line sub_filter '__POD__' '\$hostname'"
 elif [ "$SERVED_BY" = "__POD__" ]; then
-  fail "Pod名が差し込まれなかった — ページにプレースホルダ __POD__ が残っている" \
-       "nginxがsub_filterを適用しなかった: 設定のボリュームが /etc/nginx/conf.d にマウントされているか確認する"
+  fail "the pod name wasn't substituted — the placeholder __POD__ is left in the page" \
+       "nginx didn't apply sub_filter: check that the settings volume is mounted at /etc/nginx/conf.d"
 elif printf '%s' "$REAL_PODS" | grep -qx "$SERVED_BY"; then
-  ok "Pod名が差し込まれ、実際に稼働しているレプリカと一致している: ${SERVED_BY}"
-  evidence "誰がリクエストを処理したか" "$SERVED_BY"
-  evidence "稼働中のレプリカ" "$REAL_PODS"
+  ok "the pod name is substituted and matches a really running replica: ${SERVED_BY}"
+  evidence "Who served the request" "$SERVED_BY"
+  evidence "Running replicas" "$REAL_PODS"
 else
-  fail "ページはPodを「${SERVED_BY}」と呼んでいるが、クラスタにそのようなPodは存在しない" \
-       "リクエストとチェックの間にレプリカが再作成された可能性がある — スクリプトをもう一度実行する"
+  fail "the page names the pod \"${SERVED_BY}\", but there is no such pod in the cluster" \
+       "the replica may have been recreated between the request and the check — run the script again"
 fi
 
-# --- 準備完了プローブが設定されている ----------------------------------------
-# これがないとバージョンのロールアウトについてのラボでダウンタイムが発生し、参加者は我々が嘘をついたと判断する。
+# --- readiness probe is configured ------------------------------------------
+# Without it the lab about version rollout will have downtime, and the participant will decide we lied.
 PROBE_PATH="$(kubectl get deployment rickroll \
   -o jsonpath='{.spec.template.spec.containers[0].readinessProbe.httpGet.path}' 2>/dev/null)"
 if [ -n "$PROBE_PATH" ]; then
-  ok "準備完了プローブが設定されている（${PROBE_PATH}）— 更新はダウンタイムなしで進む"
+  ok "readiness probe is configured (${PROBE_PATH}) — the update will proceed without downtime"
 else
-  warn "アプリケーションに準備完了プローブがない" \
-       "ゼロダウンタイム更新についてのラボ4はこのようなアプリケーションではエラーを出す — rickroll.yaml から readinessProbe を戻す"
+  warn "the application has no readiness probe" \
+       "lab 4 about zero-downtime updates will produce errors on such an application — restore readinessProbe from rickroll.yaml"
 fi
 
 finish

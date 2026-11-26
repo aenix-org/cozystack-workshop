@@ -67,7 +67,7 @@ kubectl get vminstance -n tenant-workshopXX
 
 ```powershell
 New-Item -ItemType Directory -Force "$HOME\.kube" | Out-Null
-notepad "$HOME\.kube\workshop"    # 粘贴 kubeconfig；文件类型选「所有文件」
+notepad "$HOME\.kube\workshop"    # paste the kubeconfig; file type — "All Files"
 [Environment]::SetEnvironmentVariable("KUBECONFIG", "$HOME\.kube\workshop", "User")
 $env:KUBECONFIG = "$HOME\.kube\workshop"
 kubectl get vminstance -n tenant-workshopXX
@@ -95,7 +95,7 @@ cd cozystack-migration-workshop/laptop
 # Linux
 find manifests scripts -type f -exec sed -i 's/tenant-workshopXX/tenant-workshop03/g' {} +
 
-# macOS —— 同样的 sed，但 -i 之后需要一对空引号
+# macOS — the same sed, but it requires empty quotes after -i
 find manifests scripts -type f -exec sed -i '' 's/tenant-workshopXX/tenant-workshop03/g' {} +
 ```
 
@@ -113,7 +113,7 @@ Get-ChildItem -Path manifests,scripts -File -Recurse | ForEach-Object {
 grep -rn tenant-workshopXX manifests scripts || echo "all clean, you can continue"
 ```
 
-有一处是命令故意不去碰的：在 `manifests/03-app-vm.yaml` 里那行 `url: "ВСТАВЬТЕ_PRESIGNED_URL"`——这个链接你会在第二阶段之后拿到。
+有一处是命令故意不去碰的：在 `manifests/03-app-vm.yaml` 里那行 `url: "PASTE_PRESIGNED_URL"`——这个链接你会在第二阶段之后拿到。
 
 详见：[chat/10](chat/10-clone-and-set-number.md) ·
 文件地图 [chat/11](chat/11-file-map.md)
@@ -165,7 +165,7 @@ kubectl get vminstance convert -n tenant-workshopXX -w
 virtctl console --namespace=tenant-workshopXX vm-instance-convert
 ```
 
-进去后：`nano convert.sh`，把 `scripts/convert.sh` 的内容粘进去，再把你自己的 `bucketName`、`accessKey` 和 `secretKey` 填到 `ВСТАВЬТЕ_...` 的位置，然后运行 `bash convert.sh`。
+进去后：`nano convert.sh`，把 `scripts/convert.sh` 的内容粘进去，再把你自己的 `bucketName`、`accessKey` 和 `secretKey` 填到 `PASTE_...` 的位置，然后运行 `bash convert.sh`。
 
 **不是在我们的活动现场，而是自己做这个工作坊？** `convert.sh` 里的 `OVA_URL` 指向工作坊云的对象存储中的演示镜像。我们把它放在那里，是为了活动期间下载得快、不占用外部流量，但工作坊结束后这份副本就没有了。请把链接换成公开副本 `https://github.com/aenix-org/cozystack-workshop/releases/download/vmware-demo-ova/app-1.ova`（约 810 MB），或者换成你自己的 OVA。
 
@@ -189,7 +189,7 @@ kubectl delete vminstance convert --namespace tenant-workshopXX
 kubectl delete vmdisk convert-tools --namespace tenant-workshopXX
 ```
 
-把你拿到的链接填进 `manifests/03-app-vm.yaml`，替换掉 `url: "ВСТАВЬТЕ_PRESIGNED_URL"`，然后：
+把你拿到的链接填进 `manifests/03-app-vm.yaml`，替换掉 `url: "PASTE_PRESIGNED_URL"`，然后：
 
 ```bash
 kubectl apply -f manifests/03-app-vm.yaml
@@ -269,13 +269,13 @@ curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/actuator/health
 📍 在你的机器内部。CentOS 7 自带的 psql 是 9.2 版，它不会 SCRAM，会回 `SCRAM authentication requires libpq version 10 or above`。我们装个新的：
 
 ```bash
-# 1. PGDG 仓库——PostgreSQL 软件包的来源
+# 1. The PGDG repository — the source of PostgreSQL packages
 yum install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm
 
-# 2. libzstd：CentOS 7 的仓库里没有，我们从 EPEL 归档里取
+# 2. libzstd: not in the CentOS 7 repositories, so we take it from the EPEL archive
 yum install -y https://archives.fedoraproject.org/pub/archive/epel/7/x86_64/Packages/l/libzstd-1.5.5-1.el7.x86_64.rpm
 
-# 3. 客户端本身——只从还活着的 pgdg15 仓库取
+# 3. The client itself — only from the live pgdg15 repository
 yum install -y --disablerepo='pgdg*' --enablerepo=pgdg15 postgresql15
 ```
 
@@ -290,7 +290,7 @@ psql --version
 我们把表结构取下来并导入：
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/laptop/scripts/orders-schema.sql
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/laptop/scripts/orders-schema.sql
 
 PGPASSWORD='Orders2019!' psql \
   -h postgres-db-rw.tenant-workshopXX.svc.cozy.local -U orders -d orders \
@@ -337,13 +337,13 @@ curl -s http://localhost:8080/api/orders
 > **`vmi/` 前缀不是每条命令都需要，这不是笔误。** 这两条命令的目标语法不一样。`virtctl console` 只接受名字，带上前缀它会回 `forbidden`，因为它把 `vmi` 这个词当成了机器的名字。而 `virtctl port-forward` 要求用 `type/name` 这种形式，不带前缀它会回 `target must contain type and name separated by '/'`。
 
 ```bash
-# 登录 app-VM（root / cozydemo）
+# log into the app-VM (root / cozydemo)
 virtctl console --namespace=tenant-workshopXX vm-instance-app-1
 
-# 登录 conversion-VM（ubuntu / ubuntu）
+# log into the conversion-VM (ubuntu / ubuntu)
 virtctl console --namespace=tenant-workshopXX vm-instance-convert
 
-# 把应用的端口转发到笔记本
+# forward the application's port to the laptop
 virtctl port-forward --namespace=tenant-workshopXX vmi/vm-instance-app-1 8080:8080
 ```
 

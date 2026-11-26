@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# लैब जाँच स्क्रिप्ट्स के लिए साझा लाइब्रेरी।
-# इस तरह सोर्स की जाती है:  . "$(dirname "$0")/../../check/lib.sh"
+# Shared library for the lab check scripts.
+# Sourced like this:  . "$(dirname "$0")/../../check/lib.sh"
 #
-# `set -e` का उपयोग जानबूझकर नहीं किया गया है: स्क्रिप्ट को हर जाँच चलानी चाहिए और
-# पूरी तस्वीर दिखानी चाहिए, पहली ही विफलता पर रुकना नहीं चाहिए। पाठक इसे ठीक तभी
-# चलाता है जब वह अटक जाता है — इसे आधे रास्ते में रोक देना आधे उत्तर को छिपा देता है।
+# `set -e` is deliberately NOT used: the script must run every check and show
+# the full picture, not stop at the first failure. The reader runs it exactly
+# when they are stuck — cutting it off halfway hides half the answer.
 
 LAB_NAME="${LAB_NAME:-unknown}"
 LAB_TITLE="${LAB_TITLE:-$LAB_NAME}"
@@ -15,27 +15,29 @@ _warn=0
 _lines=()
 _evidence=()
 
-# रंग केवल तभी जब आउटपुट टर्मिनल पर जाता है: फ़ाइल में और CI में escape
-# अनुक्रम कचरे के रूप में पढ़े जाते हैं।
+# Colors only when output goes to a terminal: in a file and in CI the escape
+# sequences read as garbage.
 if [ -t 1 ]; then
   _C_OK=$'\033[32m'; _C_FAIL=$'\033[31m'; _C_WARN=$'\033[33m'; _C_DIM=$'\033[2m'; _C_OFF=$'\033[0m'
 else
   _C_OK=''; _C_FAIL=''; _C_WARN=''; _C_DIM=''; _C_OFF=''
 fi
 
-# --- मशीन-पठनीय परिणाम -------------------------------------------------------
-# result-<lab>.json मानव रिपोर्ट के साथ-साथ बनाई जाती है और इसमें केवल जाँच
-# पहचानकर्ता और उसका परिणाम होता है। शब्दांकन, कमांड आउटपुट और साक्ष्य वहाँ नहीं
-# जाते: markdown रिपोर्ट में कंटेनर लॉग की पूँछ, बाहरी लोड बैलेंसर पते, नोड पते,
-# और उपयोगकर्ता नाम के साथ एक्सेस फ़ाइल का पथ जमा हो जाते हैं। इसे regex से साफ़
-# करना अविश्वसनीय है — विश्वसनीय तरीका इसे उत्पन्न ही न करना है।
+# --- machine-readable result -------------------------------------------------
+# result-<lab>.json is built alongside the human report and contains ONLY the
+# check identifier and its outcome. The wording, command output, and evidence do
+# not go there: the markdown report accumulates container log tails, external
+# load balancer addresses, node addresses, and the path to the access file along
+# with the user name. Scrubbing that with regexes is unreliable — the reliable
+# way is not to produce it.
 #
-# पहचानकर्ता स्वयं व्युत्पन्न होता है: लैब में जाँच का क्रमांक और शब्दांकन का एक
-# छोटा हैश। संख्या स्थिरता देती है, हैश पाठ के मौन संपादन को पकड़ता है — यदि
-# शब्दांकन बदला गया, तो सेवा इसे देखेगी और चुपचाप उसी जाँच के रूप में स्वीकार नहीं करेगी।
+# The identifier derives itself: the check's ordinal number in the lab plus a
+# short hash of the wording. The number gives stability, the hash catches a
+# silent edit of the text — if the wording was changed, the service will see it
+# and will not silently accept it as the same check.
 _checks=()
 _seq=0
-_record() {   # _record <स्थिति> <शब्दांकन>
+_record() {   # _record <status> <message>
   _seq=$((_seq + 1))
   local h
   h="$(printf '%s' "$2" | shasum -a 256 2>/dev/null | cut -c1-8)"
@@ -50,14 +52,14 @@ ok() {
   _lines+=("- **OK** — $1")
 }
 
-# fail "क्या ग़लत है" "इसके बारे में क्या करें"
+# fail "what is wrong" "what to do about it"
 fail() {
   _record fail "$1"
   _fail=$((_fail + 1))
   printf '%s[ FAIL ]%s %s\n' "$_C_FAIL" "$_C_OFF" "$1"
   [ -n "${2:-}" ] && printf '         %s%s%s\n' "$_C_DIM" "$2" "$_C_OFF"
   _lines+=("- **FAIL** — $1")
-  [ -n "${2:-}" ] && _lines+=("  - क्या करें: $2")
+  [ -n "${2:-}" ] && _lines+=("  - what to do: $2")
 }
 
 warn() {
@@ -66,11 +68,11 @@ warn() {
   printf '%s[ WARN ]%s %s\n' "$_C_WARN" "$_C_OFF" "$1"
   [ -n "${2:-}" ] && printf '         %s%s%s\n' "$_C_DIM" "$2" "$_C_OFF"
   _lines+=("- **WARN** — $1")
-  [ -n "${2:-}" ] && _lines+=("  - टिप्पणी: $2")
+  [ -n "${2:-}" ] && _lines+=("  - note: $2")
 }
 
-# evidence "शीर्षक" "मान" — आर्टिफ़ैक्ट में जाता है, टर्मिनल पर नहीं छापा जाता।
-# साक्ष्य इसलिए मौजूद हैं ताकि रिपोर्ट किसी को दिखाई जा सके और वह कुछ अर्थ रखे।
+# evidence "title" "value" — goes into the artifact, is not printed to the terminal.
+# Evidence exists so the report can be shown to someone and actually mean something.
 evidence() {
   _evidence+=("### $1")
   _evidence+=('```')
@@ -78,45 +80,46 @@ evidence() {
   _evidence+=('```')
 }
 
-# जल्दी निकास को फिर भी एक रिपोर्ट छोड़नी चाहिए: README सलाह देता है «समुदाय में आएँ
-# और स्क्रिप्ट की रिपोर्ट संलग्न करें», पर पहले, जब क्लस्टर अनुपलब्ध था तो संलग्न करने के लिए
-# कुछ नहीं था — यानी ठीक उसी स्थिति में कोई रिपोर्ट नहीं थी जिसके लिए वह अस्तित्व में है।
+# Early exits must still leave a report: the README advises "come to the community
+# and attach the script's report", yet before, when the cluster was unreachable there
+# was nothing to attach — that is, there was no report precisely in the case it exists for.
 need_kubeconfig() {
   if [ -z "${KUBECONFIG:-}" ]; then
-    fail "KUBECONFIG वेरिएबल सेट नहीं है" \
-         "पहले: export KUBECONFIG=~/lab.kubeconfig (हर नई टर्मिनल विंडो में)"
+    fail "the KUBECONFIG variable is not set" \
+         "first: export KUBECONFIG=~/lab.kubeconfig (in every new terminal window)"
     finish; exit 1
   fi
   if ! kubectl version -o json >/dev/null 2>&1; then
-    fail "क्लस्टर KUBECONFIG=${KUBECONFIG} पर जवाब नहीं दे रहा" \
-         "यदि kubectl get nodes बिना जवाब के अटका रहता है — क्लस्टर कंट्रोल प्लेन ऊपर नहीं आया; डैशबोर्ड में Kubernetes एप्लिकेशन की स्थिति और कोटा की कमी (exceeded quota) के लिए टेनेंट इवेंट्स देखें"
-    evidence "एक्सेस फ़ाइल" "$KUBECONFIG"
-    evidence "क्लस्टर का जवाब" "$(kubectl get nodes 2>&1 | head -5)"
+    fail "the cluster does not respond with KUBECONFIG=${KUBECONFIG}" \
+         "if kubectl get nodes hangs with no response — the cluster control plane did not come up; check the Kubernetes application status in the dashboard and the tenant events for an exceeded quota"
+    evidence "Access file" "$KUBECONFIG"
+    evidence "Cluster response" "$(kubectl get nodes 2>&1 | head -5)"
     finish; exit 1
   fi
 }
 
 need_tenant() {
   if [ -z "${COZY_TENANT:-}" ]; then
-    printf '%s[ FAIL ]%s COZY_TENANT वेरिएबल सेट नहीं है\n' "$_C_FAIL" "$_C_OFF"
-    printf '         %sउदाहरण के लिए: export COZY_TENANT=workshop07%s\n' "$_C_DIM" "$_C_OFF"
+    printf '%s[ FAIL ]%s the COZY_TENANT variable is not set\n' "$_C_FAIL" "$_C_OFF"
+    printf '         %sfor example: export COZY_TENANT=workshop07%s\n' "$_C_DIM" "$_C_OFF"
     exit 1
   fi
 }
 
-# GNU एक्सटेंशन के बिना समय: macOS पर BSD date `-d` को नहीं समझता।
+# Time without GNU extensions: BSD date on macOS does not understand `-d`.
 _now() { date -u '+%Y-%m-%d %H:%M:%S UTC'; }
 _stamp() { date -u '+%Y%m%d-%H%M%S'; }
 
-# मशीन-पठनीय परिणाम कहाँ संग्रहीत होते हैं। जानबूझकर रिपॉज़िटरी के बाहर: क्लोन के
-# अंदर पहला ही `git pull` या ब्रांच स्विच उन्हें मिटा देता, और वे हफ़्तों में एकत्र होते हैं।
+# Where machine-readable results are stored. Outside the repo on purpose: inside
+# a clone the first `git pull` or branch switch would wipe them, and they are
+# collected over weeks.
 LAB_RESULTS_DIR="${COZY_LAB_RESULTS:-$HOME/.cozystack-labs/results}"
 
 _write_result_json() {
   mkdir -p "$LAB_RESULTS_DIR" 2>/dev/null || return 0
-  # क्लस्टर पहचानकर्ता — kube-system नेमस्पेस का uid। यह एक क्लस्टर पर सभी प्रयोगों के
-  # लिए समान होता है और अलग-अलग लोगों के बीच भिन्न, और मुख्य बात — इसे टेनेंट नाम के
-  # विपरीत «हाथ से टाइप» नहीं किया जा सकता।
+  # Cluster identifier — the uid of the kube-system namespace. It is the same for
+  # all runs on one cluster and different across people, and crucially it cannot
+  # be "typed in by hand", unlike the tenant name.
   local cluster_uid=""
   cluster_uid="$(kubectl get ns kube-system -o jsonpath='{.metadata.uid}' 2>/dev/null || true)"
   local kver=""
@@ -156,15 +159,15 @@ finish() {
   local verdict
 
   if [ "$_fail" -eq 0 ]; then
-    verdict="लैब पास"
+    verdict="LAB PASSED"
   else
-    verdict="खुले आइटम बाकी हैं"
+    verdict="OPEN ITEMS REMAIN"
   fi
 
   _write_result_json "$([ "$_fail" -eq 0 ] && echo passed || echo failed)"
 
   printf '\n'
-  printf 'जाँचें: %d · पास: %d · विफल: %d · चेतावनियाँ: %d\n' \
+  printf 'checks: %d · passed: %d · failed: %d · warnings: %d\n' \
     "$total" "$_pass" "$_fail" "$_warn"
   if [ "$_fail" -eq 0 ]; then
     printf '%s%s%s\n' "$_C_OK" "$verdict" "$_C_OFF"
@@ -173,43 +176,44 @@ finish() {
   fi
 
   {
-    echo "# रिपोर्ट: ${LAB_TITLE}"
+    echo "# Report: ${LAB_TITLE}"
     echo
-    echo "- दिनांक: $(_now)"
-    echo "- परिणाम: **${verdict}**"
-    echo "- जाँचें: ${total} (पास ${_pass}, विफल ${_fail}, चेतावनियाँ ${_warn})"
-    [ -n "${COZY_TENANT:-}" ] && echo "- टेनेंट: \`${COZY_TENANT}\`"
+    echo "- Date: $(_now)"
+    echo "- Result: **${verdict}**"
+    echo "- Checks: ${total} (passed ${_pass}, failed ${_fail}, warnings ${_warn})"
+    [ -n "${COZY_TENANT:-}" ] && echo "- Tenant: \`${COZY_TENANT}\`"
     echo
-    echo "## जाँचें"
+    echo "## Checks"
     echo
     printf '%s\n' "${_lines[@]}"
     if [ "${#_evidence[@]}" -gt 0 ]; then
       echo
-      echo "## साक्ष्य"
+      echo "## Evidence"
       echo
       printf '%s\n' "${_evidence[@]}"
     fi
     echo
     echo "---"
     echo
-    echo "यह रिपोर्ट Cozystack लैब्स की \`check.sh\` स्क्रिप्ट द्वारा तैयार की गई थी।"
-    echo "इसने वास्तविक कार्यक्षमता की गुण-दोष के आधार पर जाँच की, न कि केवल यह तथ्य कि मैनिफ़ेस्ट लागू किए गए थे।"
+    echo "This report was produced by the \`check.sh\` script from the Cozystack labs."
+    echo "It verified real functionality on the merits, not the mere fact that manifests were applied."
   } > "$report"
 
-  printf 'रिपोर्ट: %s\n' "$report"
+  printf 'report: %s\n' "$report"
   [ "$_fail" -eq 0 ] && return 0 || return 1
 }
 
-# विशेष रूप से सर्वर संस्करण। `kubectl version -o json` क्लाइंट और सर्वर दोनों छापता है;
-# gitVersion पर एक सरल grep पहला मैच लेता है — क्लाइंट वाला — और रिपोर्ट क्लस्टर संस्करण
-# के बारे में झूठ बोलने लगती है। यहाँ ग़लती करना आसान है, इसलिए इसे लाइब्रेरी में रखा गया है।
+# The SERVER version specifically. `kubectl version -o json` prints both the client
+# and the server one; a naive grep on gitVersion takes the first match — the client
+# one — and the report starts lying about the cluster version. It is easy to get this
+# wrong, so it is moved into the library.
 server_version() {
   kubectl version -o json 2>/dev/null \
     | python3 -c 'import sys,json;print(json.load(sys.stdin)["serverVersion"]["gitVersion"])' 2>/dev/null
 }
 
-# मानव-पठनीय आकार: Kubernetes allocatable को कभी Ki में, कभी नंगे बाइट्स में देता है,
-# और रिपोर्ट में «3258002390» पाठक को कुछ नहीं बताता।
+# Human-readable size: Kubernetes reports allocatable sometimes in Ki, sometimes in
+# bare bytes, and "3258002390" in the report tells the reader nothing.
 human_bytes() {
   python3 - "$1" <<'PY' 2>/dev/null
 import sys, re
@@ -229,23 +233,24 @@ else:
 PY
 }
 
-# एक बार-उपयोग वाले पॉड में कमांड चलाएँ, रहस्यों को कमांड-लाइन आर्गुमेंट्स के बजाय
-# एक अस्थायी Secret से सेट किए गए पर्यावरण वेरिएबल्स के माध्यम से पास करते हुए।
+# Run a command in a throwaway pod, passing secrets through environment variables
+# set from a temporary Secret rather than command-line arguments.
 #
-# ऐसा क्यों। पॉड के args में जाने वाली हर चीज़ `get pods` रखने वाले किसी भी व्यक्ति को
-# दिखती है, etcd में रहती है, audit log में पहुँचती है, और नोड पर `ps` में दिखती है।
-# डेटाबेस लैब्स अलग से समझाती हैं कि कमांड लाइन पर पासवर्ड एक बुरी प्रथा है; उन्हें ठीक
-# ऐसा करने वाली स्क्रिप्ट से जाँचना दोहरा मापदंड होगा।
+# Why this way. Everything that goes into a pod's args is visible to anyone with
+# `get pods`, sits in etcd, ends up in the audit log, and shows up in `ps` on the
+# node. The database labs separately explain that a password on the command line
+# is bad practice; checking them with a script that does exactly that would be a
+# double standard.
 #
-# उपयोग:
+# Usage:
 #   in_cluster_with_secrets "<image>" "KEY1=val1
-#   KEY2=val2" sh -c 'कमांड जो $KEY1 पढ़ती है'
+#   KEY2=val2" sh -c 'command that reads $KEY1'
 in_cluster_with_secrets() {
   local image="$1" envs="$2"; shift 2
   local name="check-$$-$RANDOM"
   local sec="${name}-env"
 
-  # Secret को stdin से बनाया जाता है, इसलिए मान kubectl आर्गुमेंट्स में नहीं जाते।
+  # The Secret is created from stdin, so the values do not end up in kubectl arguments.
   local args=()
   while IFS= read -r line; do
     [ -n "$line" ] && args+=(--from-literal="$line")
@@ -254,8 +259,9 @@ $envs
 EOF
   kubectl create secret generic "$sec" "${args[@]}" >/dev/null 2>&1 || return 1
 
-  # securityContext यहाँ भी अनिवार्य है: इसके बिना `restricted` प्रोफ़ाइल वाले क्लस्टर में
-  # पॉड नहीं बनेगा, और डेटाबेस लैब्स की जाँचें नहीं चलेंगी।
+  # securityContext is also mandatory here: without it the pod will not be created
+  # in a cluster with the `restricted` profile, and the checks for the database labs
+  # will not run.
   local cmd_json
   cmd_json="$(printf '%s\n' "$@" | python3 -c 'import sys,json;print(json.dumps([l.rstrip("\n") for l in sys.stdin]))')"
   kubectl run "$name" --rm -i --restart=Never --quiet \
@@ -269,12 +275,12 @@ EOF
   return $rc
 }
 
-# `restricted` प्रोफ़ाइल पास करने वाले securityContext के साथ एक override बनाएँ।
-# अलग से निकाला गया: वही ऐड-ऑन हर बार-उपयोग वाले पॉड को चाहिए, और इसके बिना
-# जाँच स्क्रिप्ट्स सख़्त क्लस्टरों में काम नहीं करतीं।
-# कमांड आर्गुमेंट्स प्रत्येक अलग-अलग पास किए जाते हैं, और JSON python द्वारा असेंबल किया
-# जाता है: bash में हाथ से कोट्स एस्केप करना पहले ही एक टूटे हुए override और पॉड की मौन
-# विफलता का कारण बन चुका है — जिसमें त्रुटि 2>/dev/null द्वारा दबा दी गई थी।
+# Build an override with a securityContext that passes the `restricted` profile.
+# Broken out separately: the same add-on is needed by every throwaway pod, and
+# without it the check scripts do not work in strict clusters.
+# The command arguments are passed EACH SEPARATELY, and the JSON is assembled by
+# python: hand-escaping quotes in bash has already led to a broken override and a
+# silent failure of the pod — with the error swallowed by 2>/dev/null.
 _restricted_overrides() {
   local name="$1" image="$2"; shift 2
   python3 - "$name" "$image" "$@" <<'PYJSON'
@@ -290,32 +296,34 @@ print(json.dumps({"spec": {
 PYJSON
 }
 
-# एक बार-उपयोग वाले पॉड में कमांड चलाएँ और उसका आउटपुट लौटाएँ।
-# वहाँ आवश्यक जहाँ क्लस्टर के अंदर से सेवा की पहुँच जाँची जाती है: लैपटॉप से
-# ClusterIP दिखाई नहीं देता। पॉड हर हाल में अपने पीछे सफ़ाई कर देता है।
+# Run a command in a throwaway pod and return its output.
+# Needed where service reachability from inside the cluster is checked: from the
+# laptop the ClusterIP is not visible. The pod cleans up after itself in any case.
 in_cluster_curl() {
   local url="$1" extra="${2:-}"
   local name="check-$$-$RANDOM"
-  # securityContext अनिवार्य है: `restricted` प्रोफ़ाइल वाले क्लस्टर में इसके बिना पॉड
-  # नहीं बनेगा, और प्रतिभागी लैब की जाँच बिल्कुल नहीं कर पाएगा।
+  # securityContext is mandatory: in a cluster with the `restricted` profile a pod
+  # without it will not be created, and the participant will not be able to check
+  # the lab at all.
   kubectl run "$name" --rm -i --restart=Never --quiet \
     --image=curlimages/curl:8.11.1 --pod-running-timeout=90s \
     --overrides="$(_restricted_overrides "$name" curlimages/curl:8.11.1 \
       curl -s --max-time 10 $extra "$url")" \
     2>/dev/null
   local rc=$?
-  # `--rm` पॉड को केवल तब तक हटाता है जब तक क्लाइंट अटैच रहता है: डिस्कनेक्ट, टाइमआउट
-  # या Ctrl+C उसे लटका छोड़ देते हैं। स्पष्ट डिलीट — ताकि स्क्रिप्ट क्लस्टर में कचरा न फैलाए।
+  # `--rm` deletes the pod only while the client stays attached: a disconnect, a
+  # timeout, or Ctrl+C leaves it hanging. The explicit delete keeps the script from
+  # littering the cluster.
   kubectl delete pod "$name" --ignore-not-found --wait=false >/dev/null 2>&1
   return $rc
 }
 
-# लगातार कई अनुरोधों से जवाब एकत्र करें, प्रति पंक्ति एक।
+# Collect responses from SEVERAL requests in a row, one per line.
 #
-# एक सेवा के पीछे कई प्रतियों के साथ एकल अनुरोध एक लॉटरी है: उसी लेबल वाला एक भटका हुआ
-# पॉड लोड बैलेंसिंग में आ जाता है, पर एकल नमूना उसे चूक सकता है, और जाँच खुशी-खुशी बदले
-# हुए कंटेंट पर हरी हो जाती है। सत्यापित: बीस में से आठ अनुरोध नकली के पास गए, और जाँच
-# लगातार चार बार «पास» बोली।
+# A single request with several replicas behind a service is a lottery: a stray pod
+# with the same label gets into the load balancing, but a single sample may miss it,
+# and the check happily turns green on substituted content. Verified: eight of twenty
+# requests went to the impostor, and the check said "passed" four times in a row.
 in_cluster_curl_many() {
   local url="$1" times="${2:-8}"
   local name="check-$$-$RANDOM"

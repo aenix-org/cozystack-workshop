@@ -9,7 +9,7 @@ archivo por su cuenta — no hace falta copiar nada por el portapapeles.
 
 Trae el script desde GitHub directamente a la máquina:
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/bastion/scripts/convert.sh
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/bastion/scripts/convert.sh
 ```
 
 Ábrelo:
@@ -33,7 +33,7 @@ y son iguales para todos.
 Para guardar en nano: `Ctrl+O`, luego `Enter`, y después `Ctrl+X` para salir. Comprueba que no
 queden marcadores:
 ```bash
-grep ВСТАВЬТЕ convert.sh || echo "all filled in, ready to run"
+grep PASTE_ convert.sh || echo "all filled in, ready to run"
 ```
 
 Ejecútalo — siempre a través de `sudo`, el script necesita privilegios de root. Y ejecútalo **dentro de `screen`**:
@@ -42,9 +42,9 @@ al bastion → la consola de la máquina conversora). Si cualquier eslabón de l
 normal se cortaría a la mitad. `screen` mantiene vivo el proceso incluso cuando la conexión se cae:
 
 ```bash
-screen -S convert          # entrar en una sesión aparte
-sudo bash convert.sh       # ejecutarlo dentro de ella
-#  ¿se cayó la conexión? vuelve a entrar a esta misma máquina, luego:  screen -r convert
+screen -S convert          # start a separate session
+sudo bash convert.sh       # run it inside that session
+#  connection dropped? log back in to this same machine, then:  screen -r convert
 ```
 
 Lo que ocurre por dentro: el script descarga la imagen de origen, ejecuta `virt-v2v`,
@@ -61,7 +61,7 @@ Al final el script imprimirá un **enlace prefirmado** a tu imagen — busca en 
 que empiece con la palabra `Share:`, el enlace va justo después.
 
 **Qué hacer con él:** cópialo en ese mismo bloc de notas. En el siguiente paso volverás al bastion, abrirás `manifests/03-app-vm.yaml` y lo pegarás en el campo `url` — donde
-ahora está el marcador `ВСТАВЬТЕ_PRESIGNED_URL`. El mismo del que te avisé
+ahora está el marcador `PASTE_PRESIGNED_URL`. El mismo del que te avisé
 cuando estábamos rellenando los números.
 
 Es un enlace firmado temporal: el almacenamiento no está expuesto al exterior, y el enlace lo generaste

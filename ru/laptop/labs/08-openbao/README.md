@@ -74,7 +74,7 @@ init-контейнер — вводятся по ходу, в том шаге, 
 ## Что лежит в папке лабы
 
 Все файлы уже у вас — вы забрали их вместе с репозиторием. Создавать и печатать заново
-ничего не нужно: там, где ниже написано `kubectl apply -f имя.yaml`, файл берётся отсюда.
+ничего не нужно: там, где ниже написано `kubectl apply -f name.yaml`, файл берётся отсюда.
 
 ```bash
 cd labs/08-openbao
@@ -146,12 +146,12 @@ limit). Значения крошечные намеренно: приложен
 **Применяем.**
 
 ```bash
-# KUBECONFIG говорит kubectl, к какому кластеру обращаться. Здесь — учебный кластер
-# из лабы 0; тенант понадобится позже, на шаге с заказом хранилища.
+# KUBECONFIG tells kubectl which cluster to talk to. Here it's the lab cluster
+# from Lab 0; the tenant will be needed later, at the step where we order the store.
 export KUBECONFIG=~/lab.kubeconfig
 cd labs/08-openbao
-# apply = «приведи кластер к тому, что описано в файле». -f — взять описание из файла.
-# Объекта с таким именем ещё нет, поэтому он будет создан.
+# apply = "bring the cluster to what's described in the file". -f = take the description from the file.
+# No object with this name exists yet, so it will be created.
 kubectl apply -f secrets-demo-naive.yaml
 ```
 
@@ -160,16 +160,16 @@ kubectl apply -f secrets-demo-naive.yaml
 Смотрим, что получилось:
 
 ```bash
-# logs = показать, что приложение напечатало в свой вывод. Отдельного файла лога нет.
-#   deploy/secrets-demo  взять вывод у пода, поднятого по этому описанию
-#   --tail=2             только две последние строки, а не всё с момента запуска
+# logs = show what the application printed to its output. There's no separate log file.
+#   deploy/secrets-demo  take the output from the Pod brought up by this description
+#   --tail=2             only the last two lines, not everything since startup
 kubectl logs deploy/secrets-demo --tail=2
 ```
 
 **Что вы должны увидеть** — примерно такое:
 
 ```
-08:14:31 подключаюсь к passes-db.internal как passes_app, отпечаток пароля sha256:a609df223d57
+08:14:31 connecting to passes-db.internal as passes_app, password fingerprint sha256:a609df223d57
 ```
 
 Приложение работает. Пароль — в файле, файл — в Git. Это ровно та ситуация, которую нашёл
@@ -223,16 +223,16 @@ Kubernetes подставит содержимое ключа `password` из с
 **Применяем.**
 
 ```bash
-# Тот же apply. В файле два объекта — Secret и изменённый Deployment; кластер сравнит
-# описанное с тем, что у него уже есть, и доведёт до совпадения.
+# The same apply. The file holds two objects — a Secret and the changed Deployment; the cluster will
+# compare what's described against what it already has and bring the two into line.
 kubectl apply -f secrets-demo-secret.yaml
 ```
 
 Убедимся, что приложение по-прежнему работает:
 
 ```bash
-# rollout status ждёт, пока новая версия приложения полностью сменит старую, и только
-# потом возвращает управление. Без него логи можно успеть прочитать у старого пода.
+# rollout status waits until the new version of the application has fully replaced the old one, and only
+# then returns control. Without it you might read the logs of the old Pod.
 kubectl rollout status deploy/secrets-demo
 kubectl logs deploy/secrets-demo --tail=2
 ```
@@ -247,8 +247,8 @@ kubectl logs deploy/secrets-demo --tail=2
 Попробуйте убедиться, что теперь всё хорошо. Спросите у кластера, что лежит в секрете:
 
 ```bash
-# get … -o yaml = «покажи объект целиком, в том виде, в каком его хранит кластер».
-# Смотреть надо на поле data — это и есть содержимое секрета.
+# get … -o yaml = "show the object in full, exactly as the cluster stores it".
+# Look at the data field — that's the secret's contents.
 kubectl get secret passes-db -o yaml
 ```
 
@@ -257,10 +257,10 @@ kubectl get secret passes-db -o yaml
 Теперь одна команда:
 
 ```bash
-#   -o jsonpath='{.data.password}'  достать из объекта ровно одно поле, без обёртки
-#   | base64 -d                     передать его дальше и раскодировать: d = decode
-#   ; echo                          допечатать перевод строки, иначе результат слипнётся
-#                                   со следующим приглашением терминала
+#   -o jsonpath='{.data.password}'  pull exactly one field out of the object, without the wrapper
+#   | base64 -d                     pass it along and decode it: d = decode
+#   ; echo                          print a trailing newline, otherwise the result runs into
+#                                   the next terminal prompt
 kubectl get secret passes-db -o jsonpath='{.data.password}' | base64 -d; echo
 ```
 
@@ -362,8 +362,8 @@ spec:
 Применяется этот файл **не в лабораторный кластер**, а в тенант:
 
 ```bash
-# --kubeconfig указывает файл доступа явно и перекрывает переменную KUBECONFIG.
-# Поэтому заказ уходит в тенант на управляющем кластере, а не в учебный кластер.
+# --kubeconfig names the access file explicitly and overrides the KUBECONFIG variable.
+# So the order goes to the tenant on the management cluster, not to the lab cluster.
 kubectl --kubeconfig ~/.kube/workshop apply -f openbao.yaml
 ```
 
@@ -407,20 +407,20 @@ openbao-secrets.tenant-workshopXX.svc.cozy.local:8200
 хранилищем, а на ноутбук ставить её не придётся. Подставьте свой номер тенанта:
 
 ```bash
-# run создаёт один под из указанного образа — одноразовую машинку внутри кластера.
-#   --image          откуда взять содержимое: официальный образ OpenBao с утилитой bao
-#   --restart=Never  не поднимать заново, когда команда внутри завершится
-#   --env            переменная окружения пода: её увидит любая команда внутри него
-#   --command --     всё, что после двух дефисов, — команда, которую под выполнит
-# sleep 86400 = «ничего не делай сутки»: под нужен нам только как рабочее место.
+# run creates a single Pod from the given image — a disposable little machine inside the cluster.
+#   --image          where to take the contents from: the official OpenBao image with the bao utility
+#   --restart=Never  don't bring it up again once the command inside finishes
+#   --env            the Pod's environment variable: any command inside it will see it
+#   --command --     everything after the two dashes is the command the Pod will run
+# sleep 86400 = "do nothing for a day": we need the Pod only as a workspace.
 kubectl run bao-workbench \
   --image=openbao/openbao:2.5.1 \
   --restart=Never \
   --env=BAO_ADDR=http://openbao-secrets.tenant-workshopXX.svc.cozy.local:8200 \
   --command -- sleep 86400
-# wait держит терминал, пока условие не выполнится.
-#   --for=condition=Ready  под запустился и готов принимать команды
-#   --timeout=120s         через две минуты сдаться и вернуть ошибку
+# wait holds the terminal until the condition is met.
+#   --for=condition=Ready  the Pod has started and is ready to accept commands
+#   --timeout=120s         give up after two minutes and return an error
 kubectl wait --for=condition=Ready pod/bao-workbench --timeout=120s
 ```
 
@@ -432,9 +432,9 @@ kubectl wait --for=condition=Ready pod/bao-workbench --timeout=120s
 Проверяем, что из лабораторного кластера видно тенант:
 
 ```bash
-# exec = выполнить команду внутри уже запущенного пода; после -- идёт сама команда.
-# bao status спрашивает хранилище о состоянии: запечатано ли оно, инициализировано ли.
-# Здесь это заодно проверка связи: ответ вообще пришёл — значит тенант виден.
+# exec = run a command inside an already-running Pod; the command itself comes after --.
+# bao status asks the store about its state: whether it's sealed, whether it's initialized.
+# Here it doubles as a connectivity check: a reply arrived at all — so the tenant is visible.
 kubectl exec bao-workbench -- bao status
 ```
 
@@ -469,9 +469,9 @@ Storage Type       file
 Связь есть, значит можно класть пароль. Попробуйте:
 
 ```bash
-# bao kv put = положить запись в хранилище.
-#   secret/passes/db  путь, по которому она будет лежать
-#   password=…        содержимое записи: пара «имя поля = значение»
+# bao kv put = place a record in the store.
+#   secret/passes/db  the path where it will live
+#   password=…        the record's contents: a "field name = value" pair
 kubectl exec bao-workbench -- bao kv put secret/passes/db password=Propusk2026
 ```
 
@@ -535,10 +535,10 @@ Initialized        false
 ровно один раз.
 
 ```bash
-# operator init выполняется один раз за жизнь хранилища: создаёт мастер-ключ и печатает
-# его доли вместе с root-токеном. Повторно эти значения не покажет никто.
-#   -key-shares=1     на сколько долей разрезать мастер-ключ
-#   -key-threshold=1  сколько долей надо предъявить, чтобы собрать его обратно
+# operator init runs once in the life of the store: it creates the master key and prints
+# its shares together with a root token. No one will show these values again.
+#   -key-shares=1     how many shares to cut the master key into
+#   -key-threshold=1  how many shares must be presented to reassemble it
 kubectl exec bao-workbench -- bao operator init -key-shares=1 -key-threshold=1
 ```
 
@@ -583,10 +583,10 @@ production-настройка — пять долей, порог три: дол
 Распечатываем. Подставьте свой unseal-ключ:
 
 ```bash
-# unseal передаёт хранилищу одну долю мастер-ключа. Когда долей набирается порог,
-# ключ оказывается в памяти процесса и хранилище начинает обслуживать запросы.
-kubectl exec bao-workbench -- bao operator unseal <ваш-unseal-ключ>
-# Повторяем status, чтобы увидеть изменившееся состояние.
+# unseal hands the store one share of the master key. Once the shares reach the threshold,
+# the key ends up in the process's memory and the store starts serving requests.
+kubectl exec bao-workbench -- bao operator unseal <your-unseal-key>
+# We repeat status to see the changed state.
 kubectl exec bao-workbench -- bao status
 ```
 
@@ -596,9 +596,9 @@ kubectl exec bao-workbench -- bao status
 токен спрашивать не будут:
 
 ```bash
-# login обменивает введённый токен на запись в файле внутри пода — дальше утилита
-# берёт токен оттуда сама, и вписывать его в каждую команду не придётся.
-# -it даёт поду терминал: без него утилите некуда вывести запрос и негде принять ввод.
+# login exchanges the entered token for an entry in a file inside the Pod — from then on the utility
+# takes the token from there itself, and you won't have to type it into every command.
+# -it gives the Pod a terminal: without it the utility has nowhere to print its prompt and nowhere to take input.
 kubectl exec -it bao-workbench -- bao login
 ```
 
@@ -607,7 +607,7 @@ Initial Root Token из вывода `init`.
 
 ⚠️ **Если `bao login` жалуется, что не может записать файл токена**, передавайте токен
 переменной окружения в каждой команде:
-`kubectl exec bao-workbench -- env BAO_TOKEN='ваш-токен' bao status`.
+`kubectl exec bao-workbench -- env BAO_TOKEN='your-token' bao status`.
 Способ рабочий, но токен попадает в историю команд — в лабе терпимо, в проде нет.
 
 ## Шаг 6. Включаем движок и кладём пароль
@@ -618,9 +618,9 @@ Initial Root Token из вывода `init`.
 секретов подключают явно.
 
 ```bash
-# secrets enable подключает движок — часть хранилища, умеющую свой вид работы.
-#   -path=secret  на какой путь его повесить: дальше всё пишется как secret/…
-#   kv-v2         какой именно движок: «ключ-значение» с историей версий
+# secrets enable turns on an engine — a part of the store that knows one kind of work.
+#   -path=secret  which path to hang it on: from here on everything is written as secret/…
+#   kv-v2         which engine exactly: "key-value" with version history
 kubectl exec bao-workbench -- bao secrets enable -path=secret kv-v2
 ```
 
@@ -650,8 +650,8 @@ OpenBao не одно хранилище, а набор движков, кажд
 Кладём пароль:
 
 ```bash
-# kv put записывает новую версию целиком: перечисленные поля станут её содержимым.
-# Полей может быть сколько угодно; здесь их два — пароль и имя пользователя базы.
+# kv put writes a whole new version: the listed fields become its contents.
+# There can be any number of fields; here there are two — the password and the database username.
 kubectl exec bao-workbench -- \
   bao kv put secret/passes/db password=Propusk2026 username=passes_app
 ```
@@ -661,8 +661,8 @@ kubectl exec bao-workbench -- \
 Проверяем, что читается:
 
 ```bash
-# kv get читает запись и печатает её поля таблицей. Читаем пока root-токеном — то есть
-# проверяем, что запись легла, а не то, что прав хватит приложению.
+# kv get reads the record and prints its fields as a table. We're still reading with the root token — that is,
+# we're checking that the record landed, not that the application will have enough permissions.
 kubectl exec bao-workbench -- bao kv get secret/passes/db
 ```
 
@@ -676,11 +676,11 @@ Root-токен приложению давать нельзя: с ним мож
 Пишем политику:
 
 ```bash
-# policy write сохраняет в хранилище именованный список прав.
-#   passes-read  имя политики; по нему её потом выдадут токену
-#   -            взять текст политики со стандартного ввода, а не из файла
-#   -i           у kubectl exec: пробросить этот ввод внутрь пода
-# <<'HCL' … HCL — способ передать многострочный текст прямо в команду, без файла.
+# policy write saves a named list of permissions in the store.
+#   passes-read  the policy's name; it's later granted to a token by this name
+#   -            take the policy text from standard input rather than from a file
+#   -i           in kubectl exec: forward that input into the Pod
+# <<'HCL' … HCL is a way to pass multi-line text straight into the command, without a file.
 kubectl exec -i bao-workbench -- bao policy write passes-read - <<'HCL'
 path "secret/data/passes/db" {
   capabilities = ["read"]
@@ -726,11 +726,11 @@ path "secret/data/passes/db" {
 Выпускаем токен с этой политикой:
 
 ```bash
-# token create выпускает новый токен и привязывает к нему набор прав.
-#   -policy=passes-read  какие права: та политика, что записана выше
-#   -ttl=24h             срок жизни; через сутки токен перестанет работать сам
-#   -field=token         напечатать только значение токена, без таблицы вокруг —
-#                        так его удобно скопировать и передать дальше
+# token create issues a new token and binds a set of permissions to it.
+#   -policy=passes-read  which permissions: the policy written above
+#   -ttl=24h             lifetime; after a day the token stops working on its own
+#   -field=token         print only the token value, without the table around it —
+#                        that way it's easy to copy and pass along
 kubectl exec bao-workbench -- \
   bao token create -policy=passes-read -ttl=24h -field=token
 ```
@@ -749,12 +749,12 @@ kubectl exec bao-workbench -- \
 Приложению нужно чем-то доказать OpenBao, что оно — это оно. Этим и будет токен.
 
 ```bash
-# create secret generic заводит объект-секрет прямо в кластере, минуя файл на диске.
-#   passes-bao-token      имя объекта; по нему на секрет сошлётся описание приложения
-#   --from-literal=имя=…  положить значение строкой из командной строки
-#                         (есть и --from-file, когда значение лежит в файле)
+# create secret generic creates a Secret object directly in the cluster, bypassing a file on disk.
+#   passes-bao-token      the object's name; the application's description will reference the secret by it
+#   --from-literal=name=…  set the value as a string from the command line
+#                          (there's also --from-file, when the value is in a file)
 kubectl create secret generic passes-bao-token \
-  --from-literal=token='вставьте-токен-из-предыдущего-шага'
+  --from-literal=token='paste-the-token-from-the-previous-step'
 ```
 
 **Обратите внимание: команда, а не файл.** Токен создаётся прямо в кластере и в Git не
@@ -798,12 +798,12 @@ kubectl create secret generic passes-bao-token \
 Теперь применяем чистый манифест. Сначала подставьте свой номер тенанта:
 
 ```bash
-# sed правит текст по образцу s/что-заменить/на-что/g; g = во всех местах строки,
-# а не только в первом. -i означает «править сам файл», а не печатать результат
-# на экран. Вместо workshop03 из примера подставьте свой номер.
+# sed edits text by the pattern s/what-to-replace/with-what/g; g = in every place on the line,
+# not just the first. -i means "edit the file itself" rather than print the result
+# to the screen. In place of workshop03 from the example, substitute your own number.
 
-# macOS: пустые кавычки после -i обязательны — иначе sed примет следующее слово
-# за расширение для резервной копии и ничего не заменит
+# macOS: the empty quotes after -i are mandatory — otherwise sed will take the next word
+# as a backup-file extension and replace nothing
 sed -i '' 's/tenant-workshopXX/tenant-workshop03/g' secrets-demo.yaml
 # Linux
 sed -i 's/tenant-workshopXX/tenant-workshop03/g' secrets-demo.yaml
@@ -891,8 +891,8 @@ Init-контейнер — контейнер, который отрабаты�
 
 ```bash
 kubectl apply -f secrets-demo.yaml
-# Ждём, пока новая версия полностью сменит старую. Если init-контейнер не сумеет забрать
-# пароль, ожидание не завершится — и это ровно то поведение, которое нам нужно.
+# We wait until the new version has fully replaced the old one. If the init container can't fetch
+# the password, the wait won't finish — and that's exactly the behavior we want.
 kubectl rollout status deploy/secrets-demo
 ```
 
@@ -903,21 +903,21 @@ kubectl rollout status deploy/secrets-demo
 Сначала посмотрим, что сказал init-контейнер:
 
 ```bash
-# -c выбирает контейнер внутри пода. Их здесь два, и без -c kubectl не угадает, какой
-# нужен. fetch-secret — тот, что отработал до запуска приложения.
+# -c selects a container inside the Pod. There are two here, and without -c kubectl can't guess which
+# one you mean. fetch-secret is the one that ran before the application started.
 kubectl logs deploy/secrets-demo -c fetch-secret
 ```
 
 **Что вы должны увидеть:**
 
 ```
-пароль получен из OpenBao, в манифесте его нет
+password fetched from OpenBao, not present in the manifest
 ```
 
 Теперь сам сервис:
 
 ```bash
-# Основной контейнер: он читает файл, который положил init-контейнер.
+# The main container: it reads the file the init container placed.
 kubectl logs deploy/secrets-demo -c app --tail=2
 ```
 
@@ -927,8 +927,8 @@ kubectl logs deploy/secrets-demo -c app --tail=2
 Уберём наивный секрет, он больше не нужен и только мешает:
 
 ```bash
-# delete убирает объект из кластера. Приложение на него больше не ссылается,
-# поэтому удаление ничего не сломает.
+# delete removes the object from the cluster. The application no longer references it,
+# so the deletion won't break anything.
 kubectl delete secret passes-db
 ```
 
@@ -943,14 +943,14 @@ kubectl delete secret passes-db
 Теперь:
 
 ```bash
-# Тот же kv put. Прежняя версия записи не стирается — рядом появляется вторая.
+# The same kv put. The previous version of the record isn't erased — a second one appears alongside it.
 kubectl exec bao-workbench -- \
-  bao kv put secret/passes/db password=Propusk2026-осень username=passes_app
-# rollout restart пересоздаёт поды приложения, не меняя ни строчки в его описании.
-# Ради этого всё и затевалось: новый пароль подхватится при следующем запуске.
+  bao kv put secret/passes/db password=Propusk2026-autumn username=passes_app
+# rollout restart recreates the application's Pods without changing a single line in its description.
+# This is what it was all for: the new password is picked up on the next start.
 kubectl rollout restart deploy/secrets-demo
 kubectl rollout status deploy/secrets-demo
-# Отпечаток в логе покажет, что пароль сменился, не показывая сам пароль.
+# The fingerprint in the log will show that the password changed, without showing the password itself.
 kubectl logs deploy/secrets-demo -c app --tail=2
 ```
 
@@ -966,8 +966,8 @@ kubectl logs deploy/secrets-demo -c app --tail=2
 Посмотрим историю:
 
 ```bash
-# kv metadata get показывает не значения, а сведения о версиях записи: сколько их,
-# когда каждая создана и какая сейчас текущая.
+# kv metadata get shows not the values but information about the record's versions: how many there are,
+# when each was created, and which is current now.
 kubectl exec bao-workbench -- bao kv metadata get secret/passes/db
 ```
 
@@ -977,7 +977,7 @@ kubectl exec bao-workbench -- bao kv metadata get secret/passes/db
 Прежнее значение можно и прочитать целиком:
 
 ```bash
-# -version=1 читает первую записанную версию вместо текущей.
+# -version=1 reads the first version written instead of the current one.
 kubectl exec bao-workbench -- bao kv get -version=1 secret/passes/db
 ```
 
@@ -992,12 +992,12 @@ kubectl exec bao-workbench -- bao kv get -version=1 secret/passes/db
 Второе требование аудитора — «покажите, кто читал пароль». Включаем журнал:
 
 ```bash
-# audit enable подключает устройство журналирования.
-#   file              тип устройства: писать записи текстом
-#   file_path=stdout  вместо файла на диске — в стандартный вывод пода, откуда
-#                     логи забирает платформа
+# audit enable turns on an audit device.
+#   file              the device type: write records as text
+#   file_path=stdout  instead of a file on disk — to the Pod's standard output, from where
+#                     the platform collects the logs
 kubectl exec bao-workbench -- bao audit enable file file_path=stdout
-# audit list перечисляет включённые устройства — проверка, что команда выше прошла.
+# audit list lists the enabled devices — a check that the command above went through.
 kubectl exec bao-workbench -- bao audit list
 ```
 
@@ -1042,11 +1042,11 @@ kubectl exec bao-workbench -- bao audit list
 
 ```bash
 cd labs/08-openbao
-# Скрипт читает эти три переменные окружения, поэтому задать их надо до запуска
-# и в том же окне терминала.
-export KUBECONFIG=~/lab.kubeconfig     # какой кластер проверять
-export COZY_TENANT=workshop03          # ваш номер тенанта
-export BAO_TOKEN='ваш-root-токен'      # тот, что напечатал bao operator init
+# The script reads these three environment variables, so you must set them before running it
+# and in the same terminal window.
+export KUBECONFIG=~/lab.kubeconfig     # which cluster to check
+export COZY_TENANT=workshop03          # your tenant number
+export BAO_TOKEN='your-root-token'     # the one bao operator init printed
 ./check.sh
 ```
 
@@ -1063,9 +1063,9 @@ export BAO_TOKEN='ваш-root-токен'      # тот, что напечата
 ## Уборка
 
 ```bash
-# delete -f = «убери из кластера всё, что описано в этом файле».
+# delete -f = "remove from the cluster everything described in this file".
 kubectl delete -f secrets-demo.yaml
-# То, что создавалось командой, а не файлом, удаляется по имени.
+# What was created by a command rather than a file is deleted by name.
 kubectl delete secret passes-bao-token
 kubectl delete pod bao-workbench
 ```

@@ -1,20 +1,20 @@
-# Лаба 13. Шаблон ConfigMap: страница «Пропуска» и конфигурация nginx.
+# Lab 13. ConfigMap template: the "Passes" page and nginx configuration.
 #
-# ConfigMap хранит текстовые файлы и отдаёт их подам. Страница лежит здесь, а не внутри
-# образа, чтобы менять текст без пересборки: значение greeting подставляется при рендере,
-# и достаточно обновить релиз.
+# A ConfigMap stores text files and serves them to pods. The page lives here rather than inside
+# the image so the text can be changed without a rebuild: the greeting value is substituted at render time,
+# and it is enough to update the release.
 #
-# Подстановка работает и внутри блоков `|`: Helm обрабатывает файл шаблона как простой
-# текст и о структуре YAML ничего не знает. Подробнее — в templates/deployment.yaml.
+# Substitution works inside `|` blocks too: Helm treats the template file as plain
+# text and knows nothing about YAML structure. See templates/deployment.yaml for details.
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ .Release.Name }}
-# Ключи в data — это имена файлов, а то, что под `|`, — их содержимое целиком.
-# Каждый ключ монтируется в контейнер отдельным файлом, см. volumeMounts в Deployment.
+# The keys in data are file names, and what is under `|` is their full content.
+# Each key is mounted into the container as a separate file, see volumeMounts in the Deployment.
 data:
-  # Страница, которую увидит сотрудник. Сюда попадают два значения: greeting из формы
-  # заказа и имя релиза — чтобы по открытой странице было видно, чей это заказ.
+  # The page an employee will see. Two values land here: greeting from the
+  # order form and the release name — so that the open page shows whose order it is.
   index.html: |
     <!doctype html>
     <html lang="en">
@@ -31,9 +31,9 @@ data:
     <p>Guest Pass service, release <b>{{ .Release.Name }}</b></p>
     <div class="pod">served by __POD__</div>
     </html>
-  # Конфигурация nginx. sub_filter подменяет метку __POD__ на имя пода в момент отдачи
-  # страницы: так по браузеру видно, какая из копий ответила. Отдельный ответ на /healthz
-  # нужен readinessProbe из Deployment — она спрашивает именно этот адрес.
+  # nginx configuration. sub_filter replaces the __POD__ marker with the pod name at the moment the
+  # page is served: this way the browser shows which of the copies answered. A separate response on /healthz
+  # is needed by the readinessProbe from the Deployment — it queries exactly this address.
   default.conf: |
     server {
       listen 8080;

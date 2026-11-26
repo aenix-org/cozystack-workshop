@@ -1,35 +1,35 @@
-// “通行证”服务，带缓存的版本。一个可执行文件，两种角色。
+// The "Pass" service, the version with a cache. One executable, two roles.
 //
-//	MODE=hr   — 遗留员工目录的桩。响应很慢，
-//	            与真实系统的方式完全一致：HR_DELAY 默认 800 毫秒。
-//	MODE=api  — “通行证”服务本身。会去查目录，如果设置了 REDIS_ADDR，
-//	            则先查缓存。
+//	MODE=hr   — a stub of the legacy employee directory. Answers slowly,
+//	            exactly the way the real one does: HR_DELAY is 800 ms by default.
+//	MODE=api  — the "Pass" service itself. Goes to the directory, and if REDIS_ADDR
+//	            is set, looks in the cache first.
 //
-// 一个角色兼顾两种情况，因为必须只有一个镜像：注册表里两个几乎相同的
-// 镜像，就是两个可能忘记更新版本的地方。
+// One role covers both cases, because there must be a single image: two nearly identical
+// images in the registry are two places where you can forget to bump the version.
 //
-// 没有任何外部依赖，只用标准库。这里的 Redis 客户端
-// 是自己写的，大约五十行 —— Redis 协议是文本的，GET/SET 一个函数
-// 就能容纳。生产环境里会用现成的库；这里更重要的是让构建
-// 不去联网拉取包。
+// There are no external dependencies, only the standard library. The Redis client here
+// is our own, about fifty lines — the Redis protocol is textual and for GET/SET fits
+// into a single function. In production you take a ready-made library; here it matters
+// more that the build does not go to the internet for packages.
 //
-// 不需要会读 Go：下面标注了每样东西的位置。先是小的辅助函数，
-// 然后是自制的 Redis 客户端，再是两种角色 ——“慢目录”和“服务
-// 本身”。这个实验真正的重点发生在 setupAPI 里，靠近文件末尾。
+// You do not need to know how to read Go: below it is marked out where everything lives. First the small helpers,
+// then the home-made Redis client, then the two roles — the "slow directory" and the
+// "service itself". The main thing the lab is about happens in setupAPI, closer to the end of the file.
 //
-// 语言的三条约定，以便阅读时不会磕绊：
+// Three conventions of the language, so you do not stumble while reading:
 //
-//	func 名字(参数) (返回什么) { ... } —— 函数声明；
-//	函数常常一次返回多个值，其中最后一个是错误：
-//	err == nil 读作“顺利”，err != nil —— “没顺利”；
-//	以 // 开头的行是注释，它们不影响程序的运行。
+//	func name(arguments) (what it returns) { ... } — a function declaration;
+//	a function often returns several values at once, and the last of them is an error:
+//	err == nil reads as "went fine", err != nil — "did not go fine";
+//	lines starting with // are comments, they do not affect how the program works.
 //
-// 该文件由相邻的 Dockerfile 在虚拟机上构建：docker build ... app/ —— 见 README。
+// The file is built by the neighboring Dockerfile, on the VM: docker build ... app/ — see README.
 package main
 
-// 本文件所使用的库的列表。每一个都是标准库，来自 Go 发行版。
-// 没有任何一行第三方代码：构建不会联网，也不会因为
-// 别人的某个包从公共仓库里被删掉而中断。
+// The list of libraries the file uses. Every single one is standard, from the Go distribution.
+// Not a single third-party line: the build does not go to the internet and will not break because
+// someone else's package got removed from a public repository.
 import (
 	"bufio"
 	"encoding/json"
@@ -47,11 +47,11 @@ import (
 	"time"
 )
 
-// ---------------------------------------------------------------- 环境变量
+// ---------------------------------------------------------------- environment
 
-// env 读取一个环境变量，如果它为空或未设置，则返回后备
-// 值。因此才有你在清单里看到的那个特性：应用的行为
-// 通过 YAML 里的一行加上一次 pod 重启来改变，而不是通过重新构建镜像。
+// env reads an environment variable and, if it is empty or unset, returns the fallback
+// value. Hence the property you see in the manifests: the application's behavior
+// changes with a line in YAML and a pod restart, not with an image rebuild.
 func env(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
@@ -59,31 +59,31 @@ func env(key, fallback string) string {
 	return fallback
 }
 
-// envInt —— 对数字做同样的事。如果变量里不是数字，应用不会
-// 崩溃：它写入日志并采用后备值。清单里的一个笔误不应把
-// 服务搞垮 —— 它应当在日志里可见。
+// envInt — the same thing for numbers. If the variable turns out not to be a digit, the application does not
+// crash: it writes to the log and takes the fallback value. A typo in the manifest must not bring down
+// the service — it must be visible in the log.
 func envInt(key string, fallback int) int {
 	if v := os.Getenv(key); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
 			return n
 		}
-		log.Printf("值 %s=%q 不是数字，采用 %d", key, v, fallback)
+		log.Printf("value %s=%q is not a number, using %d", key, v, fallback)
 	}
 	return fallback
 }
 
 // ---------------------------------------------------------------- Redis
 
-// 由 Redis 本身发来的错误（以“-”开头的行）：例如
-// NOAUTH 或 WRONGTYPE。把它与网络错误区分开很重要：重连
-// 无法解决密码错误，而重试只会掩盖原因。
+// An error sent by Redis itself (a line starting with "-"): for example
+// NOAUTH or WRONGTYPE. It is important to tell it apart from a network one: reconnecting
+// does not fix a wrong password, and retries only mask the cause.
 type redisError struct{ msg string }
 
 func (e *redisError) Error() string { return "redis: " + e.msg }
 
-// redisClient —— 一条到缓存的持久 TCP 连接，外加一把锁 mu，好让两个
-// 并发请求不会交错地往这条连接里写。我们让连接保持
-// 打开：为每个请求建立新连接比请求本身还贵。
+// redisClient — one persistent TCP connection to the cache plus a lock mu, so that two
+// simultaneous requests do not write into this connection interleaved. We keep the connection
+// open: establishing a new one for every request is more expensive than the request itself.
 type redisClient struct {
 	addr     string
 	password string
@@ -93,9 +93,9 @@ type redisClient struct {
 	rd   *bufio.Reader
 }
 
-// connectLocked 打开连接，如果设置了密码，则立即用 AUTH 命令
-// 表明身份。名字里的 Locked 后缀意为“仅在锁 mu
-// 已被持有时才调用”—— 这是这些函数之间的约定，而不是语言的特性。
+// connectLocked opens the connection and, if a password is set, immediately introduces itself
+// with the AUTH command. The Locked suffix in the name means "call only when the lock mu
+// is already held" — this is an agreement between these functions, not a property of the language.
 func (r *redisClient) connectLocked() error {
 	c, err := net.DialTimeout("tcp", r.addr, 3*time.Second)
 	if err != nil {
@@ -120,10 +120,10 @@ func (r *redisClient) closeLocked() {
 	r.rd = nil
 }
 
-// do 执行一条命令，如果连接断开则重连一次。
-// 返回值、一个“值存在”的标志，以及一个错误。
-// 恰好两次尝试，而不是十次：如果 Redis 以拒绝作答，重试只会拖延
-// 给用户的响应，并把原因抹散到各处日志里。
+// do runs a command and reconnects once if the connection dropped.
+// Returns the value, a "value is present" flag, and an error.
+// Exactly two attempts, not ten: if Redis answers with a refusal, retries only delay
+// the answer to the user and smear the cause across the logs.
 func (r *redisClient) do(args ...string) (string, bool, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -142,16 +142,16 @@ func (r *redisClient) do(args ...string) (string, bool, error) {
 		lastErr = err
 		var re *redisError
 		if errors.As(err, &re) {
-			return "", false, err // 是 Redis 本身作答 —— 重试帮不上忙
+			return "", false, err // Redis itself answered — a retry will not help
 		}
-		r.closeLocked() // 网络问题：断开并再试一次
+		r.closeLocked() // network: tear it down and try once more
 	}
 	return "", false, lastErr
 }
 
-// commandLocked 以 Redis 能理解的形式发送命令：先是
-// 后面跟着多少个片段，然后是每个片段的长度和内容。三秒的截止期限 ——
-// 是为了让卡住的缓存不会把响应拖得比去查目录本身还久。
+// commandLocked sends the command in the form Redis understands: first
+// how many chunks follow, then the length and content of each. A three-second deadline —
+// so that a stuck cache does not delay the answer longer than a trip to the directory itself.
 func (r *redisClient) commandLocked(args ...string) (string, bool, error) {
 	var b strings.Builder
 	fmt.Fprintf(&b, "*%d\r\n", len(args))
@@ -167,9 +167,9 @@ func (r *redisClient) commandLocked(args ...string) (string, bool, error) {
 	return r.readReplyLocked()
 }
 
-// readReplyLocked 解析响应。行的第一个字符说明到底来了什么，
-// 整个函数就是对五种情况的处理。“$-1”这一种尤其重要：它不是故障，
-// 而是“没有这样的键”，也就是一次普通的缓存未命中。
+// readReplyLocked parses the reply. The first character of the line tells what exactly came,
+// and the whole function is the handling of five cases. The "$-1" case is separately important: it is not a failure,
+// but "there is no such key", i.e. an ordinary cache miss.
 func (r *redisClient) readReplyLocked() (string, bool, error) {
 	line, err := r.rd.ReadString('\n')
 	if err != nil {
@@ -177,67 +177,67 @@ func (r *redisClient) readReplyLocked() (string, bool, error) {
 	}
 	line = strings.TrimRight(line, "\r\n")
 	if line == "" {
-		return "", false, errors.New("redis: 空响应")
+		return "", false, errors.New("redis: empty reply")
 	}
 	switch line[0] {
-	case '+', ':': // 一个简单字符串或一个数字
+	case '+', ':': // a simple string or a number
 		return line[1:], true, nil
-	case '-': // 来自服务器的错误
+	case '-': // an error from the server
 		return "", false, &redisError{msg: line[1:]}
-	case '$': // 已知长度的字符串；-1 表示“没有这样的键”
+	case '$': // a string of known length; -1 means "no such key"
 		n, err := strconv.Atoi(line[1:])
 		if err != nil {
 			return "", false, err
 		}
 		if n < 0 {
-			return "", false, nil // 缓存未命中不是错误
+			return "", false, nil // a cache miss is not an error
 		}
-		buf := make([]byte, n+2) // +2 是给末尾的 \r\n
+		buf := make([]byte, n+2) // +2 for the trailing \r\n
 		if _, err := io.ReadFull(r.rd, buf); err != nil {
 			return "", false, err
 		}
 		return string(buf[:n]), true, nil
 	default:
-		return "", false, fmt.Errorf("redis: 无法识别的响应 %q", line)
+		return "", false, fmt.Errorf("redis: unrecognized reply %q", line)
 	}
 }
 
-// Get 和 SetTTL —— 服务所用命令的全部集合。缓存不再需要
-// 别的东西，所以这里的客户端一页就装得下。
+// Get and SetTTL — the entire set of commands the service uses. Nothing more is
+// required from the cache, which is why the client here fits on a page.
 func (r *redisClient) Get(key string) (string, bool, error) { return r.do("GET", key) }
 
-// SetTTL 存入值并立即赋予一个生存期。用一条命令，而不是
-// SET 加 EXPIRE：在两条命令之间连接可能断开，那样键
-// 就会永远留在缓存里。
+// SetTTL stores the value and immediately assigns a lifetime. With a single command, not
+// SET plus EXPIRE: between two commands the connection may drop, and the key
+// will stay in the cache forever.
 func (r *redisClient) SetTTL(key, val string, ttlSeconds int) error {
 	_, _, err := r.do("SET", key, val, "EX", strconv.Itoa(ttlSeconds))
 	return err
 }
 
-// ---------------------------------------------------------------- 数据
+// ---------------------------------------------------------------- data
 
-// employee —— 服务对外返回并放入缓存的东西。右边的 `json:"id"` 标签
-// 设定 JSON 里的字段名：在 Go 里字段只有首字母大写才从外部可见，而在 JSON 里
-// 习惯用小写，这些标签把两者关联起来。
+// employee — what the service returns to the outside and puts in the cache. The `json:"id"` tags on the right
+// set the field names in JSON: in Go fields are visible from the outside only when capitalized, and in JSON
+// it is customary to use lowercase, and these tags link them together.
 type employee struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 	Dept string `json:"dept"`
 }
 
-// 数据是虚构的。教学台架里没有、也不应有真实的人事资料。
+// The data is made up. There are no real HR records in the training stand and there must not be.
 var surnames = []string{
-	"王军", "林安", "郑平", "陈梅",
-	"赵东", "高艳", "徐帅", "冯宁",
+	"Whitfield J.", "Prescott A.", "Sidney P.", "Marsh M.",
+	"Grant D.", "Poole E.", "Wolfe S.", "Frost N.",
 }
 
 var departments = []string{
-	"保卫处", "财务部", "研发部",
-	"物流部", "人事处", "行政处",
+	"Security", "Accounting", "Engineering",
+	"Logistics", "HR", "Administration",
 }
 
-// 数据是虚构的，但对同一个标识符是一致的：
-// 否则就无法从响应判断这是缓存还是去查了目录。
+// The data is made up, but identical for the same identifier:
+// otherwise you could not tell from the response whether it came from the cache or from a trip to the directory.
 func personFor(id string) employee {
 	h := 7
 	for _, c := range id {
@@ -253,22 +253,22 @@ func personFor(id string) employee {
 	}
 }
 
-// writeJSON 返回响应：带内容类型的头、响应码和响应体。
-// 需要 SetEscapeHTML(false)，好让俄文字母和引号不变成
-// \u 序列 —— 否则响应就得靠肉眼去解码。
+// writeJSON returns the response: a header with the content type, the response code, and the body.
+// SetEscapeHTML(false) is needed so that Russian letters and quotes do not turn
+// into \u sequences — otherwise the response would have to be decoded by eye.
 func writeJSON(w http.ResponseWriter, code int, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(code)
 	enc := json.NewEncoder(w)
 	enc.SetEscapeHTML(false)
 	if err := enc.Encode(v); err != nil {
-		log.Printf("返回响应失败: %v", err)
+		log.Printf("failed to write response: %v", err)
 	}
 }
 
-// employeeID 从查询字符串里取出 ?id=。空的标识符被转成“0”，
-// 好让缓存里的键始终有确定的形状，也不会生成一个
-// 没有尾巴的键“employee:”。
+// employeeID pulls ?id= from the query string. An empty identifier is turned into "0",
+// so that the cache key always has a definite shape and no key
+// "employee:" with no tail is created.
 func employeeID(r *http.Request) string {
 	id := r.URL.Query().Get("id")
 	if id == "" {
@@ -277,61 +277,61 @@ func employeeID(r *http.Request) string {
 	return id
 }
 
-// ---------------------------------------------------------------- 主程序
+// ---------------------------------------------------------------- main
 
-// main —— 入口点：程序的工作从这里开始。它启动 HTTP 服务器，挂上
-// /healthz，并根据 MODE 挂上两种角色之一。角色在启动时选定一次，
-// 在 pod 的生命周期内不会改变。
+// main — the entry point: this is where the program's work begins. It brings up the HTTP server, mounts
+// /healthz on it and, looking at MODE, one of the two roles. The role is chosen once
+// at startup and does not change during the pod's life.
 func main() {
 	mode := env("MODE", "api")
 	port := env("PORT", "8080")
-	pod := env("POD_NAME", "未知")
+	pod := env("POD_NAME", "unknown")
 
 	mux := http.NewServeMux()
-	// /healthz 在两种角色里都有：清单里描述的就绪探针就是敲这里。
-	// 它总是应答，且什么都不检查 —— 探针在这里的任务是判断
-	// 进程已经起来并在监听端口，而不是评估系统的健康状况。
+	// /healthz exists in both roles: this is where the readiness probe described in the manifests knocks.
+	// It always answers and checks nothing — the probe's job here is to tell
+	// that the process has come up and is listening on the port, not to assess the health of the system.
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		_, _ = w.Write([]byte("ok\n"))
 	})
 
-	// 分岔到两种角色。未知的取值不足以成为“随便”启动的理由：
-	// 我们立即失败，并给出清楚的消息。以错误角色悄悄启动，代价会是
-	// 一个小时对着日志发呆。
+	// The fork into two roles. An unknown value is no reason to start up "somehow":
+	// we fail immediately and with a clear message. A silent start in the wrong role would cost
+	// an hour of staring at logs.
 	switch mode {
 	case "hr":
 		setupHR(mux, pod)
 	case "api":
 		setupAPI(mux, pod)
 	default:
-		log.Fatalf("未知的 MODE=%q，允许的取值为 hr 和 api", mode)
+		log.Fatalf("unknown MODE=%q, allowed values are hr and api", mode)
 	}
 
-	// ReadHeaderTimeout 会在客户端开始了请求却沉默时关闭连接。没有它，
-	// 几个这样的“客户端”就足以占满整个服务器，而它们什么都没请求。
+	// ReadHeaderTimeout closes the connection if a client started a request and went silent. Without it
+	// a few such "clients" are enough to occupy the whole server without requesting anything.
 	srv := &http.Server{
 		Addr:              ":" + port,
 		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
-	log.Printf("模式 %s，端口 %s，pod %s", mode, port, pod)
+	log.Printf("mode %s, port %s, pod %s", mode, port, pod)
 	log.Fatal(srv.ListenAndServe())
 }
 
-// setupHR —— 遗留目录的桩。它唯一的特别之处在于
-// 它很慢，而这不是偶然，正是这项任务的实质。
+// setupHR — a stub of the legacy directory. Its only distinguishing feature is that
+// it is slow, and that is not by accident but the essence of the task.
 func setupHR(mux *http.ServeMux, pod string) {
 	delay, err := time.ParseDuration(env("HR_DELAY", "800ms"))
 	if err != nil {
-		log.Printf("HR_DELAY=%q 无法解析，采用 800ms", os.Getenv("HR_DELAY"))
+		log.Printf("HR_DELAY=%q could not be parsed, using 800ms", os.Getenv("HR_DELAY"))
 		delay = 800 * time.Millisecond
 	}
-	log.Printf("目录响应耗时 %s", delay)
+	log.Printf("directory responds in %s", delay)
 
-	// 这个角色唯一的地址。time.Sleep 就是整个“遗留系统”：正是那几百
-	// 毫秒，为了它实验里才出现了缓存。响应里的 source 字段
-	// 表明数据来自这里，而不是来自缓存。
+	// The only address of this role. time.Sleep is the entire "legacy system": those very
+	// hundreds of milliseconds for the sake of which the cache appears in the lab. The source field in the response
+	// shows that the data came from here, not from the cache.
 	mux.HandleFunc("/employee", func(w http.ResponseWriter, r *http.Request) {
 		id := employeeID(r)
 		time.Sleep(delay)
@@ -346,41 +346,41 @@ func setupHR(mux *http.ServeMux, pod string) {
 	})
 }
 
-// setupAPI —— “通行证”服务本身。缓存逻辑就住在这里，对
-// “为什么响应里写着 cache: off”这个问题的答案也在这里。
+// setupAPI — the "Pass" service itself. This is where the cache logic lives, and this is also where the answer
+// to the question "why does the response say cache: off" is.
 func setupAPI(mux *http.ServeMux, pod string) {
 	hrURL := env("HR_URL", "http://hr-legacy")
 	ttl := envInt("CACHE_TTL", 60)
 	version := env("APP_VERSION", "v2")
 
-	// 缓存靠 REDIS_ADDR 的存在这一事实本身来开启 —— 就是
-	// cache-patch.yaml 所添加的那个变量。没有该变量 —— cache 保持为空，下面所有
-	// `if cache != nil` 的检查都不触发，服务照旧工作。
+	// The cache is turned on by the very fact that REDIS_ADDR is present — the variable that
+	// cache-patch.yaml adds. No variable — cache stays empty, all the
+	// `if cache != nil` checks below do not fire, and the service works as it did.
 	var cache *redisClient
 	if addr := os.Getenv("REDIS_ADDR"); addr != "" {
 		cache = &redisClient{addr: addr, password: os.Getenv("REDIS_PASSWORD")}
-		log.Printf("缓存已启用: %s，记录生存期 %d 秒", addr, ttl)
+		log.Printf("cache enabled: %s, record lifetime %d s", addr, ttl)
 	} else {
-		log.Printf("缓存已禁用: 未设置 REDIS_ADDR，每个请求都会去查目录")
+		log.Printf("cache disabled: REDIS_ADDR is not set, every request will go to the directory")
 	}
 
-	// 一个单独的、连接池更大的客户端：否则在负载下
-	// 一半时间会耗在建立到目录的 TCP 连接上，
-	// 而测量出来的就不是目录的延迟，而是我们自己的马虎。
+	// A separate client with an enlarged connection pool: otherwise under load
+	// half the time would go into establishing TCP connections to the directory,
+	// and the measurement would show not the directory's latency but our own sloppiness.
 	tr := http.DefaultTransport.(*http.Transport).Clone()
 	tr.MaxIdleConnsPerHost = 64
 	hrClient := &http.Client{Timeout: 10 * time.Second, Transport: tr}
 
-	// 根路径“/” —— 服务的名片：版本、pod、节点、注册表和缓存模式。从 cache 字段
-	// 立刻就能看到 off 还是 redis，无需翻日志，也无需解析清单。
+	// The root "/" — the service's business card: version, pod, node, registry and cache mode. From the cache field
+	// you immediately see off or redis, without looking into logs and without parsing the manifest.
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{
 			"service":   "passes-api",
 			"version":   version,
 			"pod":       pod,
-			"node":      env("NODE_NAME", "未知"),
-			"namespace": env("POD_NAMESPACE", "未知"),
-			"registry":  env("IMAGE_REGISTRY", "未设置"),
+			"node":      env("NODE_NAME", "unknown"),
+			"namespace": env("POD_NAMESPACE", "unknown"),
+			"registry":  env("IMAGE_REGISTRY", "not set"),
 			"cache":     cacheMode(cache),
 			"cache_ttl": ttl,
 			"hr_url":    hrURL,
@@ -388,47 +388,47 @@ func setupAPI(mux *http.ServeMux, pod string) {
 		})
 	})
 
-	// 实验的主地址。动作的顺序：问缓存，未命中就去查目录，
-	// 把答案放进缓存。你在这个实验里测量的一切，都发生在这四十
-	// 行里。
+	// The main address of the lab. The order of actions: ask the cache, on a miss go to the directory,
+	// put the answer into the cache. Everything you measure in this lab happens in these forty
+	// lines.
 	mux.HandleFunc("/employee", func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		id := employeeID(r)
-		// 缓存里的键是“employee:”加上标识符。需要这个前缀，好让不同种类
-		// 的记录不相撞：整个应用共用一个缓存，而其中的名字是扁平的。
+		// The cache key is "employee:" plus the identifier. The prefix is needed so that different kinds
+		// of records do not collide: the cache is one for the whole application, and names in it are flat.
 		key := "employee:" + id
 
 		var emp employee
 		fromCache := false
 
-		// 第一步：问缓存。三种结果 —— 错误、命中、未命中 —— 各自
-		// 处理不同，而它们之间的区别在这里至关重要。
+		// Step one: ask the cache. Three outcomes — an error, a hit, a miss — are handled
+		// differently, and the difference between them is fundamental here.
 		if cache != nil {
 			raw, found, err := cache.Get(key)
 			switch {
 			case err != nil:
-				// 缓存不可用 —— 这不足以成为给用户返回错误的理由。
-				// 我们去查目录：慢，但正确。
-				log.Printf("缓存不可用 (%v)，改为去查目录", err)
+				// The cache is unavailable — that is no reason to return an error to the user.
+				// We go to the directory: slow, but correct.
+				log.Printf("cache unavailable (%v), going to the directory", err)
 			case found:
 				if json.Unmarshal([]byte(raw), &emp) == nil {
 					fromCache = true
 				} else {
-					log.Printf("缓存中键 %s 下存放的是垃圾数据，改为去查目录", key)
+					log.Printf("cache holds garbage under key %s, going to the directory", key)
 				}
 			}
 		}
 
-		// 第二步：未命中或缓存不可用 —— 我们去查目录。慢，但它是
-		// 唯一的事实来源。我们把答案放进缓存；如果放不进去，
-		// 用户不必知道 —— 他已经拿到了自己的答案，只不过
-		// 下一个请求又会很慢。
+		// Step two: a miss or an unavailable cache — we go to the directory. Slow, but it is
+		// the only source of truth. We put the answer into the cache; if putting it did not work out,
+		// the user need not know about it — they already got their answer, it is just that
+		// the next request will again be slow.
 		if !fromCache {
 			fetched, err := fetchEmployee(hrClient, hrURL, id)
 			if err != nil {
-				log.Printf("目录未响应: %v", err)
+				log.Printf("directory did not respond: %v", err)
 				writeJSON(w, http.StatusBadGateway, map[string]any{
-					"error": "员工目录不可用",
+					"error": "employee directory is unavailable",
 					"pod":   pod,
 				})
 				return
@@ -437,15 +437,15 @@ func setupAPI(mux *http.ServeMux, pod string) {
 			if cache != nil {
 				if b, err := json.Marshal(emp); err == nil {
 					if err := cache.SetTTL(key, string(b), ttl); err != nil {
-						log.Printf("写入缓存失败: %v", err)
+						log.Printf("failed to write to cache: %v", err)
 					}
 				}
 			}
 		}
 
-		// cached 和 took_ms 字段就是这一切的目的所在：从它们能看出请求是否命中了
-		// 缓存，以及花了多少毫秒。check.sh 在决定
-		// 实验是否通过时，读的也是它们。
+		// The cached and took_ms fields are what it was all started for: from them you see whether the request hit
+		// the cache or not and how many milliseconds it cost. They are also read by check.sh
+		// when it decides whether to pass the lab or not.
 		writeJSON(w, http.StatusOK, map[string]any{
 			"id":      emp.ID,
 			"name":    emp.Name,
@@ -459,7 +459,7 @@ func setupAPI(mux *http.ServeMux, pod string) {
 	})
 }
 
-// cacheMode 把内部状态翻译成响应里的一个词：off 或 redis。
+// cacheMode translates the internal state into a single word for the response: off or redis.
 func cacheMode(c *redisClient) string {
 	if c == nil {
 		return "off"
@@ -467,9 +467,9 @@ func cacheMode(c *redisClient) string {
 	return "redis"
 }
 
-// fetchEmployee —— 通过 HTTP 去查目录。标识符会被转义
-// （url.QueryEscape）：没有它，id 里的空格或“&”会把请求地址弄散架。
-// 响应体必定会被关闭（defer），否则在负载下连接会耗尽。
+// fetchEmployee — a trip to the directory over HTTP. The identifier is escaped
+// (url.QueryEscape): without it a space or "&" inside id would fall apart the request address.
+// The response body is always closed (defer), otherwise under load the connections would run out.
 func fetchEmployee(c *http.Client, base, id string) (employee, error) {
 	u := strings.TrimRight(base, "/") + "/employee?id=" + url.QueryEscape(id)
 	resp, err := c.Get(u)
@@ -478,7 +478,7 @@ func fetchEmployee(c *http.Client, base, id string) (employee, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return employee{}, fmt.Errorf("目录返回 %s", resp.Status)
+		return employee{}, fmt.Errorf("directory responded %s", resp.Status)
 	}
 	var emp employee
 	if err := json.NewDecoder(resp.Body).Decode(&emp); err != nil {

@@ -1,154 +1,154 @@
 #!/usr/bin/env bash
-# लैब 13 की जाँच: चार्ट और एप्लिकेशन परिभाषा एडमिन को सौंपने के लिए तैयार हैं।
+# Check for lab 13: the chart and the application definition are ready to hand off to the admin.
 #
-# यह जाँच जानबूझकर लोकल है। टेनेंट ApplicationDefinition को अप्लाई नहीं
-# कर सकता (ऑब्जेक्ट cluster-scoped है), इसलिए उसे क्लस्टर में ढूँढना व्यर्थ है:
-# ऑब्जेक्ट का न होना प्रतिभागी की गलती नहीं है। हम वह जाँचते हैं जिसके लिए वह जिम्मेदार है:
-# चार्ट बनता है, स्कीमा काम करती है, परिभाषा पार्स होती है और चार्ट के साथ मेल खाती है।
+# This check is INTENTIONALLY local. A tenant cannot apply an ApplicationDefinition
+# (the object is cluster-scoped), so looking for it in the cluster is pointless:
+# the object's absence is not the participant's fault. We check what they are responsible for:
+# the chart builds, the schema works, the definition is parsed and consistent with the chart.
 #
-# लैब फ़ोल्डर से चलाएँ:
+# Run from the lab folder:
 #   cd labs/13-catalog && ./check.sh
-# क्लस्टर अनिवार्य नहीं है: KUBECONFIG के बिना दो जाँचें चेतावनी के साथ छोड़ दी जाएँगी,
-# त्रुटि के साथ नहीं।
+# A cluster is not required: without KUBECONFIG two checks are skipped with a warning,
+# not with an error.
 
 LAB_NAME="13-catalog"
-LAB_TITLE="लैब 13 · Cozystack कैटलॉग में आपका अपना एप्लिकेशन"
+LAB_TITLE="Lab 13 · Your own application in the Cozystack catalog"
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 CHART="$HERE/chart"
 APPDEF="$HERE/applicationdefinition.yaml"
 
-# --- टूल -----------------------------------------------------------
-# helm के बिना जाँचने के लिए कुछ नहीं है, इसलिए स्क्रिप्ट यहीं तुरंत रुक जाती है और आगे
-# दर्जनों एक जैसी विफलताएँ नहीं उगलती।
+# --- tools -----------------------------------------------------------------
+# Without helm there is nothing to check, so the script stops right here instead of spitting out
+# a dozen identical failures further down the text.
 if ! command -v helm >/dev/null 2>&1; then
-  fail "इस मशीन पर helm इंस्टॉल नहीं है" \
-       "इसे इंस्टॉल करें: brew install helm (macOS) या https://helm.sh/docs/intro/install/ — इसके बिना लैब की जाँच नहीं हो सकती"
+  fail "helm is not installed on this machine" \
+       "install it: brew install helm (macOS) or https://helm.sh/docs/intro/install/ — without it the lab cannot be checked"
   finish
   exit $?
 fi
 HELM_VER="$(helm version --short 2>/dev/null)"
-ok "helm मौजूद है (${HELM_VER})"
-evidence "helm संस्करण" "$HELM_VER"
+ok "helm is present (${HELM_VER})"
+evidence "helm version" "$HELM_VER"
 
-# --- चार्ट मौजूद है ---------------------------------------------------------
-# हम «चार्ट टूटा है» को «स्क्रिप्ट गलत फ़ोल्डर से चलाई गई» से अलग करते हैं। दूसरी गलती
-# पहली से ज़्यादा आम है, और उसका संदेश अलग होना चाहिए।
+# --- chart in place --------------------------------------------------------
+# We distinguish "the chart is broken" from "the script was run from the wrong folder". The second
+# mistake is more common than the first, and its message should be separate.
 if [ ! -f "$CHART/Chart.yaml" ]; then
-  fail "${CHART} में चार्ट नहीं मिला" \
-       "स्क्रिप्ट को लैब फ़ोल्डर से चलाएँ: cd labs/13-catalog && ./check.sh"
+  fail "chart not found in ${CHART}" \
+       "run the script from the lab folder: cd labs/13-catalog && ./check.sh"
   finish
   exit $?
 fi
 
-# --- लिंटर ----------------------------------------------------------------
-# helm lint चार्ट को टेक्स्ट की तरह पढ़ता है: टेम्पलेट में टाइपो, Chart.yaml के गायब
-# फ़ील्ड, न मौजूद वैल्यू के संदर्भ खोजता है। यहाँ बात क्लस्टर तक नहीं पहुँचती।
+# --- linter ----------------------------------------------------------------
+# helm lint reads the chart as text: it finds typos in templates, missing Chart.yaml
+# fields, references to nonexistent values. It never reaches the cluster here.
 LINT_OUT="$(helm lint "$CHART" 2>&1)"
 if printf '%s' "$LINT_OUT" | grep -q '0 chart(s) failed'; then
-  ok "चार्ट helm lint पास करता है"
+  ok "chart passes helm lint"
   evidence "helm lint" "$LINT_OUT"
 else
-  fail "चार्ट helm lint पास नहीं करता" \
-       "नीचे दिया गया आउटपुट पढ़ें और बताई गई फ़ाइलें ठीक करें: helm lint chart"
+  fail "chart does not pass helm lint" \
+       "read the output below and fix the indicated files: helm lint chart"
   evidence "helm lint" "$LINT_OUT"
 fi
 
-# --- रेंडर ----------------------------------------------------------------
-# खाली आउटपुट और केवल टिप्पणियों वाला आउटपुट लिंटर छोड़ देता, इसलिए हम देखते हैं
-# कि रेंडर किए गए में एक Deployment है, और सूचीबद्ध करते हैं कि असल में क्या निकला।
-# यहाँ मुख्य बात «कमांड चल गई» नहीं, बल्कि «असली ऑब्जेक्ट निकले» है।
+# --- render ----------------------------------------------------------------
+# Empty output and output consisting only of comments would slip past the linter, so we check
+# that among the rendered output there is a Deployment, and list what was actually produced.
+# The point here is not "the command ran" but "real objects came out".
 RENDER="$(helm template main "$CHART" 2>&1)"
 if printf '%s' "$RENDER" | grep -q '^kind: Deployment'; then
   KINDS="$(printf '%s' "$RENDER" | grep '^kind:' | awk '{print $2}' | sort -u | tr '\n' ' ')"
-  ok "चार्ट रेंडर होता है, ऑब्जेक्ट निकलते हैं: ${KINDS}"
-  evidence "चार्ट क्या रेंडर करता है" "$KINDS"
+  ok "chart renders, producing objects: ${KINDS}"
+  evidence "What the chart renders" "$KINDS"
 else
-  fail "helm template ने एक भी Deployment नहीं निकाला" \
-       "रेंडर त्रुटि देखें: helm template main chart"
-  evidence "helm template आउटपुट" "$(printf '%s' "$RENDER" | head -30)"
+  fail "helm template did not produce a single Deployment" \
+       "look at the render error: helm template main chart"
+  evidence "helm template output" "$(printf '%s' "$RENDER" | head -30)"
 fi
 
-# --- चार्ट को असली क्लस्टर स्वीकार करता है ----------------------------------
-# पूरे लैब सेट में एकमात्र जाँच जो मैनिफ़ेस्ट को टेक्स्ट से नहीं, बल्कि असली क्लस्टर
-# स्कीमा से मिलाती है।
+# --- chart is accepted by a real cluster -----------------------------------
+# The only check in the whole lab set that verifies the manifest against a real cluster schema
+# rather than against text.
 #
-# `helm lint` और `helm template` टेम्पलेट जाँचते हैं, पर Kubernetes स्कीमा नहीं: गलत
-# जगह पर फ़ील्ड वाला मैनिफ़ेस्ट वे छोड़ देते हैं, पर क्लस्टर उसे अस्वीकार करता है। खुद पर
-# अनुभव किया — गलती से volumes में डाला गया securityContext दोनों पास कर गया और सिर्फ़
-# सर्वर पर टूटा। यह जाँच वहाँ ज़रूरी है जहाँ चार्ट अप्लाई किया जाता है।
+# `helm lint` and `helm template` check templates, but NOT the Kubernetes schema: a manifest
+# with a field in the wrong place slips past them, but the cluster rejects it. Learned the hard
+# way — a securityContext mistakenly inserted into volumes passed both and fell apart only
+# on the server. The check is needed where the chart is actually applied.
 #
-# lint और template इसकी जगह क्यों नहीं लेते:
-#   helm lint      चार्ट की बनावट देखता है: फ़ाइलें मौजूद हैं, टेम्पलेट पार्स होते हैं;
-#   helm template  वैल्यू भरता है और टेक्स्ट निकालता है — पर वे फ़ील्ड क्या हैं और ऐसे
-#                  ऑब्जेक्ट में होते भी हैं या नहीं, यह वह न जानता है न जान सकता है;
-#   apply --dry-run=server मैनिफ़ेस्ट को apiserver को भेजता है, वह उसे टाइप स्कीमा और
-#                  admission-कंट्रोल से गुज़ारता है और जवाब देता है कि स्वीकार करता या नहीं,
-#                  इस दौरान कुछ बनाए बिना। यहीं से `unknown field` और नीति द्वारा अस्वीकृति —
-#                  ठीक वही, जिस पर चार्ट ग्राहक के यहाँ ठोकर खाता है।
-# --dry-run=client फ़्लैग यह जाँच नहीं देता: वह मैनिफ़ेस्ट को आपकी मशीन पर पार्स करता है।
+# Why lint and template do not replace it:
+#   helm lint      looks at the chart's structure: files in place, templates parse;
+#   helm template  substitutes values and produces text — but what those fields are and whether
+#                  such an object even has them, it does not and cannot know;
+#   apply --dry-run=server sends the manifest to the apiserver, which runs it through the type
+#                  schema and through admission control and answers whether it would accept it,
+#                  creating nothing in the process. That is where `unknown field` and a policy
+#                  rejection come from — exactly what the chart stumbles over at the customer's.
+# The --dry-run=client flag does not give this check: it parses the manifest on your machine.
 if [ -n "${KUBECONFIG:-}" ] && kubectl version -o json >/dev/null 2>&1; then
   DRY="$(printf '%s' "$RENDER" | kubectl apply --dry-run=server -f - 2>&1)"
-  # अधिकारों की अस्वीकृति और स्कीमा की अस्वीकृति अलग चीज़ें हैं, इन्हें मिलाना नहीं चाहिए। टेनेंट
-  # एक्सेस (~/.kube/config) के तहत Deployment और ConfigMap पर अधिकार बिल्कुल नहीं हैं, इसलिए यहाँ
-  # Forbidden आएगा — और यह चार्ट की गुणवत्ता के बारे में कुछ नहीं कहता। असल जाँच केवल
-  # `lab` क्लस्टर के एक्सेस से संभव है, जहाँ आप पूर्ण अधिकारी हैं।
+  # A permission denial and a schema denial are different things, and must not be confused. Under
+  # tenant access (~/.kube/config) there are no rights on Deployment and ConfigMap at all, so what
+  # arrives here is Forbidden — and that says nothing about the quality of the chart. A substantive
+  # check is only possible with access to the `lab` cluster, where you are the full owner.
   if printf '%s' "$DRY" | grep -qiE 'forbidden|cannot create|is not allowed'; then
-    warn "सर्वर-साइड चार्ट जाँच छोड़ी गई: वर्तमान एक्सेस इसे चलाने की अनुमति नहीं देता" \
-         "इसे अपने क्लस्टर के एक्सेस से चलाएँ: KUBECONFIG=~/lab.kubeconfig ./check.sh"
+    warn "server-side chart check skipped: the current access does not allow running it" \
+         "run it with access to your own cluster: KUBECONFIG=~/lab.kubeconfig ./check.sh"
   elif printf '%s' "$DRY" | grep -qiE 'error|unknown field|invalid'; then
-    fail "क्लस्टर रेंडर किए गए चार्ट को अस्वीकार करता है" \
-         "देखें: helm template main chart | kubectl apply --dry-run=server -f -"
-    evidence "सर्वर की अस्वीकृति" "$(printf '%s' "$DRY" | grep -iE 'error|unknown field' | head -5)"
+    fail "cluster rejects the rendered chart" \
+         "look at: helm template main chart | kubectl apply --dry-run=server -f -"
+    evidence "Server rejection" "$(printf '%s' "$DRY" | grep -iE 'error|unknown field' | head -5)"
   else
-    ok "क्लस्टर रेंडर किए गए चार्ट को स्वीकार करता है — फ़ील्ड और उनकी जगहें सही हैं"
+    ok "cluster accepts the rendered chart — the fields and their places are correct"
   fi
 else
-  warn "क्लस्टर पर चार्ट जाँच छोड़ी गई: एक्सेस नहीं है" \
-       "helm template को kubectl apply --dry-run=server से चलाने के लिए KUBECONFIG सेट करें"
+  warn "chart check on the cluster skipped: no access" \
+       "set KUBECONFIG to run helm template through kubectl apply --dry-run=server"
 fi
 
-# --- पैरामीटर वाकई मैनिफ़ेस्ट तक पहुँचते हैं -------------------------
-# चार्ट बन और रेंडर हो सकता है, फिर भी पैरामीटर कहीं न भरा जाए —
-# उदाहरण के लिए, वैल्यू को टेम्पलेट में संख्या के रूप में लिख दिया गया। इसलिए हर पैरामीटर को असल में जाँचते हैं:
-# एक जानबूझकर असामान्य वैल्यू देते हैं और उसे तैयार मैनिफ़ेस्ट में खोजते हैं।
+# --- parameters really reach the manifests ---------------------------------
+# A chart can build and render, yet a parameter be substituted nowhere —
+# for example, the value was written into the template as a literal number. So we check each
+# parameter for real: we set a deliberately unusual value and look for it in the finished manifest.
 R5="$(helm template main "$CHART" --set replicas=5 2>/dev/null | grep -c 'replicas: 5')"
 if [ "${R5:-0}" -ge 1 ]; then
-  ok "replicas पैरामीटर मैनिफ़ेस्ट तक पहुँचता है (--set replicas=5 से replicas: 5 मिलता है)"
+  ok "the replicas parameter reaches the manifest (--set replicas=5 yields replicas: 5)"
 else
-  fail "replicas पैरामीटर मैनिफ़ेस्ट तक नहीं पहुँचता" \
-       "templates/deployment.yaml में replicas: {{ .Values.replicas }} होना चाहिए"
+  fail "the replicas parameter does not reach the manifest" \
+       "templates/deployment.yaml should have replicas: {{ .Values.replicas }}"
 fi
 
 EXT="$(helm template main "$CHART" --set external=true 2>/dev/null | grep -c 'type: LoadBalancer')"
 if [ "${EXT:-0}" -ge 1 ]; then
-  ok "external पैरामीटर Service टाइप को LoadBalancer में बदल देता है"
+  ok "the external parameter switches the Service type to LoadBalancer"
 else
-  warn "external पैरामीटर Service टाइप नहीं बदलता" \
-       "चार्ट की खराबी नहीं, पर Cozystack कैटलॉग की परंपरा: एप्लिकेशन पर external फ़ील्ड का अर्थ ठीक बाहरी एक्सेस है"
+  warn "the external parameter does not switch the Service type" \
+       "not a chart breakage, but a Cozystack catalog convention: the external field on applications means exactly external access"
 fi
 
-# --- स्कीमा वाकई सुरक्षा देती है ------------------------------------------
-# ऐसी स्कीमा जो कुछ भी अस्वीकार नहीं करती, बेकार है। हम जाँचते हैं कि वह अस्वीकार करती है।
+# --- the schema actually protects ------------------------------------------
+# A schema that rejects nothing is useless. We check that it rejects.
 if helm template main "$CHART" --set replicas=abc >/dev/null 2>&1; then
-  fail "वैल्यू स्कीमा जानबूझकर गलत वैल्यू को अस्वीकार नहीं करती (replicas=abc पास हो गया)" \
-       "जाँचें कि values.yaml के पास values.schema.json है और उसमें replicas को integer घोषित किया गया है"
+  fail "the values schema does not reject a deliberately invalid value (replicas=abc passed)" \
+       "check that values.schema.json sits next to values.yaml and declares replicas as integer"
 else
-  ok "वैल्यू स्कीमा गलत टाइप को अस्वीकार करती है (replicas=abc पास नहीं होता)"
+  ok "the values schema rejects the wrong type (replicas=abc does not pass)"
 fi
 
-# --- ApplicationDefinition: अनिवार्य फ़ील्ड ------------------------------
-# प्रतिभागी परिभाषा को अप्लाई नहीं कर सकता, यानी उसे apiserver की अस्वीकृति भी नहीं दिखेगी।
-# इसलिए अनिवार्य फ़ील्ड यहीं गिनते हैं: इनमें से किसी के बिना एडमिन को अपने यहाँ अस्वीकृति
-# मिलेगी, और सुलझाना फ़ाइल के लेखक को पड़ेगा।
+# --- ApplicationDefinition: required fields --------------------------------
+# The participant cannot apply the definition, so they will not see the apiserver's rejection.
+# Therefore we count the required fields here: without any of them the admin gets a rejection
+# on their own side, and the file's author is the one who will have to sort it out.
 if [ ! -f "$APPDEF" ]; then
-  fail "${APPDEF} नहीं मिला" \
-       "फ़ाइल चार्ट के पास होनी चाहिए; इसे लैब रिपॉज़िटरी से लें"
+  fail "${APPDEF} not found" \
+       "the file should sit next to the chart; take it from the lab repository"
 else
   MISSING=""
-  # हम कुंजियों को पंक्ति-दर-पंक्ति खोजते हैं, YAML पार्स किए बिना: PyYAML हर मशीन पर नहीं होता,
-  # और एक फ़ाइल की जाँच के लिए निर्भरता खींचना उचित नहीं।
+  # We look for keys line by line, without parsing YAML: PyYAML is not on every machine,
+  # and pulling in a dependency just to check one file is not worth it.
   check_key() {
     grep -Eq "$1" "$APPDEF" || MISSING="$MISSING $2"
   }
@@ -164,19 +164,19 @@ else
   check_key '^[[:space:]]{4}icon:[[:space:]]+\S+' 'dashboard.icon'
 
   if [ -z "$MISSING" ]; then
-    ok "ApplicationDefinition में सभी अनिवार्य फ़ील्ड मौजूद हैं"
+    ok "all required fields are present in the ApplicationDefinition"
   else
-    fail "ApplicationDefinition में फ़ील्ड कम हैं:${MISSING}" \
-         "README में दिए विवरण से मिलाएँ — इनमें से किसी के बिना एडमिन को अप्लाई के समय अस्वीकृति मिलेगी"
+    fail "the ApplicationDefinition is missing fields:${MISSING}" \
+         "check against the walkthrough in the README — without any of them the admin gets a rejection on apply"
   fi
 
-  # --- परिभाषा में स्कीमा पार्स होती है और चार्ट की स्कीमा से मेल खाती है ---------
-  # ये एक ही चीज़ की दो अलग प्रतियाँ हैं, और इनके बीच कोई संबंध नहीं है।
-  # अलग हो गईं — तो डैशबोर्ड में फ़ॉर्म वे फ़ील्ड नहीं दिखाएगा जिनकी चार्ट अपेक्षा करता है।
+  # --- the schema in the definition parses and matches the chart's schema ---
+  # These are two separate copies of the same thing, with no link between them whatsoever.
+  # If they diverge, the form in the dashboard will show different fields than the chart expects.
   SCHEMA_LINE="$(awk '/openAPISchema:/{getline; sub(/^[[:space:]]+/,""); print; exit}' "$APPDEF")"
   if [ -z "$SCHEMA_LINE" ]; then
-    fail "ApplicationDefinition में openAPISchema खाली है" \
-         "वहाँ chart/values.schema.json की सामग्री एक पंक्ति में डालें"
+    fail "openAPISchema is empty in the ApplicationDefinition" \
+         "paste the contents of chart/values.schema.json in there as a single line"
   else
     CMP="$(SCHEMA_LINE="$SCHEMA_LINE" python3 - "$CHART/values.schema.json" <<'PY' 2>&1
 import os, sys, json
@@ -195,34 +195,34 @@ if a == b:
 else:
     only_def = sorted(set(a) - set(b))
     only_chart = sorted(set(b) - set(a))
-    print("DIFF केवल परिभाषा में: %s | केवल चार्ट में: %s"
+    print("DIFF only in the definition: %s | only in the chart: %s"
           % (",".join(only_def) or "-", ",".join(only_chart) or "-"))
 PY
 )"
     case "$CMP" in
       SAME*)
-        ok "परिभाषा में स्कीमा पार्स होती है और चार्ट की स्कीमा से मेल खाती है (${CMP#SAME })"
-        evidence "एप्लिकेशन पैरामीटर" "${CMP#SAME }"
+        ok "the schema in the definition parses and matches the chart's schema (${CMP#SAME })"
+        evidence "Application parameters" "${CMP#SAME }"
         ;;
       DIFF*)
-        fail "परिभाषा में स्कीमा चार्ट की स्कीमा से अलग हो गई: ${CMP#DIFF }" \
-             "इन्हें मेल में लाएँ: openAPISchema की सामग्री chart/values.schema.json एक पंक्ति में है"
+        fail "the schema in the definition has diverged from the chart's schema: ${CMP#DIFF }" \
+             "bring them into agreement: the contents of openAPISchema are chart/values.schema.json as a single line"
         ;;
       BADJSON*)
-        fail "openAPISchema JSON के रूप में पार्स नहीं होता: ${CMP#BADJSON }" \
-             "स्कीमा 'openAPISchema: |-' के नीचे सही JSON की एक पंक्ति होनी चाहिए"
+        fail "openAPISchema does not parse as JSON: ${CMP#BADJSON }" \
+             "the schema must be a single line of valid JSON under 'openAPISchema: |-'"
         ;;
       *)
-        warn "स्कीमाओं का मिलान नहीं हो सका (${CMP})" \
-             "हाथ से जाँचें कि openAPISchema chart/values.schema.json से मेल खाता है"
+        warn "could not compare the schemas (${CMP})" \
+             "check by hand that openAPISchema matches chart/values.schema.json"
         ;;
     esac
   fi
 
-  # --- आइकन ---------------------------------------------------------------
-  # डैशबोर्ड base64 में पैक किए गए SVG की अपेक्षा करता है और तस्वीर के लिए कहीं नहीं जाता। यहाँ त्रुटि
-  # खामोश होती है: मैनिफ़ेस्ट अप्लाई हो जाएगा, पर कैटलॉग में आइकन की जगह खाली रहेगी। इसलिए स्ट्रिंग को
-  # डिकोड करते हैं और देखते हैं कि अंदर वाकई SVG है।
+  # --- icon -----------------------------------------------------------------
+  # The dashboard expects an SVG packed into base64 and does not go anywhere for the image. The error
+  # here is silent: the manifest applies, but in the catalog the icon's place will be empty. So we
+  # decode the string and check that inside there is really an SVG.
   ICON="$(grep -Eo '^[[:space:]]{4}icon:[[:space:]]+\S+' "$APPDEF" | head -1 | awk '{print $2}')"
   if [ -n "$ICON" ]; then
     ICON_HEAD="$(printf '%s' "$ICON" | python3 -c 'import sys,base64
@@ -232,45 +232,45 @@ except Exception:
     print("")' 2>/dev/null)"
     case "$ICON_HEAD" in
       *"<svg"*)
-        ok "आइकन base64 से डिकोड होता है और SVG निकलता है"
-        evidence "आइकन की शुरुआत" "$ICON_HEAD"
+        ok "the icon decodes from base64 and turns out to be an SVG"
+        evidence "Start of the icon" "$ICON_HEAD"
         ;;
       "")
-        fail "आइकन base64 से डिकोड नहीं होता" \
-             "स्ट्रिंग फिर से बनाएँ: base64 -i icon.svg | tr -d '\\n' (Linux पर: base64 -w0 icon.svg)"
+        fail "the icon does not decode from base64" \
+             "rebuild the string: base64 -i icon.svg | tr -d '\\n' (on Linux: base64 -w0 icon.svg)"
         ;;
       *)
-        fail "आइकन डिकोड होता है, पर यह SVG नहीं है" \
-             "डैशबोर्ड ठीक SVG की अपेक्षा करता है; रास्टर तस्वीर को वह कचरे की तरह दिखाएगा"
+        fail "the icon decodes, but it is not an SVG" \
+             "the dashboard expects exactly an SVG; a raster image it will show as garbage"
         ;;
     esac
   fi
 fi
 
-# --- अधिकार: यहाँ अस्वीकृति अपेक्षित है --------------------------------------
-# यह प्रतिभागी की जाँच नहीं, बल्कि प्लेटफ़ॉर्म की बनावट की पुष्टि है। इसलिए
-# जवाब `no` सफलता है, और `yes` खुश होने का नहीं, हैरान होने का कारण है।
+# --- permissions: a denial here is expected --------------------------------
+# This is not a check of the participant, but a confirmation of how the platform is built. So
+# the answer `no` is a success, and `yes` is a reason to be surprised, not glad.
 if [ -n "${KUBECONFIG:-}" ] && kubectl version -o json >/dev/null 2>&1; then
   CANI="$(kubectl auth can-i create applicationdefinitions 2>/dev/null)"
   case "$CANI" in
     no)
-      ok "पुष्टि हुई: आपको ApplicationDefinition अप्लाई करने की अनुमति नहीं है (can-i -> no)"
-      evidence "ApplicationDefinition पर अधिकार" \
+      ok "confirmed: you are not allowed to apply an ApplicationDefinition (can-i -> no)"
+      evidence "Rights on ApplicationDefinition" \
         "kubectl auth can-i create applicationdefinitions -> no
-ऑब्जेक्ट cluster-scoped है और सभी टेनेंट के लिए कैटलॉग बदलता है, इसलिए इसे प्लेटफ़ॉर्म एडमिन अप्लाई करता है।"
+The object is cluster-scoped and changes the catalog for all tenants, so it is the platform admin who applies it."
       ;;
     yes)
-      warn "आपके पास ApplicationDefinition अप्लाई करने के अधिकार हैं (can-i -> yes)" \
-           "इसका मतलब आप एडमिन अकाउंट से काम कर रहे हैं, टेनेंट से नहीं; लैब टेनेंट अकाउंट के लिए बनी है"
+      warn "you have rights to apply an ApplicationDefinition (can-i -> yes)" \
+           "that means you are working under an admin account, not a tenant one; the lab is designed for a tenant account"
       ;;
     *)
-      warn "क्लस्टर से अधिकारों के बारे में नहीं पूछा जा सका" \
-           "लैब पास करने में बाधा नहीं: जाँच लोकल है, यहाँ क्लस्टर की ज़रूरत नहीं"
+      warn "could not ask the cluster about permissions" \
+           "does not affect passing the lab: the check is local, the cluster is not needed here"
       ;;
   esac
 else
-  warn "क्लस्टर से पूछताछ नहीं हुई (KUBECONFIG सेट नहीं है या जवाब नहीं देता)" \
-       "जाँच लोकल है, यहाँ क्लस्टर की ज़रूरत नहीं। अधिकारों की अस्वीकृति देखने के लिए: export KUBECONFIG=~/.kube/config"
+  warn "cluster was not queried (KUBECONFIG is not set or does not respond)" \
+       "the check is local, the cluster is not needed here. To see the permission denial: export KUBECONFIG=~/.kube/config"
 fi
 
 finish

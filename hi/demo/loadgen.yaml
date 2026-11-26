@@ -1,6 +1,6 @@
-# demo एनवायरनमेंट (tenant-workshop00) में यूज़र गतिविधि का एमुलेशन।
-# छोटे वॉल्यूम + पुराने डेटा की सफ़ाई। इंस्टेंस को नहीं छूते, केवल उनके अंदर का डेटा।
-# CronJob टेनेंट के namespace में रहते हैं (नेटवर्क पॉलिसी सेवाओं तक पहुँच केवल अंदर से देती हैं)।
+# Emulating user activity in the demo environment (tenant-workshop00).
+# Small volumes + cleanup of old data. We don't touch the instances, only the data inside them.
+# The CronJobs live in the tenant namespace (network policies allow access to the services only from within).
 ---
 apiVersion: batch/v1
 kind: CronJob

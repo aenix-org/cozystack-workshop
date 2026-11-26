@@ -30,4 +30,4 @@ cd ~/workshop
 `nano manifests/03-app-vm.yaml` (guardar: `Ctrl+O`, `Enter`, salir: `Ctrl+X`).
 
 El único marcador que se dejó a propósito está en `manifests/03-app-vm.yaml`, la línea
-`url: "ВСТАВЬТЕ_PRESIGNED_URL"`. Esa URL la obtendrás cuando conviertas la imagen. Por ahora, solo debes saber que ahí te está esperando.
+`url: "PASTE_PRESIGNED_URL"`. Esa URL la obtendrás cuando conviertas la imagen. Por ahora, solo debes saber que ahí te está esperando.

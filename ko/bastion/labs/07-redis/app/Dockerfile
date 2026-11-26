@@ -1,59 +1,59 @@
-# 랩 7 · "출입증(Passes)" 서비스 이미지 빌드 레시피, 버전 v2.
+# Lab 7 · build recipe for the "Passes" service image, version v2.
 #
-# Dockerfile은 소스 코드를 이미지로 바꾸는 단계들의 목록입니다: 실행 명령과 함께
-# 파일시스템의 불변 스냅샷이죠. 가장 익숙한 비유는 가상 머신 템플릿이지만, 마우스가
-# 아니라 바로 이 텍스트로 만들어지며, 레지스트리에 저장되고 태그로 버전이 관리됩니다.
+# A Dockerfile is a list of steps that turn source code into an image: an immutable
+# snapshot of the filesystem together with the command to run. The closest familiar analog
+# is a virtual machine template, but it is built not with a mouse but with this text, lives
+# in a registry, and is versioned by a tag.
 #
-# 이것은 클러스터가 아니라 VM에서 빌드됩니다(README의 빌드 단계 참고):
-#   docker build --platform linux/amd64 -t <여러분의-harbor>/passes/passes-api:v2 app/
-#   docker push  <여러분의-harbor>/passes/passes-api:v2
+# It is built on a VM, not in the cluster (see the build step in the README):
+#   docker build --platform linux/amd64 -t <your-harbor>/passes/passes-api:v2 app/
+#   docker push  <your-harbor>/passes/passes-api:v2
 #
-# --platform linux/amd64은 Apple Silicon Mac에서 필수입니다: 이것 없이는 이미지가
-# ARM용으로 빌드되어, 아무 불평 없이 push되고, 클러스터에서 "exec format error"로 죽습니다.
+# --platform linux/amd64 is mandatory on a Mac with Apple Silicon: without it the image will
+# build for ARM, push without a single complaint, and crash in the cluster with "exec format error".
 #
-# 2단계 빌드.
+# Two-stage build.
 #
-# 첫 번째 단계는 빌드 단계입니다: 여기서는 전체 Go 컴파일러가 필요하며, 약 350 MB입니다.
-# 두 번째 단계는 클러스터로 배포되는 것입니다: 완성된 바이너리만 여기에 들어갑니다.
-# 이렇게 하면 최종 이미지가 350 대신 약 10 MB가 되고, 그 안에는 컴파일러도,
-# 소스도, 패키지 매니저도 없습니다 — 즉 컨테이너에 어떻게든 침입한 자가
-# 사용할 수 있는 것이 아무것도 없습니다.
+# The first stage is the build stage: here the whole Go compiler is needed, which is about 350 MB.
+# The second stage is what ships to the cluster: only the finished binary lands there.
+# This way the final image ends up around 10 MB instead of 350, and inside it there is neither
+# a compiler, nor sources, nor a package manager — that is, nothing to use
+# for whoever does manage to get into the container.
 
-# FROM — 어떤 기성 이미지에서 시작할지. 여기서는 Alpine 기반의 Go 컴파일러가 담긴
-# 공식 이미지를 가져옵니다. AS build는 이 단계에 이름을 부여하여 두 번째 단계가 그
-# 결과를 가져올 수 있게 합니다. 버전은 latest가 아니라 고정되어 있습니다(1.23): 그렇지
-# 않으면 같은 소스의 내일 빌드가 다른 바이너리를 만들어낼 수 있습니다.
+# FROM — which ready-made image we start from. Here we take the official image with the Go
+# compiler based on Alpine. AS build gives this stage a name so the second stage can grab the
+# result from it. The version is pinned (1.23), not latest: otherwise tomorrow's build of the same
+# source may produce a different binary.
 FROM golang:1.23-alpine AS build
-# WORKDIR — 이미지 내부의 작업 폴더. 이후의 모든 명령은 이 안에서 실행됩니다.
+# WORKDIR — the working folder inside the image. All following commands run in it.
 WORKDIR /src
-# COPY는 VM의 파일을 이미지 안으로 넣습니다. 한 줄이 아니라 두 줄로: go.mod는 드물게,
-# main.go는 자주 바뀌며, docker는 각 단계를 개별적으로 캐시합니다. main.go만 건드리면 —
-# go.mod 단계는 캐시에서 가져옵니다.
+# COPY places files from the VM inside the image. In two lines, not one: go.mod changes
+# rarely, main.go often, and docker caches each step separately. Touch only main.go —
+# the go.mod step will be taken from cache.
 COPY go.mod ./
 COPY main.go ./
-# RUN — 빌드 도중에 바로 명령을 실행; 그 결과는 이미지에 남습니다.
-# CGO_ENABLED=0 — 시스템 라이브러리에 대한 의존 없이 정적으로 빌드.
-# 이것 없이는 바이너리가 glibc를 요구하는데, 최종 이미지에는 그것이 없습니다.
-# -trimpath는 바이너리에서 VM의 경로를 제거하고, -ldflags="-s -w"는 디버그
-# 정보를 버립니다 — 이미지가 더 작아지고, 로그에 폴더 이름이 새어 나가지 않습니다.
+# RUN — execute a command right during the build; its result stays in the image.
+# CGO_ENABLED=0 — build statically, without ties to system libraries.
+# Without this the binary would require glibc, which will not be in the final image.
+# -trimpath strips paths from your VM out of the binary, -ldflags="-s -w" throws out
+# debug information — the image is smaller, and your folder names do not leak into the log.
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/passes-api .
 
-# 두 번째 FROM은 백지 상태에서 이미지를 처음부터 다시 시작합니다. build 단계에 있던
-# 모든 것은 이 지점에서 버려지고, 다음 COPY --from=build 명령으로 우리가 명시적으로
-# 복사하는 것만 최종 이미지에 들어갑니다.
+# The second FROM starts the image over from a clean slate. Everything that was in the build stage
+# is discarded at this point, and only what we explicitly
+# copy with the next COPY --from=build command will land in the final image.
 FROM alpine:3.21
-# 애플리케이션은 root가 아닌 사용자로 실행됩니다. 올바르게 구성된 클러스터에서는 root로
-# 실행되는 파드가 아예 허용되지 않으며, 이것은 트집이 아니라 표준 보안 요구사항입니다.
+# The application runs not as root. In a properly configured cluster a pod running as root
+# will not be allowed at all, and this is not nitpicking but a standard security requirement.
 RUN adduser -D -u 10001 app
-# 빌드 단계에서 넘어오는 유일한 것은 파일 하나입니다: 완성된 바이너리.
+# The only thing that moves over from the build stage is a single file: the finished binary.
 COPY --from=build /out/passes-api /usr/local/bin/passes-api
-# USER — 어떤 사용자로 프로세스를 실행할지. 이름이 아니라 번호가 지정되어 있습니다:
-# kubernetes는 매니페스트에서 바로 그 번호를 확인하며(runAsNonRoot는 uid를 봅니다),
-# 둘은 일치해야 합니다.
+# USER — as whom to run the process. A number is given, not a name: kubernetes checks
+# exactly the number in the manifest (runAsNonRoot looks at the uid), and they must match.
 USER 10001
-# EXPOSE — "내부에서 이 포트를 수신한다"는 표시. 아무것도 열거나 포워딩하지 않으며,
-# 매니페스트를 작성할 사람을 위한 문서입니다.
+# EXPOSE — a note that "this port is listened on inside". It does not open or forward anything,
+# it is documentation for whoever will write the manifest.
 EXPOSE 8080
-# ENTRYPOINT — 컨테이너가 시작될 때 실행되는 것. 여기 프로세스는 하나이고 그것이
-# 주된 것입니다: 그것이 끝나면 컨테이너도 끝나고, 클러스터가 새 복제본을 띄웁니다.
+# ENTRYPOINT — what runs when the container starts. There is one process here and it is
+# the main one: when it ends the container ends, and the cluster brings up a new copy.
 ENTRYPOINT ["/usr/local/bin/passes-api"]

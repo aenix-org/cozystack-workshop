@@ -1,16 +1,16 @@
 ---
-# 实验 7 · “通行证”服务，v2 版本——能够使用缓存的那个版本。
-# 这里缓存还没有启用：我们先测量一下没有它时有多糟糕。它稍后才会启用，
-# 通过同一文件夹里的 cache-patch.yaml 补丁。
+# Lab 7 · the "Pass" service, version v2 — the one that can work with a cache.
+# The cache is NOT enabled here yet: first we measure how bad it is without it. It gets enabled later,
+# by the cache-patch.yaml patch from this same folder.
 #
-# 应用位置：你的 `lab` 集群（export KUBECONFIG=~/lab.kubeconfig）。
-# 命令：kubectl apply -f passes-api.yaml
+# Where it is applied: your `lab` cluster (export KUBECONFIG=~/lab.kubeconfig).
+# Command: kubectl apply -f passes-api.yaml
 #
-# HARBOR-HOST 是占位符，不是地址。请替换成你自己 Harbor 的地址（见 hr-legacy.yaml，
-# 那里也有一次性替换所有文件的 sed 命令）。
+# HARBOR-HOST is a placeholder, not an address. Substitute the address of your own Harbor (see hr-legacy.yaml,
+# it also has the sed command to replace it across all files at once).
 #
-# 文件里有两个用 `---` 分隔的对象：Deployment（应用的副本）和 Service（给它们的一个稳定名称）。
-# apiVersion、kind 和 metadata.name 在文件下方不再注释。
+# The file has two objects separated by `---`: Deployment (copies of the application) and Service (a stable name
+# for them). apiVersion, kind and metadata.name are not commented further down the file.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -18,64 +18,64 @@ metadata:
   labels:
     app: passes-api
 spec:
-  # 两个副本，而不是一个,这样稍后就能看到缓存的主要特性：它是共享的。
-  # 一个 Pod 把答案放进 Redis，另一个从那里取出来，尽管它自己从没访问过通讯录。
+  # Two copies, not one, so that later the main property of the cache is visible: it is shared.
+  # One pod put the answer into Redis, another took it from there, even though it never went to the directory itself.
   replicas: 2
-  # Deployment 通过这个标签把自己的 Pod 和别人的区分开。它必须和下方 template 里的标签一致，
-  # 否则对象就找不到自己创建的东西。
+  # By this label the Deployment tells its own pods from foreign ones. It must match the label
+  # in the template below, otherwise the object will not find what it created itself.
   selector:
     matchLabels:
       app: passes-api
-  # template —— Pod 模板：每个副本按什么来组装。
+  # template — the pod template: what to assemble each copy from.
   template:
     metadata:
       labels:
         app: passes-api
     spec:
-      # Pod 级别的安全要求：不以 root 运行，受限的系统调用集合。
-      # 在启用了策略的集群里，缺少这些字段的 Pod 不会被接受。
+      # Pod-level security requirements: not from root, a restricted set of system
+      # calls. In a cluster with policies enabled, a pod without these fields will not be accepted.
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
         seccompProfile:
           type: RuntimeDefault
-      # 拉取镜像时集群将如何向封闭的 Harbor 表明身份。没有对这个 secret 的引用，
-      # Pod 就会卡在 ImagePullBackOff。
+      # How the cluster will identify itself to the closed Harbor when pulling the image. Without a reference
+      # to this secret the pod will get stuck in ImagePullBackOff.
       imagePullSecrets:
         - name: harbor
       containers:
         - name: api
-          # 容器的权限被削减到最低：禁止提权，没有内核特权。
+          # The container's privileges are cut to a minimum: escalation is forbidden, no kernel privileges.
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # 和通讯录相同的镜像。区分它们的只有下面的 MODE。
+          # The same image as the directory. Only the MODE below separates them.
           image: HARBOR-HOST/passes/passes-api:v2
-          # 需要端口名称，这样探针和 Service 引用的是名称，而不是数字。
+          # The port name is needed so that the probe and the Service reference a name, not a number.
           ports:
             - containerPort: 8080
               name: http
-          # 应用的全部行为都在这里设定。请注意：列表里没有
-          # REDIS_ADDR 和 REDIS_PASSWORD 这两个变量——正因如此缓存才是关闭的，
-          # 每个请求都老老实实地跑去访问慢速的通讯录。
+          # All the application's behavior is set here. Note: the variables
+          # REDIS_ADDR and REDIS_PASSWORD are not in the list — and that is exactly why the cache is off,
+          # and every request honestly goes to the slow directory.
           env:
-            # MODE=api —— 这个实例作为“通行证”服务本身运行。
+            # MODE=api — this instance works as the "Pass" service itself.
             - name: MODE
               value: "api"
-            # 应用工作时并不需要版本和注册表——它们会显示在对 “/” 的响应里，
-            # 让你确认正在运行的正是你刚刚构建的东西。
+            # The application does not need the version and registry to work — they are visible in the response to "/"
+            # and let you confirm that exactly what you just built is running.
             - name: APP_VERSION
               value: "v2"
             - name: IMAGE_REGISTRY
               value: HARBOR-HOST
-            # 去哪里取数据。用服务名，而不是地址：通讯录的副本
-            # 可以被重建任意多次，名称不会改变。
+            # Where to go for data. A service name, not an address: the directory's copies
+            # can be recreated any number of times, the name does not change.
             - name: HR_URL
               value: "http://hr-legacy.default.svc.cluster.local"
-            # 谁在哪里执行请求。集群会自己填入这三个值：
-            # 事先没有人知道它们。它们会出现在服务的响应里，从中可以看出
-            # 是哪个副本、在哪个节点上作出的应答——这在测量时会派上用场。
+            # Who executes the request and where. The cluster substitutes these three values itself:
+            # nobody knows them in advance. They end up in the service's response, and from them you can see
+            # which copy on which node answered — this will be useful during measurements.
             - name: POD_NAME
               valueFrom:
                 fieldRef:
@@ -88,9 +88,9 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
-          # requests —— 挑选节点时预留的量，limits —— 上限。这里一核的上限
-          # 不是贪心：在负载下应用会顶到它，而不会吃掉整个节点，
-          # 于是测量显示的是通讯录的延迟，而不是对 CPU 的争夺。
+          # requests — what gets reserved when picking a node, limits — the ceiling. A one-core ceiling
+          # here is not greed: under load the application will hit it rather than eat up
+          # the whole node, and the measurement will show the directory's latency, not a fight for the CPU.
           resources:
             requests:
               cpu: 50m
@@ -98,9 +98,9 @@ spec:
             limits:
               cpu: "1"
               memory: 64Mi
-          # 在 /healthz 应答之前，Service 不会向这个副本发送任何一个请求。
-          # 更新时这同一个字段能让你免于中断：旧副本不会被移除，
-          # 直到新副本报告就绪。
+          # Until /healthz responds, the Service will not send a single request to this copy.
+          # During an update this same field saves you from an outage: old copies are not removed
+          # until the new ones report readiness.
           readinessProbe:
             httpGet:
               path: /healthz
@@ -108,19 +108,19 @@ spec:
             initialDelaySeconds: 2
             periodSeconds: 5
 ---
-# Service —— 给两个副本一个稳定的名称，并在它们之间分配请求。
-# Pod 会被重建并更换 IP，而 passes-api 这个名称保持不变。Fortio
-# 和检查脚本都通过这个名称访问服务。
+# Service — one stable name for both copies and distribution of requests between them.
+# Pods are recreated and change IPs, the name passes-api stays. By this name both Fortio
+# and the check script reach the service.
 apiVersion: v1
 kind: Service
 metadata:
   name: passes-api
 spec:
-  # Service 依据这个标签收集存活副本的列表。若它与 Pod 的标签不一致——
-  # Service 会存在，却指向空无一物。
+  # The label by which the Service gathers the list of live copies. If it does not match the pods' label —
+  # the Service will exist and lead nowhere.
   selector:
     app: passes-api
   ports:
-    # 从外部通过 80 端口访问，进入 Pod 后转到名为 http（8080）的端口。
+    # From outside they connect on 80, into the pod it goes to the port named http (8080).
     - port: 80
       targetPort: http

@@ -1,73 +1,74 @@
--- ラボ9 · データジェネレータ: ClickHouse 自身が生成する100万件の改札記録。
+-- Lab 9 · data generator: a million turnstile records, invented by ClickHouse itself.
 --
--- 実行場所: VM 上、ラボクラスタ内で、README にある短いコマンド `ch` を使う:
+-- Where it runs: on the VM, in the lab cluster, with the short command `ch`
+-- from the README:
 --     cd labs/09-clickhouse && ch < 02-generate.sql
--- その前にテーブルを作成しておく必要がある — 01-schema.sql。
+-- Before this, the table must be created — 01-schema.sql.
 --
--- 待ち時間: 100万行はサーバー内部だけで数秒のうちに計算・書き込みされる。
--- データはネットワークを通らず、あなたの VM も経由しない。
--- INSERT の応答は空 — それが成功の合図。確認方法: echo 'SELECT count() FROM passes' | ch
+-- How long to wait: a million rows are computed and written in a few seconds,
+-- entirely inside the server. The data does not travel over the network or pass through your VM.
+-- The INSERT reply is empty — that means success. To check: echo 'SELECT count() FROM passes' | ch
 --
--- ファイルを2回実行すれば行数は200万になる: INSERT は追加するだけで
--- 何も置き換えない。やり直すには: TRUNCATE TABLE passes、その後にこのファイルをもう一度。
+-- Run the file twice and you get two million rows: INSERT only appends and
+-- replaces nothing. To start over: TRUNCATE TABLE passes, then this file again.
 --
--- 以下は単一の INSERT ... SELECT コマンド: 行は外部から来るのではなく、
--- 続くクエリによって計算される。
+-- Below is a single INSERT ... SELECT command: the rows don't come from outside, they are
+-- computed by the query that follows.
 INSERT INTO passes
 SELECT
-    -- 通行番号。number はジェネレータ内で一意 — したがって pass_id も
-    -- 一意になる。
+    -- Pass number. number is unique within the generator — so pass_id
+    -- is unique too.
     number AS pass_id,
-    -- 入場時刻は3つの部分から組み立てられる: 日、時、分。各部分は
-    -- それぞれ独自の擬似乱数で、cityHash64(number, 'ソルト') として得られる。
-    -- cityHash64 は高速なハッシュ関数: 同じ入力に対して常に同じ結果を返すので、
-    -- データは再現可能になる。一方で異なる「ソルト」
-    -- ('day', 'hour', 'minute', ...) は、一つの number から好きなだけ
-    -- 互いに独立した乱数値を作り出す。
+    -- The entry time is assembled from three parts: day, hour, and minute. Each part
+    -- is its own pseudo-random number, obtained as cityHash64(number, 'salt').
+    -- cityHash64 is a fast hash function: for the same input it always gives
+    -- the same result, so the data is reproducible, while a different salt
+    -- ('day', 'hour', 'minute', ...) turns a single number into as many
+    -- mutually independent random values as you like.
     addMinutes(
         addHours(
             addDays(
-                -- 起点は1月1日。57600 で割った余りは 57599 までの数を与え、
-                -- その平方根は 0 から 239、つまり8か月分の日数になる。
-                -- ここでの平方根は飾りではない: 通行を期間の終わりの方へ
-                -- 集中させる。時間とともに来場者が増えていく — 現実と同じであり、
-                -- まさにその増加を経営陣はレポートで見たがっている。
+                -- The starting point is January 1. The remainder modulo 57600 gives a number up to 57599,
+                -- and its square root is a day from 0 to 239, that is, eight months.
+                -- The square root here is not for looks: it concentrates the passes
+                -- toward the end of the period. Guests grow more numerous over time — as
+                -- in real life, and that growth is exactly what management wants to see in the report.
                 toDateTime('2026-01-01 00:00:00'),
                 toUInt16(sqrt(cityHash64(number, 'day') % 57600))
             ),
-            -- 到着時刻は「8時から18時まで」一様にではなく、配列から取る。
-            -- そこでは時刻が異なる頻度で繰り返される: 10 は3回、15 は3回、
-            -- 8 は1回。これで昼前と昼後の2つの顕著なピークができる。
-            -- レポートはそれを見つけるためのもの。テストデータの中に、
-            -- 我々がその中で探そうとしているものが含まれているのは良いことだ。
-            -- ClickHouse の配列の添字は1から始まるので、1 + …
+            -- The arrival hour is taken not uniformly "from 8 to 18", but from an array where
+            -- hours repeat with different frequency: 10 occurs three times, 15 three times,
+            -- 8 once. This produces two pronounced peaks, before lunch and after;
+            -- the report is meant to find them. It's good when the test data contains
+            -- what we intend to look for in it.
+            -- Array numbering in ClickHouse starts at one, hence 1 + …
             [8, 9, 9, 10, 10, 10, 11, 11, 12,
              13, 14, 14, 15, 15, 15, 16, 17, 18][1 + cityHash64(number, 'hour') % 18]
         ),
-        -- 時内の分は、同じ number から得られるもう一つの独立した値。
+        -- The minutes within the hour are yet another independent value from the same number.
         cityHash64(number, 'minute') % 60
     ) AS created_at,
-    -- 来場者名は各行ごとに固有: 一つの列に100万通りの異なる値。
-    -- ラボの少し先で、ディスク上ではこれが最も重い列だと分かる。
-    concat('ゲスト No. ', toString(number)) AS guest_name,
-    -- 受け入れ担当者の部署: 5つの値、均等に分布。
-    ['営業部', '開発部', '経理部',
-     '人事部', '物流部'][1 + cityHash64(number, 'dept') % 5] AS host_dept,
-    -- 入場ゲート。同じ手口だが分布は不均等:「北口」は6枠のうち
-    -- 3枠を占めて流量の半分を得る、「南口」は3分の1、「西口」は
-    -- 残り。均等に分布したデータはレポートでは不自然に見え、何も
-    -- 示さない。
-    ['北口', '北口', '北口',
-     '南口', '南口', '西口'][1 + cityHash64(number, 'entrance') % 6] AS entrance,
-    -- 通行証の種類: 10枠のうち6枠が「一回券」、2枠が「週間券」、
-    -- 「車両券」と「団体券」に1枠ずつ — 改札での実際の見え方はこうなる。
-    ['一回券', '一回券', '一回券', '一回券', '一回券', '一回券',
-     '週間券', '週間券',
-     '車両券', '団体券'][1 + cityHash64(number, 'type') % 10] AS pass_type,
-    -- 滞在時間は30分から329分まで。toUInt16 が必要なのは、この列が
-    -- UInt16 として宣言されている一方、算術の結果はより幅広く、自動では縮まらないため。
+    -- Each row has its own guest name: a million different values in one column.
+    -- A bit later in the lab you'll see that on disk this is the heaviest column.
+    concat('Guest No. ', toString(number)) AS guest_name,
+    -- The host employee's department: five values, distributed evenly.
+    ['Sales', 'Engineering', 'Accounting',
+     'HR', 'Logistics'][1 + cityHash64(number, 'dept') % 5] AS host_dept,
+    -- Entry gate. The same trick, but the distribution is uneven: «North» takes
+    -- three cells out of six and gets half the flow, «South» a third, «West» the
+    -- remainder. Evenly distributed data looks implausible in a report and shows
+    -- nothing.
+    ['North', 'North', 'North',
+     'South', 'South', 'West'][1 + cityHash64(number, 'entrance') % 6] AS entrance,
+    -- Pass type: six cells out of ten go to «single-use», two to «weekly»,
+    -- one each to «vehicle» and «group» — that's how it looks at the gate.
+    ['single-use', 'single-use', 'single-use', 'single-use', 'single-use', 'single-use',
+     'weekly', 'weekly',
+     'vehicle', 'group'][1 + cityHash64(number, 'type') % 10] AS pass_type,
+    -- Visit duration from 30 to 329 minutes. toUInt16 is needed because the column
+    -- is declared as UInt16, while the arithmetic result is wider and won't narrow itself.
     toUInt16(30 + cityHash64(number, 'duration') % 300) AS duration_min
--- numbers(1000000) は組み込みのジェネレータテーブル: 単一の列 number を持つ
--- 100万行で、値は 0 から 999999 まで。ディスク上には存在せず、その場で
--- 計算される。データを増減したければ、この数字だけを変える。
+-- numbers(1000000) is a built-in generator table: a million rows with a single
+-- column number holding values from 0 to 999999. It doesn't exist on disk, it's computed
+-- on the fly. Need more or less data — only this number changes.
 FROM numbers(1000000)

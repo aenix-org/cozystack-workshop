@@ -56,12 +56,12 @@
 той кластер.** Перед кожним блоком команд написано, куди він адресований. Якщо сумніваєтеся:
 
 ```bash
-# echo друкує значення змінної: яким файлом доступу зараз користується kubectl.
-# Порожньо — значить kubectl візьме файл за замовчуванням ~/.kube/config, а не той, що ви думаєте.
+# echo prints the value of the variable: which access file kubectl is using right now.
+# Empty means kubectl will use the default file ~/.kube/config, not the one you think.
 echo $KUBECONFIG
 
-# get nodes = «покажи вузли кластера». Тут це лакмусовий папірець:
-# з відповіді видно, у який із двох кластерів пішла команда.
+# get nodes = "show the cluster's nodes". Here it's a litmus test:
+# the answer tells you which of the two clusters the command went to.
 kubectl get nodes
 ```
 
@@ -74,7 +74,7 @@ kubectl get nodes
 нічого не потрібно: там, де нижче написано `kubectl apply -f name.yaml`, файл береться звідси.
 
 ```bash
-# усі команди цієї лаби виконуються з теки лаби — перейдіть до неї
+# every command in this lab is run from the lab folder — change into it
 cd labs/06-harbor
 ```
 
@@ -143,12 +143,12 @@ cd labs/06-harbor
 застосунок платформа заводить окреме правило, що дозволяє саме його реквізити:
 
 ```bash
-# get secret = «покажи об'єкт-секрет». Ім'я секрета зібрано з префікса типу
-# застосунку і його імені: harbor- + harbor.
-#   -n tenant-workshopXX  у якому namespace шукати — у вашому тенанті
-#   -o jsonpath='...'     витягти з об'єкта одне поле, а не друкувати його цілком
-#   base64 -d             розкодувати: значення всередині секретів лежать у base64
-#   ; echo                дописати новий рядок, інакше пароль злипнеться із запрошенням
+# get secret = "show the Secret object". The secret's name is assembled from the prefix
+# for the application type and its name: harbor- + harbor.
+#   -n tenant-workshopXX  which namespace to look in — your tenant
+#   -o jsonpath='...'     pull a single field out of the object rather than printing the whole thing
+#   base64 -d             decode: values inside secrets are stored in base64
+#   ; echo                add a newline, otherwise the password runs into the prompt
 kubectl -n tenant-workshopXX get secret harbor-harbor-credentials \
   -o jsonpath='{.data.admin-password}' | base64 -d; echo
 ```
@@ -164,9 +164,9 @@ kubectl -n tenant-workshopXX get secret harbor-harbor-credentials \
 і `docker pull` ходять у цей реєстр, нічого не запитуючи.
 
 ```bash
-# login = «запам'ятай реквізити ось цього реєстру».
-# Аргумент — адреса реєстру з ключа url; harbor-harbor.workshop03.example.org тут приклад.
-# Команда запитає ім'я користувача (admin) і пароль; пароль при вводі не відображається.
+# login = "remember the credentials for this registry".
+# The argument is the registry address from the url key; harbor-harbor.workshop03.example.org here is an example.
+# The command will ask for a username (admin) and a password; the password isn't shown as you type.
 docker login harbor-harbor.workshop03.example.org
 ```
 
@@ -307,13 +307,13 @@ USER 10001
 ```bash
 cd labs/06-harbor
 
-# build = «збери образ за Dockerfile».
-#   --platform linux/amd64  під який процесор збирати; вузли кластера на x86,
-#                           а ноутбук може бути на ARM — тоді без прапорця вийде не те
-#   -t <адреса>/<проєкт>/<ім'я>:<тег>  як назвати результат. Адреса реєстру на початку імені
-#                           — це те, куди потім поїде docker push
-#   app/                    останній аргумент — тека з Dockerfile і вихідниками;
-#                           її вміст цілком передається складальнику
+# build = "build the image from the Dockerfile".
+#   --platform linux/amd64  which processor to build for; the cluster nodes are on x86,
+#                           and the laptop may be on ARM — then without the flag you get the wrong thing
+#   -t <address>/<project>/<name>:<tag>  what to name the result. The registry address at the start of the name
+#                           is where docker push will later send it
+#   app/                    the last argument — the folder with the Dockerfile and sources;
+#                           its entire contents are handed to the builder
 docker build --platform linux/amd64 -t harbor-harbor.workshop03.example.org/passes/passes-api:v1 app/
 ```
 
@@ -337,8 +337,8 @@ Successfully tagged harbor-harbor.workshop03.example.org/passes/passes-api:v1
 шар за шаром; шари, які в реєстрі вже є, повторно не передаються.
 
 ```bash
-# push = «відправ образ у реєстр». Куди відправляти, docker бере з імені образу:
-# перша частина імені — адреса реєстру, туди він і піде, з реквізитами від docker login.
+# push = "send the image to the registry". Where to send it, docker takes from the image name:
+# the first part of the name is the registry address, and there it goes, with the credentials from docker login.
 docker push harbor-harbor.workshop03.example.org/passes/passes-api:v1
 ```
 
@@ -356,9 +356,9 @@ docker push harbor-harbor.workshop03.example.org/passes/passes-api:v1
 📍 **Де:** на ноутбуці, кластер `lab`.
 
 ```bash
-# KUBECONFIG каже kubectl, яким файлом доступу користуватися. Перемикаємося на
-# ваш кластер `lab`: далі всі kubectl-команди йдуть у нього.
-# Діє до закриття вікна термінала.
+# KUBECONFIG tells kubectl which access file to use. We switch to your `lab` cluster:
+# from here on all kubectl commands go to it.
+# It stays in effect until the terminal window is closed.
 export KUBECONFIG=~/lab.kubeconfig
 ```
 
@@ -367,11 +367,11 @@ export KUBECONFIG=~/lab.kubeconfig
 нічого не запитуючи й не показуючи. Візьміть рядок для своєї системи:
 
 ```bash
-# sed -i = «редагуй файл на місці»
-#   's|що|на що|g'  замінити всі входження; роздільник | взято замість / тому,
-#                     що в адресі є слеші і їх довелося б екранувати
-#   Версія sed у macOS вимагає після -i обов'язковий аргумент; порожні лапки
-#   означають «резервну копію не робити». У Linux такого аргумента бути не повинно.
+# sed -i = "edit the file in place"
+#   's|what|with what|g'  replace all occurrences; the separator | is used instead of / because
+#                     the address has slashes and they would have to be escaped
+#   The sed in macOS requires a mandatory argument after -i; the empty quotes
+#   mean "make no backup copy". On Linux there must be no such argument.
 
 # Linux
 sed -i    's|HARBOR-HOST|harbor-harbor.workshop03.example.org|g' passes-broken.yaml
@@ -382,13 +382,13 @@ sed -i '' 's|HARBOR-HOST|harbor-harbor.workshop03.example.org|g' passes-broken.y
 Застосовуємо:
 
 ```bash
-# apply = «приведи кластер до того, що описано у файлі»
+# apply = "bring the cluster to what's described in the file"
 kubectl apply -f passes-broken.yaml
 
-# get pods = «покажи Pod'и».
-#   -l app=passes-api  тільки ті, у яких є ця мітка, а не всі поспіль
-#   -w                 не виходити, а друкувати зміни в міру їх появи;
-#                      перервати спостереження — Ctrl+C
+# get pods = "show the Pods".
+#   -l app=passes-api  only the ones with this label, not everything
+#   -w                 don't exit, print changes as they appear;
+#                      stop watching — Ctrl+C
 kubectl get pods -l app=passes-api -w
 ```
 
@@ -403,9 +403,9 @@ passes-api-6c9d4f7b8-2xk4n    0/1     ImagePullBackOff   0          22s
 Перервіть спостереження по `Ctrl+C` і подивіться, що каже кластер:
 
 ```bash
-# describe = «розкажи про об'єкт детально». У самому кінці виводу йде журнал подій:
-# що кластер намагався зробити з Pod'ом і чим це закінчилося.
-# tail -12 залишає останні дванадцять рядків — події якраз там.
+# describe = "tell me about the object in detail". At the very end of the output comes the event log:
+# what the cluster tried to do with the Pod and how it ended.
+# tail -12 keeps the last twelve lines — the events are right there.
 kubectl describe pod -l app=passes-api | tail -12
 ```
 
@@ -471,35 +471,35 @@ kubectl describe pod -l app=passes-api | tail -12
 робить секрет такого виду, який `kubelet` уміє читати сам при завантаженні образів:
 
 ```bash
-# create secret docker-registry = «заведи секрет з реквізитами до реєстру»
-#   harbor             ім'я секрета всередині кластера; на нього зішлеться маніфест застосунку
-#   --docker-server    до якого реєстру ці реквізити — та сама адреса, що в імені образу
-#   --docker-username  хто заходить
-#   --docker-password  пароль; одинарні лапки потрібні, якщо в ньому є $, ! або пробіл
+# create secret docker-registry = "create a secret with registry credentials"
+#   harbor             the secret's name inside the cluster; the application manifest will refer to it
+#   --docker-server    which registry these credentials are for — the same address as in the image name
+#   --docker-username  who's logging in
+#   --docker-password  the password; single quotes are needed if it has a $, ! or space
 kubectl create secret docker-registry harbor \
   --docker-server=harbor-harbor.workshop03.example.org \
   --docker-username=admin \
-  --docker-password='ВАШ-ПАРОЛЬ'
+  --docker-password='YOUR-PASSWORD'
 ```
 
 ⚠️ **Пароль у командному рядку залишається в історії оболонки.** На тестовому середовищі це неважливо,
 у робочому середовищі — важливо. Спосіб без історії:
 
 ```bash
-# read кладе введене з клавіатури в змінну HARBOR_PASS:
-#   -s  не показувати введене на екрані
-#   -r  не вважати зворотний слеш службовим символом
-# На екрані після цього рядка нічого не з'явиться: вставте пароль і натисніть Enter.
+# read puts what's typed at the keyboard into the HARBOR_PASS variable:
+#   -s  don't show what's typed on the screen
+#   -r  don't treat a backslash as a special character
+# Nothing will appear on the screen after this line: paste the password and press Enter.
 read -rs HARBOR_PASS
 
-# Далі пароль підставляється зі змінної, тому в історію оболонки йде
-# тільки ім'я змінної. Подвійні лапки обов'язкові: без них пробіли розірвуть значення.
+# From here the password is substituted from the variable, so only the variable name
+# goes into the shell history. The double quotes are mandatory: without them spaces would break the value.
 kubectl create secret docker-registry harbor \
   --docker-server=harbor-harbor.workshop03.example.org \
   --docker-username=admin \
   --docker-password="$HARBOR_PASS"
 
-# unset стирає змінну, щоб пароль не дістався наступним командам у цьому вікні
+# unset erases the variable so the password doesn't reach the next commands in this window
 unset HARBOR_PASS
 ```
 
@@ -509,8 +509,8 @@ unset HARBOR_PASS
 Запитаємо в кластера, якого виду секрет вийшов:
 
 ```bash
-#   -o jsonpath='{.type}'  надрукувати одне поле об'єкта — тип секрета
-#   {"\n"}                 додати новий рядок, інакше вивід злипнеться із запрошенням
+#   -o jsonpath='{.type}'  print a single field of the object — the secret's type
+#   {"\n"}                 add a newline, otherwise the output runs into the prompt
 kubectl get secret harbor -o jsonpath='{.type}{"\n"}'
 ```
 
@@ -528,10 +528,10 @@ kubernetes.io/dockerconfigjson
 записати бінарні дані текстом, розкодувати може будь-хто):
 
 ```bash
-# .data.\.dockerconfigjson — ключ усередині секрета. Ім'я ключа само починається з крапки,
-# тому її екранують: інакше jsonpath прийме її за роздільник шляху.
-# base64 -d розкодує значення назад у текст — побачите той самий формат,
-# що й у файлі ~/.docker/config.json на вашому ноутбуці.
+# .data.\.dockerconfigjson — the key inside the secret. The key name itself starts with a dot,
+# so it's escaped: otherwise jsonpath would take it for a path separator.
+# base64 -d decodes the value back into text — you'll see the same format
+# as in the file ~/.docker/config.json on your laptop.
 kubectl get secret harbor -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d
 ```
 
@@ -558,12 +558,12 @@ sed -i    's|HARBOR-HOST|harbor-harbor.workshop03.example.org|g' passes.yaml
 # macOS
 sed -i '' 's|HARBOR-HOST|harbor-harbor.workshop03.example.org|g' passes.yaml
 
-# delete -f = видалити з кластера рівно ті об'єкти, що описані у файлі
+# delete -f = remove from the cluster exactly the objects described in the file
 kubectl delete -f passes-broken.yaml
 kubectl apply -f passes.yaml
 
-# rollout status чекає, поки нові копії не стануть готові, і завершується сам.
-# Якщо не дочекається — поверне помилку, тому такий рядок зручно ставити в скрипти.
+# rollout status waits until the new replicas become ready, then finishes on its own.
+# If it doesn't get there, it returns an error, which is why such a line is handy in scripts.
 kubectl rollout status deployment/passes-api
 ```
 
@@ -590,19 +590,19 @@ deployment "passes-api" successfully rolled out
 без правки мережі.
 
 ```bash
-# port-forward svc/passes-api = тунель до сервісу, а не до конкретного Pod'а
-#   8080:80 — ліве число порт у вас на ноутбуці, праве порт сервісу в кластері
-# Вікно не закривайте: тунель живе, поки команда працює.
+# port-forward svc/passes-api = a tunnel to the service, not to a specific Pod
+#   8080:80 — the left number is the port on your laptop, the right one the service port in the cluster
+# Don't close the window: the tunnel lives as long as the command runs.
 kubectl port-forward svc/passes-api 8080:80
 ```
 
 У іншому вікні термінала:
 
 ```bash
-# curl — «сходи за адресою і покажи відповідь».
-#   -s     не показувати індикатор завантаження
-#   ; echo дописати новий рядок: відповідь приходить одним рядком, без нього
-#          вона злипнеться із запрошенням оболонки
+# curl — "go to the address and show the answer".
+#   -s     don't show the progress indicator
+#   ; echo add a newline: the answer comes as a single line, and without it
+#          it runs into the shell prompt
 curl -s http://localhost:8080/; echo
 ```
 
@@ -624,11 +624,11 @@ curl -s http://localhost:8080/; echo
 Поле `pod` у відповіді — ім'я копії, яка відповіла. Звірте його зі списком копій:
 
 ```bash
-# нове вікно термінала про змінну KUBECONFIG не знає — задайте її і тут,
-# інакше kubectl піде не в той кластер
+# a new terminal window knows nothing about the KUBECONFIG variable — set it here too,
+# otherwise kubectl will go to the wrong cluster
 export KUBECONFIG=~/lab.kubeconfig
 
-# та сама вибірка за міткою: у списку має бути ім'я, яке ви бачили у відповіді
+# the same selection by label: the list should contain the name you saw in the answer
 kubectl get pods -l app=passes-api
 ```
 
@@ -641,9 +641,9 @@ kubectl get pods -l app=passes-api
 який живе всередині кластера:
 
 ```bash
-# run піднімає одноразовий Pod, --rm прибирає його за собою.
-# Усе після -- виконується всередині Pod'а: вісім разів смикаємо сервіс за внутрішнім іменем
-# і друкуємо рядок з іменем копії, що відповіла.
+# run brings up a one-off Pod, --rm cleans it up afterwards.
+# Everything after -- runs inside the Pod: eight times we hit the service by its internal name
+# and print the line with the name of the replica that answered.
 kubectl run probe --rm -i --restart=Never --quiet --image=curlimages/curl:8.11.1 \
   -- sh -c 'for i in $(seq 1 8); do curl -s http://passes-api/ | grep -o "passes-api-[a-z0-9-]*"; done'
 ```
@@ -667,13 +667,13 @@ kubectl run probe --rm -i --restart=Never --quiet --image=curlimages/curl:8.11.1
 ```bash
 cd labs/06-harbor
 
-# у якому кластері перевіряти застосунок — у вашому `lab`
+# which cluster to check the application in — your `lab`
 export KUBECONFIG=~/lab.kubeconfig
-# ваш номер тенанта: з нього скрипт збере ім'я namespace tenant-workshop03
+# your tenant number: from it the script assembles the namespace name tenant-workshop03
 export COZY_TENANT=workshop03
-# де лежить доступ до кластера керування — там скрипт подивиться на сам Harbor.
-# Не задати можна: тоді скрипт пошукає ~/.kube/workshop, а не знайшовши — пропустить
-# перевірки на кластері керування і скаже про це.
+# where the access to the management cluster lives — there the script will look at Harbor itself.
+# You can leave it unset: then the script looks for ~/.kube/workshop, and not finding it — skips
+# the checks on the management cluster and says so.
 export COZY_KUBECONFIG=~/.kube/workshop
 
 ./check.sh
@@ -694,9 +694,9 @@ Pod'а, який справді існує.
 Коли закінчите з усіма лабами:
 
 ```bash
-# видаляємо об'єкти, описані у файлі: і Deployment, і Service
+# delete the objects described in the file: both the Deployment and the Service
 kubectl delete -f passes.yaml
-# секрет створювався командою, а не файлом, — видаляємо його по імені
+# the secret was created by a command, not a file — delete it by name
 kubectl delete secret harbor
 ```
 

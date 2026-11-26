@@ -1,82 +1,82 @@
 #!/usr/bin/env bash
-# ラボ9の検証: ClickHouse に入退場パスのログが入っており、それを基にレポートを計算する。
+# Check for lab 9: ClickHouse holds a log of entry passes and a report is computed from it.
 #
-# 検証するのは「サービスが作成された」ことではなく本質: テーブルが存在し、行数が100万以上あり、
-# データが多様で顕著なピークを持ち、月次レポートがミリ秒で実行され、
-# 単一カラムのクエリがテーブルのごく一部だけを読む — つまり
-# カラム型ストレージが機能している、単に主張されているだけではない、ということ。
+# We check not "the service was created" but the substance: the table exists, at least a million rows,
+# the data is varied and has pronounced peaks, the monthly report runs in
+# milliseconds, and a single-column query reads a small fraction of the table — that is,
+# columnar storage works, it is not merely claimed.
 #
-# 実行(新しいターミナルウィンドウごとに変数は再設定する):
+# Run (in each new terminal window the variables are set again):
 #   export KUBECONFIG=~/lab.kubeconfig
-#   export COZY_TENANT=workshopXX       # XX の代わりに自分の番号を
-#   export CH_PASSWORD='analyst ユーザーのパスワード'
+#   export COZY_TENANT=workshopXX       # your own number instead of XX
+#   export CH_PASSWORD='password of the analyst user'
 #   cd labs/09-clickhouse && ./check.sh
 #
-# パスワードは出力されず、レポートにも残らない。
-# スクリプトは curl の使い捨て Pod を起動するため、実行に約1分かかる。
+# The password is not printed and does not end up in the report.
+# The script spins up one-off pods with curl, so it takes about a minute.
 
-# 名前とタイトルは共通ライブラリが必要とする: それらでレポート成果物に署名する。
-# lib.sh には ok/fail/warn/evidence/finish と以下の環境チェックが入っている — こうして
-# 15個の検証スクリプトが各自バラバラではなく統一された形で出力する。
+# The name and title are needed by the shared library: it labels the report artifact with them.
+# lib.sh holds ok/fail/warn/evidence/finish and the environment checks below — so that
+# fifteen check scripts print uniformly, rather than each in its own way.
 LAB_NAME="09-clickhouse"
-LAB_TITLE="ラボ9 · 100万行の分析"
+LAB_TITLE="Lab 9 · Analytics over a million rows"
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
-# どちらのチェックも、クラスターアクセスファイルまたはテナント番号が未設定なら
-# 分かりやすいメッセージでスクリプトを止める。これがないと以降 kubectl のエラーが続く。
+# Both checks stop the script with a clear message if the cluster access file
+# or the tenant number is not set. Without them, kubectl errors would follow.
 need_kubeconfig
 need_tenant
 
-# 参加者は COZY_TENANT を `workshop07` として設定するが、namespace は
-# `tenant-workshop07` と呼ばれる。どちらの書き方も受け付ける。
+# The participant sets COZY_TENANT as `workshop07`, while the namespace is called
+# `tenant-workshop07`. We accept both spellings.
 NS="$COZY_TENANT"
 case "$NS" in
   tenant-*) ;;
   *) NS="tenant-$NS" ;;
 esac
 
-# デフォルト名はラボと同じもの。${X:-値} という記法は「環境変数を取り、
-# なければ値を代入する」という意味: アプリを別の名前にしたなら
-# CH_APP=名前 ./check.sh として実行すればよく、スクリプトを編集する必要はない。
-# アドレスは内部のもの、クラスター内部から: 8123 は ClickHouse の HTTP インターフェースのポート。
+# The default names are the same as in the lab. The form ${X:-value} means "take the
+# environment variable, and if it is absent, substitute the value": if you named the app
+# differently — run as CH_APP=name ./check.sh, no need to edit the script.
+# The address is internal, from within the cluster: 8123 — the port of ClickHouse's HTTP interface.
 CH_APP="${CH_APP:-analytics}"
 CH_USER="${CH_USER:-analyst}"
 CH_TABLE="${CH_TABLE:-passes}"
 CH_HOST="chendpoint-clickhouse-${CH_APP}.${NS}.svc.cozy.local:8123"
 CH_URL="http://${CH_HOST}/"
 
-evidence "ClickHouse アドレス" "$CH_URL"
+evidence "ClickHouse address" "$CH_URL"
 
-# --- 1. サービスがそもそも応答するか ---------------------------------------------
-# /ping はパスワード不要なので、これが最初で最も安価なチェック:
-# 「接続なし」と「接続はあるがパスワードが違う」を切り分ける。
+# --- 1. does the service respond at all -------------------------------------
+# /ping requires no password, so this is the first and cheapest check:
+# it separates "no connection" from "connection exists, wrong password".
 PING="$(in_cluster_curl "${CH_URL}ping")"
 if printf '%s' "$PING" | grep -qi 'ok'; then
-  ok "ClickHouse がテナントの内部アドレスで応答している"
+  ok "ClickHouse responds at the tenant's internal address"
 else
-  fail "ClickHouse が ${CH_HOST} で応答しない" \
-       "COZY_TENANT のテナント番号とアプリ名を確認(デフォルトは 'analytics'、それ以外なら CH_APP=名前 ./check.sh)。ダッシュボードでアプリが ready 状態になっている必要がある"
+  fail "ClickHouse does not respond at ${CH_HOST}" \
+       "check the tenant number in COZY_TENANT and the app name (default 'analytics'; otherwise CH_APP=name ./check.sh); in the dashboard the app must be in a ready state"
   finish
   exit $?
 fi
 
-# これ以降はすべてデータベースへのログインが必要。パスワードがなければスクリプトは推測も沈黙もせず、
-# データベースの内容は未検証だと正直に告げてレポートを終える: そうしないと
-# 参加者はチェックに合格したと思い込んでしまう。
+# Everything below requires logging into the database. Without a password the script does not guess
+# or stay silent, but honestly says that the database contents were not checked, and finishes the
+# report: otherwise the participant would think the check had passed.
 if [ -z "${CH_PASSWORD:-}" ]; then
-  fail "CH_PASSWORD 変数が未設定のため、データベースの内容は未検証" \
-       "export CH_PASSWORD='${CH_USER} ユーザーのパスワード' としてスクリプトを再実行。パスワードはダッシュボードで見える、シークレット clickhouse-${CH_APP}-credentials"
+  fail "the CH_PASSWORD variable is not set, the database contents were not checked" \
+       "export CH_PASSWORD='password of the ${CH_USER} user' and run the script again; the password is visible in the dashboard, secret clickhouse-${CH_APP}-credentials"
   finish
   exit $?
 fi
 
-# 標準入力から SQL を実行し、応答を返す。
-# in_cluster_curl ではなく専用関数: クエリは POST のボディで送られ、ボディには
-# 標準入力が必要だが、共通関数にはそれがない。
-# パスワードは引数ではなく一時 Secret から環境変数として Pod に渡される:
-# args に入るものはすべて `get pods` を持つ誰にでも見え、etcd に残り、audit
-# log に現れる。ラボ自体がこれについて語っている — それと逆のことをするスクリプトで検証するのは
-# ダブルスタンダードになる。
+# Run SQL from standard input and return the response.
+# A separate function, not in_cluster_curl: the query goes in the POST body, and the body
+# needs standard input, which the shared function does not have.
+# The password goes into the pod as an environment variable from a temporary Secret, not as an argument:
+# everything that ends up in args is visible to anyone with `get pods`, sits in etcd and shows up in the audit
+# log. The lab itself talks about this — checking it with a script that does the opposite
+# would be a double standard.
 ch_query() {
   in_cluster_with_secrets "curlimages/curl:8.11.1" \
     "CH_USER=${CH_USER}
@@ -85,7 +85,7 @@ CH_URL=${CH_URL}" \
     sh -c 'curl -sS --max-time 90 -u "$CH_USER:$CH_PASSWORD" --data-binary @- "$CH_URL?default_format=TSV"'
 }
 
-# JSON 形式の応答の statistics ブロックから数値を取り出す。
+# Pull a number out of the statistics block of a JSON-format response.
 chstat() {
   python3 -c '
 import sys, json
@@ -102,25 +102,25 @@ print(val)
 ' "$1" 2>/dev/null
 }
 
-# --- 2. テーブルが存在する --------------------------------------------------
+# --- 2. the table exists ----------------------------------------------------
 EXISTS="$(printf 'EXISTS TABLE %s' "$CH_TABLE" | ch_query | tr -d '[:space:]')"
 if [ "$EXISTS" = "1" ]; then
-  ok "テーブル ${CH_TABLE} が存在する"
+  ok "table ${CH_TABLE} exists"
 else
   if printf '%s' "$EXISTS" | grep -qi 'auth'; then
-    fail "ClickHouse がユーザー ${CH_USER} のパスワードを拒否した" \
-         "ダッシュボードでパスワードを確認: アプリ ${CH_APP} → Secrets → clickhouse-${CH_APP}-credentials"
+    fail "ClickHouse rejected the password for user ${CH_USER}" \
+         "verify the password in the dashboard: app ${CH_APP} → Secrets → clickhouse-${CH_APP}-credentials"
   else
-    fail "テーブル ${CH_TABLE} が存在しない" \
-         "作成する: ch < 01-schema.sql(スキーマの解説は README に)"
+    fail "table ${CH_TABLE} does not exist" \
+         "create it: ch < 01-schema.sql (schema walkthrough — in README)"
   fi
   finish
   exit $?
 fi
 
-# --- 3. データがどれだけあり、どれだけ多様か -------------------------
-# 6回ではなく1回のクエリで: ch_query の呼び出しごとに Pod が起動するので、6つの
-# Pod を続けて起動すると、何の理由もなく検証が1分待ちになってしまう。
+# --- 3. how much data there is and how varied it is -------------------------
+# One query instead of six: each ch_query call spins up a pod, and six
+# pods in a row would turn the check into a minute-long wait for no reason.
 STATS="$(ch_query <<SQL
 SELECT
     (SELECT count() FROM ${CH_TABLE}),
@@ -150,29 +150,29 @@ for v in ROWS UNIQ_ENT UNIQ_TYPE UNIQ_MONTH PEAK_MAX PEAK_MIN TABLE_BYTES; do
 done
 
 if [ "$ROWS" -ge 1000000 ]; then
-  ok "テーブルに ${ROWS} 行 — 100万行が生成された"
+  ok "the table has ${ROWS} rows — a million was generated"
 else
-  fail "テーブルに ${ROWS} 行、100万行が期待された" \
-       "ジェネレーターを実行: ch < 02-generate.sql(ジェネレーターの解説は README に)"
+  fail "the table has ${ROWS} rows, a million was expected" \
+       "run the generator: ch < 02-generate.sql (generator walkthrough — in README)"
 fi
 
 if [ "$UNIQ_ENT" -ge 2 ] && [ "$UNIQ_TYPE" -ge 3 ] && [ "$UNIQ_MONTH" -ge 3 ]; then
-  ok "データは多様: 入口 ${UNIQ_ENT}、パス種別 ${UNIQ_TYPE}、月 ${UNIQ_MONTH}"
+  ok "the data is varied: entrances ${UNIQ_ENT}, pass types ${UNIQ_TYPE}, months ${UNIQ_MONTH}"
 else
-  fail "データが単調: 入口 ${UNIQ_ENT}、種別 ${UNIQ_TYPE}、月 ${UNIQ_MONTH}" \
-       "こうしたデータではレポートは何も示さない。再生成する: TRUNCATE TABLE ${CH_TABLE}、その後 ch < 02-generate.sql"
+  fail "the data is monotonous: entrances ${UNIQ_ENT}, types ${UNIQ_TYPE}, months ${UNIQ_MONTH}" \
+       "on such data the report will show nothing; regenerate: TRUNCATE TABLE ${CH_TABLE}, then ch < 02-generate.sql"
 fi
 
 if [ "$PEAK_MIN" -gt 0 ] && [ "$PEAK_MAX" -ge $((PEAK_MIN * 2)) ]; then
-  ok "データに時間ごとの顕著なピークがある(最も混む時間帯が最も静かな時間帯の2倍以上)"
-  evidence "時間ごとの分布" "時間あたり最大: ${PEAK_MAX}
-時間あたり最小: ${PEAK_MIN}"
+  ok "the data has pronounced hourly peaks (the busiest hour to the quietest — at least twofold)"
+  evidence "Distribution by hour" "max per hour: ${PEAK_MAX}
+min per hour: ${PEAK_MIN}"
 else
-  warn "時間ごとのピークが見えない: 最大 ${PEAK_MAX}、最小 ${PEAK_MIN}" \
-       "こうしたデータでは「ピークはいつか」レポートは意味をなさない。ジェネレーターが最後まで動いたか確認する"
+  warn "no hourly peaks visible: max ${PEAK_MAX}, min ${PEAK_MIN}" \
+       "the 'when are the peaks' report is meaningless on such data; check that the generator completed fully"
 fi
 
-# --- 4. 月次レポートが高速に計算される -----------------------------------
+# --- 4. the monthly report computes fast ------------------------------------
 REPORT="$(ch_query <<SQL
 SELECT toStartOfMonth(created_at) AS month, count() AS guests
 FROM ${CH_TABLE}
@@ -186,31 +186,31 @@ ELAPSED="$(printf '%s' "$REPORT" | chstat elapsed)"
 READ_ROWS="$(printf '%s' "$REPORT" | chstat rows_read)"
 
 if [ -z "$ELAPSED" ]; then
-  fail "月次レポートが実行されなかった" \
-       "手動で実行する: ch < 03-report.sql してエラーテキストを見る"
+  fail "the monthly report did not run" \
+       "run it manually: ch < 03-report.sql and look at the error text"
 else
   MS="$(python3 -c "print(round(float('$ELAPSED') * 1000, 1))" 2>/dev/null)"
-  # しきい値はラボが約束する値の近くに保つ。以前の5秒は、4秒のレポートを
-  # 成功として数えていた — ラボのヘッダーには「ミリ秒で計算される」と
-  # 書かれているのに。スクリプトは検証していないことを是認してはならない。
+  # We keep the threshold close to what the lab promises. The former five seconds counted
+  # a four-second report as a success — even though the lab header says
+  # "computes in milliseconds". The script must not confirm what it did not check.
   FAST="$(python3 -c "print(1 if float('$ELAPSED') < 0.5 else 0)" 2>/dev/null)"
   SLOW="$(python3 -c "print(1 if float('$ELAPSED') > 3 else 0)" 2>/dev/null)"
   if [ "$FAST" = "1" ]; then
-    ok "月次レポートは ${MS} ミリ秒で計算された、読んだ行数: ${READ_ROWS}"
+    ok "the monthly report computed in ${MS} ms, rows read: ${READ_ROWS}"
   elif [ "$SLOW" = "1" ]; then
-    fail "月次レポートの計算に ${MS} ミリ秒 — これはラボが扱う桁ではない" \
-         "空いているスタンドでの100万行は数十ミリ秒に収まる。サービスが隣接する負荷で忙しくないか確認して再試行する"
+    fail "the monthly report took ${MS} ms — that is not the order of magnitude the lab is about" \
+         "a million rows on an idle stand fits within tens of milliseconds; check that the service is not busy with a neighboring load, and retry"
   else
-    warn "月次レポートは ${MS} ミリ秒で計算された — 期待より遅いが妥当な範囲内" \
-         "混んでいるスタンドではこうなる。空いていればこのレポートは数十ミリ秒に収まる"
+    warn "the monthly report computed in ${MS} ms — slower than expected, but within reason" \
+         "this happens on a busy stand; on an idle one such a report fits within tens of milliseconds"
   fi
-  evidence "月次レポート" "時間: ${MS} ミリ秒
-読んだ行数: ${READ_ROWS}"
+  evidence "Monthly report" "time: ${MS} ms
+rows read: ${READ_ROWS}"
 fi
 
-# --- 5. カラム型ストレージが機能している、単に主張されているだけではない --------------------------------
-# クエリは1つの小さなカラムに触れる。ストレージがカラム型なら、読まれる量は
-# テーブル全体の重さより顕著に少なくなる。
+# --- 5. columnar storage works, it is not merely claimed --------------------
+# The query touches one small column. If the storage is columnar, the amount read
+# will be noticeably less than the whole table weighs.
 NARROW="$(ch_query <<SQL
 SELECT count() FROM ${CH_TABLE} WHERE duration_min > 100 FORMAT JSON
 SQL
@@ -220,32 +220,32 @@ case "$NARROW_BYTES" in
   ''|*[!0-9]*) NARROW_BYTES=0 ;;
 esac
 
-# 両方の値は非圧縮: クエリ統計の `bytes_read` は展開後のボリュームで、
-# system.columns からは `data_uncompressed_bytes` を取る。`data_compressed_bytes`
-# と比較すると、ディスク上のサイズに対する割合になり、参加者に誤った数字を出力していた —
-# よく圧縮されたテーブルでは100パーセントを超えることもあった。
+# Both quantities are UNCOMPRESSED: `bytes_read` in the query statistics is the decompressed
+# volume, and from system.columns we take `data_uncompressed_bytes`. Comparing against
+# `data_compressed_bytes` gave a fraction of the on-disk size and printed the participant
+# a wrong number — on a well-compressed table it could go past a hundred percent.
 if [ "$NARROW_BYTES" -gt 0 ] && [ "$TABLE_BYTES" -gt 0 ]; then
   SHARE="$(python3 -c "print(round(100 * $NARROW_BYTES / $TABLE_BYTES))" 2>/dev/null)"
-  evidence "単一カラムの読み取り" "読んだバイト数: ${NARROW_BYTES}
-非圧縮のテーブル全体、バイト: ${TABLE_BYTES}
-割合: ${SHARE}%"
-  # 単なる「全体より少ない」ではなくしきい値。7つのうち1つの狭いカラムなら1桁パーセントに
-  # なるはず。「100%ではなく99%」は形式的には少ないが何も証明しない — そしてまさに
-  # それがラボがタイトルに掲げる主張だ。
+  evidence "Single-column read" "bytes read: ${NARROW_BYTES}
+whole table uncompressed, bytes: ${TABLE_BYTES}
+share: ${SHARE}%"
+  # A threshold, not just "less than the whole". One narrow column out of seven should give single-digit
+  # percents; "99% instead of 100%" is formally less but proves nothing — and that is exactly
+  # the claim the lab puts in its title.
   if [ "$SHARE" -le 25 ]; then
-    ok "単一カラムのクエリはテーブルのデータの ${SHARE}% を読んだ — カラム型ストレージが機能している"
+    ok "the single-column query read ${SHARE}% of the table's data — columnar storage works"
   elif [ "$NARROW_BYTES" -lt "$TABLE_BYTES" ]; then
-    warn "単一カラムのクエリはテーブルのデータの ${SHARE}% を読んだ — 全体より少ないが、利得は期待より控えめ" \
-         "1桁パーセントが期待された。クエリが複数ではなく1つの狭いカラムを対象にしているか確認する"
+    warn "the single-column query read ${SHARE}% of the table's data — less than the whole, but the gain is more modest than expected" \
+         "single-digit percents were expected; check that the query addresses one narrow column, not several"
   else
-    warn "単一カラムのクエリがテーブル全体以上を読んだ" \
-         "非常に小さなテーブルではこうなる。本当に100万行あるか確認する"
+    warn "the single-column query read no less than the whole table" \
+         "this happens on very small tables; check that there really are a million rows"
   fi
 else
-  warn "狭いクエリがどれだけ読んだか測定できなかった" \
-       "手動で実行する: SELECT count() FROM ${CH_TABLE} WHERE duration_min > 100 FORMAT JSON して bytes_read を見る"
+  warn "could not measure how much the narrow query read" \
+       "run it manually: SELECT count() FROM ${CH_TABLE} WHERE duration_min > 100 FORMAT JSON and look at bytes_read"
 fi
 
-# finish は総括を出力し、レポート成果物をファイルに書き出す。少なくとも1つの
-# チェックが失敗していれば終了コードは非ゼロになる。
+# finish prints the summary and writes the report artifact to a file; the exit code is non-zero
+# if at least one check failed.
 finish

@@ -1,11 +1,11 @@
-# 랩 13. Service 템플릿: 애플리케이션의 안정적인 주소.
+# Lab 13. Service template: a stable address for the application.
 #
-# 애플리케이션의 복제본은 생겼다 사라지며, 그 주소는 매번 새로 바뀝니다. Service는 바뀌지 않는
-# 이름을 제공하고, 요청을 살아 있는 복제본들에게 분배합니다. 이웃 파드에서
-# 애플리케이션에 접근할 때는 릴리스 이름으로 접근합니다.
+# Copies of the application come and go, and their addresses are new every time. Service gives a name
+# that does not change and spreads requests across the live copies. From a neighboring pod
+# the application is reached by the release name.
 #
-# 이중 중괄호 안의 치환과 객체 이름이 어디에서 오는지에 대해서는
-# templates/deployment.yaml에 설명되어 있습니다 — 여기서도 모든 것이 같은 방식으로 동작합니다.
+# Substitution inside double curly braces and where object names come from is
+# described in templates/deployment.yaml — here everything works the same way.
 apiVersion: v1
 kind: Service
 metadata:
@@ -14,20 +14,20 @@ metadata:
     app.kubernetes.io/name: guest-pass
     app.kubernetes.io/instance: {{ .Release.Name }}
 spec:
-  # values의 플래그 하나가 애플리케이션이 클러스터 외부 주소를 받을지 여부를 결정합니다.
-  # Cozystack의 기본 제공 애플리케이션들도 같은 방식으로 동작합니다: external 필드.
-  # if/else 구문은 렌더링 시점에 두 값 중 하나를 선택합니다 — 완성된 매니페스트에는
-  # LoadBalancer 또는 ClusterIP 중 하나가 들어가며, 분기는 더 이상 남지 않습니다.
+  # A single flag in values decides whether the application gets an address outside the cluster or not.
+  # Cozystack's built-in applications work the same way: the external field.
+  # The if/else construct picks one of the two values at render time — the finished manifest
+  # gets either LoadBalancer or ClusterIP, with no branching left in it.
   type: {{ if .Values.external }}LoadBalancer{{ else }}ClusterIP{{ end }}
-  # 트래픽을 누구에게 보낼지. Service는 파드를 이름이 아니라 레이블로 선택하므로,
-  # 복제본이 몇 개인지, 이름이 무엇인지는 상관하지 않습니다. 레이블은 Deployment가
-  # 자신의 복제본에 붙이는 것과 동일합니다.
+  # Whom to send traffic to. Service selects pods by labels, not by names, so
+  # it does not care how many copies there are or what they are called. The labels are the same ones the Deployment
+  # puts on its copies.
   selector:
     app.kubernetes.io/name: guest-pass
     app.kubernetes.io/instance: {{ .Release.Name }}
-  # port — Service 자체가 어느 포트에서 수신하는지, targetPort — 파드 내부의 어디로 연결하는지.
-  # targetPort는 이름으로 기록되어 있습니다: http라는 이름의 포트는 Deployment 템플릿에 선언되어 있습니다.
-  # 그곳에서 번호가 바뀌어도 여기서는 수정할 필요가 없습니다.
+  # port — which port the Service itself listens on, targetPort — where it knocks inside the pod.
+  # targetPort is written as a name: the port named http is declared in the Deployment template.
+  # If the number changes there, nothing needs fixing here.
   ports:
     - name: http
       port: 80

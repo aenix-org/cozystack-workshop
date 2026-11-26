@@ -67,7 +67,7 @@
 없습니다: 아래에서 `kubectl apply -f name.yaml`이라고 적힌 곳의 파일은 여기서 가져옵니다.
 
 ```bash
-# 이 랩의 모든 명령은 랩 폴더에서 실행합니다 — 폴더로 이동하세요
+# all commands in this lab run from the lab folder — switch into it
 cd labs/07-redis
 ```
 
@@ -107,7 +107,7 @@ if cache != nil {
     raw, found, err := cache.Get(key)
     switch {
     case err != nil:
-        log.Printf("캐시 사용 불가 (%v), 명부로 갑니다", err)
+        log.Printf("cache unavailable (%v), going to the directory", err)
     case found:
         if json.Unmarshal([]byte(raw), &emp) == nil {
             fromCache = true
@@ -170,15 +170,15 @@ tr.MaxIdleConnsPerHost = 64
 ```bash
 cd labs/07-redis
 
-# build = 「Dockerfile로부터 이미지를 빌드하라」.
-#   --platform linux/amd64  어떤 프로세서용으로 빌드할지; 클러스터 노드는 x86입니다
-#   -t <호스트>/<프로젝트>/<이름>:<태그>  결과에 붙일 이름; 이름 맨 앞의 레지스트리
-#                           호스트가 나중에 push가 보낼 곳입니다
-#   app/                    Dockerfile과 빌드할 소스가 있는 폴더
+# build = "build the image from the Dockerfile".
+#   --platform linux/amd64  which processor to build for; the cluster nodes are x86
+#   -t <host>/<project>/<name>:<tag>  what to name the result; the registry host at the
+#                           start of the name is where push will send it later
+#   app/                    the folder with the Dockerfile and sources to build from
 docker build --platform linux/amd64 -t harbor.workshop03.example.org/passes/passes-api:v2 app/
 
-# push = 「이미지를 레지스트리로 보내라」. 주소는 이미지 이름의 첫 부분에서,
-# 자격 증명은 이전 랩에서 한 docker login에서 가져옵니다.
+# push = "send the image to the registry". The address is taken from the first part of the
+# image name, the credentials — from the docker login you did in the previous lab.
 docker push harbor.workshop03.example.org/passes/passes-api:v2
 ```
 
@@ -195,26 +195,26 @@ docker push harbor.workshop03.example.org/passes/passes-api:v2
 `rollout status`가 복제본이 뜰 때까지 기다립니다.
 
 ```bash
-# KUBECONFIG는 kubectl에게 어떤 접근 파일을 쓸지 알려 줍니다. 여러분의 `lab`
-# 클러스터로 전환합니다; 터미널 창을 닫을 때까지 유지됩니다.
+# KUBECONFIG tells kubectl which access file to use. We switch to
+# your `lab` cluster; it holds until you close the terminal window.
 export KUBECONFIG=~/lab.kubeconfig
 
-# sed -i = 「파일을 제자리에서 편집하라」.
-#   's|old|new|g'  모든 출현을 치환; 주소에 슬래시가 있어서 구분자로 / 대신 |를
-#                  사용합니다
-#   macOS 버전 sed는 -i 뒤에 인자를 반드시 요구합니다; 빈 따옴표는
-#   「백업을 만들지 말라」는 뜻입니다. Linux에서는 그 인자가 있으면 안 됩니다.
-#   줄 끝에 파일이 두 개 있습니다: sed는 여러 개를 한꺼번에 받아 한 번에 편집합니다.
+# sed -i = "edit the file in place".
+#   's|old|new|g'  replace every occurrence; the | separator is used instead of / because
+#                  the address contains slashes
+#   The macOS version of sed requires a mandatory argument after -i; empty quotes
+#   mean "don't make a backup". On Linux that argument must not be there.
+#   There are two files at the end of the line: sed accepts several at once and edits them in one pass.
 
 # Linux
 sed -i    's|HARBOR-HOST|harbor.workshop03.example.org|g' hr-legacy.yaml passes-api.yaml
 # macOS
 sed -i '' 's|HARBOR-HOST|harbor.workshop03.example.org|g' hr-legacy.yaml passes-api.yaml
 
-# apply = 「클러스터를 파일에 기술된 상태로 만들라」. -f 플래그는 파일마다 반복합니다.
+# apply = "bring the cluster to what's described in the files". The -f flag is repeated for each file.
 kubectl apply -f hr-legacy.yaml -f passes-api.yaml
 
-# rollout status는 복제본이 준비될 때까지 기다렸다가 스스로 종료합니다; 준비되지 않으면 오류를 반환합니다
+# rollout status waits for the copies to be ready and exits on its own; if they don't, it returns an error
 kubectl rollout status deployment/hr-legacy
 kubectl rollout status deployment/passes-api
 ```
@@ -224,14 +224,14 @@ kubectl rollout status deployment/passes-api
 Secret을 만들려면:
 
 ```bash
-# create secret docker-registry = 「레지스트리 자격 증명을 담은 Secret을 만들라」;
-# 그런 Secret은 kubelet이 노드로 이미지를 내려받을 때 직접 읽을 수 있습니다.
-#   harbor             클러스터 내 Secret 이름 — 두 매니페스트가 이것을 참조합니다
-#   --docker-server    이 자격 증명이 어느 레지스트리를 위한 것인지
-#   --docker-username  누가 로그인하는지; --docker-password — Harbor 관리자 비밀번호
+# create secret docker-registry = "create a Secret with registry credentials";
+# such a Secret can be read by the kubelet itself when it pulls the image onto a node.
+#   harbor             the Secret's name in the cluster — both manifests reference it
+#   --docker-server    which registry these credentials are for
+#   --docker-username  who logs in; --docker-password — the Harbor administrator password
 kubectl create secret docker-registry harbor \
   --docker-server=harbor.workshop03.example.org \
-  --docker-username=admin --docker-password='여러분의-비밀번호'
+  --docker-username=admin --docker-password='YOUR-PASSWORD'
 ```
 
 체인이 작동하는지 확인합시다. 서비스는 클러스터 안에서만 보이므로 요청도 거기서 합니다:
@@ -239,15 +239,15 @@ kubectl create secret docker-registry harbor \
 사라집니다.
 
 ```bash
-# run probe = 「probe라는 이름의 Pod를 실행하라」.
-#   --rm              작업이 끝나는 즉시 Pod를 삭제
-#   -i                그 출력을 우리에게 보여 줌
-#   --restart=Never   재시작하지 않음: 이것은 상시 서비스가 아니라 일회성 명령입니다
-#   --image=...       어떤 이미지를 쓸지; 새것이 딸려오지 않도록 버전을 고정했습니다
-#   --quiet           서비스 라인은 출력하지 않고 답만
-#   --                이 두 대시 뒤의 모든 것은 Pod 내부의 명령입니다
-# <service>.<namespace>.svc.cluster.local 형태의 주소는 서비스의 내부 이름입니다;
-# 이 이름으로 Pod들은 주소를 몰라도 서로를 찾습니다.
+# run probe = "run a Pod named probe".
+#   --rm              delete the Pod as soon as it's done
+#   -i                show us its output
+#   --restart=Never   don't restart: this is a one-time command, not a permanent service
+#   --image=...       which image to use; the version is pinned so nothing new arrives
+#   --quiet           don't print service lines, only the answer
+#   --                everything after these two dashes is the command inside the Pod
+# An address of the form <service>.<namespace>.svc.cluster.local is the service's internal name;
+# by it the Pods find each other without knowing addresses.
 kubectl run probe --rm -i --restart=Never --image=curlimages/curl:8.11.1 --quiet -- \
   curl -s "http://passes-api.default.svc.cluster.local/employee?id=42"
 ```
@@ -255,7 +255,7 @@ kubectl run probe --rm -i --restart=Never --image=curlimages/curl:8.11.1 --quiet
 **여러분이 봐야 할 것:**
 
 ```json
-{"cache":"off","cached":false,"dept":"물류팀","id":"42","name":"한은○",
+{"cache":"off","cached":false,"dept":"Logistics","id":"42","name":"Poole E.",
  "pod":"passes-api-6f8b9c7d5-x2ktm","took_ms":803,"ttl_s":60}
 ```
 
@@ -272,7 +272,7 @@ kubectl run probe --rm -i --restart=Never --image=curlimages/curl:8.11.1 --quiet
 그래야 측정이 여러분의 인터넷이나 터널에 좌우되지 않습니다:
 
 ```bash
-# 파일에는 객체가 둘 있습니다: 생성기 자체와 그것을 위한 서비스
+# the file has two objects: the generator itself and a service for it
 kubectl apply -f fortio.yaml
 kubectl rollout status deployment/fortio
 ```
@@ -281,17 +281,17 @@ kubectl rollout status deployment/fortio
 여기서는 생성기 안에서 생성기 자체가 포격 모드로 실행됩니다:
 
 ```bash
-# exec deploy/fortio = 이 애플리케이션의 Pod 안에서 명령을 실행
-#   --            경계: 왼쪽은 kubectl, 오른쪽은 Pod 안으로 들어가는 명령
-#   fortio load   포격 모드: 요청을 보내고 응답 시간을 측정
-#   -qps 20       초당 20개 요청 — 「있는 힘껏 밀어붙이기」가 아니라 페이스를 정합니다
-#   -t 20s        측정이 얼마나 지속되는지
-#   -c 16         병렬 연결 16개. 이 수는 임의가 아닙니다:
-#                 명부는 800ms에 응답하므로, 연결 하나는 초당 요청 한 개보다
-#                 조금 넘게 처리합니다. 정해진 초당 20개를 유지하려면 연결이
-#                 최소 열여섯 개는 필요합니다 — 그러지 않으면 Fortio가 지연의
-#                 벽에 부딪혀 요청한 페이스를 내지 못합니다.
-#   마지막 인자는 우리가 포격하는 주소입니다
+# exec deploy/fortio = run a command inside this application's Pod
+#   --            the boundary: kubectl on the left, on the right the command that goes into the Pod
+#   fortio load   bombardment mode: send requests and measure the response time
+#   -qps 20       twenty requests per second — we set a pace, not "push as hard as we can"
+#   -t 20s        how long the measurement lasts
+#   -c 16         sixteen parallel connections. The number isn't arbitrary:
+#                 the directory answers in 800 ms, so one connection manages
+#                 a little more than one request per second. To hold the set 20 per
+#                 second, you need no fewer than sixteen connections — otherwise Fortio
+#                 will hit the latency wall and not deliver the requested pace.
+#   the last argument is the address we're bombarding
 kubectl exec deploy/fortio -- fortio load -qps 20 -t 20s -c 16 \
   "http://passes-api.default.svc.cluster.local/employee?id=42"
 ```
@@ -315,10 +315,10 @@ Code 200 : 400 (100.0 %)
 자체 웹 인터페이스가 있고, 거기엔 터널로 닿아야 합니다.
 
 ```bash
-# port-forward svc/fortio = 노트북에서 클러스터 내 생성기 서비스로 가는 터널
-#   8081:8080 — 왼쪽 숫자는 노트북의 포트, 오른쪽은 클러스터 내 서비스 포트
-# 8081 포트를 쓰는 이유는 8080이 여러분 머신의 다른 무언가에 점유돼 있을 수 있어서입니다.
-# 창을 닫지 마세요: 터널은 명령이 실행되는 동안만 삽니다. 멈추려면 — Ctrl+C.
+# port-forward svc/fortio = a tunnel from your laptop to the generator's service in the cluster
+#   8081:8080 — the left number is the port on your laptop, the right one the service port in the cluster
+# Port 8081 is used because 8080 might be taken by something else on your machine.
+# Don't close the window: the tunnel lives as long as the command runs. To stop it — Ctrl+C.
 kubectl port-forward svc/fortio 8081:8080
 ```
 
@@ -421,11 +421,11 @@ Redis는 관리 클러스터의 여러분 테넌트에 살고, 애플리케이�
 어떤 서비스가 생겼는지 봅시다:
 
 ```bash
-# --kubeconfig는 접근 파일을 명령 안에서 바로 지정합니다 — KUBECONFIG를 건드리지 않고 딱 한 번만.
-# 이렇게 하면 연달아 실행하는 두 명령을 헷갈리지 않고 서로 다른 클러스터로 보낼 수 있습니다.
-#   -n tenant-workshopXX  여러분 테넌트의 namespace
-#   get svc               「서비스를 보여 줘」 — Pod가 뒷받침하는 영구 주소
-#   | grep redis          출력에서 redis라는 단어가 있는 줄만 남김
+# --kubeconfig sets the access file right in the command — just once, without touching KUBECONFIG.
+# This way two commands in a row can be addressed to different clusters without getting confused.
+#   -n tenant-workshopXX  the namespace of your tenant
+#   get svc               "show the services" — permanent addresses backed by Pods
+#   | grep redis          keep only the lines with the word redis in the output
 kubectl --kubeconfig ~/.kube/workshop -n tenant-workshopXX get svc | grep redis
 ```
 
@@ -468,15 +468,15 @@ namespace에 접근할 수 있는 누구나 읽을 수 있습니다. `redis-cli`
 ```bash
 export KUBECONFIG=~/lab.kubeconfig
 
-# run redis-probe = redis-cli 클라이언트가 담긴 일회용 Pod:
-#   --rm --restart=Never  제 할 일을 하고 스스로 삭제됨, 재시작 필요 없음
-#   -i --quiet            출력을 우리에게 보여 주고 서비스 라인은 출력하지 않음
-#   --env=REDISCLI_AUTH   비밀번호는 인자가 아니라 환경 변수로 Pod에 들어갑니다
-#   --                    이 대시 오른쪽은 Pod 안으로 들어가는 명령입니다
-#   redis-cli -h <이름>   어느 서버에 접속할지; 이름은 그 전체 이름 그대로입니다
-#   ping                  짧은 「살아 있니」; 그에 대한 답은 PONG입니다
+# run redis-probe = a one-off Pod with the redis-cli client:
+#   --rm --restart=Never  it did its job and deleted itself, no need to restart
+#   -i --quiet            show us the output and don't print service lines
+#   --env=REDISCLI_AUTH   the password goes into the Pod as an environment variable, not an argument
+#   --                    to the right of these dashes is the command that goes into the Pod
+#   redis-cli -h <name>   which server to connect to; the name is that same full one
+#   ping                  a short "are you alive"; the answer to it is PONG
 kubectl run redis-probe --rm -i --restart=Never --image=redis:7-alpine --quiet \
-  --env=REDISCLI_AUTH='여러분의-비밀번호' -- \
+  --env=REDISCLI_AUTH='YOUR-PASSWORD' -- \
   redis-cli -h rfrm-redis-cache.tenant-workshopXX.svc.cozy.local ping
 ```
 
@@ -490,8 +490,8 @@ PONG
 보이지 않는 것입니다. 이것은 IP로 주소를 지정해 해결합니다:
 
 ```bash
-# -o jsonpath='{.spec.clusterIP}' — 객체의 한 필드를 출력: 플랫폼이 이 서비스에
-# 할당한 내부 주소. {"\n"}은 줄바꿈을 추가합니다.
+# -o jsonpath='{.spec.clusterIP}' — print one field of the object: the internal address
+# the platform assigned to this service. {"\n"} adds a line break.
 kubectl --kubeconfig ~/.kube/workshop -n tenant-workshopXX get svc rfrm-redis-cache \
   -o jsonpath='{.spec.clusterIP}{"\n"}'
 ```
@@ -509,19 +509,19 @@ kubectl --kubeconfig ~/.kube/workshop -n tenant-workshopXX get svc rfrm-redis-ca
 `kubectl patch`는 이미 존재하는 객체를 통째로 교체하는 게 아니라 변경을 덧붙입니다.
 
 ```bash
-# 앞서와 같은 주소 치환, 다만 자리표시자가 다릅니다 — REDIS-ADDR
+# the same address substitution as before, only the placeholder is different — REDIS-ADDR
 
 # Linux
 sed -i    's|REDIS-ADDR|rfrm-redis-cache.tenant-workshopXX.svc.cozy.local|g' cache-patch-broken.yaml
 # macOS
 sed -i '' 's|REDIS-ADDR|rfrm-redis-cache.tenant-workshopXX.svc.cozy.local|g' cache-patch-broken.yaml
 
-# patch deployment passes-api = 「이 객체를 파일에 있는 것으로 고쳐라」
-#   --patch-file  변경을 어디서 가져올지
-# 환경 변수를 바꾼다는 것은 새 Pod를 뜻합니다: 기존 것들은 교체됩니다.
+# patch deployment passes-api = "fix up this object with what's in the file"
+#   --patch-file  where to take the changes from
+# Changing environment variables means new Pods: the old ones will be replaced.
 kubectl patch deployment passes-api --patch-file cache-patch-broken.yaml
 
-# 새 복제본이 준비될 때까지 기다립니다 — 그러지 않으면 아직 옛것을 측정하게 됩니다
+# wait until the new copies become ready — otherwise we'll measure the old ones still
 kubectl rollout status deployment/passes-api
 ```
 
@@ -529,7 +529,7 @@ kubectl rollout status deployment/passes-api
 플래그까지 일치해야 합니다, 그러지 않으면 비교할 것이 없습니다:
 
 ```bash
-# 같은 초당 20개 요청, 같은 20초, 같은 16개 연결
+# the same twenty requests per second, the same twenty seconds, the same sixteen connections
 kubectl exec deploy/fortio -- fortio load -qps 20 -t 20s -c 16 \
   "http://passes-api.default.svc.cluster.local/employee?id=42"
 ```
@@ -549,7 +549,7 @@ kubectl exec deploy/fortio -- fortio load -qps 20 -t 20s -c 16 \
 캐시에서 왔는지 보여 주는 필드가 있습니다.
 
 ```bash
-# 앞서와 같은 curl이 담긴 일회용 Pod: 클러스터 안에서 서비스에 물어봅니다
+# the same one-off Pod with curl as before: we ask the service from inside the cluster
 kubectl run probe --rm -i --restart=Never --image=curlimages/curl:8.11.1 --quiet -- \
   curl -s "http://passes-api.default.svc.cluster.local/employee?id=42"
 ```
@@ -565,15 +565,15 @@ kubectl run probe --rm -i --restart=Never --image=curlimages/curl:8.11.1 --quiet
 보이는 유일한 곳이 바로 거기입니다:
 
 ```bash
-# logs = 「애플리케이션이 자기 출력에 쓴 것을 보여 줘」.
-#   -l app=passes-api  이름을 지정한 한 복제본이 아니라, 이 레이블을 가진 모든 복제본을 한꺼번에
-#   --tail=20          전체 로그가 아니라 각 복제본의 마지막 스무 줄
+# logs = "show what the application wrote to its output".
+#   -l app=passes-api  across all copies with this label at once, not one named copy
+#   --tail=20          the last twenty lines of each copy, not the whole log
 kubectl logs -l app=passes-api --tail=20
 ```
 
 ```
-캐시 사용 불가 (redis: NOAUTH Authentication required.), 명부로 갑니다
-캐시 사용 불가 (redis: NOAUTH Authentication required.), 명부로 갑니다
+cache unavailable (redis: NOAUTH Authentication required.), going to the directory
+cache unavailable (redis: NOAUTH Authentication required.), going to the directory
 ```
 
 여기 답이 있습니다. 우리는 Redis 주소는 지정했지만 비밀번호는 지정하지 않았습니다. Redis는
@@ -605,19 +605,19 @@ Redis 비밀번호는 관리 클러스터에 있고, 애플리케이션은 그�
 않도록요:
 
 ```bash
-# read는 키보드로 입력한 것을 REDIS_PASS 변수에 넣습니다:
-#   -s  입력한 것을 화면에 표시하지 않음
-#   -r  백슬래시를 특수 문자로 취급하지 않음
-# 이 줄 다음에는 화면에 아무것도 나타나지 않습니다: 대시보드의 비밀번호를 붙여넣고 Enter.
+# read puts what's typed on the keyboard into the REDIS_PASS variable:
+#   -s  don't show what's typed on the screen
+#   -r  don't treat a backslash as a special character
+# Nothing will appear on screen after this line: paste the password from the dashboard and Enter.
 read -rs REDIS_PASS
 
-# create secret generic = 평범한 Secret, 키-값 쌍의 모음.
-#   redis-password              클러스터 내 Secret 이름
-#   --from-literal=password=... 그 안에 이 값을 가진 password 키를 만듭니다;
-#                               패치가 참조하는 것은 「Secret 이름 + 키」 쌍입니다
+# create secret generic = an ordinary Secret, a set of key-value pairs.
+#   redis-password              the Secret's name in the cluster
+#   --from-literal=password=... create a password key in it with this value;
+#                               it's the "Secret name + key" pair the patch will reference
 kubectl create secret generic redis-password --from-literal=password="$REDIS_PASS"
 
-# unset은 비밀번호가 이 창의 다음 명령들에 닿지 않도록 변수를 지웁니다
+# unset erases the variable so the password doesn't reach the next commands in this window
 unset REDIS_PASS
 ```
 
@@ -625,14 +625,14 @@ unset REDIS_PASS
 항목의 수명이 들어 있습니다; 설명은 명령 바로 다음 스포일러에 있습니다.
 
 ```bash
-# 같은 주소 치환, 이번엔 작동하는 패치 파일에서
+# the same address substitution, now in the working patch file
 
 # Linux
 sed -i    's|REDIS-ADDR|rfrm-redis-cache.tenant-workshopXX.svc.cozy.local|g' cache-patch.yaml
 # macOS
 sed -i '' 's|REDIS-ADDR|rfrm-redis-cache.tenant-workshopXX.svc.cozy.local|g' cache-patch.yaml
 
-# 기존 Deployment를 파일 내용으로 고치고 새 복제본을 기다립니다
+# fix up the existing Deployment with the file's contents and wait for the new copies
 kubectl patch deployment passes-api --patch-file cache-patch.yaml
 kubectl rollout status deployment/passes-api
 ```
@@ -685,10 +685,10 @@ namespace에서 Secret을 읽을 수 있는 사람은 누구나 비밀번호를 
 첫 번째는 반드시 느리고, 두 번째는 — 빠릅니다.
 
 ```bash
-# 같은 curl이 담긴 일회용 Pod, 다만 그 안에서 sh 셸이 실행됩니다:
-#   sh -c '...'  하나의 문자열로 전달된 여러 명령을 실행
-#   ; echo       답들이 붙어 버리지 않도록 사이에 줄바꿈을 삽입
-# id=777을 쓴 이유는 이 직원을 아직 물어본 적이 없어서입니다: 캐시에 확실히 없습니다.
+# the same one-off Pod with curl, but an sh shell is launched inside it:
+#   sh -c '...'  run several commands passed as a single string
+#   ; echo       insert a line break between the answers so they don't run together
+# id=777 is used because this employee hasn't been asked for yet: it's definitely not in the cache.
 kubectl run probe --rm -i --restart=Never --image=curlimages/curl:8.11.1 --quiet -- \
   sh -c 'curl -s "http://passes-api.default.svc.cluster.local/employee?id=777"; echo;
          curl -s "http://passes-api.default.svc.cluster.local/employee?id=777"'
@@ -707,7 +707,7 @@ kubectl run probe --rm -i --restart=Never --image=curlimages/curl:8.11.1 --quiet
 이제 부하를 준 측정, 같은 플래그의 같은 명령으로, 세 번째:
 
 ```bash
-# 포격 조건은 아무것도 바꾸지 않습니다: 바뀌는 것은 서비스 내부뿐입니다
+# we change nothing in the bombardment conditions: only what's inside the service changes
 kubectl exec deploy/fortio -- fortio load -qps 20 -t 20s -c 16 \
   "http://passes-api.default.svc.cluster.local/employee?id=42"
 ```
@@ -751,8 +751,8 @@ Code 200 : 400 (100.0 %)
 확인할 수 있습니다 — 서로 다른 식별자로 짧은 시리즈를 두 번 돌리고 각각의 첫 요청을 보세요:
 
 ```bash
-# 서로 다른 직원으로 연달아 두 번의 포격, 각각 10초.
-# 각 시리즈 시작 시 그 키에 대해 캐시는 비어 있고 — 첫 요청은 명부로 갑니다.
+# two bombardments in a row over different employees, ten seconds each.
+# At the start of each series the cache is empty for that key — and the first request goes to the directory.
 kubectl exec deploy/fortio -- fortio load -qps 20 -t 10s -c 16 \
   "http://passes-api.default.svc.cluster.local/employee?id=1"
 kubectl exec deploy/fortio -- fortio load -qps 20 -t 10s -c 16 \
@@ -810,13 +810,13 @@ TTL은 캐시의 유일한 진짜 파라미터이고, 기술적 근거로 고르
 ```bash
 cd labs/07-redis
 
-# 애플리케이션을 어느 클러스터에서 확인할지 — 여러분의 `lab`
+# which cluster to check the application in — your `lab`
 export KUBECONFIG=~/lab.kubeconfig
-# 여러분의 테넌트 번호: 이것으로 스크립트는 namespace 이름 tenant-workshop03을 조립합니다
+# your tenant number: from it the script assembles the namespace name tenant-workshop03
 export COZY_TENANT=workshop03
-# 관리 클러스터에 대한 접근이 어디 있는지 — 거기서 스크립트는 Redis 자체를 봅니다.
-# 설정하지 않아도 됩니다: 그러면 스크립트는 ~/.kube/workshop을 찾고, 찾지 못하면 —
-# 관리 클러스터에 대한 검사를 건너뛰고 그렇다고 말합니다.
+# where the access to the management cluster lives — there the script looks at Redis itself.
+# You can leave it unset: then the script looks for ~/.kube/workshop, and not finding it — skips
+# the checks on the management cluster and says so.
 export COZY_KUBECONFIG=~/.kube/workshop
 
 ./check.sh
@@ -837,9 +837,9 @@ export COZY_KUBECONFIG=~/.kube/workshop
 모든 랩을 끝냈을 때:
 
 ```bash
-# delete -f = 파일에 기술된 바로 그 객체들을 클러스터에서 제거
+# delete -f = remove from the cluster exactly the objects described in the files
 kubectl delete -f passes-api.yaml -f hr-legacy.yaml -f fortio.yaml
-# Secret은 파일이 아니라 명령으로 만들었으므로 — 이름으로 삭제합니다
+# the Secret was created by a command, not a file — we delete it by name
 kubectl delete secret redis-password
 ```
 

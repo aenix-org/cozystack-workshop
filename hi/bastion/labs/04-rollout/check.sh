@@ -1,48 +1,48 @@
 #!/usr/bin/env bash
-# लैब 4 की जाँच: नया संस्करण रोल आउट करना और रोलबैक करना।
+# Check for lab 4: rolling out a new version and rolling back.
 #
-# हम टाइप किए गए आदेशों को नहीं, बल्कि सार को परखते हैं:
-#   - एप्लिकेशन के इतिहास में कई रिवीज़न हैं, यानी संस्करण वास्तव में बदला गया था;
-#   - दूसरे संस्करण का ConfigMap क्लस्टर में एक अलग ऑब्जेक्ट के रूप में है, पहले का संपादन नहीं;
-#   - कंटेनर में readinessProbe है — इसके बिना ज़ीरो डाउनटाइम पुनरुत्पादित नहीं होता;
-#   - रोलआउट पूरा हो गया और अटका नहीं;
-#   - Service द्वारा परोसा गया पृष्ठ उस ConfigMap से मेल खाता है जिसका स्पेक
-#     संदर्भ देता है। यह उस स्थिति को पकड़ता है «स्पेक रोलबैक हुआ, पर पॉड फिर से नहीं बने»।
+# We verify the substance, not the commands typed:
+#   - the application history has several revisions, i.e. the version was actually changed;
+#   - the second version's ConfigMap sits in the cluster as a separate object, not an edit of the first;
+#   - the container has a readinessProbe — without it zero downtime is not reproducible;
+#   - the rollout ran to completion and did not get stuck;
+#   - the page served by the Service matches the ConfigMap that the spec
+#     references. This catches the case "the spec was rolled back, but the pods weren't recreated".
 #
-# स्क्रिप्ट कुछ भी नहीं बदलती। एक-बार का पॉड केवल क्लस्टर के भीतर से पृष्ठ लाने के
-# लिए चाहिए और वह खुद को हटा देता है।
+# The script changes nothing. The one-off pod is only needed to fetch the page
+# from inside the cluster and it removes itself.
 #
-# यह VM पर, इस लैब के फ़ोल्डर से, प्रशिक्षण क्लस्टर `lab` तक पहुँच के साथ चलती है
-# (प्रबंधन क्लस्टर पर टेनेंट तक नहीं):
+# Runs on the VM, from this lab's folder, using access to the training cluster `lab`
+# (not to the tenant on the management cluster):
 #     export KUBECONFIG=~/lab.kubeconfig
 #     cd labs/04-rollout && ./check.sh
-# यहाँ COZY_TENANT चर की ज़रूरत नहीं: पूरी लैब `lab` क्लस्टर के भीतर चलती है।
+# The COZY_TENANT variable is not needed here: the whole lab runs inside the `lab` cluster.
 #
-# इसे सफ़ाई से पहले और रोलबैक पूरा होने के बाद चलाएँ: रिवीज़न इतिहास Deployment के
-# साथ रहता है, और उसी के साथ ग़ायब हो जाता है।
+# Run it BEFORE cleanup and after the rollback has finished: the revision history lives
+# together with the Deployment, and disappears together with it.
 
-# ये रिपोर्ट के शीर्षक में और स्क्रिप्ट के पास फ़ाइल नाम report-<लैब>-<तारीख>.md में जाते हैं।
+# These go into the report header and into the file name report-<lab>-<date>.md next to the script.
 LAB_NAME="04-rollout"
-LAB_TITLE="लैब 4 · नया संस्करण रोल आउट करना और रोलबैक करना"
-# साझा लाइब्रेरी: ok / fail / warn / evidence / finish, क्लस्टर के भीतर से अनुरोध,
-# रिपोर्ट लिखना। पथ स्क्रिप्ट के अपने स्थान से गिना जाता है, वर्तमान डायरेक्टरी से नहीं।
+LAB_TITLE="Lab 4 · Rolling out a new version and rolling back"
+# Shared library: ok / fail / warn / evidence / finish, in-cluster requests,
+# writing the report. The path is computed from the script's own location, not the current directory.
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
-# KUBECONFIG के बिना kubectl VM पर क्लस्टर ढूँढता है और सब कुछ एक ही त्रुटि के साथ गिरा देता है,
-# जिसमें असली कारण दिखाई नहीं देता। हम तुरंत रुक जाते हैं।
+# Without KUBECONFIG kubectl looks for a cluster on the VM and fails everything with a single error
+# in which the real cause is impossible to make out. We stop right away.
 need_kubeconfig
 
 APP=rickroll
 
-# --- एप्लिकेशन अपनी जगह पर है और कार्यशील स्थिति में लाया गया है ------------------
-# एप्लिकेशन के बिना जाँचने को कुछ नहीं, इसलिए यहाँ एकमात्र समयपूर्व निकास है।
-# आगे हम केवल तैयार कॉपियों की संख्या नहीं, बल्कि Progressing स्थिति में कारण भी
-# देखते हैं: NewReplicaSetAvailable का अर्थ है रोलआउट पूरा हुआ। केवल तैयार कॉपियाँ
-# काफ़ी नहीं — अटके अपडेट पर पुराना संस्करण चलता रहता है, काउंटर अपेक्षित संख्या
-# दिखाता है, फिर भी नई कॉपी एक बार भी नहीं उठी।
+# --- application is in place and brought to a working state ------------------
+# Without the application there is nothing to check, so this is the only early exit.
+# Further on we look not only at the number of ready copies, but also at the reason in the
+# Progressing condition: NewReplicaSetAvailable means the rollout is COMPLETE. Ready copies
+# alone are not enough — with a stuck update the old version is running, the counter
+# shows the expected number, yet the new copy never came up even once.
 if ! kubectl get deployment "$APP" >/dev/null 2>&1; then
-  fail "एप्लिकेशन ${APP} क्लस्टर में नहीं है" \
-       "इसे परिनियोजित करें: kubectl apply -f ../01-deploy/rickroll.yaml"
+  fail "application ${APP} is not in the cluster" \
+       "deploy it: kubectl apply -f ../01-deploy/rickroll.yaml"
   finish
   exit $?
 fi
@@ -55,150 +55,150 @@ PROG_REASON="$(kubectl get deployment "$APP" \
   -o jsonpath='{range .status.conditions[?(@.type=="Progressing")]}{.reason}{end}' 2>/dev/null)"
 
 if [ "$HAVE" = "$WANT" ] && [ "${HAVE:-0}" -ge 1 ] && [ "$PROG_REASON" = "NewReplicaSetAvailable" ]; then
-  ok "रोलआउट पूरा हुआ: ${WANT} में से ${HAVE} कॉपियाँ तैयार"
+  ok "rollout ran to completion: ${HAVE} of ${WANT} copies ready"
 else
-  fail "एप्लिकेशन पूर्ण स्थिति में नहीं है (${WANT} में से ${HAVE} तैयार, कारण: ${PROG_REASON:-कोई नहीं})" \
-       "यदि रोलआउट अटका है — रोलबैक से बाहर निकलें: kubectl rollout undo deployment/${APP}"
+  fail "application is not in a completed state (${HAVE} of ${WANT} ready, reason: ${PROG_REASON:-none})" \
+       "if the rollout is stuck — get out via rollback: kubectl rollout undo deployment/${APP}"
 fi
-evidence "एप्लिकेशन की स्थिति" "$(kubectl get deployment,rs,pods -l app=${APP} 2>/dev/null)"
+evidence "Application state" "$(kubectl get deployment,rs,pods -l app=${APP} 2>/dev/null)"
 
-# --- readinessProbe: वह जिससे ज़ीरो डाउनटाइम चुकाया जाता है -----------------------
+# --- readinessProbe: what pays for zero downtime -----------------------
 PROBE="$(kubectl get deployment "$APP" \
   -o jsonpath='{.spec.template.spec.containers[0].readinessProbe.httpGet.path}' 2>/dev/null)"
 if [ -n "$PROBE" ]; then
-  ok "कंटेनर में readinessProbe है (${PROBE}) — कॉपियाँ तैयार होने के बाद ही बदली जाती हैं"
+  ok "the container has a readinessProbe (${PROBE}) — copies are replaced only after they are ready"
 else
-  fail "कंटेनर में readinessProbe नहीं है" \
-       "इसके बिना क्लस्टर तैयार-नहीं कॉपी पर ट्रैफ़िक भेजता है; ../01-deploy/rickroll.yaml लागू करें"
+  fail "the container has no readinessProbe" \
+       "without it the cluster sends traffic to a not-ready copy; apply ../01-deploy/rickroll.yaml"
 fi
 
-# --- संस्करण अलग-अलग ऑब्जेक्ट के रूप में बनाए गए --------------------------------------
-# पृष्ठ के दोनों संस्करण क्लस्टर में दो अलग ConfigMap के रूप में होने चाहिए।
-# जिसने इसके बजाय rickroll-page-v1 को जगह पर ही संपादित किया, वह स्क्रीन पर नया पृष्ठ
-# देखेगा और तय करेगा कि लैब पूरी हो गई — पर रोलबैक करने के लिए कहीं जगह नहीं होगी,
-# और कॉपियों का प्रतिस्थापन तथा रिवीज़न-इतिहास में प्रविष्टि बिल्कुल नहीं होगी।
+# --- versions made as separate objects --------------------------------------
+# Both versions of the page must live in the cluster as two separate ConfigMaps.
+# Whoever edited rickroll-page-v1 in place instead will see the new page on screen
+# and decide the lab is done — but there will be nowhere to roll back to,
+# and no copy replacement or revision-history entry will happen at all.
 if kubectl get configmap rickroll-page-v2 >/dev/null 2>&1; then
-  ok "ConfigMap rickroll-page-v2 क्लस्टर में एक अलग ऑब्जेक्ट के रूप में है"
+  ok "ConfigMap rickroll-page-v2 sits in the cluster as a separate object"
 else
-  fail "क्लस्टर में ConfigMap rickroll-page-v2 नहीं है" \
-       "इसे लागू करें: kubectl apply -f rickroll-page-v2.yaml"
+  fail "there is no ConfigMap rickroll-page-v2 in the cluster" \
+       "apply it: kubectl apply -f rickroll-page-v2.yaml"
 fi
 
 if kubectl get configmap rickroll-page-v1 >/dev/null 2>&1; then
-  ok "पृष्ठ का पहला संस्करण भी सुरक्षित है — रोलबैक करने के लिए जगह है"
+  ok "the first version of the page is also preserved — there is somewhere to roll back to"
 else
-  warn "ConfigMap rickroll-page-v1 क्लस्टर में नहीं मिला" \
-       "इसके बिना पहले संस्करण पर रोलबैक पॉड नहीं उठाएगा: kubectl apply -f ../01-deploy/rickroll.yaml"
+  warn "ConfigMap rickroll-page-v1 not found in the cluster" \
+       "a rollback to the first version without it will not bring the pods up: kubectl apply -f ../01-deploy/rickroll.yaml"
 fi
 
-# --- रिवीज़न इतिहास -------------------------------------------------------
-# हम अंतिम रिवीज़न का नंबर देखते हैं, इतिहास में पंक्तियों की संख्या नहीं। रोलबैक नया
-# ReplicaSet नहीं जोड़ता — वह पुराने को फिर से उपयोग करता है और उसका नंबर बढ़ाता है,
-# इसलिए रोलबैक के बाद इतिहास में उतनी ही पंक्तियाँ रहती हैं, पर नंबर बढ़ जाता है।
-#   1 — स्पेक कभी नहीं बदला गया
-#   2 — संस्करण स्विच किया गया
-#   3 और अधिक — स्विच किया और वापस लाया गया
+# --- revision history -------------------------------------------------------
+# We look at the NUMBER of the latest revision, not the number of lines in the history. A rollback
+# does not add a new ReplicaSet — it reuses the old one and bumps its number,
+# so after a rollback there are just as many lines in the history, while the number grows.
+#   1 — the spec was never changed
+#   2 — the version was switched
+#   3 and more — switched and rolled back
 REV_MAX="$(kubectl rollout history deployment/${APP} 2>/dev/null \
   | awk '$1 ~ /^[0-9]+$/ { if ($1+0 > m) m = $1+0 } END { print m+0 }')"
 [ -z "$REV_MAX" ] && REV_MAX=0
 
 if [ "$REV_MAX" -ge 3 ]; then
-  ok "एप्लिकेशन का अंतिम रिवीज़न — ${REV_MAX}: संस्करण स्विच किया और वापस लाया गया"
+  ok "the application's latest revision is ${REV_MAX}: the version was switched and rolled back"
 elif [ "$REV_MAX" -eq 2 ]; then
-  warn "अंतिम रिवीज़न — 2: रोलआउट हो गया, रोलबैक अभी नहीं" \
-       "पहला संस्करण बहाल करें: kubectl rollout undo deployment/${APP}"
+  warn "latest revision is 2: the rollout is done, the rollback is not yet" \
+       "restore the first version: kubectl rollout undo deployment/${APP}"
 else
-  fail "अंतिम रिवीज़न — ${REV_MAX}: एप्लिकेशन का स्पेक कभी नहीं बदला गया" \
-       "लैब के पैच से वॉल्यूम को दूसरे संस्करण पर स्विच करें, फिर रोलबैक करें"
+  fail "latest revision is ${REV_MAX}: the application's spec was never changed" \
+       "switch the volume to the second version with the patch from the lab, then roll back"
 fi
-evidence "रिवीज़न इतिहास" "$(kubectl rollout history deployment/${APP} 2>/dev/null)"
+evidence "Revision history" "$(kubectl rollout history deployment/${APP} 2>/dev/null)"
 
-# --- स्पेक किस संस्करण की ओर इशारा करता है --------------------------------------
-# हम वॉल्यूम को page नाम से ढूँढते हैं, भले ही लैब का पैच उसे इंडेक्स से संबोधित करता है।
-# ठीक यही अंतर यहाँ पकड़ा जाता है: यदि पैच ग़लत सूची तत्व में गया, तो page नाम पिछले
-# ConfigMap की ओर इशारा करेगा या ग़ायब हो जाएगा, और प्रतिभागी इसे किसी अजीब nginx त्रुटि
-# के बजाय शब्दों में जानेगा।
+# --- which version the spec points at --------------------------------------
+# We look up the volume BY THE NAME page, even though the patch in the lab addresses it by index.
+# The difference is exactly what gets caught here: if the patch went to the wrong list element,
+# the name page will point at the previous ConfigMap or disappear, and the participant will learn
+# about it in words, rather than through a strange nginx error.
 VOL_CM="$(kubectl get deployment "$APP" \
   -o jsonpath='{range .spec.template.spec.volumes[?(@.name=="page")]}{.configMap.name}{end}' 2>/dev/null)"
 
 case "$VOL_CM" in
   rickroll-page-v1)
-    ok "एप्लिकेशन स्पेक पृष्ठ के पहले संस्करण पर रोलबैक कर दिया गया है"
+    ok "the application spec has been rolled back to the first version of the page"
     ;;
   rickroll-page-v2)
-    warn "एप्लिकेशन स्पेक पृष्ठ के दूसरे संस्करण की ओर इशारा करता है" \
-         "लैब रोलबैक के साथ समाप्त होती है; यदि यह इरादतन है — चिंता की बात नहीं, अन्यथा: kubectl rollout undo deployment/${APP}"
+    warn "the application spec points at the second version of the page" \
+         "the lab ends with a rollback; if this is intended — nothing to worry about, otherwise: kubectl rollout undo deployment/${APP}"
     ;;
   "")
-    fail "स्पेक में page नाम का कोई वॉल्यूम नहीं है" \
-         "लगता है पैच ग़लत जगह पहुँचा (इंडेक्स से संबोधन!); ../01-deploy/rickroll.yaml फिर से लागू करें"
+    fail "the spec has no volume named page" \
+         "looks like the patch landed in the wrong place (addressing by index!); apply ../01-deploy/rickroll.yaml again"
     ;;
   *)
-    fail "वॉल्यूम page उस ConfigMap ${VOL_CM} की ओर इशारा करता है जिसे लैब ने नहीं बनाया" \
-         "रोलबैक करें: kubectl rollout undo deployment/${APP}"
+    fail "volume page points at ConfigMap ${VOL_CM}, which the lab did not create" \
+         "roll back: kubectl rollout undo deployment/${APP}"
     ;;
 esac
 
-# --- क्लाइंट को वास्तव में क्या परोसा जाता है ------------------------------------
-# सबसे सारगर्भित जाँच: हम स्पेक की तुलना उससे करते हैं जो उपयोगकर्ता देखता है।
-# यहाँ बेमेल का अर्थ है कि पॉड नए स्पेक के लिए फिर से नहीं बने।
-# आठ अनुरोध, एक नहीं। सर्विस के पीछे तीन कॉपियाँ हैं; यदि रोलआउट पूरी तरह अभिसरित नहीं हुआ,
-# तो एकल अनुरोध के तीन में से एक बार सही संस्करण पर पहुँचकर बेमेल छिपाने की संभावना है।
+# --- what is actually served to the client ------------------------------------
+# The most substantive check: we compare the spec with what the user sees.
+# A mismatch here means the pods were not recreated for the new spec.
+# Eight requests, not one. There are three copies behind the service; if the rollout did not fully converge,
+# a single request has a one-in-three chance of hitting the right version and hiding the mismatch.
 BODIES="$(in_cluster_curl_many "http://${APP}/" 8)"
 BODY="$BODIES"
 
 if [ -z "$BODY" ]; then
-  fail "Service ${APP} ने क्लस्टर के भीतर से पृष्ठ नहीं लौटाया" \
-       "एंडपॉइंट जाँचें: kubectl get endpointslices -l kubernetes.io/service-name=${APP}"
+  fail "Service ${APP} did not return a page from inside the cluster" \
+       "check the endpoints: kubectl get endpointslices -l kubernetes.io/service-name=${APP}"
 else
-  # हम दोनों संस्करणों को सकारात्मक रूप से, प्रत्येक को उसके अपने मार्कर से पहचानते हैं। शाखा
-  # «यदि v2 नहीं, तो v1» किसी भी चीज़ को पहला संस्करण गिन लेती थी: डिफ़ॉल्ट nginx पृष्ठ, 404,
-  # किसी और का एप्लिकेशन, कचरा — परखा गया, कचरे पर स्क्रिप्ट «लैब पास» छाप देती थी।
-  if printf '%s' "$BODY" | grep -q 'संस्करण 2'; then
+  # We detect both versions POSITIVELY, each by its own marker. The "if not v2, then
+  # v1" branch counted anything as the first version: the default nginx page, a 404, someone else's
+  # application, garbage — verified, on garbage the script would print "LAB PASSED".
+  if printf '%s' "$BODY" | grep -q 'VERSION 2'; then
     SERVED_VER="rickroll-page-v2"
   elif printf '%s' "$BODY" | grep -q 'Never Gonna Give You Up'; then
     SERVED_VER="rickroll-page-v1"
   else
     SERVED_VER=""
-    fail "सर्विस के पते पर एप्लिकेशन पृष्ठ के अलावा कुछ और परोसा जाता है" \
-         "उत्तर में एक भी परिचित मार्कर नहीं — मूल बहाल करें: kubectl apply -f ../01-deploy/rickroll.yaml"
-    evidence "पृष्ठ के बजाय क्या लौटा" "$(printf '%s' "$BODY" | head -12)"
+    fail "the service address serves something other than the application page" \
+         "not a single familiar marker in the response — restore the original: kubectl apply -f ../01-deploy/rickroll.yaml"
+    evidence "What was returned instead of the page" "$(printf '%s' "$BODY" | head -12)"
   fi
 
   if [ -n "$VOL_CM" ] && [ "$SERVED_VER" = "$VOL_CM" ]; then
-    ok "क्लाइंट को ठीक वही संस्करण परोसा जाता है जो स्पेक में दर्ज है (${SERVED_VER})"
+    ok "the client is served exactly the version recorded in the spec (${SERVED_VER})"
   elif [ -n "$VOL_CM" ]; then
-    fail "स्पेक ${VOL_CM} की ओर इशारा करता है, पर क्लाइंट को ${SERVED_VER} परोसा जाता है" \
-         "कॉपियाँ नए स्पेक के लिए फिर से नहीं बनीं: kubectl rollout status deployment/${APP}"
+    fail "the spec points at ${VOL_CM}, but the client is served ${SERVED_VER}" \
+         "the copies were not recreated for the new spec: kubectl rollout status deployment/${APP}"
   fi
 
   if printf '%s' "$BODY" | grep -q '__POD__'; then
-    fail "कॉपी का नाम पृष्ठ में प्रतिस्थापित नहीं होता" \
-         "ConfigMap rickroll-conf खो गया: ../01-deploy/rickroll.yaml पूरा लागू करें"
+    fail "the copy name is not substituted into the page" \
+         "ConfigMap rickroll-conf is lost: apply ../01-deploy/rickroll.yaml in full"
   else
     SERVED_POD="$(printf '%s' "$BODY" | grep -o "${APP}-[a-z0-9]*-[a-z0-9]*" | head -1)"
     if [ -n "$SERVED_POD" ] && kubectl get pod "$SERVED_POD" >/dev/null 2>&1; then
-      ok "पृष्ठ को एक जीवित कॉपी ${SERVED_POD} ने परोसा"
+      ok "the page was served by a live copy ${SERVED_POD}"
     else
-      warn "पृष्ठ के नाम को किसी चालू कॉपी से मिलाया नहीं जा सका" \
-           "संभवतः जाँच के दौरान ही कॉपियाँ बदल रही थीं — स्क्रिप्ट फिर से चलाएँ"
+      warn "could not match the name from the page with a running copy" \
+           "the copies were probably changing during the check itself — run the script again"
     fi
   fi
 
-  evidence "परोसा गया पृष्ठ (अंश)" \
+  evidence "Served page (fragment)" \
     "$(printf '%s' "$BODY" | grep -o '<h1>[^<]*</h1>' | head -1)
-$(printf '%s' "$BODY" | grep -o "सेवा प्रदान करने वाला Pod<b>${APP}-[a-z0-9-]*</b>" | head -1)"
+$(printf '%s' "$BODY" | grep -o "served by pod<b>${APP}-[a-z0-9-]*</b>" | head -1)"
 fi
 
-# --- अगली लैब के लिए तैयारी ------------------------------------------
-# लैब ने कॉपियाँ तीन तक बढ़ाई थीं ताकि प्रतिस्थापन एक-एक करके दिखे। बची हुई तीन कॉपियाँ
-# कुछ नहीं तोड़तीं — इसलिए warn, fail नहीं — पर वे प्रशिक्षण नोड पर जगह घेरती हैं,
-# जो आगे पड़ोसी लैब के लिए कम पड़ जाएगी।
+# --- readiness for the next labs ------------------------------------------
+# The lab scaled the copies up to three so the replacement could be seen one by one. The three
+# leftover copies break nothing — hence a warn, not a fail — but they take up space on the training
+# node, which the neighboring labs will run short of further on.
 if [ "$WANT" = "1" ]; then
-  ok "कॉपियों की संख्या वापस एक कर दी गई है"
+  ok "the number of copies has been returned to one"
 else
-  warn "अभी अनुरोधित कॉपियाँ: ${WANT}" \
-       "लैब के बाद एक पर लौटना उचित है: kubectl scale deployment ${APP} --replicas=1"
+  warn "currently requested copies: ${WANT}" \
+       "after the lab it is worth returning to one: kubectl scale deployment ${APP} --replicas=1"
 fi
 
 finish

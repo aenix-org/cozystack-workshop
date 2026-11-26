@@ -1,26 +1,26 @@
 ---
-# लैब 13. आपके एप्लिकेशन का ऑर्डर ऐसा दिखेगा उसके बाद जब
-# एडमिन applicationdefinition.yaml लागू कर देगा। इसे अपने टेनेंट में लागू करें:
+# Lab 13. This is what ordering your application will look like AFTER
+# the admin applies applicationdefinition.yaml. Apply it in your tenant:
 #   kubectl apply -f guestpass-example.yaml
 #
-# ध्यान दें: tenant-workshopXX एक प्लेसहोल्डर है, namespace का नाम नहीं। लागू करने से पहले
-# XX को अपने टेनेंट के नंबर से बदलें, अन्यथा kubectl मना कर देगा: ऐसा कोई namespace नहीं है,
-# और किसी दूसरे के namespace में आपको प्रवेश नहीं मिलेगा।
+# ATTENTION: tenant-workshopXX is a placeholder, not a namespace name. Replace XX with your
+# tenant number before applying, otherwise kubectl will refuse: there is no such namespace,
+# and you won't be allowed into someone else's.
 #
-# ध्यान दें: apps.cozystack.io ग्रुप वही है जिसका उपयोग Bucket,
-# VMInstance और बाकी कैटलॉग एप्लिकेशन करते हैं। आपका एप्लिकेशन उनके
-# साथ एक कतार में खड़ा होगा, किनारे कहीं नहीं।
+# Note: the apps.cozystack.io group is the same one used by Bucket,
+# VMInstance and the other catalog applications. Your application will stand
+# in line with them, not off to the side.
 #
-# इस फ़ाइल को एडमिन द्वारा definition रजिस्टर करने से पहले लागू नहीं
-# कर सकते: kubectl जवाब देगा `no matches for kind "GuestPass"`।
+# You can't apply this file before the admin has registered the definition:
+# kubectl will reply `no matches for kind "GuestPass"`.
 apiVersion: apps.cozystack.io/v1alpha1
 kind: GuestPass
 metadata:
   name: main
   namespace: tenant-workshopXX
-# spec में मौजूद फ़ील्ड्स ठीक वही पैरामीटर हैं जो chart/values.yaml में वर्णित हैं और
-# डैशबोर्ड में ऑर्डर फ़ॉर्म द्वारा दिखाए जाते हैं। यहाँ उन्हें टेक्स्ट के रूप में लिखा गया है: यह वैसा ही है
-# जैसे डैशबोर्ड में बटन दबाना, लेकिन ऐसी फ़ाइल की समीक्षा की जा सकती है, Git में रखी जा सकती है और रोलबैक की जा सकती है।
+# The fields in spec are exactly the parameters described in chart/values.yaml and shown by
+# the order form in the dashboard. Here they are written out as text: the same as pressing
+# a button in the dashboard, but such a file can be reviewed, put in Git and rolled back.
 spec:
   replicas: 2
   greeting: "Order a pass for your guest"

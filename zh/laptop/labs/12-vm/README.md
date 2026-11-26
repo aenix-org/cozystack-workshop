@@ -93,7 +93,7 @@ ssh_pwauth: true
 write_files:
   - path: /opt/directory/index.html
     content: |
-      <!doctype html><html lang="ru"><head><meta charset="utf-8"><title>通讯录</title></head><body><h1>员工通讯录</h1><ul><li>王军 — 101</li><li>潘平 — 102</li></ul></body></html>
+      <!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Directory</title></head><body><h1>Staff directory</h1><ul><li>Whitfield J. — 101</li><li>Petersen P. — 102</li></ul></body></html>
   - path: /etc/systemd/system/directory.service
     content: |
       [Unit]
@@ -114,12 +114,12 @@ runcmd: [ "systemctl daemon-reload", "systemctl enable --now directory" ]
 **同一件事，用文本表达。** 磁盘和机器这两个对象都在同一个文件 `staff-directory-vm.yaml` 里，并用一条命令创建：先磁盘，后机器。在应用之前，打开文件，把里面的占位符 `tenant-workshopXX` 替换成你自己租户的名字——否则对象会跑到错误的地方去。
 
 ```bash
-# KUBECONFIG 是 kubectl 从中读取集群地址和登录数据的变量。
-# 这里需要的是租户（TENANT）访问文件：虚拟机住在管理集群上的租户里。
+# KUBECONFIG is the variable kubectl reads the cluster address and login data from.
+# Here you need the TENANT access file: the VM lives in the tenant on the management cluster.
 export KUBECONFIG=~/.kube/workshop
-# apply = 「把集群带到文件里所写的状态」。没有对象——就创建它们，
-# 对象已存在——就把它们带到所描述的状态。
-#   -f   从文件读取描述
+# apply = "bring the cluster to what's written in the file". No objects — it creates them,
+# objects present — it brings them to the described state.
+#   -f   read the description from a file
 kubectl apply -f staff-directory-vm.yaml
 ```
 
@@ -204,8 +204,8 @@ cloud-init 是每一个云上 Linux 镜像都懂的标准首次开机初始配�
 讲师已经提前发布了通讯录：你的租户里已经有一个 host 为 `spravochnik.workshopXX.workshop.aenix.io` 的 `Ingress spravochnik`，以及一个路由到机器内部 8080 端口的 `Service spravochnik-http`。发布已经就绪，只等通讯录一开始应答就接住它。我们现在就来检查，不用等机器加载完。
 
 ```bash
-# curl —— 「去这个地址，把响应显示出来」。把 XX 替换成你自己的租户编号。
-#   --max-time 5   5 秒后放弃，而不是长时间等待
+# curl — "go to the address and show the response". Replace XX with your own tenant number.
+#   --max-time 5   give up after 5 seconds instead of waiting a long time
 curl --max-time 5 http://spravochnik.workshopXX.workshop.aenix.io
 ```
 
@@ -253,13 +253,13 @@ curl --max-time 5 http://spravochnik.workshopXX.workshop.aenix.io
 它语法上有一个怪癖值得提前讲清楚，否则你的第一条命令就会被拒。`virtctl` 的目标不是用裸名字给出，而是带一个类型前缀：`vmi/<name>`。`vmi` 是 virtual machine instance，即机器的**正在运行的实例**；你创建的那个 `VMInstance` 对象和正在运行的实例，在 API 里是两个不同的对象。在租户访问权限下，权限授予在 `virtualmachineinstances` 这个 **subresource** 上（`console` 和 `portforward`），而不是在整个 `virtualmachines` 对象上——裸名字会打到 vm 对象上，返回 `forbidden`。平台用前缀 `vm-instance-` 加上你机器的名字来构成实例名：`spravochnik` 就是实例 `vm-instance-spravochnik`。
 
 ```bash
-# 租户访问：机器住在租户里
+# tenant access: the machine lives in the tenant
 export KUBECONFIG=~/.kube/workshop
-# console = 连接到机器的串行控制台。它就是 vSphere 里
-# 「Open Console」给你的那块屏幕，只不过是文本形式的：
-#   --namespace  在集群的哪个分区里查找；对你的租户来说它叫
-#                tenant- 加上你的登录名，把 XX 替换成你自己的编号
-#   vmi/...      目标：机器正在运行的实例，而不是 VMInstance 描述
+# console = connect to the machine's serial console. It's the same screen that
+# "Open Console" gives you in vSphere, only text-based:
+#   --namespace  which section of the cluster to look in; for your tenant it's called
+#                tenant- plus your login, replace XX with your own number
+#   vmi/...      the target: the running instance of the machine, not the VMInstance description
 virtctl console --namespace=tenant-workshopXX vmi/vm-instance-spravochnik
 ```
 
@@ -268,9 +268,9 @@ virtctl console --namespace=tenant-workshopXX vmi/vm-instance-spravochnik
 从内部看，它就是一台普通的 Ubuntu。确认通讯录已经起来：
 
 ```bash
-uname -a                       # 内核和架构：和裸金属服务器上是同一行输出
-systemctl status directory     # 通讯录服务：应当是 active (running)
-curl -s localhost:8080 | head  # 同一个页面，但从机器自身内部请求
+uname -a                       # kernel and architecture: the same line as on a bare-metal server
+systemctl status directory     # the directory service: should be active (running)
+curl -s localhost:8080 | head  # the same page, but requested from inside the machine itself
 ```
 
 如果 `systemctl status directory` 显示 `active (running)`，而对 `localhost:8080` 的 `curl` 返回了带员工列表的 HTML——那么服务器就绪了，外面的发布马上就会把 `503` 换成页面。内部没有一丝 Kubernetes 的痕迹，也不该有：客户机并不知道自己在一个集群里——正如 vSphere 里的虚拟机无需知道 vCenter 的存在。
@@ -288,7 +288,7 @@ curl http://spravochnik.workshopXX.workshop.aenix.io
 **你应当看到**——通讯录页面的 HTML：
 
 ```html
-<h1>员工通讯录</h1><ul><li>王军 — 101</li><li>潘平 — 102</li></ul>
+<h1>Staff directory</h1><ul><li>Whitfield J. — 101</li><li>Petersen P. — 102</li></ul>
 ```
 
 在浏览器里打开这个地址，你会看到同样的列表。通讯录以一个对人友好的域名从外部可见，带着来自平台的 HTTPS，没有向网络部门或证书部门提过一张工单。
@@ -306,12 +306,12 @@ curl http://spravochnik.workshopXX.workshop.aenix.io
 脚本检查的不是对象是否存在，而是实质上是否工作：域名返回 `200` 且是通讯录页面，机器本身在运行，发布它的 `Ingress` 在位。按域名的检查即使没有租户访问权限也能工作——它只需要 `curl`；租户访问权限会额外加上机器状态的检查。
 
 ```bash
-# 租户访问：脚本从这里取用虚拟机本身和 Ingress
+# tenant access: from here the script takes the VM itself and the Ingress
 export KUBECONFIG=~/.kube/workshop
-# 不带 tenant- 前缀的你的登录名：脚本用它同时拼出分区名 tenant-workshopXX
-# 和域名 spravochnik.workshopXX.workshop.aenix.io
+# your login without the word tenant-: from it the script builds both the section name tenant-workshopXX
+# and the domain name spravochnik.workshopXX.workshop.aenix.io
 export COZY_TENANT=workshopXX
-# 名字前面的 ./ 意为「当前目录里的文件」，也就是 labs/12-vm 里的
+# the ./ before the name means "the file from the current folder", i.e. from labs/12-vm
 ./check.sh
 ```
 

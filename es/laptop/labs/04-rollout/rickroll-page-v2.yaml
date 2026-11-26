@@ -1,39 +1,39 @@
 ---
-# Lab 4. La segunda versión de la página — la que desplegamos bajo carga.
-# Debe diferenciarse de forma notable: el participante mira el navegador, no un diff.
+# Lab 4. The second version of the page — the one we roll out under load.
+# It should differ noticeably: the participant looks at the browser, not at a diff.
 #
-# Un único objeto. Se aplica en tu clúster de formación `lab`, no en el tenant
-# del clúster de gestión:
+# A single object. Applied to your training cluster `lab`, not to the tenant
+# on the management cluster:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl apply -f rickroll-page-v2.yaml
-# Aquí no hay marcadores como tenant-workshopXX — no hace falta insertar tu número en ningún sitio.
+# There are no placeholders like tenant-workshopXX here — no need to plug in your number anywhere.
 #
-# Lo principal con lo que la gente tropieza aquí: este apply por sí mismo no despliega nada.
-# Coloca en el clúster otro archivo de configuración junto al primero. Mientras el volumen `page`
-# del Deployment apunte a rickroll-page-v1, los usuarios ven la primera versión.
-# El despliegue pasa a ser el siguiente paso de la lab — cambiar el volumen a este ConfigMap.
-# De ahí toda la construcción con dos objetos: la primera versión permanece en el clúster
-# intacta, y un rollback la devuelve por completo, en lugar de reconstruirla de memoria.
+# The main thing people stumble on here: this apply by itself rolls out nothing.
+# It puts one more settings file into the cluster next to the first one. As long as the `page` volume
+# of the Deployment references rickroll-page-v1, users see the first version.
+# The rollout becomes the next step of the lab — switching the volume to this ConfigMap.
+# Hence the whole two-object construction: the first version stays in the cluster
+# untouched, and a rollback brings it back in full, rather than reconstructing it from memory.
 #
-# Si en cambio editáramos el ConfigMap rickroll-page-v1 sobre la marcha, no habría
-# adónde hacer rollback, y los pods recibirían contenido nuevo sin reemplazar copias y sin dejar registro
-# en el historial de revisiones — es decir, sin todo aquello para lo que se hace la lab.
+# Were we to edit the rickroll-page-v1 ConfigMap in place instead, there would be
+# nowhere to roll back to, and the pods would get new content without replacing copies and without a record
+# in the revision history — that is, without everything the lab is done for.
 #
-# El nombre del objeto no debe cambiarse: a rickroll-page-v2 lo referencia el patch del README
-# y la comprobación en check.sh.
+# The object name must not be changed: rickroll-page-v2 is referenced by the patch from the README
+# and by the check in check.sh.
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: rickroll-page-v2
 data:
-  # Todo lo que va por debajo de la sangría tras `|` es el contenido literal del archivo index.html,
-  # que acabará dentro del contenedor. Esto ya no es YAML: aquí no hay comentarios
-  # ni puede haberlos, una almohadilla aparecería en la página como texto normal.
+  # Everything below the indent after `|` is the verbatim content of the index.html file
+  # that will end up inside the container. This is no longer YAML: there are no comments here
+  # and there cannot be — a hash would land on the page as ordinary text.
   #
-  # En el marcado importan dos cosas que check.sh mira: el rótulo «VERSIÓN 2» —
-  # por él la comprobación distingue la segunda versión de la primera, y el marcador __POD__ — que se
-  # sustituye por el nombre del pod nginx según la regla del ConfigMap rickroll-conf (lab 1).
-  # Si eliminas cualquiera de ellos, la comprobación de la lab no pasará, aunque el despliegue tenga éxito.
+  # Two things matter in the markup, which check.sh looks at: the caption «VERSION 2» —
+  # by it the check tells the second version from the first, and the placeholder __POD__ — it is
+  # replaced with the nginx pod name by the rule from the rickroll-conf ConfigMap (lab 1).
+  # Remove either of them and the lab check will not pass, though the rollout will succeed.
   index.html: |
     <!doctype html>
     <html lang="ru">
@@ -56,9 +56,9 @@ data:
       .pod b{display:block;margin-top:.4em;color:#00ffa3;font-size:1.35em;word-break:break-all}
       .hint{margin-top:3em;color:#3f5561;font-size:14px}
     </style>
-    <div class="tag">VERSIÓN 2</div>
+    <div class="tag">VERSION 2</div>
     <h1>We're No Strangers To Love</h1>
     <p class="lyr">You know the rules &middot; And so do I</p>
-    <div class="pod">te atendió el Pod<b>__POD__</b></div>
-    <p class="hint">El despliegue se realizó bajo carga. Mira en Fortio: cero errores.</p>
+    <div class="pod">served by pod<b>__POD__</b></div>
+    <p class="hint">The rollout happened under load. Look at Fortio: zero errors.</p>
     </html>

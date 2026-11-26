@@ -33,12 +33,12 @@ los tenants a la vez. Un tenant no puede crear un objeto así. Compruébalo tú 
 mismo: al clúster se le puede preguntar por tus permisos sin crear nada.
 
 ```bash
-# KUBECONFIG — la variable que kubectl lee para encontrar la dirección del clúster y tus credenciales.
-# Aquí es el acceso de tenant, el mismo archivo que en todos los demás laboratorios.
+# KUBECONFIG — the variable kubectl reads to find the cluster's address and your credentials.
+# Here it is the tenant access, the same file as in every other lab.
 export KUBECONFIG=~/.kube/workshop
-# auth can-i = «¿me está permitido?». El clúster responde yes o no y no cambia nada:
-#   create                   qué acción comprobamos
-#   applicationdefinitions   sobre qué tipo de objeto
+# auth can-i = "am I allowed to?". The cluster answers yes or no and changes nothing:
+#   create                   which action we are checking
+#   applicationdefinitions   on which type of object
 kubectl auth can-i create applicationdefinitions
 ```
 
@@ -96,13 +96,13 @@ va del empaquetado.
 
 ```
 chart/
-├── Chart.yaml            nombre, versión, descripción
-├── values.yaml           parámetros y valores por defecto
-├── values.schema.json    qué values considerar válidos
+├── Chart.yaml            name, version, description
+├── values.yaml           parameters and default values
+├── values.schema.json    which values to consider valid
 └── templates/
-    ├── configmap.yaml    la página y la configuración de nginx
-    ├── deployment.yaml   la propia aplicación
-    └── service.yaml      la dirección
+    ├── configmap.yaml    the page and the nginx config
+    ├── deployment.yaml   the application itself
+    └── service.yaml      the address
 ```
 
 <details>
@@ -158,10 +158,10 @@ El esquema lo comprueba Helm **antes** de que nada viaje al clúster. Compruéba
 cuela una cadena en un parámetro numérico.
 
 ```bash
-# template = «arma los manifiestos a partir del chart e imprímelos», el clúster no se toca:
-#   gp                    el nombre del release bajo el que el chart se despliega de forma nominal
-#   chart                 la carpeta con el chart
-#   --set replicas=abc    sobrescribe un solo parámetro directamente en la línea de comandos
+# template = "assemble the manifests from the chart and print them", the cluster is not touched:
+#   gp                    the release name the chart is notionally deployed under
+#   chart                 the folder with the chart
+#   --set replicas=abc    override a single parameter right on the command line
 helm template gp chart --set replicas=abc
 ```
 
@@ -235,9 +235,9 @@ la indentación equivocada, un campo obligatorio perdido, una plantilla que no s
 
 ```bash
 cd labs/13-catalog
-# lint = «comprueba el paquete en busca de errores de formato y campos obligatorios»
-#   chart   ruta a la carpeta del chart; dentro Helm espera Chart.yaml, values.yaml
-#           y la carpeta templates/
+# lint = "check the package for formatting errors and required fields"
+#   chart   path to the chart folder; inside it Helm expects Chart.yaml, values.yaml
+#           and the templates/ folder
 helm lint chart
 ```
 
@@ -260,8 +260,8 @@ las plantillas en manifiestos terminados: Helm toma los valores de `values.yaml`
 sustituye en el texto e imprime el resultado.
 
 ```bash
-# main — el nombre del release, es decir, de este despliegue concreto del chart. Va
-# a los nombres de los objetos creados, por lo que dos instalaciones contiguas no chocarán.
+# main — the release name, that is, of this specific deployment of the chart. It goes
+# into the names of the objects created, so two installations side by side will not clash.
 helm template main chart
 ```
 
@@ -272,10 +272,10 @@ Comprueba que los parámetros de verdad llegan a los manifiestos. Renderizamos d
 valores distintos y conservamos en la salida solo la línea que debía cambiar.
 
 ```bash
-# --set replicas=5 sobrescribe el valor de values.yaml durante una sola ejecución.
-# | grep 'replicas:' — de toda la salida conserva solo las líneas con esta palabra.
+# --set replicas=5 overrides the value from values.yaml for the duration of one run.
+# | grep 'replicas:' — from the whole output keep only the lines with this word.
 helm template main chart --set replicas=5 | grep 'replicas:'
-# lo mismo para el parámetro booleano: external decide qué tipo de Service acaba en el manifiesto
+# the same for the boolean parameter: external decides which Service type ends up in the manifest
 helm template main chart --set external=true | grep 'type:'
 ```
 
@@ -330,11 +330,11 @@ Tras aplicar este archivo, en el clúster aparece un nuevo tipo de objeto. No un
 administrador aplique la definición:
 
 ```bash
-# get = «muéstrame qué hay». guestpasses es ese mismo nombre del campo plural de abajo:
-#   -n tenant-workshopXX   en qué namespace mirar; reemplaza XX por tu propio número
+# get = "show me what's there". guestpasses is that very name from the plural field below:
+#   -n tenant-workshopXX   which namespace to look in; replace XX with your own number
 kubectl get guestpasses -n tenant-workshopXX
-# describe = «muéstrame todo sobre un objeto»: parámetros, estado, eventos recientes.
-# main aquí es el nombre de una aplicación concreta pedida, no el nombre del tipo.
+# describe = "show me everything about one object": parameters, state, recent events.
+# main here is the name of a specific ordered application, not the name of the type.
 kubectl describe guestpass main -n tenant-workshopXX
 ```
 
@@ -429,9 +429,9 @@ pero el campo `icon` necesita una única cadena continua, así que los saltos de
 eliminan en un paso aparte.
 
 ```bash
-# base64 = convertir un archivo binario en una cadena de letras, dígitos y los signos + / =
-#   -i icon.svg   qué codificar (la grafía del flag para macOS y BSD)
-# tr -d '\n' = descartar todos los saltos de línea de la salida, pegándola en una sola
+# base64 = turn a binary file into a string of letters, digits and the signs + / =
+#   -i icon.svg   what to encode (the flag spelling for macOS and BSD)
+# tr -d '\n' = drop every line break from the output, gluing it into one
 base64 -i icon.svg | tr -d '\n'
 ```
 
@@ -460,9 +460,9 @@ los derechos. La denegación vendrá del clúster, no de `kubectl`, y el texto d
 dirá exactamente qué faltaba.
 
 ```bash
-# acceso de tenant — el mismo con el que has trabajado durante todo el taller
+# tenant access — the same one you have worked with throughout the workshop
 export KUBECONFIG=~/.kube/workshop
-# apply = «pon el clúster en línea con lo que está escrito en el archivo»; -f — leer de un archivo
+# apply = "bring the cluster into line with what's written in the file"; -f — read from a file
 kubectl apply -f applicationdefinition.yaml
 ```
 
@@ -512,10 +512,10 @@ cosas: primero preguntamos por los permisos, luego hacemos que `kubectl` analice
 entero, sin enviarlo a ninguna parte.
 
 ```bash
-# auth can-i = «¿me está permitido?». La respuesta es yes o no, y el clúster no se cambia.
+# auth can-i = "am I allowed to?". The answer is yes or no, and the cluster is not changed.
 kubectl auth can-i create applicationdefinitions
-# --dry-run=client = «analiza el archivo y muestra qué saldría, pero no vayas al clúster».
-# client significa que toda la comprobación corre en la laptop y el clúster ni siquiera se entera.
+# --dry-run=client = "parse the file and show what would come out, but do not go to the cluster".
+# client means the whole check runs on the laptop and the cluster never even hears about it.
 kubectl apply -f applicationdefinition.yaml --dry-run=client
 ```
 
@@ -589,7 +589,7 @@ decodifica en SVG y, lo más importante, que el esquema de la definición coinci
 esquema del chart.
 
 ```bash
-# ./ antes del nombre significa «el archivo de la carpeta actual», es decir, de labs/13-catalog
+# ./ before the name means "the file from the current folder", that is, from labs/13-catalog
 ./check.sh
 ```
 

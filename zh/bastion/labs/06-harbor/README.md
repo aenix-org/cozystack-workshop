@@ -54,12 +54,12 @@
 之前都写明了它是发给哪个集群的。如果你不确定：
 
 ```bash
-# echo 打印变量的值：kubectl 现在用的是哪个访问文件。
-# 为空则表示 kubectl 会使用默认文件 ~/.kube/config，而不是你以为的那个。
+# echo prints the value of the variable: which access file kubectl is using right now.
+# Empty means kubectl will use the default file ~/.kube/config, not the one you think.
 echo $KUBECONFIG
 
-# get nodes = 「显示集群的节点」。这里它是一张石蕊试纸：
-# 从返回结果就能看出命令去了两个集群中的哪一个。
+# get nodes = "show the cluster's nodes". Here it's a litmus test:
+# the answer tells you which of the two clusters the command went to.
 kubectl get nodes
 ```
 
@@ -72,7 +72,7 @@ kubectl get nodes
 `kubectl apply -f name.yaml` 的地方，文件都取自这里。
 
 ```bash
-# 本实验的每条命令都在实验目录里执行 —— 先切换进去
+# every command in this lab is run from the lab folder — change into it
 cd labs/06-harbor
 ```
 
@@ -139,12 +139,12 @@ secret，它里面有三个你需要的键：
 的规则，恰好放行它自己的凭据：
 
 ```bash
-# get secret = 「显示 Secret 对象」。这个 secret 的名字由应用类型前缀
-# 和它的名字拼成：harbor- + harbor。
-#   -n tenant-workshopXX  在哪个 namespace 里查找 —— 你的租户
-#   -o jsonpath='...'     从对象里取出单个字段，而不是整个打印出来
-#   base64 -d             解码：secret 里的值以 base64 存储
-#   ; echo                补一个换行，否则密码会和提示符粘在一起
+# get secret = "show the Secret object". The secret's name is assembled from the prefix
+# for the application type and its name: harbor- + harbor.
+#   -n tenant-workshopXX  which namespace to look in — your tenant
+#   -o jsonpath='...'     pull a single field out of the object rather than printing the whole thing
+#   base64 -d             decode: values inside secrets are stored in base64
+#   ; echo                add a newline, otherwise the password runs into the prompt
 kubectl -n tenant-workshopXX get secret harbor-harbor-credentials \
   -o jsonpath='{.data.admin-password}' | base64 -d; echo
 ```
@@ -158,9 +158,9 @@ kubectl -n tenant-workshopXX get secret harbor-harbor-credentials \
 这个镜像仓库。
 
 ```bash
-# login = 「记住这个镜像仓库的凭据」。
-# 参数是 url 键里的镜像仓库地址；这里的 harbor-harbor.workshop03.example.org 是示例。
-# 命令会询问用户名（admin）和密码；输入密码时不会显示。
+# login = "remember the credentials for this registry".
+# The argument is the registry address from the url key; harbor-harbor.workshop03.example.org here is an example.
+# The command will ask for a username (admin) and a password; the password isn't shown as you type.
 docker login harbor-harbor.workshop03.example.org
 ```
 
@@ -292,13 +292,13 @@ USER 10001
 ```bash
 cd labs/06-harbor
 
-# build = 「按 Dockerfile 构建镜像」。
-#   --platform linux/amd64  为哪种处理器构建；集群节点是 x86，
-#                           而 bastion 可能是 ARM —— 那样不加这个标志就会构建出不对的东西
-#   -t <地址>/<项目>/<名称>:<标签>  给结果起什么名字。名字开头的镜像仓库地址
-#                           就是之后 docker push 要发往的地方
-#   app/                    最后一个参数 —— 装着 Dockerfile 和源码的目录；
-#                           它的全部内容都会交给构建器
+# build = "build the image from the Dockerfile".
+#   --platform linux/amd64  which processor to build for; the cluster nodes are on x86,
+#                           and the bastion may be on ARM — then without the flag you get the wrong thing
+#   -t <address>/<project>/<name>:<tag>  what to name the result. The registry address at the start of the name
+#                           is where docker push will later send it
+#   app/                    the last argument — the folder with the Dockerfile and sources;
+#                           its entire contents are handed to the builder
 docker build --platform linux/amd64 -t harbor-harbor.workshop03.example.org/passes/passes-api:v1 app/
 ```
 
@@ -322,8 +322,8 @@ Successfully tagged harbor-harbor.workshop03.example.org/passes/passes-api:v1
 镜像仓库里的层不会再次发送。
 
 ```bash
-# push = 「把镜像发到镜像仓库」。发往哪里，docker 从镜像名里取：
-# 名字的第一部分是镜像仓库地址，就发往那里，用 docker login 得到的凭据。
+# push = "send the image to the registry". Where to send it, docker takes from the image name:
+# the first part of the name is the registry address, and there it goes, with the credentials from docker login.
 docker push harbor-harbor.workshop03.example.org/passes/passes-api:v1
 ```
 
@@ -340,9 +340,9 @@ docker push harbor-harbor.workshop03.example.org/passes/passes-api:v1
 📍 **在哪里：** 在 bastion 上，实验集群 `lab`。
 
 ```bash
-# KUBECONFIG 告诉 kubectl 用哪个访问文件。我们切换到你的实验集群 `lab`：
-# 从这里开始所有 kubectl 命令都发往它。
-# 它一直生效，直到关闭终端窗口。
+# KUBECONFIG tells kubectl which access file to use. We switch to your `lab` cluster:
+# from here on all kubectl commands go to it.
+# It stays in effect until the terminal window is closed.
 export KUBECONFIG=~/lab.kubeconfig
 ```
 
@@ -351,11 +351,11 @@ export KUBECONFIG=~/lab.kubeconfig
 适合你系统的那一行：
 
 ```bash
-# sed -i = 「就地修改文件」
-#   's|什么|换成什么|g'  替换所有出现处；分隔符用 | 而不是 /，因为
-#                     地址里有斜杠，用 / 就得转义
-#   macOS 的 sed 在 -i 后面必须跟一个参数；空引号
-#   表示「不做备份」。Linux 上则不能有这个参数。
+# sed -i = "edit the file in place"
+#   's|what|with what|g'  replace all occurrences; the separator | is used instead of / because
+#                     the address has slashes and they would have to be escaped
+#   The sed in macOS requires a mandatory argument after -i; the empty quotes
+#   mean "make no backup copy". On Linux there must be no such argument.
 
 # Linux
 sed -i    's|HARBOR-HOST|harbor-harbor.workshop03.example.org|g' passes-broken.yaml
@@ -366,13 +366,13 @@ sed -i '' 's|HARBOR-HOST|harbor-harbor.workshop03.example.org|g' passes-broken.y
 应用它：
 
 ```bash
-# apply = 「把集群变成文件里描述的样子」
+# apply = "bring the cluster to what's described in the file"
 kubectl apply -f passes-broken.yaml
 
-# get pods = 「显示 Pod」。
-#   -l app=passes-api  只显示带这个标签的，而不是全部
-#   -w                 不退出，随着变化出现就打印出来；
-#                      停止观察 —— Ctrl+C
+# get pods = "show the Pods".
+#   -l app=passes-api  only the ones with this label, not everything
+#   -w                 don't exit, print changes as they appear;
+#                      stop watching — Ctrl+C
 kubectl get pods -l app=passes-api -w
 ```
 
@@ -387,9 +387,9 @@ passes-api-6c9d4f7b8-2xk4n    0/1     ImagePullBackOff   0          22s
 用 `Ctrl+C` 停止观察，看看集群怎么说：
 
 ```bash
-# describe = 「详细讲讲这个对象」。输出的最末尾是事件日志：
-# 集群对这个 Pod 做了什么尝试、结果如何。
-# tail -12 保留最后十二行 —— 事件正好在那里。
+# describe = "tell me about the object in detail". At the very end of the output comes the event log:
+# what the cluster tried to do with the Pod and how it ended.
+# tail -12 keeps the last twelve lines — the events are right there.
 kubectl describe pod -l app=passes-api | tail -12
 ```
 
@@ -449,11 +449,11 @@ kubectl describe pod -l app=passes-api | tail -12
 `kubelet` 在下载镜像时可以自行读取的 secret：
 
 ```bash
-# create secret docker-registry = 「创建一个带镜像仓库凭据的 secret」
-#   harbor             这个 secret 在集群内的名字；应用清单会引用它
-#   --docker-server    这些凭据是给哪个镜像仓库的 —— 和镜像名里一样的地址
-#   --docker-username  谁在登录
-#   --docker-password  密码；如果里面有 $、! 或空格，就需要用单引号
+# create secret docker-registry = "create a secret with registry credentials"
+#   harbor             the secret's name inside the cluster; the application manifest will refer to it
+#   --docker-server    which registry these credentials are for — the same address as in the image name
+#   --docker-username  who's logging in
+#   --docker-password  the password; single quotes are needed if it has a $, ! or space
 kubectl create secret docker-registry harbor \
   --docker-server=harbor-harbor.workshop03.example.org \
   --docker-username=admin \
@@ -464,20 +464,20 @@ kubectl create secret docker-registry harbor \
 一种不留历史的办法：
 
 ```bash
-# read 把从键盘输入的内容放进 HARBOR_PASS 变量：
-#   -s  不在屏幕上显示输入的内容
-#   -r  不把反斜杠当作特殊字符
-# 这一行之后屏幕上不会出现任何东西：粘贴密码并按回车。
+# read puts what's typed at the keyboard into the HARBOR_PASS variable:
+#   -s  don't show what's typed on the screen
+#   -r  don't treat a backslash as a special character
+# Nothing will appear on the screen after this line: paste the password and press Enter.
 read -rs HARBOR_PASS
 
-# 从这里开始密码从变量里替换进来，所以进入 shell 历史的只有变量名。
-# 双引号是必须的：没有它们，空格会把值拆断。
+# From here the password is substituted from the variable, so only the variable name
+# goes into the shell history. The double quotes are mandatory: without them spaces would break the value.
 kubectl create secret docker-registry harbor \
   --docker-server=harbor-harbor.workshop03.example.org \
   --docker-username=admin \
   --docker-password="$HARBOR_PASS"
 
-# unset 清除变量，这样密码不会传到本窗口后续的命令里
+# unset erases the variable so the password doesn't reach the next commands in this window
 unset HARBOR_PASS
 ```
 
@@ -487,8 +487,8 @@ unset HARBOR_PASS
 我们来问问集群，做出来的是什么种类的 secret：
 
 ```bash
-#   -o jsonpath='{.type}'  打印对象的单个字段 —— secret 的类型
-#   {"\n"}                 补一个换行，否则输出会和提示符粘在一起
+#   -o jsonpath='{.type}'  print a single field of the object — the secret's type
+#   {"\n"}                 add a newline, otherwise the output runs into the prompt
 kubectl get secret harbor -o jsonpath='{.type}{"\n"}'
 ```
 
@@ -504,10 +504,10 @@ kubernetes.io/dockerconfigjson
 谁都能解码）：
 
 ```bash
-# .data.\.dockerconfigjson —— secret 里的键。这个键名本身以点开头，
-# 所以要转义：否则 jsonpath 会把它当成路径分隔符。
-# base64 -d 把值解码回文本 —— 你会看到和 bastion 上
-# ~/.docker/config.json 文件里一样的格式。
+# .data.\.dockerconfigjson — the key inside the secret. The key name itself starts with a dot,
+# so it's escaped: otherwise jsonpath would take it for a path separator.
+# base64 -d decodes the value back into text — you'll see the same format
+# as in the file ~/.docker/config.json on your bastion.
 kubectl get secret harbor -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d
 ```
 
@@ -533,12 +533,12 @@ sed -i    's|HARBOR-HOST|harbor-harbor.workshop03.example.org|g' passes.yaml
 # macOS
 sed -i '' 's|HARBOR-HOST|harbor-harbor.workshop03.example.org|g' passes.yaml
 
-# delete -f = 从集群里删除文件中描述的那些对象
+# delete -f = remove from the cluster exactly the objects described in the file
 kubectl delete -f passes-broken.yaml
 kubectl apply -f passes.yaml
 
-# rollout status 会等到新副本就绪后自行结束。
-# 如果等不到，它会返回错误，所以这样一行放在脚本里很方便。
+# rollout status waits until the new replicas become ready, then finishes on its own.
+# If it doesn't get there, it returns an error, which is why such a line is handy in scripts.
 kubectl rollout status deployment/passes-api
 ```
 
@@ -564,19 +564,19 @@ deployment "passes-api" successfully rolled out
 一个临时的端口转发，只不过完全不用动网络。
 
 ```bash
-# port-forward svc/passes-api = 通往 service 的隧道，而不是通往某个具体的 Pod
-#   8080:80 —— 左边的数字是 bastion 上的端口，右边是集群里 service 的端口
-# 别关窗口：命令运行多久，隧道就存活多久。
+# port-forward svc/passes-api = a tunnel to the service, not to a specific Pod
+#   8080:80 — the left number is the port on your bastion, the right one the service port in the cluster
+# Don't close the window: the tunnel lives as long as the command runs.
 kubectl port-forward svc/passes-api 8080:80
 ```
 
 在另一个终端窗口里：
 
 ```bash
-# curl —— 「去这个地址并显示返回」。
-#   -s     不显示进度指示器
-#   ; echo 补一个换行：返回是单独一行，没有它
-#          就会和 shell 提示符粘在一起
+# curl — "go to the address and show the answer".
+#   -s     don't show the progress indicator
+#   ; echo add a newline: the answer comes as a single line, and without it
+#          it runs into the shell prompt
 curl -s http://localhost:8080/; echo
 ```
 
@@ -598,11 +598,11 @@ curl -s http://localhost:8080/; echo
 应答里的 `pod` 字段是作出应答的那个副本的名字。把它和副本列表对一对：
 
 ```bash
-# 新终端窗口对 KUBECONFIG 变量一无所知 —— 这里也要设一遍，
-# 否则 kubectl 会去错误的集群
+# a new terminal window knows nothing about the KUBECONFIG variable — set it here too,
+# otherwise kubectl will go to the wrong cluster
 export KUBECONFIG=~/lab.kubeconfig
 
-# 同样按标签筛选：列表里应该包含你在返回里看到的那个名字
+# the same selection by label: the list should contain the name you saw in the answer
 kubectl get pods -l app=passes-api
 ```
 
@@ -613,9 +613,9 @@ kubectl get pods -l app=passes-api
 你可以这样真正地检验负载均衡 —— 从一个活在集群内部的临时 Pod 发出八个请求：
 
 ```bash
-# run 起一个一次性的 Pod，--rm 用完后清理掉它。
-# -- 之后的一切都在 Pod 内部运行：八次通过内部名字访问 service，
-# 并打印出应答副本名字所在的那一行。
+# run brings up a one-off Pod, --rm cleans it up afterwards.
+# Everything after -- runs inside the Pod: eight times we hit the service by its internal name
+# and print the line with the name of the replica that answered.
 kubectl run probe --rm -i --restart=Never --quiet --image=curlimages/curl:8.11.1 \
   -- sh -c 'for i in $(seq 1 8); do curl -s http://passes-api/ | grep -o "passes-api-[a-z0-9-]*"; done'
 ```
@@ -637,13 +637,13 @@ kubectl run probe --rm -i --restart=Never --quiet --image=curlimages/curl:8.11.1
 ```bash
 cd labs/06-harbor
 
-# 在哪个集群里检查应用 —— 你的 `lab`
+# which cluster to check the application in — your `lab`
 export KUBECONFIG=~/lab.kubeconfig
-# 你的租户编号：脚本据此拼出 namespace 名字 tenant-workshop03
+# your tenant number: from it the script assembles the namespace name tenant-workshop03
 export COZY_TENANT=workshop03
-# 管理集群的访问文件在哪里 —— 脚本会去那里查看 Harbor 本身。
-# 也可以不设：那样脚本会去找 ~/.kube/config，找不到就跳过
-# 管理集群上的检查，并作出说明。
+# where the access to the management cluster lives — there the script will look at Harbor itself.
+# You can leave it unset: then the script looks for ~/.kube/config, and not finding it — skips
+# the checks on the management cluster and says so.
 export COZY_KUBECONFIG=~/.kube/config
 
 ./check.sh
@@ -663,9 +663,9 @@ export COZY_KUBECONFIG=~/.kube/config
 当你做完所有实验之后：
 
 ```bash
-# 删除文件里描述的对象：Deployment 和 Service 都删
+# delete the objects described in the file: both the Deployment and the Service
 kubectl delete -f passes.yaml
-# 这个 secret 是用命令创建的，不是用文件 —— 按名字删除
+# the secret was created by a command, not a file — delete it by name
 kubectl delete secret harbor
 ```
 

@@ -1,46 +1,46 @@
-# Lab 9 · Bestellung einer ClickHouse-Datenbank für die Analyse des Zutrittsprotokolls.
-# Eine Beschreibung dessen, was Sie erhalten möchten; die Plattform baut den Dienst zusammen und konfiguriert ihn.
-# Dasselbe, was Sie mit der Maus im Dashboard bestellen würden — nur als Text.
-# Wird NICHT auf das Laborcluster angewendet, sondern auf einen Tenant im Management-Cluster:
+# Lab 9 · ordering a ClickHouse database for analytics over the access-pass log.
+# A description of what you want to get; the platform assembles and configures the service.
+# The same thing you would order with the mouse in the dashboard — only as text.
+# Applied NOT to the lab cluster, but to a tenant on the management cluster:
 #   kubectl --kubeconfig="$HOME/.kube/workshop" apply -f clickhouse.yaml
 #
-# VOR DEM ANWENDEN: Ersetzen Sie tenant-workshopXX durch Ihren Namespace
-# und ЗдесьВашПароль durch ein Passwort, das Sie sich ausdenken.
+# BEFORE APPLYING: replace tenant-workshopXX with your namespace,
+# and YourPasswordHere with a password you come up with.
 apiVersion: apps.cozystack.io/v1alpha1
 kind: ClickHouse
 metadata:
   name: analytics
   namespace: tenant-workshopXX
 spec:
-  # Eine Replika und ein Shard. In der Produktion hält man mindestens zwei Replikas, sonst bedeutet der
-  # Ausfall eines Knotens die Nichtverfügbarkeit der Daten, — aber wir brauchen eine Million Zeilen, keine
-  # Ausfallsicherheit, und eine zusätzliche Replika würde einfach die Ressourcen des Stands auffressen.
+  # One replica and one shard. In production you keep at least two replicas, otherwise losing a node
+  # means data unavailability, — but we need a million rows, not fault
+  # tolerance, and an extra replica would just eat up the stand's resources.
   replicas: 1
   shards: 1
-  # Festplatte für die Tabellendaten. Eine Million Zeilen aus diesem Lab belegen einige zehn Megabyte:
-  # spaltenorientierte Speicherung mit Wörterbüchern komprimiert ein solches Protokoll sehr stark.
+  # Disk for table data. A million rows from this lab will take up tens of megabytes:
+  # columnar storage with dictionaries compresses such a log very strongly.
   size: 5Gi
-  # Eine separate Festplatte für die Systemprotokolle des Servers, einschließlich des Abfrageprotokolls.
+  # A separate disk for the server's system logs, including the query log.
   logStorageSize: 2Gi
-  # Nach wie vielen Tagen das Abfrageprotokoll verworfen wird. Wir werden hineinschauen.
+  # After how many days to discard the query log. We will be looking into it.
   logTTL: 15
-  # replicated — Volumes, die eine Kopie auf einem anderen Clusterknoten haben: Ein Knoten fiel aus,
-  # die Daten blieben erhalten.
+  # replicated — volumes that have a copy on another cluster node: a node dropped,
+  # the data remained.
   storageClass: replicated
-  # 1 Prozessor, 4 GB. ClickHouse rechnet im Speicher, und bei Gruppierungen über
-  # eine Million Zeilen macht sich das bemerkbar.
+  # 1 processor, 4 GB. ClickHouse computes in memory, and on group-bys over a
+  # million rows this is noticeable.
   resourcesPreset: u1.small
-  # Der Datenbankbenutzer und sein Passwort. Denken Sie sich Ihr eigenes Passwort aus und merken Sie es sich: Es wird
-  # vom Arbeits-Pod (Variable CH_AUTH) und vom Prüfskript (Variable CH_PASSWORD) benötigt.
-  # Nach der Erstellung ist es im Dashboard sichtbar, im Secret clickhouse-analytics-credentials.
+  # The database user and its password. Come up with your own password and remember it: it is needed
+  # by the worker pod (variable CH_AUTH) and the verification script (variable CH_PASSWORD).
+  # After creation it is visible in the dashboard, in the secret clickhouse-analytics-credentials.
   users:
     analyst:
-      password: ЗдесьВашПароль
-  # Backups in den Objektspeicher. Die Daten hier sind generiert,
-  # es gibt nichts wiederherzustellen — auf dem Trainingsstand deaktiviert.
+      password: YourPasswordHere
+  # Backups to object storage. The data here is generated,
+  # there is nothing to restore — disabled on the training stand.
   backup:
     enabled: false
-  # Keeper wird für die Koordination zwischen Replikas benötigt. Es gibt eine Replika — es gibt niemanden,
-  # mit dem koordiniert werden könnte, und drei Keeper-Pods würden Ressourcen umsonst verbrauchen.
+  # Keeper is needed for coordination between replicas. There is one replica — nothing
+  # to coordinate with, and three Keeper pods would waste resources for nothing.
   clickhouseKeeper:
     enabled: false

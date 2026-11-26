@@ -43,7 +43,7 @@ migration इसी में है कि handler को बचा-खुच�
 </details>
 
 ```bash
-kubectl apply -f manifests/04-प्रबंधित.yaml
+kubectl apply -f manifests/04-managed.yaml
 kubectl get postgreses.apps.cozystack.io,kafkas.apps.cozystack.io -n tenant-workshopXX
 ```
 

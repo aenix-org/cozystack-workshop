@@ -37,16 +37,16 @@ vSphere라면 그런 공간은 누군가가 여러분에게 배정해 주었을 
 해결책은 **WSL**입니다. Windows 안의 Linux 서브시스템이지요. 관리자 권한으로 실행한 PowerShell에서 명령 하나로 설치됩니다:
 
 ```powershell
-# Windows 안에 Linux 서브시스템을 설치합니다: 커널, 서비스, 그리고 기본 Ubuntu
-# 배포판. 설치가 끝나면 Windows가 재부팅을 요청합니다.
+# installs the Linux subsystem inside Windows: the kernel, the service and the default
+# Ubuntu distribution. After installation Windows will ask you to reboot.
 wsl --install
 ```
 
 재부팅 후에는 Ubuntu 콘솔이 생기고, 이후에는 다른 모든 사람과 똑같이 그 안에서 작업합니다. WSL 안에는 여러분만의 `kubectl`이 필요합니다. 클러스터에 접속할 때 쓰는 명령이지요:
 
 ```bash
-# snap은 Ubuntu의 패키지 관리자입니다. --classic은 격리 없이 패키지를 설치합니다:
-# 격리 모드에서는 kubectl이 홈 폴더의 접근 파일을 보지 못합니다.
+# snap is Ubuntu's package manager. --classic installs the package without isolation:
+# in isolated mode kubectl won't see the access file in your home folder.
 sudo snap install kubectl --classic
 ```
 
@@ -59,7 +59,7 @@ Windows 드라이브는 WSL에서 `/mnt/c/...` 경로로 보이므로, 일반 �
 모든 파일은 이미 여러분의 것입니다. 리포지터리와 함께 가져왔으니까요. 새로 만들거나 다시 입력할 것은 없습니다. 아래에서 `kubectl apply -f name.yaml`이라고 적힌 곳이면 어디든 그 파일은 여기서 가져옵니다.
 
 ```bash
-# 경로는 리포지터리 루트를 기준으로 셉니다 — 그것은 다음 단계에서 가져옵니다
+# the path is counted from the repository root — you fetch it in the next step
 cd labs/00-cluster
 ```
 
@@ -90,8 +90,8 @@ ls manifests scripts labs
 이 경로는 모든 랩에서 사용됩니다. 접근이 되는지 확인해 봅시다:
 
 ```bash
-# 관리 클러스터에 여러분의 Kubernetes 클러스터 목록을 요청합니다.
-# --kubeconfig는 접근 파일을 명시적으로 가리킵니다(여기서는 기본 파일이기도 합니다).
+# Ask the management cluster for the list of your Kubernetes clusters.
+# --kubeconfig explicitly points to the access file (here it's the default file too).
 kubectl --kubeconfig ~/.kube/config get kubernetes.apps.cozystack.io -n tenant-workshopXX
 ```
 
@@ -158,19 +158,19 @@ spec:
 ⚠️ 아래 명령들은 **관리 클러스터에서** 실행됩니다. 테넌트와 함께 받은 접근 권한으로요. `lab` 클러스터 자체의 접근 파일은 아직 없습니다. 그것은 클러스터가 뜬 뒤에야 생깁니다.
 
 ```bash
-# 랩 폴더로 이동합니다 — 이후 모든 파일은 여기서 가져옵니다
+# move into the lab folder — from here on all files are taken from here
 cd labs/00-cluster
-# 적용하기 전에, 파일에서 XX 자리에 여러분 자신의 테넌트 번호를 대입하세요.
-# apply = "파일에 기술된 상태로 클러스터를 맞춰라". 이 명령이 클러스터를 직접 띄우는
-# 것은 아닙니다 — 주문을 플랫폼에 넘기면, 플랫폼이 무엇을 어떤 순서로 만들지
-# 결정합니다.
-#   -f   파일에서 설명을 가져옵니다
+# before applying, substitute your own tenant number in the file in place of XX.
+# apply = "bring the cluster to what's described in the file". The command doesn't bring
+# the cluster up itself — it hands the order to the platform, which decides what to
+# create and in what order.
+#   -f   take the description from the file
 kubectl apply -f cluster.yaml
-# get = "무엇이 있는지 보여줘". kubernetes.apps.cozystack.io는 객체 타입의 전체
-# 이름으로, 파일에 기술된 바로 그것이며(kind: Kubernetes), lab은 여러분 주문의 이름입니다.
-#   -n   어느 namespace에서 찾을지; 이 플래그가 없으면 kubectl은 기본 namespace를 봅니다
-#   -w   변화를 지켜보며 출력합니다. 나가려면 — Ctrl+C, 그래도 설치는 중단되지 않습니다
-# READY 열에 True가 나타날 때까지 기다립니다.
+# get = "show what's there". kubernetes.apps.cozystack.io is the full name of the object
+# type, the very one described in the file (kind: Kubernetes), lab is the name of your order.
+#   -n   which namespace to look in; without the flag kubectl looks in the default namespace
+#   -w   watch and print changes. To exit — Ctrl+C, the installation won't be interrupted by it
+# Wait until True appears in the READY column.
 kubectl -n tenant-workshopXX get kubernetes.apps.cozystack.io lab -w
 ```
 
@@ -183,9 +183,9 @@ kubectl -n tenant-workshopXX get kubernetes.apps.cozystack.io lab -w
 ⚠️ **20분이 넘었는데도 상태가 바뀌지 않는다면 — 원인이 여러분의 클러스터가 아닐 수 있습니다.** 플랫폼의 모든 애플리케이션 설치는 공용 큐로 진행되며, 그 안에 누군가의 긴 작업이 서 있으면 여러분의 클러스터는 차례를 기다립니다. 작업에 착수되었는지 확인하려면:
 
 ```bash
-# 주문 자체와, 플랫폼이 그것에 대해 적는 내용을 봅니다.
-# 출력 끝의 status.conditions 섹션이 그 보고서입니다: 작업에 착수되었는지,
-# 무엇이 막고 있는지, 무엇을 기다리는지.
+# Look at the order itself and at what the platform writes about it.
+# The status.conditions section at the end of the output is its report: whether it's been
+# picked up for work, what's blocking, what it's waiting for.
 kubectl --kubeconfig ~/.kube/config -n tenant-workshopXX \
   get kubernetes.apps.cozystack.io lab -o yaml
 ```
@@ -193,7 +193,7 @@ kubectl --kubeconfig ~/.kube/config -n tenant-workshopXX \
 거기서도 뚜렷한 것이 없다면 — 테넌트의 이벤트를 보세요. 이것은 플랫폼이 여러분의 객체에 대해 한 일의 기록입니다:
 
 ```bash
-# events = 사건 기록. 가장 최신이 아래로 오도록 시간순으로 정렬합니다.
+# events = a log of incidents. We sort by time so the freshest is at the bottom.
 kubectl --kubeconfig ~/.kube/config -n tenant-workshopXX \
   get events --sort-by=.lastTimestamp | tail -20
 ```
@@ -223,12 +223,12 @@ kubectl --kubeconfig ~/.kube/config -n tenant-workshopXX \
 **주된 방법 — 명령으로.** Cozystack은 여러분의 클러스터에 바로 이 Secret만 읽을 수 있고 그 이상은 안 되는 별도의 접근 규칙을 설정합니다. 명령은 테넌트와 함께 받은 접근 권한으로 **관리 클러스터에서** 실행되며, 결과는 bastion의 파일에 담깁니다:
 
 ```bash
-# get secret = Secret를 보여줍니다; -o go-template — 전체를 출력하지 말고,
-# 그중 한 필드만 뽑아 텍스트로 내보냅니다:
-#   index .data "admin.conf"   Secret에서 admin.conf 키를 가져옵니다
-#   base64decode               Secret의 내용은 base64로 인코딩되어 저장되며,
-#                              이 함수가 원래 텍스트를 돌려줍니다
-#   > ~/lab.kubeconfig         출력을 화면 대신 파일에 씁니다
+# get secret = show the Secret; -o go-template — don't print it whole,
+# but pull one field out of it and output it as text:
+#   index .data "admin.conf"   take the admin.conf key from the Secret
+#   base64decode               the contents of Secrets are stored base64-encoded,
+#                              this function returns the original text
+#   > ~/lab.kubeconfig         write the output to a file instead of the screen
 kubectl -n tenant-workshopXX get secret kubernetes-lab-admin-kubeconfig \
   -o go-template='{{ printf "%s\n" (index .data "admin.conf" | base64decode) }}' > ~/lab.kubeconfig
 ```
@@ -244,18 +244,18 @@ kubectl -n tenant-workshopXX get secret kubernetes-lab-admin-kubeconfig \
 macOS와 Linux:
 
 ```bash
-# KUBECONFIG는 kubectl이 어떤 접근 파일을 가져올지 알아내는 변수입니다.
-# export는 이 터미널 창에서 이후 실행되는 모든 명령에 그것을 보이게 합니다.
+# KUBECONFIG is the variable from which kubectl learns which access file to take.
+# export makes it visible to all commands run further in this terminal window.
 export KUBECONFIG=~/lab.kubeconfig
-# nodes는 클러스터의 노드, 바로 여러분의 애플리케이션이 실행될 가상 머신들입니다.
-# 이 응답은 접근 파일이 작동한다는 것도 함께 증명합니다.
+# nodes are the cluster's nodes, the very virtual machines your applications will run on.
+# The answer also proves the access file works.
 kubectl get nodes
 ```
 
 Windows PowerShell — WSL을 설치하지 못한 경우에만:
 
 ```powershell
-# PowerShell에서 환경 변수는 $env:로 설정하며 창이 닫힐 때까지 유지됩니다
+# in PowerShell environment variables are set via $env: and live until the window closes
 $env:KUBECONFIG="$HOME\lab.kubeconfig"
 kubectl get nodes
 ```
@@ -276,10 +276,10 @@ kubernetes-lab-md0-xxxxx    Ready    <none>   3m    v1.35.6
 📍 **위치:** bastion에서, `kubectl`로 작업하던 바로 그 터미널 창에서.
 
 ```bash
-# 스크립트는 랩 폴더에서 실행됩니다: 파일을 자신의 옆에서 찾기 때문입니다
+# the script runs from the lab folder: it looks for files next to itself
 cd labs/00-cluster
-# 이름 앞의 ./는 "바로 여기서 파일을 실행하라"는 뜻입니다; 이것이 없으면 셸은
-# check.sh 명령을 시스템 폴더에서 찾다가 찾지 못합니다
+# ./ before the name means "run the file right from here"; without it the shell
+# will look for the check.sh command among the system folders and won't find it
 ./check.sh
 ```
 

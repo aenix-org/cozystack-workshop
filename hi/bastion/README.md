@@ -69,11 +69,11 @@ kubectl get vminstance -n tenant-workshopXX
 ```bash
 cd ~/workshop
 ls manifests scripts
-grep -rl tenant-workshop manifests | head -1 | xargs grep -m1 namespace   # आपको अपना नंबर दिखेगा
+grep -rl tenant-workshop manifests | head -1 | xargs grep -m1 namespace   # you will see your number
 ```
 
 एक जगह जानबूझकर प्लेसहोल्डर के रूप में छोड़ी गई है: `manifests/03-app-vm.yaml` में लाइन
-`url: "ВСТАВЬТЕ_PRESIGNED_URL"` — वह लिंक आपको दूसरे चरण के बाद मिलेगा और आप उसे खुद भरेंगे।
+`url: "PASTE_PRESIGNED_URL"` — वह लिंक आपको दूसरे चरण के बाद मिलेगा और आप उसे खुद भरेंगे।
 
 विस्तार से: [chat/10](chat/10-clone-and-set-number.md) ·
 फ़ाइल मैप [chat/11](chat/11-file-map.md)
@@ -138,7 +138,7 @@ kubectl get vminstance convert -n tenant-workshopXX -w
 virtctl console --namespace=tenant-workshopXX vm-instance-convert
 ```
 
-अंदर: `nano convert.sh`, `scripts/convert.sh` का टेक्स्ट पेस्ट करें, और `ВСТАВЬТЕ_...` की जगह
+अंदर: `nano convert.sh`, `scripts/convert.sh` का टेक्स्ट पेस्ट करें, और `PASTE_...` की जगह
 अपने `bucketName`, `accessKey` और `secretKey` डालें।
 
 **क्या आप यह वर्कशॉप हमारे इवेंट के बाहर, ख़ुद कर रहे हैं?** `convert.sh` में `OVA_URL` वर्कशॉप क्लाउड के ऑब्जेक्ट स्टोरेज में रखी डेमो इमेज की ओर इशारा करता है। हम उसे वहाँ इसलिए रखते हैं ताकि इवेंट के दौरान इमेज जल्दी डाउनलोड हो और बाहरी ट्रैफ़िक ख़र्च न हो, लेकिन वर्कशॉप ख़त्म होने के बाद वह कॉपी नहीं रहती। लिंक को सार्वजनिक कॉपी `https://github.com/aenix-org/cozystack-workshop/releases/download/vmware-demo-ova/app-1.ova` (लगभग 810 MB) से या अपनी OVA से बदल दें।
@@ -148,9 +148,9 @@ virtctl console --namespace=tenant-workshopXX vm-instance-convert
 भी जब कनेक्शन चला गया हो:
 
 ```bash
-screen -S convert          # एक अलग सत्र खोलें
-sudo bash convert.sh       # उसी सत्र के अंदर चलाएँ
-#  कनेक्शन टूट गया? bastion में वापस ssh करें, फिर:  screen -r convert
+screen -S convert          # open a separate session
+sudo bash convert.sh       # run it inside that session
+#  connection dropped? ssh back into the bastion, then:  screen -r convert
 ```
 
 **आपको दिखना चाहिए:** आउटपुट के अंत में, `Share:` शब्द के बाद — इमेज का एक साइन किया हुआ लिंक।
@@ -176,7 +176,7 @@ kubectl delete vmdisk convert-tools --namespace tenant-workshopXX
 ```
 
 आपको जो लिंक मिला उसे `manifests/03-app-vm.yaml` में
-`url: "ВСТАВЬТЕ_PRESIGNED_URL"` की जगह डालें, फिर:
+`url: "PASTE_PRESIGNED_URL"` की जगह डालें, फिर:
 
 ```bash
 kubectl apply -f manifests/03-app-vm.yaml
@@ -267,13 +267,13 @@ curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/actuator/health
 `SCRAM authentication requires libpq version 10 or above`। हम एक नया इंस्टॉल करते हैं:
 
 ```bash
-# 1. PGDG रिपॉज़िटरी — PostgreSQL पैकेजों का स्रोत
+# 1. The PGDG repository — the source of PostgreSQL packages
 yum install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm
 
-# 2. libzstd: CentOS 7 रिपॉज़िटरी में नहीं, इसलिए हम इसे EPEL आर्काइव से लेते हैं
+# 2. libzstd: not in the CentOS 7 repositories, so we take it from the EPEL archive
 yum install -y https://archives.fedoraproject.org/pub/archive/epel/7/x86_64/Packages/l/libzstd-1.5.5-1.el7.x86_64.rpm
 
-# 3. खुद क्लाइंट — सिर्फ़ जीवित pgdg15 रिपॉज़िटरी से
+# 3. The client itself — only from the live pgdg15 repository
 yum install -y --disablerepo='pgdg*' --enablerepo=pgdg15 postgresql15
 ```
 
@@ -292,7 +292,7 @@ psql --version
 हम स्कीमा लाते हैं और उसे लागू करते हैं (यह app-VM इंटरनेट तक पहुँचती है, इसलिए फ़ाइल डाउनलोड होगी):
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/bastion/scripts/orders-schema.sql
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/bastion/scripts/orders-schema.sql
 
 PGPASSWORD='Orders2019!' psql \
   -h postgres-db-rw.tenant-workshopXX.svc.cozy.local -U orders -d orders \
@@ -347,13 +347,13 @@ curl -s https://app.workshopXX.workshop.aenix.io/api/orders
 > `virtctl ssh` और `virtctl port-forward` को `vmi/<name>` रूप चाहिए।
 
 ```bash
-# app-VM में लॉग इन करें (root / cozydemo)
+# log into the app-VM (root / cozydemo)
 virtctl console --namespace=tenant-workshopXX vm-instance-app-1
 
-# conversion-VM में लॉग इन करें (ubuntu / ubuntu)
+# log into the conversion-VM (ubuntu / ubuntu)
 virtctl console --namespace=tenant-workshopXX vm-instance-convert
 
-# SSH के ज़रिए app-VM के अंदर एक शेल (मशीन का नेटवर्क चालू होने के बाद)
+# a shell inside the app-VM over SSH (once the machine's network is up)
 virtctl ssh ubuntu@vmi/vm-instance-app-1 --namespace=tenant-workshopXX
 ```
 

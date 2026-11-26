@@ -72,5 +72,5 @@ grep -rn tenant-workshopXX manifests scripts || echo "clean, you can continue"
 ```
 
 Hay un sitio que el comando no tocará: en `manifests/03-app-vm.yaml`, la línea
-`url: "ВСТАВЬТЕ_PRESIGNED_URL"`. Esa URL la obtendrás más tarde, cuando conviertas la imagen.
+`url: "PASTE_PRESIGNED_URL"`. Esa URL la obtendrás más tarde, cuando conviertas la imagen.
 Por ahora, solo debes saber que ahí te está esperando.

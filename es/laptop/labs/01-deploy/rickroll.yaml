@@ -1,27 +1,27 @@
-# Lab 1. Toda la aplicación de práctica rickroll en un solo archivo: configuración de nginx, la página,
-# el propio despliegue y una dirección permanente para acceder a él. Cuatro objetos, separados por `---`.
+# Lab 1. The entire rickroll training app in a single file: nginx settings, the page,
+# the deployment itself, and a permanent address to reach it. Four objects, separated by `---`.
 #
-# Se aplica en tu clúster de práctica `lab`, no en un tenant del clúster de gestión:
+# Applied on your training cluster `lab`, not in a tenant on the management cluster:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl apply -f rickroll.yaml
-# Aquí no hay marcadores como tenant-workshopXX — no necesitas sustituir tu número en ninguna parte.
+# There are no placeholders like tenant-workshopXX here — you don't need to substitute your number anywhere.
 #
-# Los campos que se repiten en los cuatro objetos se explican una sola vez aquí:
-#   apiVersion — el grupo de API en el que vive este tipo de objeto;
-#   kind       — el tipo de objeto en sí;
-#   metadata.name — el nombre por el que luego se busca el objeto mediante `kubectl get`.
-# Un nombre es único dentro de su propio tipo, por eso el Deployment y el Service de abajo se llaman ambos
-# rickroll y no entran en conflicto.
+# The fields that repeat across all four objects are covered once here:
+#   apiVersion — the API group this object type lives in;
+#   kind       — the object type itself;
+#   metadata.name — the name by which the object is later looked up via `kubectl get`.
+# A name is unique within its own type, so the Deployment and Service below are both called
+# rickroll and don't conflict.
 ---
-# Configuración de nginx. No cambia entre versiones de la página, por eso se mantiene aparte.
-# ConfigMap — un archivo de configuración que vive en el clúster por sí mismo y se coloca
-# dentro del contenedor al arrancar. La idea es cambiar la configuración sin reconstruir
-# la imagen. La clave `default.conf` se convertirá en el nombre del archivo en el directorio donde se monta el volumen.
+# nginx settings. They don't change between page versions, so they're kept separately.
+# ConfigMap — a settings file that lives in the cluster on its own and is placed
+# inside the container at startup. The point is to change settings without rebuilding
+# the image. The `default.conf` key becomes the file name in the directory where the volume is mounted.
 #
-# Todo lo que está debajo de la indentación tras `|` no es YAML, sino el contenido literal del archivo. Las líneas
-# con almohadilla dentro de este bloque acaban en la configuración de nginx tal cual, en lugar de desaparecer durante
-# el análisis. Por esa misma razón, al bloque de la página de abajo no se le añadieron comentarios:
-# es HTML, y una almohadilla ahí sería visible para el usuario en pantalla.
+# Everything below the indent after `|` is not YAML but the verbatim contents of the file. Lines
+# with a hash inside this block end up in the nginx config as-is, rather than disappearing during
+# parsing. For the same reason, no comments were added to the page block below:
+# it's HTML, and a hash there would be visible to the user on screen.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -33,8 +33,8 @@ data:
       root /usr/share/nginx/html;
 
       location / {
-        # El meollo de toda la lab: nginx inserta el nombre de su propio pod directamente en el HTML.
-        # $hostname dentro del pod es exactamente el nombre del pod.
+        # The whole point of the lab: nginx substitutes its own pod name right into the HTML.
+        # $hostname inside the pod is exactly the pod name.
         sub_filter '__POD__' '$hostname';
         sub_filter_once off;
       }
@@ -45,10 +45,10 @@ data:
       }
     }
 ---
-# La página, versión 1. Un objeto separado de la configuración — para que en la lab 4 se pueda cambiar
-# la aplicación a la segunda versión sin tocar la configuración de nginx ni reconstruir la imagen.
-# El sufijo -v1 en el nombre no es decoración: junto a él aparecerá rickroll-page-v2, y cambiar
-# el volumen entre ambos es exactamente lo que es el despliegue de una nueva versión.
+# The page, version 1. A separate object from the settings — so that in lab 4 the app can be
+# switched to the second version without touching the nginx config or rebuilding the image.
+# The -v1 suffix in the name is not decoration: rickroll-page-v2 will appear alongside it, and switching
+# the volume between them is exactly what a new-version rollout is.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -76,13 +76,13 @@ data:
     </style>
     <h1>Never Gonna Give You Up</h1>
     <p class="lyr">Never gonna let you down &middot; Never gonna run around and desert you</p>
-    <div class="pod">te atendió el Pod<b>__POD__</b></div>
-    <p class="hint">Actualiza la página. Cuando haya más réplicas, el nombre empezará a cambiar.</p>
+    <div class="pod">served by pod<b>__POD__</b></div>
+    <p class="hint">Refresh the page. Once there are more replicas, the name will start changing.</p>
     </html>
 ---
-# La aplicación en sí. El Deployment describe el estado deseado — qué imagen ejecutar,
-# cuántas copias mantener, cómo reemplazarlas al actualizar. A partir de ahí el propio clúster lleva
-# la realidad a coincidir con esta descripción y la vigila de forma continua, no solo una vez al crearla.
+# The app itself. Deployment describes the desired state — which image to run,
+# how many copies to keep, how to replace them on update. From there the cluster itself brings
+# reality to match this description and keeps watching it continuously, not just once at creation.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -90,28 +90,28 @@ metadata:
   labels:
     app: rickroll
 spec:
-  # Cuántas copias mantener en ejecución. La formulación es exactamente esta: no «arranca una»,
-  # sino «mantén una». Si una copia desaparece, el clúster crea una nueva sin preguntar. En la lab 3
-  # el autoescalado empezará a cambiar este mismo campo, así que ya no lo tocas a mano.
+  # How many copies to keep running. The wording is exactly this: not "start one",
+  # but "keep one". If a copy disappears, the cluster creates a new one without asking. In lab 3
+  # autoscaling will start changing this same field, so you no longer touch it by hand.
   replicas: 1
-  # Por qué etiqueta el Deployment considera suyos a los pods. La etiqueta de aquí y la etiqueta del template
-  # de abajo deben coincidir: si no coinciden, el objeto no se creará en absoluto.
+  # By which label the Deployment considers pods its own. The label here and the label in the template
+  # below must match: on a mismatch the object won't be created at all.
   selector:
     matchLabels:
       app: rickroll
-  # La plantilla del pod — cada copia se estampa a partir de ella. Editar cualquier campo dentro de template
-  # significa una nueva revisión de la aplicación y reemplazar las copias una a una (eso es exactamente la lab 4).
-  # Editar campos fuera de template (por ejemplo, replicas) no crea una revisión.
+  # The pod template — every copy is stamped from it. Editing any field inside template
+  # means a new revision of the app and replacing copies one by one (that's exactly lab 4).
+  # Editing fields outside template (for example, replicas) does not create a revision.
   template:
     metadata:
       labels:
-        # La misma etiqueta cuelga de los propios pods: por ella los encuentra el Service al final del archivo.
+        # The same label hangs on the pods themselves: the Service at the end of the file finds them by it.
         app: rickroll
     spec:
-      # Requisitos del perfil de seguridad `restricted` a nivel de todo el pod: ejecución
-      # no como root, un UID concreto y el perfil seccomp estándar. En un clúster corporativo
-      # con `restricted` activado, un pod sin estos campos no será admitido para ejecutarse,
-      # y el rechazo llega en el momento de crear el pod, no al aplicar el manifiesto.
+      # Requirements of the `restricted` security profile at the whole-pod level: running
+      # not as root, a specific UID, and the standard seccomp profile. In a corporate
+      # cluster with `restricted` enabled, a pod without these fields won't be admitted to run,
+      # and the rejection comes at pod creation time, not at manifest apply.
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
@@ -119,77 +119,77 @@ spec:
           type: RuntimeDefault
       containers:
         - name: nginx
-          # La misma rigurosidad, pero a nivel de contenedor: al proceso de dentro se le prohíbe
-          # escalar sus privilegios, y se le retiran todas las capabilities de linux.
+          # The same strictness, but at the container level: the process inside is forbidden
+          # to escalate its privileges, and all linux capabilities are taken away from it.
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # Una variante sin privilegios: escucha en 8080 y se ejecuta no como root.
-          # Solo con esto basta para el perfil `baseline`, pero no para `restricted` — ese necesita
-          # securityContext explícito en el pod y en el contenedor, definidos arriba. En un
-          # clúster corporativo normalmente está activado precisamente `restricted`.
+          # An unprivileged variant: listens on 8080 and runs not as root.
+          # This alone is enough for the `baseline` profile, but not `restricted` — that one needs
+          # explicit securityContext on the pod and the container, set above. In a
+          # corporate cluster it's usually `restricted` that's enabled.
           image: nginxinc/nginx-unprivileged:1.27-alpine
-          # Por defecto nginx levanta un proceso de trabajo por núcleo del nodo. En una máquina
-          # de práctica con un núcleo es un proceso, pero en un nodo de producción con 64 núcleos son 64,
-          # y un pod con un límite de memoria pequeño muere con OOMKilled antes de la primera petición.
-          # El autoajuste cuenta los workers según el límite de CPU: con 300m es un proceso.
-          # Mediante una variable de entorno, no con -g: la directiva ya está en la configuración base
-          # de la imagen, y una segunda declaración tumba nginx con un error de «duplicate».
+          # By default nginx spins up one worker process per node core. On a training
+          # machine with one core that's one process, but on a production node with 64 cores it's 64,
+          # and a pod with a small memory limit dies with OOMKilled before the first request.
+          # The autotune counts workers by the CPU limit: at 300m that's one process.
+          # Via an environment variable, not via -g: the directive is already in the image's base
+          # config, and a second declaration crashes nginx with a "duplicate" error.
           env:
             - name: NGINX_ENTRYPOINT_WORKER_PROCESSES_AUTOTUNE
               value: "1"
-          # Al puerto se le da un nombre, no solo un número: a `http` se refieren la readinessProbe
-          # de abajo y el targetPort del Service. Si cambia el número, hay que editarlo en un solo sitio.
+          # The port is given a name, not just a number: `http` is referenced by the readinessProbe
+          # below and by the Service's targetPort. If the number changes, you edit it in one place.
           ports:
             - containerPort: 8080
               name: http
-          # Dos cosas distintas que se confunden constantemente. requests — cuánto recurso
-          # reservar de forma garantizada; por él el planificador elige el nodo, y de él mismo
-          # el autoescalado de la lab 3 calcula la carga en porcentaje.
-          # limits — el techo por encima del cual no se permite subir: en CPU se ralentiza
-          # al llegar al tope, en memoria se mata el contenedor.
+          # Two different things that are constantly confused. requests — how much of a resource
+          # to reserve guaranteed; the scheduler picks a node by it, and autoscaling in lab 3
+          # also computes load in percent from it.
+          # limits — the ceiling above which it isn't allowed to rise: on CPU it's throttled
+          # when it hits the wall, on memory the container is killed.
           resources:
-            # Deliberadamente ínfimos: en el taller habrá muchas aplicaciones así.
-            # 20m son dos centésimas de núcleo. El valor es bajo a propósito: cuanto menor
-            # sea requests, más rápido la carga supera el umbral y el crecimiento de copias en la lab 3
-            # se ve en segundos, no en media hora.
+            # Deliberately tiny: there will be many such apps at the workshop.
+            # 20m is two hundredths of a core. The value is low on purpose: the smaller
+            # requests is, the faster load crosses the threshold and the copy growth in lab 3
+            # is visible in seconds, not half an hour.
             requests:
               cpu: 20m
               memory: 32Mi
             limits:
               cpu: 300m
               memory: 128Mi
-          # Comprobación de disponibilidad. Mientras no llegue respuesta a esta dirección, el clúster no
-          # enruta tráfico a la copia. Por ella se ha creado en la configuración de nginx un location
-          # /healthz aparte con respuesta «ok». Con este campo se paga el despliegue sin tiempo de inactividad
-          # en la lab 4: la copia vieja se apaga solo después de que la nueva haya respondido.
-          # Quítalo — y la actualización empezará a tirar peticiones.
+          # Readiness check. Until a response arrives at this address, the cluster does not
+          # route traffic to the copy. For its sake a separate location /healthz with an "ok"
+          # response is set up in the nginx config. This field is what pays for the zero-downtime rollout
+          # in lab 4: the old copy is shut down only after the new one has responded.
+          # Remove it — and the update will start dropping requests.
           readinessProbe:
             httpGet:
               path: /healthz
               port: http
-            # Dos segundos hasta la primera llamada — obtenido por experiencia. Menos no tiene
-            # sentido, nginx tarda eso en arrancar; más — alargaría cada despliegue en vano.
+            # Two seconds before the first knock — arrived at by experience. Less makes no
+            # sense, nginx takes that long to start; more would stretch out every rollout for nothing.
             initialDelaySeconds: 2
-          # Dónde colocar el contenido del ConfigMap dentro del contenedor. Los directorios están elegidos
-          # no de forma arbitraria: del primero nginx sirve archivos, del segundo lee la configuración.
-          # Sin estas dos líneas ambos ConfigMap se quedarían ahí en el clúster,
-          # y nginx mostraría su página por defecto.
+          # Where to place the ConfigMap contents inside the container. The directories are chosen
+          # not arbitrarily: from the first nginx serves files, from the second it reads settings.
+          # Without these two lines both ConfigMaps would just sit in the cluster,
+          # and nginx would show its default page.
           volumeMounts:
             - name: page
               mountPath: /usr/share/nginx/html
             - name: conf
               mountPath: /etc/nginx/conf.d
-      # Qué ConfigMap conectar al pod. El nombre del volumen aquí lo enlaza con la entrada
-      # de volumeMounts de arriba — lo que debe coincidir son precisamente los nombres, el orden no
-      # importa para el enlace. Pero para la lab 4 sí importa, ver la advertencia de abajo.
+      # Which ConfigMaps to attach to the pod. The volume name here ties it to the entry
+      # in volumeMounts above — the names are what must match; the order doesn't matter for the binding.
+      # But it does matter for lab 4, see the warning below.
       volumes:
-        # ATENCIÓN: este volumen debe ser el primero (volumes[0]).
-        # La lab 4 cambia la versión de la página con un patch por índice.
-        # JSON Patch direcciona un elemento de la lista por número, no por nombre. Si intercambias los volúmenes
-        # de sitio — el patch sustituirá en silencio la configuración de nginx en lugar de la página, la aplicación
-        # se romperá, y el mensaje de error hablará de algo completamente distinto.
+        # ATTENTION: this volume must be first (volumes[0]).
+        # Lab 4 switches the page version with a patch by index.
+        # JSON Patch addresses a list element by number, not by name. Swap the volumes
+        # around — and the patch will silently replace the nginx settings instead of the page, the app
+        # will break, and the error message will be talking about something else entirely.
         - name: page
           configMap:
             name: rickroll-page-v1
@@ -197,23 +197,23 @@ spec:
           configMap:
             name: rickroll-conf
 ---
-# La dirección permanente de la aplicación. Las copias nacen y mueren, sus direcciones cambian, pero el nombre
-# `rickroll` dentro del clúster permanece igual — por él la llaman los vecinos a la aplicación.
-# La lista de copias vivas tras este nombre la lleva el propio clúster, por etiquetas.
+# The app's permanent address. Copies are born and die, their addresses change, but the name
+# `rickroll` inside the cluster stays the same — that's how neighbors call the app.
+# The cluster keeps the list of live copies behind this name itself, by labels.
 apiVersion: v1
 kind: Service
 metadata:
   name: rickroll
 spec:
-  # A quién poner detrás de esta dirección: todos los pods con esa etiqueta, quienquiera que los haya
-  # creado. De ahí un contratiempo típico — un pod ajeno con la etiqueta app: rickroll
-  # entrará en silencio en el balanceo y empezará a responder a tus usuarios. El script
-  # check.sh de esta carpeta verifica por separado que no haya tales impostores.
+  # Who to put behind this address: all pods with such a label, whoever created them.
+  # Hence a typical nuisance — a stray pod with the label app: rickroll
+  # will silently end up in the load balancing and start answering your users. The check.sh
+  # script in this folder separately verifies that there are no such impostors.
   selector:
     app: rickroll
   ports:
-    # port — en qué puerto responde el propio servicio, targetPort — a dónde llama dentro
-    # del pod. Aquí targetPort se indica por el nombre del puerto del contenedor, no por un número: si cambia
-    # el número en el contenedor — no habrá que editar este archivo.
+    # port — which port the service itself answers on, targetPort — where it knocks inside
+    # the pod. Here targetPort is set by the container port's name, not a number: if the
+    # number in the container changes, you won't have to edit this file.
     - port: 80
       targetPort: http

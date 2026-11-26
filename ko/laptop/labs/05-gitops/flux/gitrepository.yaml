@@ -1,39 +1,39 @@
 ---
-# 랩 5 · Git 안의 인프라. 소스: Flux가 원하는 상태를 어디서 가져오는지.
+# Lab 5 · Infrastructure in Git. The source: where Flux gets the desired state from.
 #
-# 이웃한 kustomization.yaml과 함께 여러분의 `lab` 클러스터에 적용됩니다:
+# Applied on your `lab` cluster together with the neighboring kustomization.yaml:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl apply -f flux/
 #
-# 주의: 적용하기 전에 url을 여러분 소유의 리포지토리 주소로 바꾸세요.
-# ЗАМЕНИТЕ-МЕНЯ 문자열은 자리표시자이며, 그대로 두면 Flux가 존재하지 않는 주소로 가서
-# 오류로 멈춥니다. 브랜치도 확인하세요: GitHub는 새 리포지토리를 main 브랜치로 만듭니다.
+# ATTENTION: REPLACE the url with the address of YOUR repository before applying: the
+# REPLACE-ME string is a stub, with it Flux will go to a nonexistent address and stall
+# with an error. Check the branch too: GitHub creates new repositories with the main branch.
 #
-# 각 객체에서: apiVersion — 기술 스키마의 버전, kind — 무엇을 만드는지,
-# metadata.name — 이후에 객체를 참조할 때 쓰는 이름. 아래에서는 반복하지 않습니다.
+# In each object: apiVersion — the version of the description schema, kind — what we create,
+# metadata.name — the name by which the object is referenced further on. Not repeated below.
 #
-# 이 객체의 유일한 임무는 리포지토리의 최신 사본을 클러스터에 유지하는 것입니다.
-# 아무것도 적용하지 않고 다운로드만 합니다. 적용은 이웃한 Kustomization이 하며,
-# 그것은 여기를 `passes`라는 이름으로 참조하므로 이름을 단독으로 바꿀 수 없습니다.
+# The only task of this object is to keep a fresh copy of the repository in the cluster.
+# It applies nothing: it only downloads. The neighboring Kustomization applies things,
+# and it references here by the name `passes`, so the name cannot be changed on its own.
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: GitRepository
 metadata:
   name: passes
-  # flux-system — flux install 명령이 만든 네임스페이스이며, 그 안에 Flux 서비스
-  # 자체가 있습니다. 설정 객체도 그곳에 두어야 하며, 그렇지 않으면 서비스가 보지 못합니다.
+  # flux-system — the namespace that the flux install command set up; the Flux services
+  # themselves live in it. Configuration objects go there too, otherwise the services won't see them.
   namespace: flux-system
 spec:
-  # 얼마나 자주 새 상태를 가져오러 Git에 갈지. 1분 — 랩용입니다;
-  # 실전에서는 보통 1~5분이며, 즉각적인 반응은 GitHub 웹훅으로 만듭니다.
+  # How often to go to Git for the new state. One minute — for the lab;
+  # in production usually 1–5 minutes, and an instant reaction is done with a webhook from GitHub.
   interval: 1m
-  # 리포지토리 주소. 공개 리포지토리라서 여기에 로그인도 키도 없습니다 —
-  # 이는 학습용 스탠드의 단순화입니다. 실전에서는 리포지토리가 비공개이고, 그 옆에
-  # deploy 키가 담긴 시크릿에 대한 참조가 나타납니다(secretRef 필드).
-  url: https://github.com/ЗАМЕНИТЕ-МЕНЯ/passes-gitops
-  # 어느 브랜치를 진실의 원천으로 삼을지. main에 병합된 것이 클러스터로 갑니다;
-  # 다른 브랜치에 있는 것은 가지 않습니다. 여기서 리뷰가 나옵니다: 변경은
-  # 먼저 자신의 브랜치에서 살며 거기서 살펴볼 수 있고, main에 병합되어야만
-  # 비로소 효력을 갖습니다. 리포지토리가 오래된 master 브랜치로 만들어졌다면 —
-  # 여기서 고치세요, 그렇지 않으면 Flux가 읽을 대상을 찾지 못합니다.
+  # The repository address. It's public, so there's neither a login nor a key here —
+  # this is a simplification of the training stand. In production the repository is private, and next to it
+  # appears a reference to a secret with a deploy key (the secretRef field).
+  url: https://github.com/REPLACE-ME/passes-gitops
+  # Which branch to consider the source of truth. What is merged into main goes to the cluster;
+  # what lies in other branches does not go. This is where review comes from: a change
+  # first lives in its own branch, where it can be looked at, and only a merge into main
+  # makes it effective. If the repository was created with the old master branch —
+  # fix it here, otherwise Flux won't find what to read.
   ref:
     branch: main

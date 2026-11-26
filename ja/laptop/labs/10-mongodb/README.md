@@ -181,10 +181,10 @@ spec:
 プラットフォームに手渡し、プラットフォームが自分の側で必要なものすべてを立ち上げます。
 
 ```bash
-# apply = 「ファイルに書かれた状態にクラスターを合わせる」。
-#   --kubeconfig ~/.kube/workshop  どのアクセスファイルを使うか。指定しないと kubectl は
-#                                    デフォルトのアクセスを使い、別のクラスターへ迷い込んでしまう
-#   -f mongodb.yaml                どのファイルを適用するか（-f = file）
+# apply = "bring the cluster to what's described in the file".
+#   --kubeconfig ~/.kube/workshop  which access file to use. Without it kubectl
+#                                  will take the default access and wander off to the wrong cluster
+#   -f mongodb.yaml                which file to apply (-f = file)
 kubectl --kubeconfig ~/.kube/workshop apply -f mongodb.yaml
 ```
 
@@ -195,9 +195,9 @@ kubectl --kubeconfig ~/.kube/workshop apply -f mongodb.yaml
 進み具合はこうやって見られます：
 
 ```bash
-# get = 「そこに何があるか見せて」。READY 列を見れば、注文が稼働状態に達したかどうかがわかる。
-#   -n tenant-workshopXX  どの namespace を見るか（namespace はクラスター内部の区画であり、
-#                         あなたのテナントはまさにこうした独立した namespace）
+# get = "show me what's there". The READY column will tell you whether the order reached a working state.
+#   -n tenant-workshopXX  which namespace to look in (a namespace is a partition inside
+#                         the cluster; your tenant is exactly such a separate namespace)
 kubectl --kubeconfig ~/.kube/workshop get mongodb passes -n tenant-workshopXX
 ```
 
@@ -281,28 +281,28 @@ Pod を立ち上げます。`workshopXX` を自分のテナント番号に、`Yo
 置き換えてください：
 
 ```bash
-# KUBECONFIG — kubectl がどのアクセスファイルを使うか。ここでは lab 0 の
-# lab クラスター：自分の Pod を起動できるのはこの中だけで、テナントにはこれでは入れない。
+# KUBECONFIG — which access file kubectl uses. Here it's the lab cluster
+# from lab 0: you launch your own Pods only in it, the tenant won't let you in with this.
 export KUBECONFIG=~/lab.kubeconfig
 
-# run = 「単一の Pod を作り、その中でこのイメージを実行する」。重要なフラグ：
-#   --image=mongo:8.0        何を実行するか。イメージには mongosh シェルが含まれている
-#   --restart=Never          Deployment ではなく、あくまで単一の Pod を作る。さもないと
-#                            クラスターは Pod が終了するたびに再起動してしまう
-#   --env=MONGO_URI=...      Pod 内部の環境変数。パスワードはこの中に留まり、
-#                            以降のコマンドで毎回繰り返さずに済む
-#   --command -- sleep 86400 コンテナを何で動かし続けるか。mongo イメージはデフォルトで
-#                            データベースサーバーを起動してしまう——それは不要で、必要なのは
-#                            中に入れる生きたコンテナ。86400 秒は 1 日
+# run = "create a single Pod and run this image in it". The flags that matter:
+#   --image=mongo:8.0        what to run. The image contains the mongosh shell
+#   --restart=Never          create exactly a single Pod, not a Deployment. Otherwise
+#                            the cluster would bring it back up every time it finished
+#   --env=MONGO_URI=...      an environment variable inside the Pod. The password stays in it,
+#                            rather than being repeated in every following command
+#   --command -- sleep 86400 what to keep the container busy with. The mongo image would by default start
+#                            the database server — we don't need it, we need a live container
+#                            you can step into. 86400 seconds is a day
 kubectl run mongo-workbench \
   --image=mongo:8.0 \
   --restart=Never \
   --env=MONGO_URI="mongodb://passapp:YourPasswordHere@mongodb-passes-rs0.tenant-workshopXX.svc.cozy.local:27017/passes?authSource=admin&directConnection=true" \
   --command -- sleep 86400
 
-# wait = 「条件が満たされるまで制御を返さない」
-#   --for=condition=Ready  Pod 自身が準備完了を報告するまで待つ
-#   --timeout=180s         永遠にぶら下がらず、エラーを返すまでどれだけ待つか
+# wait = "don't return control until the condition is met"
+#   --for=condition=Ready  we wait until the Pod reports readiness itself
+#   --timeout=180s         how long to wait before returning an error rather than hanging forever
 kubectl wait --for=condition=Ready pod/mongo-workbench --timeout=180s
 ```
 
@@ -312,18 +312,18 @@ kubectl wait --for=condition=Ready pod/mongo-workbench --timeout=180s
 では、毎回これをすべて打たなくて済むよう短いコマンドを用意し、データベースへの接続を確認します：
 
 ```bash
-# mo — ターミナルのウィンドウを閉じるまで生きているショートカット：これがシェルで
-# 自分のコマンドを宣言するやり方。
-#   exec        すでに動いている Pod の中で何かを実行する
-#   -i          標準入力を中へ渡す：これがないとプログラムを流し込めない
-#   sh -c '...' Pod 内でシェルを実行し、$MONGO_URI を Pod 自身に展開させる。
-#               クォートをシングルにしているのはわざと：変数を展開すべきはあなたの
-#               ターミナルではなく Pod——さもないとパスワードがコマンド履歴に残ってしまう
-#   --quiet     mongosh の挨拶を出さず、答えだけを残す
+# mo — a shortcut that lives until you close the terminal window: this is how you
+# declare your own command in the shell.
+#   exec        run something inside an already-running Pod
+#   -i          forward standard input inside: without it you can't feed in a program
+#   sh -c '...' we run a shell in the Pod so that it substitutes $MONGO_URI itself.
+#               The quotes are single on purpose: the Pod should substitute the variable, not
+#               your terminal — otherwise the password ends up in the command history
+#   --quiet     don't print the mongosh greeting, leave only the answer
 mo() { kubectl exec -i mongo-workbench -- sh -c 'mongosh --quiet "$MONGO_URI"'; }
 
-# ping — サービス用のリクエスト、「生きてる?」。何も読み書きせず、接続と
-# 認証情報が受け入れられたことを確認する。| 記号はこの行を mongosh の入力へ送る
+# ping — a service request, "are you alive?". It reads and writes nothing, it checks the connection
+# and that the credentials were accepted. The | sign sends this line to mongosh's input
 echo 'db.runCommand({ ping: 1 })' | mo
 ```
 
@@ -345,8 +345,8 @@ echo 'db.runCommand({ ping: 1 })' | mo
 ままで、その中でクエリを次々に打っていけます：
 
 ```bash
-# -i ではなく -it：t が加わる——「ターミナルをちょうだい」。だから入力プロンプトや、
-# 上矢印でのコマンド履歴、ハイライトが使える。t がないとシェルは黙って入力を待つだけ。
+# -it instead of -i: a t is added — "give me a terminal". Hence the input prompt,
+# command history on the up arrow, and highlighting. Without t the shell would silently wait for input.
 kubectl exec -it mongo-workbench -- sh -c 'mongosh "$MONGO_URI"'
 ```
 
@@ -363,8 +363,8 @@ kubectl exec -it mongo-workbench -- sh -c 'mongosh "$MONGO_URI"'
 
 ```bash
 cd labs/10-mongodb
-# < 記号はファイルの中身をコマンドの入力へ流し込む——mongosh シェルでファイルの全文を
-# 手で打ち込んだのと同じこと。
+# The < sign feeds the file's contents into the command's input — the same thing as if you
+# typed the whole text of the file by hand in the mongosh shell.
 mo < passes.js
 ```
 
@@ -383,12 +383,12 @@ mo < passes.js
 
 ```js
   {
-    type: "一回券",
-    guest: "田中 太郎",
+    type: "single-use",
+    guest: "James P. Whitfield",
     host: "petrov@corp.example",
-    entrance: "北口",
+    entrance: "North",
     valid_on: ISODate("2026-09-01T09:00:00Z"),
-    purpose: "面接"
+    purpose: "job interview"
   }
 ```
 
@@ -403,7 +403,7 @@ mo < passes.js
 `entrances` は今や **リスト** です：
 
 ```js
-    entrances: ["北口", "南口"],
+    entrances: ["North", "South"],
     badge_returned: false
 ```
 
@@ -418,8 +418,8 @@ mo < passes.js
 
 ```js
     car: {
-      plate: "品川 300 あ 12-34",
-      model: "トヨタ ハイエース",
+      plate: "AB-1174-CD",
+      model: "Ford Transit",
       trailer: false,
       weight_kg: 3500
     },
@@ -432,9 +432,9 @@ mo < passes.js
 
 ```js
     members: [
-      { name: "伊藤 修", age: 16 },
-      { name: "山本 真理", age: 15 },
-      { name: "中村 勇", age: 17 }
+      { name: "Peter Hale", age: 16 },
+      { name: "Mary Fenwick", age: 15 },
+      { name: "Isaac Hart", age: 17 }
     ]
 ```
 
@@ -458,9 +458,9 @@ mo < passes.js
 **特定の日付のすべての通行証：**
 
 ```js
-// find = 「条件に一致するドキュメントを見せて」
-// { valid_on: ISODate(...) } — ドキュメントの valid_on フィールドがちょうどこの日付と
-// 等しくなければならない。ISODate は文字列ではなく日付：比較は綴りではなく時刻で行われる
+// find = "show the documents that match the condition"
+// { valid_on: ISODate(...) } — the document's valid_on field must equal exactly this
+// date. ISODate is a date, not a string: the comparison is by time, not by spelling
 db.passes.find({ valid_on: ISODate("2026-09-02T07:30:00Z") })
 ```
 
@@ -469,16 +469,16 @@ db.passes.find({ valid_on: ISODate("2026-09-02T07:30:00Z") })
 **車両の通行証だけ：**
 
 ```js
-// 普通の文字列フィールドに対する条件：完全一致で、ここに大文字小文字の区別なしはない
-db.passes.find({ type: "車両券" })
+// A condition on an ordinary string field: a whole match, there's no case-insensitivity here
+db.passes.find({ type: "vehicle" })
 ```
 
 **ナンバープレートで検索する——ドットを介して入れ子のオブジェクトの中へ到達する：**
 
 ```js
-// "car.plate" — ドキュメントへのパス：car オブジェクト内部の plate フィールド。
-// パスを囲むクォートは必須。さもないと JavaScript はドットを自分流に解釈してしまう
-db.passes.find({ "car.plate": "品川 300 あ 12-34" })
+// "car.plate" — a path into the document: the plate field inside the car object.
+// The quotes around the path are mandatory, otherwise JavaScript will read the dot its own way
+db.passes.find({ "car.plate": "AB-1174-CD" })
 ```
 
 <details>
@@ -499,9 +499,9 @@ db.passes.find({ "car.plate": "品川 300 あ 12-34" })
 **複数の入口で有効な通行証：**
 
 ```js
-// entrances は文字列ではなくリスト：["北口", "南口"]。条件は普通のフィールドと
-// 同じように書き、MongoDB がリストの各要素に対して自分で照合してくれる
-db.passes.find({ entrances: "南口" })
+// entrances is not a string but a list: ["North", "South"]. The condition is still written
+// as for an ordinary field, MongoDB will check it against each element of the list itself
+db.passes.find({ entrances: "South" })
 ```
 
 注意：条件は、あたかも `entrances` が値 `"南口"` を持つ普通のフィールドであるかのように書かれて
@@ -511,9 +511,9 @@ db.passes.find({ entrances: "南口" })
 **未成年を含む団体の通行証：**
 
 ```js
-// members.age というパスはオブジェクトのリストの内部——各参加者の age フィールドへ導く。
-// $lt = より小さい。$ の付いた条件は値ではなく比較の仕方：
-// 「フィールドは 16 より小さくなければならない」であって「16 と等しくなければならない」ではない
+// The path members.age leads inside a list of objects — to the age field of each participant.
+// $lt = less than. A condition with $ is not a value but a way of comparing:
+// "the field must be less than 16", not "the field must equal 16"
 db.passes.find({ "members.age": { $lt: 16 } })
 ```
 
@@ -523,8 +523,8 @@ db.passes.find({ "members.age": { $lt: 16 } })
 **そもそも車両が指定されているすべての通行証：**
 
 ```js
-// $exists は値についてではなく、ドキュメントにそのフィールドが存在するかどうかを問う：
-// 「このドキュメントにそもそも car フィールドはあるか?」
+// $exists asks not about the value but about the very presence of the field in the document:
+// "does this document have a car field at all?"
 db.passes.find({ car: { $exists: true } })
 ```
 
@@ -553,10 +553,10 @@ SQL での同じ結果は — `SELECT type, count(*) FROM passes GROUP BY type O
 </details>
 
 ```js
-// aggregate = 「ドキュメントを一連のステージの連鎖に通す」。ステージは順に並び、
-// それぞれ前のステージが生み出したものを受け取る：
-//   $group — type フィールドの値でドキュメントをグループに分け、それぞれを数える
-//   $sort  — グループを count で並べる。-1 は「降順」の意味
+// aggregate = "run the documents through a chain of stages". The stages go in order,
+// each receiving what the previous one produced:
+//   $group — sort the documents into groups by the value of the type field, and count each one
+//   $sort  — order the groups by count, -1 means "descending"
 db.passes.aggregate([
   { $group: { _id: "$type", count: { $sum: 1 } } },
   { $sort: { count: -1 } }
@@ -573,12 +573,12 @@ db.passes.aggregate([
 前と同じですが、ドキュメントの代わりに、データベースがそれらをどう探したかについてのレポートを求めます。
 
 ```js
-// explain = 「ドキュメントを寄こすのではなく、どうやって探したかを教えて」
-//   "executionStats"     レポートのモード：計画だけでなく、実際に何が起きたか
-//   .executionStats      答えの全部を読まなくて済むよう、ちょうどこのセクションだけ取り出す
-// レポートでは totalDocsExamined を見る——1 件を返すために
-// データベースが何件のドキュメントを読んだか
-db.passes.find({ "car.plate": "品川 300 あ 12-34" }).explain("executionStats").executionStats
+// explain = "don't give me the documents, tell me how you looked for them"
+//   "executionStats"     report mode: not only the plan, but what actually happened
+//   .executionStats      we take exactly this section from the answer, so as not to read all of it
+// In the report we look at totalDocsExamined — how many documents the database read,
+// to return one
+db.passes.find({ "car.plate": "AB-1174-CD" }).explain("executionStats").executionStats
 ```
 
 **表示されるはず** — `totalDocsExamined` がコレクション内のドキュメント数と等しくなります。データベースは
@@ -589,14 +589,14 @@ db.passes.find({ "car.plate": "品川 300 あ 12-34" }).explain("executionStats"
 別途の構造です：
 
 ```js
-// createIndex = 「このフィールドにインデックスを作り、これ以降は自分で保守し続けて」
-//   { "car.plate": 1 }   どのフィールドに作るか。1 は「昇順」
-//   name: "car_plate"    インデックスの名前。後で見分けて削除できるように
-//   sparse: true         フィールドを持つドキュメントだけがインデックスに入る
+// createIndex = "build an index on this field and keep maintaining it yourself from now on"
+//   { "car.plate": 1 }   on which field. 1 is "ascending" order
+//   name: "car_plate"    what to name the index, so you can recognize and delete it later
+//   sparse: true         only documents that have the field get into the index
 db.passes.createIndex({ "car.plate": 1 }, { name: "car_plate", sparse: true })
 
-// 同じレポートを繰り返し、前のものと比べる
-db.passes.find({ "car.plate": "品川 300 あ 12-34" }).explain("executionStats").executionStats
+// We repeat the same report and compare it with the previous one
+db.passes.find({ "car.plate": "AB-1174-CD" }).explain("executionStats").executionStats
 ```
 
 **表示されるはず** — `totalDocsExamined` が 1 に等しくなり、計画では `COLLSCAN` の代わりに `IXSCAN` が
@@ -638,10 +638,10 @@ db.passes.find({ "car.plate": "品川 300 あ 12-34" }).explain("executionStats"
 作業を続けましょう。門の係員がもう一つ一回限りの通行証を発行しました——急いで書いたスクリプトを通じて：
 
 ```js
-// insertOne = 「ドキュメントを 1 件追加する」。どんなフィールドが入っているか、データベースは尋ねない
+// insertOne = "add one document". What fields are in it, the database doesn't ask
 db.passes.insertOne({
-  tipe: "一回券",
-  guest: "小林 誠",
+  tipe: "single-use",
+  guest: "Nathan S. Graham",
   host: "petrov@corp.example",
   data: ISODate("2026-09-04T09:00:00Z")
 })
@@ -651,17 +651,17 @@ db.passes.insertOne({
 ドキュメントの一意なキー——が返ってきました。今ドキュメントが五件あることを確認しましょう：
 
 ```js
-// countDocuments = 「条件に一致するドキュメントを数える」。
-// 空の波括弧は制限のない条件、つまり「すべて」
+// countDocuments = "count the documents that match the condition".
+// Empty curly braces are a condition with no restrictions, that is, "all"
 db.passes.countDocuments({})
 ```
 
 五件。では警備が毎朝すること——一回限りの通行証のリストを開きます：
 
 ```js
-// 検索のステップと同じ type による絞り込み：type フィールドが
-// "一回券" と等しい通行証を見せる
-db.passes.find({ type: "一回券" })
+// The same selection by type as in the search step: show the passes whose
+// type field equals "single-use"
+db.passes.find({ type: "single-use" })
 ```
 
 > **読み進める前に、立ち止まって考えてください。**
@@ -683,8 +683,8 @@ db.passes.find({ type: "一回券" })
 被害者を探しましょう——`type` フィールドがそもそもないドキュメントです：
 
 ```js
-// $exists: false — 前のステップの逆：「フィールドがドキュメントにない」。
-// こういうクエリは手元に置いておく価値がある：スキーマの外に何が溜まったかを見せてくれる
+// $exists: false — the opposite of the previous step: "the field is not in the document".
+// It's worth keeping such a query handy: it shows what has accumulated past the schema
 db.passes.find({ type: { $exists: false } })
 ```
 
@@ -704,8 +704,8 @@ exist`。エラーはテストで表面化し、一週間後に門でではあ�
 type のないドキュメントを削除します：
 
 ```js
-// deleteMany = 「条件に一致するドキュメントをすべて削除する」。条件は上の検索と
-// 同じ——つまり、たった今見たものがそのまま削除される
+// deleteMany = "delete all documents that match the condition". The condition is the same
+// as in the search above — which means exactly what you just saw will be deleted
 db.passes.deleteMany({ type: { $exists: false } })
 ```
 
@@ -740,7 +740,7 @@ db.runCommand({
 
 ```js
         type: {
-          enum: ["一回券", "週間券", "車両券", "団体券"],
+          enum: ["single-use", "weekly", "vehicle", "group"],
         },
 ```
 
@@ -776,8 +776,8 @@ db.runCommand({
 ルールを適用します：
 
 ```bash
-# passes.js と同じ手口：ファイルの中身が mongosh の入力に流し込まれる。
-# ルールは稼働中のコレクションに掛けられる——データベースを止める必要はない
+# The same trick as with passes.js: the file's contents are fed to mongosh's input.
+# The rule is hung on a live collection — no need to stop the database
 mo < validator.js
 ```
 
@@ -786,9 +786,9 @@ mo < validator.js
 同じタイプミスを繰り返してみます——今度はルールの監視下で：
 
 ```js
-// tipe フィールドはルールにとって未知で、ドキュメントに必須の type がない。
-// 以前なら、こういうドキュメントは黙ってコレクションに収まっていた
-db.passes.insertOne({ tipe: "一回券", guest: "確認", host: "x@corp.example" })
+// The tipe field is unknown to the rule, and there's no required type in the document.
+// Before, such a document would silently settle into the collection
+db.passes.insertOne({ tipe: "single-use", guest: "Check", host: "x@corp.example" })
 ```
 
 **表示されるはず** — `MongoServerError: Document failed validation`。今度はタイプミスが通りません。
@@ -819,15 +819,15 @@ SQL ならこれは一行です：`JOIN staff ON staff.email = passes.host`。
 
 ```js
 db.passes.aggregate([
-  // $lookup = 「各通行証について別のコレクションへ行き、そこからレコードを持ち帰る」
+  // $lookup = "for each pass, go to another collection and bring back a record from there"
   { $lookup: {
-      from: "staff",          // どこへ行くか——従業員のコレクション
-      localField: "host",     // 通行証のどのフィールドを比較するか
-      foreignField: "email",  // 従業員のどのフィールドと
-      as: "host_info"         // 見つけたものをドキュメントにどんな名前で入れるか
+      from: "staff",          // where to go — the employees collection
+      localField: "host",     // which pass field to compare
+      foreignField: "email",  // with which employee field
+      as: "host_info"         // under what name to put what's found into the document
   } },
-  // 見つかったものは、一致が 1 件でも常にリストとして入る。
-  // $unwind はリストを単一の値へと巻き戻す
+  // What's found is always put as a list, even if there's a single match.
+  // $unwind unrolls the list back into a single value
   { $unwind: "$host_info" }
 ])
 ```
@@ -865,10 +865,10 @@ db.passes.aggregate([
 やってみましょう：
 
 ```js
-// host フィールドは意味の上では従業員を指す。そんな従業員は存在しない——
-// データベースはこれを確認するだろうか? このドキュメントは前のステップのルールを満たす：type は
-// あってリストの中にあり、host は文字列
-db.passes.insertOne({ type: "一回券", host: "存在しない@corp.example", guest: "テスト" })
+// The host field, by meaning, refers to an employee. No such employee exists —
+// will the database check this? The document satisfies the rule from the last step: type is
+// in place and from the list, host is a string
+db.passes.insertOne({ type: "single-use", host: "does-not-exist@corp.example", guest: "Test" })
 ```
 
 ドキュメントは挿入されます。そんな email の従業員はいませんが、データベースはそれを見ようとしません。
@@ -884,8 +884,8 @@ db.passes.insertOne({ type: "一回券", host: "存在しない@corp.example", g
 テスト用のドキュメントを取り除くのを忘れずに：
 
 ```js
-// deleteOne = 「条件に一致するドキュメントを 1 件削除する」、一度に全部ではなく
-db.passes.deleteOne({ host: "存在しない@corp.example" })
+// deleteOne = "delete one document that matches the condition", not all of them at once
+db.passes.deleteOne({ host: "does-not-exist@corp.example" })
 ```
 
 </details>
@@ -904,11 +904,11 @@ db.passes.deleteOne({ host: "存在しない@corp.example" })
 以上が欲しいなら——セッションを開き、明示的にトランザクションを開始します：
 
 ```js
-// セッションはデータベースとの独立した「会話」であり、その中でトランザクションを宣言できる
+// A session is a separate "conversation" with the database, within which you can declare a transaction
 const s = db.getMongo().startSession();
-s.startTransaction();          // ここから変更が積み重なるが、誰にも見えない
-// … s.getDatabase("passes") を通した操作 …
-s.commitTransaction();         // すべてを一度に適用する。すべてを一度に取り消すには——abortTransaction()
+s.startTransaction();          // from this point changes accumulate, but are visible to no one
+// … operations through s.getDatabase("passes") …
+s.commitTransaction();         // apply it all at once. To cancel it all at once — abortTransaction()
 ```
 
 **そして三つ目の真実、最も実際的なもの：** MongoDB のトランザクションはリレーショナルデータベースより
@@ -935,15 +935,15 @@ s.commitTransaction();         // すべてを一度に適用する。すべて�
 
 ```js
 db.passes.aggregate([
-  // $$ROOT — ドキュメントの丸ごと全部。$objectToArray はそれを
-  // 「フィールド名 — 値」のペアに分解し、フィールドをデータとして扱えるようにする
+  // $$ROOT — the whole document in full. $objectToArray breaks it into
+  // "field name — value" pairs, so you can then work with the fields as data
   { $project: { fields: { $objectToArray: "$$ROOT" } } },
-  // ペアのリストを展開する：1 ペアが、次のステージの入力での 1 行になる
+  // We unroll the list of pairs: one pair — one row at the input of the next stage
   { $unwind: "$fields" },
-  // 2 つの属性で一度にグループ化する：フィールド名 (k) とその値の型 (t)、
-  // そしてその組み合わせが何回現れたかを数える
+  // We group by two attributes at once: the field name (k) and its value type (t),
+  // and count how many times such a combination occurred
   { $group: { _id: { k: "$fields.k", t: { $type: "$fields.v" } }, n: { $sum: 1 } } },
-  { $sort: { "_id.k": 1 } }   // アルファベット順に。1 つのフィールドが自分の型の隣に並ぶように
+  { $sort: { "_id.k": 1 } }   // alphabetically, so one field sits next to its own types
 ])
 ```
 
@@ -980,12 +980,12 @@ db.passes.aggregate([
 
 ```bash
 cd labs/10-mongodb
-# 上のステップと同じアクセスファイル：スクリプトは lab クラスターの内側から動く
+# The same access file as in the steps above: the script works from inside the lab cluster
 export KUBECONFIG=~/lab.kubeconfig
-# テナント番号：これをもとにスクリプトがデータベースのアドレスを組み立てる。自分の番号に置き換えること
+# The tenant number: from it the script will assemble the database address. Substitute your own
 export COZY_TENANT=workshop03
-# パスワードはシングルクォートで：その中では文字列内の $、!、& にシェルが手を出さない。
-# パスワードはレポートに載らない
+# The password in single quotes: inside them the shell doesn't touch $, ! and & within the string.
+# The password doesn't make it into the report
 export MONGO_PASSWORD='your-passapp-password'
 ./check.sh
 ```
@@ -1006,8 +1006,8 @@ type のないドキュメントが残っていないこと。
 いました：
 
 ```bash
-# delete = 「クラスターから取り除く」。Pod は MONGO_URI 変数もろとも消えるので、
-# パスワードはクラスターに残らない
+# delete = "remove from the cluster". The Pod disappears along with its MONGO_URI variable,
+# so the password doesn't remain in the cluster
 kubectl delete pod mongo-workbench
 ```
 

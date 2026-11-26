@@ -1,41 +1,42 @@
--- 实验 9 · 管理层来要的报表：每个月有多少访客、
--- 一次来访平均持续多久、他们最常在哪个小时到达、以及哪个入口
--- 更繁忙。
+-- Lab 9 · the report management came asking for: how many guests each month,
+-- how long a visit lasts on average, at which hour they arrive most often, and which
+-- entrance is busier.
 --
--- 在哪里运行：在虚拟机上、在实验集群里，用 README 里的简短命令 `ch`：
+-- Where it runs: on the VM, in the lab cluster, with the short command `ch`
+-- from the README:
 --     cd labs/09-clickhouse && ch < 03-report.sql
--- 在此之前，必须已经执行过 01-schema.sql 和 02-generate.sql。
+-- Before this, 01-schema.sql and 02-generate.sql must have been run.
 --
--- 如何解读结果：数据中出现的每个月一行（共八个），
--- 月份按升序排列，访客数逐月增长。
+-- How to read the result: one row per month present in the data (there are
+-- eight of them), months in ascending order, the guest count growing month over month.
 --
--- 为什么一百万行能在毫秒级内统计完。ClickHouse 把每一列
--- 存成一个单独的文件。这个查询只碰到七列中的三列——其余四列，
--- 包括最重的 guest_name，根本不会从磁盘读取。在按行整体
--- 存盘的数据库里，为了对其中三个字段做统计，你不得不把全部一百万行连同所有字段
--- 都取上来。时间上的差异正源于此。
--- 想用数字看到这一点：在查询末尾追加一行 FORMAT JSON——响应
--- 中就会出现一个统计块，包含耗时和读取的数据量。
+-- Why a million rows are counted in milliseconds. ClickHouse stores each column
+-- as a separate file. This query touches three columns out of seven — the other four,
+-- including the heaviest guest_name, are not read from disk at all. In a database where a row
+-- sits on disk in one piece, you would have to lift all million rows with all their fields
+-- just to count over three of them. Hence the difference in time.
+-- To see it in numbers: append the line FORMAT JSON to the end of the query — the response
+-- will include a statistics block with the elapsed time and the volume read.
 --
--- 数据中出现的每个月，报表里对应一行。
+-- One report row per month that appeared in the data.
 SELECT
-    -- 把这次通行归到哪个月。toStartOfMonth 把精确时间
-    -- 变成该月的第一天：用一个值同时完成分组和排序，
-    -- 而不必用「年加月」这样一对值。
+    -- Which month to attribute the pass to. toStartOfMonth turns the exact time
+    -- into the first day of the month: a single value to both group and sort by,
+    -- instead of a "year plus month" pair.
     toStartOfMonth(created_at)          AS month,
-    -- 有多少行落入该组——这就是「每月有多少访客」。
+    -- How many rows fell into the group — that is "how many guests per month".
     count()                             AS guests,
-    -- 平均来访时长，四舍五入到整分钟。
+    -- Average visit duration, rounded to whole minutes.
     round(avg(duration_min))            AS avg_minutes,
-    -- 最频繁的到达小时——也就是高峰时段。topK(1)(x) 返回一个
-    -- 只含单个最频繁值的数组，[1] 把它从中取出（从一开始计数）。
+    -- The most frequent arrival hour — the very rush hour. topK(1)(x) returns an array
+    -- of the single most frequent value, [1] pulls it out of there (counting from one).
     topK(1)(toHour(created_at))[1]      AS peak_hour,
-    -- 用同样的手法得出本月最繁忙的入口。
+    -- The busiest entrance of this month, by the same technique.
     topK(1)(entrance)[1]                AS busiest_entrance
--- 注意这个查询里没有什么：没有子查询、临时表和 join。
--- 一切都在对数据的一次遍历中算完。
+-- Note what the query does not have: subqueries, temporary tables, or joins.
+-- Everything is computed in a single pass over the data.
 FROM passes
--- 把同一个月的所有行折叠成一行结果。
+-- Collapse all rows of one month into a single response row.
 GROUP BY month
--- 按升序输出月份，让增长从上往下读出来。
+-- Output months in ascending order so the growth reads top to bottom.
 ORDER BY month

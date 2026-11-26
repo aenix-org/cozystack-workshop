@@ -1,54 +1,54 @@
 ---
-# 实验 11。构建本身：放在 ConfigMap 里的脚本，以及执行它的 Job。
-# 一个文件里两个对象，用 `---` 行分隔。
+# Lab 11. The build itself: a script in a ConfigMap and a Job that runs it.
+# Two objects in one file, separated by the `---` line.
 #
-# 应用到你的 `lab` 训练集群，而不是管理集群上的租户：
+# Applied to your `lab` training cluster, not to the tenant on the management cluster:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl apply -f android-build.yaml
-# 这里没有 tenant-workshopXX 之类的占位符 —— 不需要在任何地方替换你的编号。
+# There are no placeholders like tenant-workshopXX here — you don't need to substitute your number anywhere.
 #
-# 应用之前，集群里必须已经存在两个对象，否则构建 pod 起不来：
-# 集群不会挂载不存在的东西，pod 会一直等待。
-#     configmap/propusk-src   源码：kubectl apply -f propusk-src.yaml
-#     secret/bucket-creds     四个访问桶的密钥，手工录入
+# Before applying, two objects must already exist in the cluster, otherwise the build pod won't start:
+# the cluster won't mount what isn't there, and the pod keeps waiting.
+#     configmap/propusk-src   sources: kubectl apply -f propusk-src.yaml
+#     secret/bucket-creds     four bucket access keys, entered by hand
 #
-# 用 Job 而不是 Deployment：构建有终点。Deployment 会把已结束的进程
-# 当成故障，重新拉起一份副本 —— 构建就会循环下去，永远停不下来。
+# A Job, not a Deployment: a build has an end. A Deployment treats a finished process
+# as a failure and brings up a fresh copy — the build would loop and never stop.
 #
-# 为什么构建脚本作为独立对象存在，而不是写成 Job 自己 command 字段里的一个字符串：
-#   - YAML 字段里六十行 shell 无法阅读也无法检查：而这里它是
-#     一个普通文件，编辑器会高亮它，也能接受 `bash -n`；
-#   - 用一条命令就能完整看到它：kubectl get configmap android-build-script -o yaml；
-#   - 可以在不动任务描述的情况下修改构建，反之亦然。
-# 这份便利的代价：脚本与 Job 分开存放。修改 ConfigMap，已经在跑的
-# 构建不会察觉 —— 只有下一次运行才会看到新内容。
+# WHY THE BUILD SCRIPT LIVES AS A SEPARATE OBJECT rather than a string in the Job's own command field:
+#   - sixty lines of shell inside a YAML field can't be read or checked: here it's
+#     an ordinary file that the editor highlights and that accepts `bash -n`;
+#   - it's visible in full with one command: kubectl get configmap android-build-script -o yaml;
+#   - you can fix the build without touching the task description, and vice versa.
+# The price of convenience: the script lives separately from the Job. Change the ConfigMap and an already running
+# build won't notice — only the next run will see the new text.
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: android-build-script
 data:
-  # 五个构建步骤 —— 正是你会在构建服务器上手工敲的那些命令。
-  # 容器启动时几乎是空的：Java 和 Gradle 来自镜像，其余的由脚本
-  # 自己带来。
-  #   1/5  下载 command-line tools —— 用来安装 Android SDK 本身的工具（1-2 分钟）
-  #   2/5  接受许可并安装 SDK、平台 34 和 build-tools。最漫长的一步，
-  #        5-15 分钟，而且这段时间日志里一片安静：sdkmanager 在非交互模式下
-  #        不打印进度。这里的安静不是卡死
-  #   3/5  gradle :app:assembleDebug —— 把 /src 里的源码编译成 APK（3-8 分钟）
-  #   4/5  安装 mc，对象存储的命令行客户端
-  #   5/5  用两个名字把 APK 放进桶：带日期的和 propusk-latest（几秒钟）
+  # Five build steps — exactly the commands you'd type by hand on a build server.
+  # The container starts almost empty: Java and Gradle come from the image, the rest the script
+  # brings with it.
+  #   1/5  downloads command-line tools — the utilities that install the Android SDK itself (1-2 min)
+  #   2/5  accepts licenses and installs the SDK, platform 34 and build-tools. The longest step,
+  #        5-15 minutes, and the whole time the log is silent: sdkmanager prints no progress
+  #        in non-interactive mode. Silence here is not a hang
+  #   3/5  gradle :app:assembleDebug — compiles the sources from /src into an APK (3-8 minutes)
+  #   4/5  installs mc, the console client for the object store
+  #   5/5  puts the APK into the bucket under two names: a dated one and propusk-latest (seconds)
   #
-  # 每次构建都同样漫长：没有缓存，/work 磁盘是一次性的（见文件末尾的
-  # emptyDir）。在真正的构建服务器上取而代之的会是持久卷，第二次
-  # 构建就能在几分钟内完成。
+  # Every build takes equally long: there is no cache, the /work disk is disposable (see emptyDir
+  # at the end of the file). On a real build server there would be a persistent volume instead, and the second
+  # build would finish in minutes.
   #
-  # 下面是 build.sh 文件的逐字内容，不是 YAML。其中以井号开头的行
-  # 会原样进入脚本：它们是 shell 注释，无需删除。
+  # Below is the verbatim content of the build.sh file, not YAML. Hash-prefixed lines inside it
+  # go into the script as-is: they are shell comments, and there's no need to remove them.
   build.sh: |
     #!/usr/bin/env bash
-    # 这里 set -e 是合适的：这不是检查，而是构建。如果某一步失败 ——
-    # 继续下去毫无意义，Job 应当以错误结束，并带着日志
-    # 留在集群里。
+    # set -e is appropriate here: this is not a check, it's a build. If a step fails —
+    # continuing is pointless, the Job should finish with an error and remain
+    # in the cluster with its logs.
     set -euo pipefail
 
     WORK=/work
@@ -56,42 +56,42 @@ data:
     export ANDROID_SDK_ROOT="$WORK/android-sdk"
     export ANDROID_HOME="$ANDROID_SDK_ROOT"
     export GRADLE_USER_HOME="$WORK/gradle-home"
-    # 一次性容器里不需要 Gradle 守护进程：它是为下一次构建
-    # 而存在的，而这个容器里不会有下一次构建。
-    # -Duser.home 是必需的，它并不是上面 export HOME 的重复。Java 取家目录
-    # 不是从环境变量，而是从系统用户记录里取，而
-    # 非特权 uid 没有这条记录 —— Gradle 会填入 "?" 并在打包
-    # APK 时失败：它会在诸如 /work/project/app/?/.android/ 这样的路径下寻找签名密钥。
+    # The Gradle daemon is not needed in a disposable container: it lives for the sake of the next
+    # build, and there won't be a next build in this container.
+    # -Duser.home is mandatory, and it is not a duplicate of export HOME above. Java takes the home
+    # directory not from the environment variable but from the system user record, and an
+    # unprivileged uid doesn't have one — Gradle substitutes "?" and fails while packaging the
+    # APK: it looks for the signing key at a path like /work/project/app/?/.android/.
     export GRADLE_OPTS="-Xmx3g -Dorg.gradle.daemon=false -Duser.home=$WORK"
 
     CMDLINE_TOOLS_URL="https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"
     MC_URL="https://github.com/pgsty/mc/releases/download/RELEASE.2026-09-13T00-00-00Z/mcli_20260913000000.0.0_linux_amd64.tar.gz"
 
-    echo "== 1/5 正在安装 Android 命令行工具 =="
+    echo "== 1/5 installing Android command-line tools =="
     mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
     cd "$ANDROID_SDK_ROOT/cmdline-tools"
     curl -fsSL -o tools.zip "$CMDLINE_TOOLS_URL"
-    # 不是每个基础镜像都有 unzip，而 JDK 里的 jar 会解压 zip。
+    # unzip isn't in every base image, and jar from the JDK can unpack zip.
     unzip -q tools.zip 2>/dev/null || jar xf tools.zip
     rm -f tools.zip
     mv cmdline-tools latest
     export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
 
-    echo "== 2/5 正在接受许可协议并下载 SDK（最耗时的一步） =="
-    # 当 sdkmanager 关闭输入时，`yes` 会收到 SIGPIPE，并返回
-    # 非零码。在 set -o pipefail 下这会平白无故地弄垮构建，
-    # 所以这里的返回码是故意压掉的。如果许可其实
-    # 没有被接受 —— 下一条命令会说出来。
+    echo "== 2/5 accepting licenses and downloading the SDK (the longest step) =="
+    # `yes` receives SIGPIPE when sdkmanager closes its input, and returns
+    # a non-zero code. With set -o pipefail this would fail the build for no reason,
+    # so the return code is suppressed deliberately. If the licenses really
+    # weren't accepted — the next command will say so.
     yes | sdkmanager --sdk_root="$ANDROID_SDK_ROOT" --licenses >/dev/null 2>&1 || true
     sdkmanager --sdk_root="$ANDROID_SDK_ROOT" \
       "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
-    echo "== 3/5 正在构建 APK =="
-    # ConfigMap 以只读方式挂载，而 Gradle 会写在源码旁边，
-    # 所以先把目录树复制到磁盘上。
-    # -L 会解引用符号链接：ConfigMap 挂载的不是文件，
-    # 而是指向内部 ..data 目录的链接，没有 -L 项目里就会出现链接。
-    # 用通配符而不是 /src/. —— 是为了不把这个内部目录本身复制进去。
+    echo "== 3/5 building the APK =="
+    # The ConfigMap is mounted read-only, and Gradle writes next to the sources,
+    # so the tree is first copied onto the disk.
+    # -L dereferences symbolic links: the ConfigMap is mounted not as files
+    # but as links to the internal ..data directory, and without -L the links would end up in the project.
+    # A glob instead of /src/. — so that this internal directory itself isn't copied.
     mkdir -p "$WORK/project"
     cp -rL /src/* "$WORK/project/"
     cd "$WORK/project"
@@ -100,31 +100,31 @@ data:
     APK="$WORK/project/app/build/outputs/apk/debug/app-debug.apk"
     ls -l "$APK"
 
-    echo "== 4/5 正在安装 S3 客户端 =="
-    # 我们把客户端放进工作目录，而不是放进 /usr/local/bin。pod 以
-    # 非特权用户身份运行，而镜像的系统目录属于 root：
-    # 往那里写会以 Permission denied 收场 —— 而且恰恰是在第四步这里，
-    # 也就是构建了半小时之后。/work 目录属于我们，可以往里写。
+    echo "== 4/5 installing the S3 client =="
+    # We put the client in the working folder, NOT in /usr/local/bin. The pod runs as an
+    # unprivileged user, and the image's system folders belong to root:
+    # writing there would end in Permission denied — and right here, on the fourth step,
+    # i.e. after half an hour of building. The /work folder belongs to us, we can write to it.
     mkdir -p "$WORK/bin"
-    # dl.min.io больше не отдаёт клиент mc — берём совместимый форк pgsty/mc (mcli из tar.gz).
+    # dl.min.io no longer serves the mc client — use the compatible fork pgsty/mc (mcli from tar.gz).
     curl -fsSL "$MC_URL" | tar -xz -C "$WORK/bin" mcli
     mv "$WORK/bin/mcli" "$WORK/bin/mc"
     chmod +x "$WORK/bin/mc"
-    # PATH 是 shell 查找命令的目录列表。我们把自己的追加进去，这样后面
-    # 就可以只写 `mc` 而不用写完整路径。
+    # PATH is the list of folders where the shell looks for commands. We append ours so that later
+    # we can just write `mc` instead of the full path.
     export PATH="$WORK/bin:$PATH"
 
-    echo "== 5/5 正在将 APK 上传到 Bucket =="
-    # 变量 accessKey/secretKey/endpoint/bucketName 来自 Secret，
-    # 经由 envFrom。我们压掉 alias set 的输出：没必要让它往日志里打印任何东西。
-    # 出于同样的原因脚本里没有 set -x —— 它会把密钥打印出来。
-    # 别名叫 builds 而不是 lab：`lab` 这个词在所有实验里都指训练
-    # 集群，不该把两者混淆。
+    echo "== 5/5 uploading the APK to the bucket =="
+    # The variables accessKey/secretKey/endpoint/bucketName come from the Secret
+    # via envFrom. We suppress the output of alias set: no need for it to print anything to the log.
+    # For the same reason there is no set -x in the script — it would print the keys.
+    # The alias is named builds, not lab: the word `lab` is used in all labs for the training
+    # cluster, and one shouldn't be confused with the other.
     mc alias set builds "https://${endpoint}" "${accessKey}" "${secretKey}" >/dev/null
     STAMP="$(date -u +%Y%m%d-%H%M%S)"
     mc cp "$APK" "builds/${bucketName}/propusk/propusk-${STAMP}.apk"
     mc cp "$APK" "builds/${bucketName}/propusk/propusk-latest.apk"
-    # 一行标记：check.sh 用它来区分「Job 跑过了」和「APK 到位了」。
+    # A marker line: check.sh uses it to tell "the Job ran" from "the APK arrived".
     echo "APK-UPLOADED ${bucketName}/propusk/propusk-${STAMP}.apk"
     mc ls --recursive "builds/${bucketName}/propusk/"
 ---
@@ -133,63 +133,63 @@ kind: Job
 metadata:
   name: propusk-build
 spec:
-  # 如果构建失败，重建 pod 多少次。设为零本来更诚实，
-  # 但下载 SDK 时网络偶尔会闪一下，而第二次尝试比
-  # 解释「为什么我这里失败了」要便宜。
+  # How many times to recreate the pod if the build failed. Zero would be more honest,
+  # but the network sometimes blinks while downloading the SDK, and a second attempt is cheaper
+  # than explaining "why did mine fail".
   backoffLimit: 1
-  # 整个构建的上限。没有它，卡住的构建会把节点占到天黑。
-  # 计时从 Job 的创建开始，而不是从容器启动开始：处于 Pending 的时间以及
-  # 实验里稍后的节点重建也会消耗它。一小时不够 ——
-  # 就在有人把它等出来之后，构建以 DeadlineExceeded 死掉了。
+  # A ceiling on the whole build. Without it a hung build would hold the node until evening.
+  # The countdown runs from the Job's CREATION, not from the container start: time in Pending and
+  # node recreation a bit later in the lab also consume it. An hour wasn't enough —
+  # the build died with DeadlineExceeded right after a person had waited it out.
   activeDeadlineSeconds: 7200
-  # pod 模板：Job 用它来铸造运行构建的 pod。pod 没有自己的
-  # 名字 —— Job 在自己的名字后追加一个随机尾巴，所以要找这个 pod 得
-  # 按 job-name 标签找，而不是按名字。
+  # The pod template: the Job stamps out the pod that will run the build from it. The pod has no name
+  # of its own — the Job appends a random tail to its own name, so you have to look for the pod
+  # by the job-name label, not by name.
   template:
     spec:
-      # 构建从互联网上拉取别人的代码并立刻运行它。为此它不需要
-      # root 权限：它只往 /work 写 —— 包括 S3 客户端，它也把客户端下载
-      # 到那里，因为非特权用户不被允许往镜像的系统
-      # 目录写。同样这三个字段在第一个实验的应用上也有，理由相同：
-      # 没有它们，pod 不会被准入到启用了
-      # `restricted` 安全配置的集群里。
+      # The build pulls someone else's code from the internet and runs it right away. It doesn't need
+      # root rights for this: it writes only to /work — including the S3 client, which it downloads
+      # there too, because an unprivileged user won't be allowed to write to the image's system
+      # folders. The same three fields were on the app from the first lab and for the same reason:
+      # without them the pod won't be admitted to a cluster where the
+      # `restricted` security profile is enabled.
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
         seccompProfile:
           type: RuntimeDefault
-      # 对 Job 而言这是必填字段。Never 意味着：失败的 pod 不在原地
-      # 重启，而是把决定交给 Job —— 由它创建一个新的。
+      # For a Job this is a mandatory field. Never means: don't restart a failed pod
+      # in place, but hand the decision to the Job — it will create a new one.
       restartPolicy: Never
       containers:
         - name: build
-          # 容器层面同样的严格：禁止给自己提权，
-          # linux capabilities 被逐一全部剥除。
+          # The same strictness at the container level: escalating one's own privileges is forbidden,
+          # linux capabilities are all dropped to the last one.
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # 一个带 Gradle 和 JDK 17 的现成镜像。JDK 版本不是随意选的：它
-          # 必须与 app-build.gradle.kts 里的 jvmTarget = "17" 一致，否则构建
-          # 会在字节码版本不匹配上失败。镜像里没有 Android SDK ——
-          # 脚本第一步会下载它，因为内含 SDK 的镜像重达数十
-          # GB，拉取起来会比 SDK 本身还慢。
+          # A ready-made image with Gradle and JDK 17. The JDK version is not chosen arbitrarily: it
+          # must match jvmTarget = "17" in app-build.gradle.kts, otherwise the build
+          # fails on a bytecode-version mismatch. There is no Android SDK in the image — the
+          # first step of the script downloads it, because images with the SDK inside weigh tens
+          # of gigabytes and would take longer to pull than the SDK itself.
           image: gradle:8.9-jdk17
-          # 我们运行的不是镜像默认做的事，而是我们自己的、来自挂载在
-          # /scripts 的 ConfigMap 的脚本。
+          # We run not what the image does by default, but our own script from the ConfigMap
+          # mounted at /scripts.
           command: ["bash", "/scripts/build.sh"]
           envFrom:
-            # 所有四个 secret 密钥都变成环境变量，
-            # 名字保持不变：accessKey、secretKey、endpoint、bucketName。
+            # All four secret keys become environment variables
+            # with the same names: accessKey, secretKey, endpoint, bucketName.
             - secretRef:
                 name: bucket-creds
-          # Android 构建的实打实成本，经验摸索得出。requests —— 要预留
-          # 多少：调度器按这个数字挑节点，而不是按实际
-          # 消耗。少于四 GB，Kotlin 编译器扛不住。
-          # limits —— 上限：CPU 上撞到它会被限速，内存上
-          # 容器会被杀（OOMKilled）。作为对比，第一个实验的应用
-          # 靠 20m CPU 和 32Mi 内存就够用。正是因为这些数字，训练
-          # 集群的节点不得不加大：实验 0 里订的那个，装不下这次构建。
+          # The honest cost of an Android build, found empirically. requests — how much
+          # to reserve: the scheduler picks a node by this number, not by actual
+          # consumption. The Kotlin compiler doesn't survive less than four gigabytes.
+          # limits — the ceiling: on CPU, hitting it throttles; on memory, the
+          # container is killed (OOMKilled). For comparison, the app from the first lab
+          # got by on 20m of CPU and 32Mi of memory. It's precisely because of these numbers that the
+          # training cluster node will have to be enlarged: the build doesn't fit into the one ordered in lab 0.
           resources:
             requests:
               cpu: "1"
@@ -197,9 +197,9 @@ spec:
             limits:
               cpu: "2"
               memory: 6Gi
-          # 三个卷。源码和脚本 —— 只读：ConfigMap 本来就以
-          # 只读挂载，但显式的 readOnly 一眼就说明构建不往那里写。
-          # 它写的是 /work，那是它唯一被允许写的地方。
+          # Three volumes. The sources and the script — read-only: the ConfigMap is mounted
+          # read-only anyway, but an explicit readOnly says right away that the build doesn't write there.
+          # It writes to /work, and that's the only place it's allowed to.
           volumeMounts:
             - name: src
               mountPath: /src
@@ -213,9 +213,9 @@ spec:
         - name: src
           configMap:
             name: propusk-src
-            # ConfigMap 的 key 不能包含斜杠，而挂载时的路径
-            # 可以。平铺的映射就这样被展开成
-            # Gradle 期望的目录树。
+            # A ConfigMap key can't contain a slash, but a mount path
+            # can. That's how a flat map is unfolded into the directory tree
+            # that Gradle expects.
             items:
               - key: settings.gradle.kts
                 path: settings.gradle.kts
@@ -232,15 +232,15 @@ spec:
         - name: scripts
           configMap:
             name: android-build-script
-            # 卷内文件的权限：读和执行。脚本以
-            # `bash /scripts/build.sh` 的方式调用，所以这里的执行位是个保险 ——
-            # 将来某天有人直接运行这个文件时会用到它。
+            # File permissions for the volume: read and execute. The script is invoked as
+            # `bash /scripts/build.sh`, so the execute bit here is a safety net — it will
+            # be needed by whoever one day runs the file directly.
             defaultMode: 0755
         - name: work
-          # 节点上的临时磁盘，存活时间与 pod 完全一致。
-          # SDK、Gradle 依赖和构建结果都会落到这里。
+          # A temporary disk on the node, lives exactly as long as the pod.
+          # The SDK, Gradle dependencies and the build result will land here.
           emptyDir:
-            # 十二 GB 留有余量：SDK、Gradle 缓存和构建结果加起来
-            # 是六到八。设上限是为了让失控的构建不至于把节点磁盘
-            # 整个吃光，并把相邻的 pod 一起拖垮。
+            # Twelve gigabytes with headroom: the SDK, the Gradle cache and the build result are
+            # six-to-eight. The ceiling is needed so a runaway build doesn't eat the node's disk
+            # entirely and drag down the neighboring pods with it.
             sizeLimit: 12Gi

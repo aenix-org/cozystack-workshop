@@ -6,7 +6,7 @@
 засвоїти до початку практики.
 
 **Маніфести — `manifests/*.yaml`. Застосовуються з вашого ноутбука.**
-Це опис того, що створити в кластері. Команда завжди одна: `kubectl apply -f <файл>`.
+Це опис того, що створити в кластері. Команда завжди одна: `kubectl apply -f <file>`.
 
 • `01-bucket.yaml` — сховище під образ · крок 1
 • `02-conversion-vm.yaml` — машина-конвертер · крок 2
@@ -27,7 +27,7 @@
 У **машини-конвертера** є мережа, тому вона завантажує файл сама. Репозиторій
 відкритий, ключі не потрібні:
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/laptop/scripts/convert.sh
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/laptop/scripts/convert.sh
 ```
 
 У **вашій віртуальній машині мережі спочатку немає взагалі** — вона і є та поломка, яку ми лагодимо

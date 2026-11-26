@@ -1,40 +1,41 @@
-# 实验 8 · 订购 OpenBao 密钥存储。
-# 与你在仪表板里用鼠标订购的完全相同 —— 只不过是文本形式。
-# 它不是应用到实验集群，而是应用到管理集群上的租户：
+# Lab 8 · ordering an OpenBao secrets store.
+# The same thing you would order with the mouse in the dashboard — only as text.
+# It is applied NOT to the lab cluster, but to a tenant on the management cluster:
 #   kubectl --kubeconfig="$HOME/.kube/config" apply -f openbao.yaml
 #
-# 应用前：把 tenant-workshopXX 替换成你自己的命名空间。XX 是占位符，
-# 不是名字的一部分；你的编号是和密码一起发给你的。如果应用到了别人的租户 ——
-# 你会收到拒绝访问，而这已经是所有可能结果中最好的一种了。
+# BEFORE APPLYING: replace tenant-workshopXX with your own namespace. XX is a placeholder,
+# not part of the name; you received your own number together with the password. If it goes
+# into someone else's tenant — you get an access denial, and that is the best possible outcome.
 #
-# kind: OpenBAO —— 这不是 Kubernetes 内置对象，而是 Cozystack 新增的一种类型。
-# 你描述你需要什么，平台自己就会部署 pod、磁盘和服务，之后也自己更新它们。
-# 这最接近于按目录订购一项服务，而不是在交付给你的虚拟机上安装软件。
+# kind: OpenBAO — this is not a built-in Kubernetes object, but a type that Cozystack
+# adds. You describe what you need, and the platform itself deploys the pods, disks
+# and services, and then updates them itself. It is closest to ordering a service from a catalog,
+# not to installing software on a handed-out virtual machine.
 apiVersion: apps.cozystack.io/v1alpha1
 kind: OpenBAO
 metadata:
-  # 名字影响的不仅是仪表板里的卡片：存储的内部地址就是由它拼出来的 ——
-  # openbao-secrets.<namespace>.svc.cozy.local。如果你改了名字 ——
-  # 请同时修改 secrets-demo.yaml 里的地址以及 check.sh 用到的 BAO_APP 变量。
+  # The name affects not only the card in the dashboard: the store's internal address
+  # is assembled from it — openbao-secrets.<namespace>.svc.cozy.local. If you rename it —
+  # fix the address in secrets-demo.yaml and in the BAO_APP variable for check.sh.
   name: secrets
   namespace: tenant-workshopXX
 spec:
-  # 单个副本。生产环境部署三个，就能得到 Raft 复制：一旦 replicas > 1，
-  # chart 自己就会启用它。来回切换需要迁移数据，
-  # 所以这个决定要在之前做，而不是之后。
+  # A single copy. In production three are deployed and you get Raft replication: the chart enables
+  # it itself as soon as replicas > 1. Switching back and forth requires
+  # moving data, so the decision is made before, not after.
   replicas: 1
-  # 存储数据用的磁盘。两个 GB 是留有余量的：密钥只占几个字节，
-  # 空间是被版本历史和审计日志用掉的。卷创建后无法缩小，
-  # 但通常可以扩大，所以这里没必要抠门。
+  # Disk for the store's data. Two gigabytes is with a reserve: secrets weigh bytes,
+  # space goes to version history and the audit log. You cannot shrink a volume after creation,
+  # but you can usually grow it, so there is no point being stingy here.
   size: 2Gi
-  # replicated 存储类意味着数据以多份副本存放在
-  # 不同节点上。某个节点故障不会把你所有的密码一起带走 —— 而从备份里
-  # 恢复一个密钥存储本身就是一件另外让人不快的事。
+  # The replicated storage class means the data lies in several copies on
+  # different nodes. A node failure does not take all your passwords with it — and restoring
+  # a secrets store from a backup is a separately unpleasant affair.
   storageClass: replicated
-  # 现成的一套「多少 CPU 和内存」。平台以列表形式提供它们，
-  # 免得逼着每个人手动去算 requests 和 limits。
+  # A ready-made "how much CPU and memory" set. The platform offers them as a list,
+  # so as not to force everyone to compute requests and limits by hand.
   resourcesPreset: t1.small
-  # Web 界面在集群内部启动。我们不把它对外暴露：
-  # external: true 会挂上一个 LoadBalancer，而在实验里我们不需要它。
+  # The web interface comes up inside the cluster. We do not expose it outside:
+  # external: true would attach a LoadBalancer, and we do not need it in the lab.
   ui: true
   external: false

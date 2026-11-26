@@ -75,7 +75,7 @@ kubectl get vminstance -n tenant-workshopXX
 
 ```powershell
 New-Item -ItemType Directory -Force "$HOME\.kube" | Out-Null
-notepad "$HOME\.kube\workshop"    # вставьте kubeconfig; тип файла — "Все файлы"
+notepad "$HOME\.kube\workshop"    # paste the kubeconfig; file type — "All Files"
 [Environment]::SetEnvironmentVariable("KUBECONFIG", "$HOME\.kube\workshop", "User")
 $env:KUBECONFIG = "$HOME\.kube\workshop"
 kubectl get vminstance -n tenant-workshopXX
@@ -108,7 +108,7 @@ cd cozystack-migration-workshop/laptop
 # Linux
 find manifests scripts -type f -exec sed -i 's/tenant-workshopXX/tenant-workshop03/g' {} +
 
-# macOS — тот же sed, но требует пустых кавычек после -i
+# macOS — the same sed, but it requires empty quotes after -i
 find manifests scripts -type f -exec sed -i '' 's/tenant-workshopXX/tenant-workshop03/g' {} +
 ```
 
@@ -123,11 +123,11 @@ Get-ChildItem -Path manifests,scripts -File -Recurse | ForEach-Object {
 Проверяем, что не осталось ни одной заглушки:
 
 ```bash
-grep -rn tenant-workshopXX manifests scripts || echo "чисто, можно продолжать"
+grep -rn tenant-workshopXX manifests scripts || echo "all clean, you can continue"
 ```
 
 Одно место команда не тронет намеренно: в `manifests/03-app-vm.yaml` строка
-`url: "ВСТАВЬТЕ_PRESIGNED_URL"` — эту ссылку вы получите после второй фазы.
+`url: "PASTE_PRESIGNED_URL"` — эту ссылку вы получите после второй фазы.
 
 Подробно: [chat/10](chat/10-clone-and-set-number.md) ·
 карта файлов [chat/11](chat/11-file-map.md)
@@ -193,7 +193,7 @@ virtctl console --namespace=tenant-workshopXX vm-instance-convert
 ```
 
 Внутри: `nano convert.sh`, вставить текст `scripts/convert.sh`, вписать свои
-`bucketName`, `accessKey` и `secretKey` вместо `ВСТАВЬТЕ_...`, запустить
+`bucketName`, `accessKey` и `secretKey` вместо `PASTE_...`, запустить
 `bash convert.sh`.
 
 **Проходите воркшоп самостоятельно, не на нашем мероприятии?** `OVA_URL` в `convert.sh` указывает на демо-образ в объектном хранилище облака воркшопа. Мы держим его там, чтобы на мероприятии образ скачивался быстро и не тратил внешний трафик, но после воркшопа этой копии уже нет. Замените ссылку на публичную копию, `https://github.com/aenix-org/cozystack-workshop/releases/download/vmware-demo-ova/app-1.ova` (около 810 МБ), или на свой OVA.
@@ -221,7 +221,7 @@ kubectl delete vmdisk convert-tools --namespace tenant-workshopXX
 ```
 
 Впишите полученную ссылку в `manifests/03-app-vm.yaml` вместо
-`url: "ВСТАВЬТЕ_PRESIGNED_URL"`, затем:
+`url: "PASTE_PRESIGNED_URL"`, затем:
 
 ```bash
 kubectl apply -f manifests/03-app-vm.yaml
@@ -309,13 +309,13 @@ curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/actuator/health
 отвечает `SCRAM authentication requires libpq version 10 or above`. Ставим свежий:
 
 ```bash
-# 1. Репозиторий PGDG — источник пакетов PostgreSQL
+# 1. The PGDG repository — the source of PostgreSQL packages
 yum install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm
 
-# 2. libzstd: в репозиториях CentOS 7 её нет, берём из архива EPEL
+# 2. libzstd: not in the CentOS 7 repositories, so we take it from the EPEL archive
 yum install -y https://archives.fedoraproject.org/pub/archive/epel/7/x86_64/Packages/l/libzstd-1.5.5-1.el7.x86_64.rpm
 
-# 3. Сам клиент — только из живого репозитория pgdg15
+# 3. The client itself — only from the live pgdg15 repository
 yum install -y --disablerepo='pgdg*' --enablerepo=pgdg15 postgresql15
 ```
 
@@ -335,7 +335,7 @@ psql --version
 Забираем схему и накатываем:
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/laptop/scripts/orders-schema.sql
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/laptop/scripts/orders-schema.sql
 
 PGPASSWORD='Orders2019!' psql \
   -h postgres-db-rw.tenant-workshopXX.svc.cozy.local -U orders -d orders \
@@ -387,13 +387,13 @@ curl -s http://localhost:8080/api/orders
 > префикса отвечает `target must contain type and name separated by '/'`.
 
 ```bash
-# зайти в app-VM (root / cozydemo)
+# log into the app-VM (root / cozydemo)
 virtctl console --namespace=tenant-workshopXX vm-instance-app-1
 
-# зайти в conversion-VM (ubuntu / ubuntu)
+# log into the conversion-VM (ubuntu / ubuntu)
 virtctl console --namespace=tenant-workshopXX vm-instance-convert
 
-# пробросить порт приложения на ноутбук
+# forward the application's port to the laptop
 virtctl port-forward --namespace=tenant-workshopXX vmi/vm-instance-app-1 8080:8080
 ```
 

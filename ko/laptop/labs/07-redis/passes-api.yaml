@@ -1,16 +1,16 @@
 ---
-# 랩 7 · 「출입증(출입증)」 서비스, 버전 v2 — 캐시와 함께 동작할 수 있는 버전.
-# 여기서 캐시는 아직 켜져 있지 않습니다: 먼저 캐시 없이 얼마나 나쁜지 측정합니다. 캐시는 나중에
-# 같은 폴더의 cache-patch.yaml 패치로 켭니다.
+# Lab 7 · the "Pass" service, version v2 — the one that can work with a cache.
+# The cache is NOT enabled here yet: first we measure how bad things are without it. It gets
+# enabled later, with the cache-patch.yaml patch from this same folder.
 #
-# 어디에 적용하는가: 여러분의 `lab` 클러스터 (export KUBECONFIG=~/lab.kubeconfig).
-# 명령: kubectl apply -f passes-api.yaml
+# Where it is applied: your `lab` cluster (export KUBECONFIG=~/lab.kubeconfig).
+# Command: kubectl apply -f passes-api.yaml
 #
-# HARBOR-HOST는 주소가 아니라 자리표시자입니다. 여러분 자신의 Harbor 주소를 넣으세요 (hr-legacy.yaml 참고,
-# 거기에 모든 파일에서 한 번에 치환하는 sed 명령도 있습니다).
+# HARBOR-HOST is a placeholder, not an address. Substitute the address of your own Harbor
+# (see hr-legacy.yaml, which also has the sed command to replace it across all files at once).
 #
-# 파일에는 `---`로 구분된 두 개의 객체가 있습니다: Deployment(애플리케이션의 복제본)와 Service(그들을 위한
-# 안정적인 이름). apiVersion, kind, metadata.name은 이후로 더 주석을 달지 않습니다.
+# The file has two objects separated by `---`: a Deployment (copies of the application) and a
+# Service (a stable name for them). apiVersion, kind and metadata.name are not commented further down.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -18,64 +18,64 @@ metadata:
   labels:
     app: passes-api
 spec:
-  # 하나가 아니라 두 개의 복제본을 두는 이유: 나중에 캐시의 핵심 속성이 드러나도록 하기 위함입니다 — 캐시는 공유됩니다.
-  # 한 파드가 응답을 Redis에 넣었고, 다른 파드가 자신은 디렉터리에 가지 않았는데도 거기서 그것을 가져왔습니다.
+  # Two copies, not one, so that later the key property of the cache becomes visible: it is shared.
+  # One pod put a response into Redis, another took it from there, even though it never went to the directory itself.
   replicas: 2
-  # 이 레이블로 Deployment는 자신의 파드를 다른 것과 구분합니다. 아래 template의 레이블과 일치해야 하며,
-  # 그렇지 않으면 객체는 자신이 만든 것을 찾지 못합니다.
+  # By this label the Deployment tells its own pods from others. It must match the label
+  # in the template below, otherwise the object won't find what it created itself.
   selector:
     matchLabels:
       app: passes-api
-  # template은 파드 템플릿입니다: 각 복제본을 무엇으로 조립할지.
+  # template is the pod template: what each copy is assembled from.
   template:
     metadata:
       labels:
         app: passes-api
     spec:
-      # 파드 수준의 보안 요구사항: root가 아니며, 제한된 시스템 호출 집합. 정책이 켜진 클러스터에서는
-      # 이 필드들이 없는 파드는 받아들여지지 않습니다.
+      # Pod-level security requirements: not as root, a restricted set of system
+      # calls. In a cluster with policies enabled a pod without these fields won't be admitted.
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
         seccompProfile:
           type: RuntimeDefault
-      # 이미지를 내려받을 때 클러스터가 닫힌 Harbor에게 자신을 어떻게 제시할지. 이 시크릿에 대한 참조가
-      # 없으면 파드는 ImagePullBackOff에 갇힙니다.
+      # What the cluster presents to the closed Harbor when pulling the image. Without a reference
+      # to this secret the pod will get stuck in ImagePullBackOff.
       imagePullSecrets:
         - name: harbor
       containers:
         - name: api
-          # 컨테이너의 권한은 최소한으로 깎였습니다: 상승 불가, 커널 특권 없음.
+          # The container's privileges are trimmed to the minimum: no escalation, no kernel privileges.
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # 디렉터리와 동일한 이미지. 그들을 구분하는 것은 아래의 MODE뿐입니다.
+          # The same image as the directory. Only the MODE below separates them.
           image: HARBOR-HOST/passes/passes-api:v2
-          # 포트 이름이 필요한 이유는 프로브와 Service가 숫자가 아니라 이름을 참조하도록 하기 위함입니다.
+          # The port name is needed so that the probe and the Service reference a name, not a number.
           ports:
             - containerPort: 8080
               name: http
-          # 애플리케이션의 모든 동작은 여기서 설정됩니다. 주목하세요: REDIS_ADDR와 REDIS_PASSWORD
-          # 변수가 목록에 없습니다 — 바로 그래서 캐시가 꺼져 있고,
-          # 모든 요청이 정직하게 느린 디렉터리로 갑니다.
+          # All the application's behavior is set here. Note: the REDIS_ADDR and REDIS_PASSWORD
+          # variables are not in the list — and that is exactly why the cache is off,
+          # and every request honestly goes to the slow directory.
           env:
-            # MODE=api — 이 인스턴스는 「출입증」 서비스 자체로 동작합니다.
+            # MODE=api — this instance works as the "Pass" service itself.
             - name: MODE
               value: "api"
-            # 버전과 레지스트리는 애플리케이션이 동작하는 데 필요하지 않습니다 — 「/」에 대한 응답에서 보이며,
-            # 여러분이 방금 빌드한 바로 그것이 실행되고 있음을 확인시켜 줍니다.
+            # The version and registry are not needed by the application to run — they are visible in the response to "/"
+            # and let you confirm that exactly what you just built is running.
             - name: APP_VERSION
               value: "v2"
             - name: IMAGE_REGISTRY
               value: HARBOR-HOST
-            # 데이터를 가지러 어디로 가는가. 주소가 아니라 서비스 이름입니다: 디렉터리의 복제본은
-            # 몇 번이든 재생성될 수 있지만, 이름은 바뀌지 않습니다.
+            # Where to go for data. A service name, not an address: the directory's copies
+            # can be recreated any number of times, the name doesn't change.
             - name: HR_URL
               value: "http://hr-legacy.default.svc.cluster.local"
-            # 누가 어디서 요청을 수행하는가. 클러스터가 이 세 값을 스스로 채웁니다:
-            # 아무도 미리 알지 못합니다. 이 값들은 서비스의 응답에 담기며, 이것으로
-            # 어느 복제본이 어느 노드에서 응답했는지 볼 수 있습니다 — 측정 시 유용합니다.
+            # Who runs the request and where. The cluster fills in these three values itself:
+            # nobody knows them in advance. They end up in the service's response, and by them you can see
+            # which copy and on which node answered — this will come in handy during measurements.
             - name: POD_NAME
               valueFrom:
                 fieldRef:
@@ -88,9 +88,9 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
-          # requests는 노드를 고를 때 예약되는 것이고, limits는 상한입니다. 여기서 1코어 상한은
-          # 욕심이 아닙니다: 부하가 걸리면 애플리케이션은 노드 전체를 먹어치우는 대신 여기에 부딪히고,
-          # 측정은 CPU 다툼이 아니라 디렉터리의 지연을 보여줍니다.
+          # requests is what gets reserved when a node is chosen, limits is the ceiling. A one-core ceiling
+          # here is not greed: under load the application hits it rather than eating up the
+          # whole node, and the measurement shows the directory's latency, not a fight over the CPU.
           resources:
             requests:
               cpu: 50m
@@ -98,9 +98,9 @@ spec:
             limits:
               cpu: "1"
               memory: 64Mi
-          # /healthz가 응답하기 전까지 Service는 이 복제본으로 단 하나의 요청도 보내지 않습니다.
-          # 업데이트 시 이 같은 필드는 여러분을 장애로부터 지킵니다: 새 복제본이 준비를 알리기 전까지
-          # 오래된 복제본은 제거되지 않습니다.
+          # Until /healthz answers, the Service won't send a single request to this copy.
+          # During an update this same field saves you from an outage: the old copies aren't removed
+          # until the new ones report readiness.
           readinessProbe:
             httpGet:
               path: /healthz
@@ -108,19 +108,19 @@ spec:
             initialDelaySeconds: 2
             periodSeconds: 5
 ---
-# Service — 두 복제본에 대한 하나의 안정적인 이름이자 그들 사이의 요청 분배.
-# 파드는 재생성되며 IP가 바뀌지만, passes-api라는 이름은 남습니다. Fortio도 점검 스크립트도
-# 이 이름으로 서비스에 접근합니다.
+# Service — a single stable name for both copies and load distribution between them.
+# Pods get recreated and change IP, the name passes-api stays. Both Fortio and the check
+# script reach the service by this name.
 apiVersion: v1
 kind: Service
 metadata:
   name: passes-api
 spec:
-  # Service가 살아 있는 복제본 목록을 모으는 기준이 되는 레이블. 파드의 레이블과 일치하지 않으면
-  # Service는 존재하되 아무 데로도 이어지지 않습니다.
+  # The label by which the Service gathers the list of live copies. If it doesn't match the pods' label,
+  # the Service will exist and lead nowhere.
   selector:
     app: passes-api
   ports:
-    # 외부에서는 80으로 접근하고, 파드 내부로는 http라는 이름의 포트(8080)로 갑니다.
+    # Externally they reach port 80, inside the pod it goes to the port named http (8080).
     - port: 80
       targetPort: http

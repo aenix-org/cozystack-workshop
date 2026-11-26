@@ -1,42 +1,42 @@
-# Лаба 13. Значення за замовчуванням для чарту «Перепустки».
+# Lab 13. Default values for the "Passes" chart.
 #
-# Це відповіді на запитання, які чарт ставить під час розгортання: скільки копій, який
-# текст на сторінці, чи потрібна зовнішня адреса. Тут вони записані на випадок «нічого не
-# вибирали». Той, хто замовляє застосунок, їх перевизначає: у дашборді — полями форми,
-# у терміналі — ключем `--set replicas=5` або власним файлом `helm install ... -f my.yaml`.
-# Правка цього файлу змінює умовчання для майбутніх замовлень, а не для вже розгорнутих.
+# These are answers to the questions the chart asks at deploy time: how many copies, what
+# text on the page, whether an external address is needed. They are written here for the "nothing
+# was selected" case. Whoever orders the application overrides them: in the dashboard — with form
+# fields, in the terminal — with the `--set replicas=5` flag or their own file `helm install ... -f my.yaml`.
+# Editing this file changes the defaults for future orders, not for already deployed ones.
 #
-# Як значення звідси перетворюються на форму замовлення в дашборді:
-#   тип        — яке поле показати: {int} число, {bool} перемикач,
-#                {string} рядок вводу, {struct} вкладена група полів;
-#   Опис       — підпис поля і підказка під ним;
-#   =значення  — що вже стоїть у полі, коли форму відкрили;
-#   обов'язковість — задається списком required у схемі. Тут його немає: у кожного
-#                параметра є значення за замовчуванням, тому пропустити можна будь-яке поле.
-# Тому описи пишуться англійською: їх читає не лише автор чарту, але й будь-хто,
-# хто замовляє застосунок у дашборді.
+# How the values here turn into an order form in the dashboard:
+#   type       — which field to show: {int} number, {bool} toggle,
+#                {string} input line, {struct} nested group of fields;
+#   Description — the field label and the hint below it;
+#   =value     — what is already in the field when the form is opened;
+#   required-ness  — set by the required list in the schema. There is none here: every
+#                parameter has a default value, so any field can be skipped.
+# That is why descriptions are written in English: they are read not only by the chart author, but by anyone
+# who orders the application in the dashboard.
 
-## Коментарі виду `## @param` — не прикраса. За ними генератор Cozystack
-## (cozyvalues-gen) збирає values.schema.json і таблицю параметрів у README.
-## Формат: ## @param {тип} ім'я=значення-за-замовчуванням - Опис.
+## Comments of the form `## @param` are not decoration. From them the Cozystack generator
+## (cozyvalues-gen) builds values.schema.json and the parameter table in the README.
+## Format: ## @param {type} name=default-value - Description.
 
-# Скільки копій застосунку тримати запущеними. Одна копія — простій на час
-# перезапуску вузла, дві переживають втрату будь-якої з них.
+# How many copies of the application to keep running. One copy means downtime during a
+# node restart; two survive the loss of either one.
 ## @param {int} replicas=2 - Number of application replicas.
 replicas: 2
 
-# Текст на головній сторінці. Винесений у параметри, тому що в кожної дочірньої компанії
-# він свій, а збирати заради цього окремий образ ніхто не стане.
+# Text on the main page. Exposed as a parameter because each subsidiary has
+# its own, and nobody is going to build a separate image just for that.
 ## @param {string} greeting=Order a pass for your guest - Text shown on the main page.
 greeting: "Order a pass for your guest"
 
-# Чи потрібна застосунку адреса за межами кластера. Угода каталогу Cozystack:
-# поле з іменем external означає в усіх застосунків одне й те саме — зовнішній доступ.
+# Whether the application needs an address outside the cluster. The Cozystack catalog convention:
+# a field named external means the same thing across all applications — external access.
 ## @param {bool} external=false - Enable external access from outside the cluster.
 external: false
 
-# Розмір однієї копії. Винесений окремою групою полів, щоб у формі замовлення це
-# виглядало як один блок «ресурси», а не як два незв'язані поля.
+# The size of one copy. Grouped as a separate set of fields so that in the order form it
+# looks like a single "resources" block rather than two unrelated fields.
 ## @typedef {struct} Resources - CPU and memory for each replica.
 ## @field {quantity} cpu - CPU available to each replica.
 ## @field {quantity} memory - Memory (RAM) available to each replica.

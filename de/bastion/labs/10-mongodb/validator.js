@@ -1,66 +1,66 @@
-// Lab 10 · eine Regel zur Dokumentvalidierung (Schema-Validator) für die Collection passes.
+// Lab 10 · a document validation rule (schema validator) for the passes collection.
 //
-// Ein Programm für mongosh — die MongoDB-Shell. Es läuft auf der VM,
-// im Lab-Cluster, mit dem kurzen Befehl `mo` aus der README:
+// A program for mongosh — the MongoDB shell. It runs on the VM,
+// in the lab cluster, with the short command `mo` from the README:
 //     cd labs/10-mongodb && mo < validator.js
-// Als Antwort sehen Sie die Zeile «Regel installiert».
+// In response you will see the line «rule installed».
 //
-// Was ein Validierungsschema ist. Standardmäßig hat eine Collection kein Schema: die Datenbank akzeptiert
-// ein Dokument beliebiger Form und speichert einen Tippfehler in einem Feldnamen («tipe» statt «type») stillschweigend —
-// eine Lücke, die der Wächter am Kontrollpunkt nicht bemerkt. Ein Validator ist eine Beschreibung dessen, wie
-// ein Dokument aussehen muss. Ab dem Moment der Anwendung prüft die Datenbank jede Einfügung und jede
-// Änderung selbst.
+// What a validation schema is. By default a collection has no schema: the database accepts
+// a document of any shape and silently stores a typo in a field name («tipe» instead of «type») —
+// a gap the guard at the checkpoint will not catch. A validator is a description of what
+// a document must look like. From the moment it is applied, the database checks every insert and every
+// change itself.
 //
-// Was mit einem Dokument geschieht, das der Regel nicht entspricht: es wird nicht geschrieben,
-// und die Operation gibt einen Fehler MongoServerError: Document failed validation zurück. Dokumente,
-// die bereits in der Collection liegen, werden bei der Installation der Regel nicht geprüft und nicht
-// neu geschrieben — aber ihre spätere Bearbeitung beginnt abgelehnt zu werden. Deshalb wird der Müll
-// (Dokumente ohne Feld type) vor dem Anwenden dieser Datei entfernt, nicht danach.
+// What happens to a document that does not match the rule: it is not written,
+// and the operation returns an error MongoServerError: Document failed validation. Documents
+// that are already in the collection are not checked and not
+// rewritten when the rule is installed — but a later edit of them will start being rejected. That is why the junk
+// (documents without a type field) is removed before applying this file, not after.
 
-// runCommand — sende einen Befehl direkt an die Datenbank und umgehe das übliche db.<collection>.<...>.
-// collMod — «ändere die Einstellungen einer bestehenden Collection». Die Regel wird nachträglich an eine lebende
-// Collection angehängt: es ist nicht nötig, die Datenbank zu stoppen und die Daten neu zu laden.
+// runCommand — send a command to the database directly, bypassing the usual db.<collection>.<...>.
+// collMod — «change the settings of an existing collection». The rule is attached to a live
+// collection after the fact: there is no need to stop the database and reload the data.
 db.runCommand({
   collMod: "passes",
-  // validator — die Regel selbst. $jsonSchema — eine Möglichkeit, die Form eines Dokuments zu beschreiben:
-  // welche Felder erforderlich sind, welchen Typ sie haben und welche Werte erlaubt sind.
+  // validator — the rule itself. $jsonSchema — a way to describe the shape of a document:
+  // which fields are required, what type they are and which values are allowed.
   validator: {
     $jsonSchema: {
-      // Das Dokument der obersten Ebene selbst — ein Objekt.
+      // The top-level document itself — an object.
       bsonType: "object",
-      // Die Felder, ohne die ein Dokument nicht akzeptiert wird. Beachten Sie, was NICHT in der Liste steht:
-      // guest. Ein Gruppenausweis hat eine Organisation anstelle eines Gastes, und die Regel muss
-      // breit genug sein, damit die legitime Form des Dokuments durch sie
-      // hindurchkommt. Die Einschränkung ist sofort spürbar: je vielfältiger die Dokumente,
-      // desto weniger kann von allen gleichzeitig verlangt werden.
+      // The fields without which a document is not accepted. Notice what is NOT in the list:
+      // guest. A group pass has an organization instead of a guest, and the rule must
+      // be broad enough for the legitimate form of the document to
+      // pass through it. The constraint is felt immediately: the more varied the documents,
+      // the less can be required of all of them at once.
       required: ["type", "host"],
-      // Anforderungen an einzelne Felder. Ein hier nicht aufgeführtes Feld wird in keiner Weise
-      // geprüft — ein unbekanntes Feld gelangt in das Dokument. Das kann verboten werden
-      // (additionalProperties: false), aber dann erfordert jedes neue Feld eine Änderung
-      // der Regel, und Sie sind wieder bei einer Schema-Migration für jede Kleinigkeit. Wo die Grenze zu ziehen ist —
-      // ist Ihre Entscheidung, und sie ist immer ein Kompromiss.
+      // Requirements for individual fields. A field not listed here is not checked
+      // in any way — an unknown field will pass into the document. This can be forbidden
+      // (additionalProperties: false), but then every new field will require editing
+      // the rule, and you are back to a schema migration for every little thing. Where to draw the line —
+      // is your decision, and it is always a compromise.
       properties: {
-        // Der Ausweistyp — nur einer der vier aufgeführten Werte. Ein fünfter Typ
-        // erfordert eine Änderung dieser Regel, und das ist gut: die Änderung wird bewusst.
+        // The pass type — only one of the four listed values. A fifth type
+        // will require changing this rule, and that is good: the change will become deliberate.
         type: {
-          enum: ["Einmalausweis", "Wochenausweis", "Fahrzeugausweis", "Gruppenausweis"],
-          description: "Ausweistyp, nur aus der Liste"
+          enum: ["single-use", "weekly", "vehicle", "group"],
+          description: "pass type, only from the list"
         },
-        // Welcher Mitarbeiter den Ausweis bestellt hat. Das Feld ist erforderlich, und es muss eine
-        // Zeichenkette sein.
+        // Which employee ordered the pass. The field is required, and it must be
+        // a string.
         host: {
           bsonType: "string",
-          description: "welcher Mitarbeiter die Bestellung aufgegeben hat"
+          description: "which employee placed the order"
         },
-        // guest ist in properties, aber nicht in required: wenn das Feld im Dokument vorhanden ist,
-        // muss es eine Zeichenkette sein; wenn es fehlt — ist das Dokument dennoch gültig.
+        // guest is in properties, but not in required: if the field is present in the document,
+        // it must be a string; if it is absent — the document is still valid.
         guest: {
           bsonType: "string"
         },
-        // Regeln funktionieren auch innerhalb verschachtelter Objekte. Es gibt kein Feld car — keine
-        // Anforderungen. Wenn es eines gibt — muss es ein Objekt sein, und das Kennzeichen des Autos darin
-        // ist erforderlich, während der Anhänger, falls angegeben, — ein boolescher Wert ist, keine Zeichenkette
-        // «nein».
+        // Rules work inside nested objects too. There is no car field — no
+        // requirements. If there is one — it must be an object, and the car plate in it
+        // is required, while the trailer, if specified, — is a boolean value, not the string
+        // «no».
         car: {
           bsonType: "object",
           required: ["plate"],
@@ -71,8 +71,8 @@ db.runCommand({
             weight_kg: { bsonType: ["int", "long", "double"] }
           }
         },
-        // Und innerhalb von Listen. items beschreibt, wie jedes Element der
-        // members-Liste sein muss: name ist erforderlich, age — falls angegeben — eine ganze Zahl.
+        // And inside lists. items describes what each element of the
+        // members list must be: name is required, age — if specified — an integer.
         members: {
           bsonType: "array",
           items: {
@@ -87,18 +87,18 @@ db.runCommand({
       }
     }
   },
-  // strict — alle Einfügungen und alle Änderungen prüfen. Die weichere Variante moderate
-  // prüft neue Dokumente und Bearbeitungen jener, die der Regel bereits entsprechen, und lässt das alte
-  // Durcheinander in Ruhe. Gerade mit moderate schaltet man die Validierung an einer Collection ein,
-  // in der sich bereits Müll angesammelt hat: erst hört man auf, es weiter zu verschlimmern, dann repariert
-  // man das Alte, dann wechselt man zu strict.
+  // strict — check all inserts and all changes. The softer variant moderate
+  // checks new documents and edits of those that already match the rule, and leaves the old
+  // mishmash alone. It is precisely with moderate that you turn on validation on a collection
+  // that has already accumulated junk: first stop making it worse, then fix
+  // the old, then switch to strict.
   validationLevel: "strict",
-  // error — ein ungeeignetes Dokument ablehnen. Die Variante warn schreibt ins Protokoll und akzeptiert es
-  // trotzdem: gut, um eine Woche lang zu beobachten, was hereinkommt, bevor man die
-  // Ablehnung einschaltet und jemandes funktionierenden Code kaputt macht.
+  // error — reject an unsuitable document. The warn variant writes to the log and still
+  // accepts it: good for spending a week watching what comes in, before turning on
+  // rejection and breaking someone's working code.
   validationAction: "error"
 });
 
-// runCommand antwortet mit einem Objekt, in dem Erfolg wie { ok: 1 } aussieht. Wir drucken
-// unsere eigene Zeile, damit das Ergebnis der Anwendung der Datei auf einen Blick lesbar ist.
-print("Regel installiert");
+// runCommand replies with an object in which success looks like { ok: 1 }. We print
+// our own line so that the result of applying the file reads at a glance.
+print("rule installed");

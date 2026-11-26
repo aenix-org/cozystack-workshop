@@ -6,16 +6,16 @@
 
 **Ваши доступы** (логин и пароль одинаковы во всех трёх местах):
 ```
-дашборд:  https://dashboard.workshop.aenix.io
-виртуалка: ssh workshopXX@<адрес-виртуалки>
-логин:    workshopXX      ← ваш номер, скажу лично
-пароль:   ...             ← скажу лично
+dashboard: https://dashboard.workshop.aenix.io
+bastion:   ssh workshopXX@<bastion-address>
+login:     workshopXX      ← your number, I'll tell you in person
+password:  ...             ← I'll tell you in person
 ```
 
 Заходим на виртуалку — пароль тот же, что от дашборда, **SSH-ключ не нужен**:
 
 ```bash
-ssh workshopXX@<адрес-виртуалки>
+ssh workshopXX@<bastion-address>
 ```
 
 Внутри доступ к кластеру уже настроен: kubeconfig лежит в `~/.kube/config`, и `kubectl`

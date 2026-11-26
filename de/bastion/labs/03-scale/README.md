@@ -30,7 +30,7 @@ Unterwegs klären wir das, worüber hier die meisten stolpern — den Unterschie
 Sie haben bereits alle Dateien — Sie haben sie zusammen mit dem Repository erhalten. Es gibt nichts zu erstellen oder neu einzutippen: Wo unten `kubectl apply -f name.yaml` steht, stammt die Datei von hier.
 
 ```bash
-# Jeder Befehl in diesem Lab wird aus diesem Ordner ausgeführt — sonst werden die darin genannten Dateinamen nicht gefunden.
+# Every command in this lab is run from this folder — otherwise the file names in them won't be found.
 cd labs/03-scale
 ```
 
@@ -47,19 +47,19 @@ cd labs/03-scale
 Das ganze Lab beruht darauf, dass die Replikenzahl merklich wächst. Also müssen wir bei eins beginnen — sonst gibt es nichts, womit sich das Wachstum vergleichen ließe. Sehen wir nach, wie viele Repliken gerade laufen.
 
 ```bash
-# KUBECONFIG ist der Pfad zur Datei mit der Adresse des Clusters und den Anmeldedaten.
-# Solange die Variable nicht gesetzt ist, sucht kubectl den Cluster auf dem Bastion selbst und findet ihn nicht.
+# KUBECONFIG is the path to the file with the cluster's address and login details.
+# Until the variable is set, kubectl looks for the cluster on the bastion itself and doesn't find it.
 export KUBECONFIG=~/lab.kubeconfig
 
-# Die Spalte READY liest sich als „bereit / angefordert": 1/1 bedeutet eine Replik angefordert und laufend.
+# The READY column reads as "ready / requested": 1/1 means one replica requested and running.
 kubectl get deployment rickroll
 ```
 
 Es sollte `1/1` anzeigen. Ist es mehr, setzen Sie es auf eins zurück, sonst ist das Wachstum nicht so gut sichtbar:
 
 ```bash
-# scale ändert genau ein Feld im Datensatz der Anwendung — die Replikenzahl.
-# Die überzähligen Repliken entfernt der Cluster von selbst, innerhalb von Sekunden.
+# scale changes exactly one field in the application's record — the replica count.
+# The cluster will retire the extra replicas on its own, within seconds.
 kubectl scale deployment rickroll --replicas=1
 ```
 
@@ -68,11 +68,11 @@ kubectl scale deployment rickroll --replicas=1
 Bevor Sie die Autoskalierung konfigurieren, müssen Sie verstehen, wovon sie die Prozente berechnet.
 
 ```bash
-# Ein Objekt im Cluster hat Hunderte von Feldern; die Tabelle zeigt sie nicht. jsonpath holt
-# genau eine Stelle aus der Antwort heraus. Lesen Sie den Pfad von oben nach unten: spec.template ist die Vorlage,
-# aus der die Repliken erzeugt werden, containers[0] ist der erste Container darin, resources ist seine
-# Anforderung und Obergrenze für CPU und Speicher. Das Anhängsel {"\n"} ist ein Zeilenumbruch, damit die Antwort
-# nicht mit der nächsten Eingabeaufforderung verschmilzt.
+# An object in the cluster has hundreds of fields; the table doesn't show them. jsonpath extracts
+# exactly one spot from the response. Read the path top to bottom: spec.template is the template
+# from which replicas are created, containers[0] is the first container in it, resources is its
+# request and ceiling for CPU and memory. The tail {"\n"} is a newline, so the response
+# doesn't run into the next command prompt.
 kubectl get deployment rickroll \
   -o jsonpath='{.spec.template.spec.containers[0].resources}{"\n"}'
 ```
@@ -147,7 +147,7 @@ Die Regel: die **durchschnittliche** Last über alle Repliken bei 50% ihrer `req
 Das Wort „durchschnittlich“ ist hier entscheidend, und die ganze Arithmetik hängt davon ab. HPA rechnet so:
 
 ```
-benötigte Repliken = ceil( aktuelle Repliken × aktuelle Last ÷ Ziel-Last )
+replicas needed = ceil( current replicas × current load ÷ target load )
 ```
 
 Eine Replik bei 645% Last und einem Ziel von 50% ergibt `ceil(1 × 645 / 50) = 13`. Dreizehn ist mehr als sechs, deshalb stößt HPA an `maxReplicas`.
@@ -184,8 +184,8 @@ Der Standardwert hier ist **300 Sekunden**, fünf Minuten. Wir haben ihn auf ein
 Wenden Sie sie an:
 
 ```bash
-# apply = „bringe den Cluster in den in der Datei beschriebenen Zustand". Das HPA-Objekt erscheint sofort,
-# zu rechnen beginnt es aber nicht sofort — darüber stolpern wir im nächsten Schritt.
+# apply = "bring the cluster to what's described in the file." The HPA object will appear at once,
+# but it won't start computing right away — that's what we'll trip over in the next step.
 kubectl apply -f hpa.yaml
 ```
 
@@ -194,9 +194,9 @@ kubectl apply -f hpa.yaml
 Sehen wir, was dabei herausgekommen ist:
 
 ```bash
-# hpa ist die Kurzform für horizontalpodautoscaler; kubectl versteht beide Schreibweisen.
-# Die Spalte TARGETS liest sich als „aktuelle Last / Ziel", REPLICAS ist, wie viele
-# Repliken gerade angefordert sind.
+# hpa is shorthand for horizontalpodautoscaler; kubectl understands both spellings.
+# The TARGETS column reads as "current load / target," REPLICAS is how many
+# replicas are requested right now.
 kubectl get hpa rickroll
 ```
 
@@ -223,7 +223,7 @@ In der Spalte `TARGETS` steht statt der Last `<unknown>`. Die Autoskalierung wei
 Es fehlt an Zeit. Warten Sie anderthalb bis zwei Minuten und sehen Sie erneut nach:
 
 ```bash
-# Derselbe Befehl wie oben. Wir betrachten dieselbe Spalte TARGETS.
+# The same command as above. We're looking at the same TARGETS column.
 kubectl get hpa rickroll
 ```
 
@@ -237,9 +237,9 @@ rickroll   Deployment/rickroll   cpu: 0%/50%     1         6         1          
 Dass die Metriken fließen, können Sie direkt prüfen:
 
 ```bash
-# top = „wie viele Ressourcen diese Pods gerade verbrauchen". Die Zahlen stammen von
-# demselben metrics-server, der auch die Autoskalierung speist: Antwortet top, dann ist die
-# Datenquelle am Leben, und es ist nur eine Frage der Zeit.
+# top = "how many resources these pods are eating right now." The numbers come from
+# the same metrics-server that feeds autoscaling: if top answers, then the
+# data source is alive and it's only a matter of time.
 kubectl top pods -l app=rickroll
 ```
 
@@ -253,9 +253,9 @@ Ist es nach fünf Minuten immer noch `<unknown>` und `kubectl top` antwortet `er
 `metrics-server` installiert sich zusammen mit dem Cluster von selbst — Sie müssen ihn nicht separat aktivieren. Er lebt im namespace `cozy-monitoring`, prüfen können Sie so:
 
 ```bash
-# -n = in welchem namespace gesucht wird. Ein namespace ist ein Abschnitt des Clusters;
-# standardmäßig sucht kubectl in default und sieht die System-Pods dort nicht.
-# deploy ist die Kurzform für deployment.
+# -n = which namespace to look in. A namespace is a section of the cluster;
+# by default kubectl looks in default and doesn't see the system pods there.
+# deploy is shorthand for deployment.
 kubectl -n cozy-monitoring get deploy metrics-server
 ```
 
@@ -264,8 +264,8 @@ Verwechseln Sie ihn nicht mit dem Kontrollkästchen **Monitoring agents** aus La
 Die genaue Ursache verrät:
 
 ```bash
-# describe = die vollständige Karte des Objekts: alle Felder, Ereignisse und Conditions,
-# anders als get, das nur ein paar Tabellenspalten ausgibt.
+# describe = the object's full card: all fields, events, and conditions,
+# unlike get, which prints a few table columns.
 kubectl describe hpa rickroll
 ```
 
@@ -341,12 +341,12 @@ Eine stabile Adresse für die Weboberfläche. Von innerhalb des Clusters ist sie
 Anwenden und warten:
 
 ```bash
-# In der Datei stehen gleich zwei Objekte: das Deployment mit dem Generator und ein Service — eine
-# stabile Adresse für seine Weboberfläche.
+# There are two objects at once in the file: the Deployment with the generator and a Service — a
+# stable address for its web interface.
 kubectl apply -f fortio.yaml
 
-# rollout status hält das Terminal und gibt den Fortschritt aus, bis die Replik bereit ist.
-# Wir warten hier bewusst: Solange der Generator nicht oben ist, gibt es nichts, womit sich Last erzeugen ließe.
+# rollout status holds the terminal and prints progress until the replica is ready.
+# We wait here on purpose: until the generator is up, there's nothing to drive load with.
 kubectl rollout status deployment/fortio
 ```
 
@@ -357,10 +357,10 @@ kubectl rollout status deployment/fortio
 ```bash
 export KUBECONFIG=~/lab.kubeconfig
 
-# port-forward legt einen Tunnel vom Bastion in den Cluster.
-#   svc/fortio    wozu wir uns verbinden: der Service namens fortio
-#   8081:8080     liest sich als „Port auf Ihrer Seite : Port im Cluster" — eine Anfrage
-#                 an localhost:8081 geht an Port 8080 dieses Service
+# port-forward runs a tunnel from the bastion into the cluster.
+#   svc/fortio    what we connect to: the Service named fortio
+#   8081:8080     reads as "port on your side : port in the cluster" — a request
+#                 to localhost:8081 goes to port 8080 of this Service
 kubectl port-forward svc/fortio 8081:8080
 ```
 
@@ -379,16 +379,16 @@ Beobachten werden wir mit dem Flag `-w` (watch). Es bedeutet nicht „den Bildsc
 ```bash
 export KUBECONFIG=~/lab.kubeconfig
 
-# Wir beobachten die Repliken von rickroll: Jede neue Zeile ist ein Zustandswechsel einer von ihnen.
-# Der Befehl endet nicht; zum Beenden Ctrl+C — auf die Repliken selbst hat das keine Auswirkung.
+# We watch rickroll's replicas: each new line is a state change of one of them.
+# The command doesn't finish; to exit, Ctrl+C — this has no effect on the replicas themselves.
 kubectl get pods -l app=rickroll -w
 ```
 
 Wenn Sie ein drittes Fenster haben, legen Sie auch dies hinein — so sehen Sie den Entscheidungsprozess selbst:
 
 ```bash
-# Dieselbe Beobachtung, aber der Autoskalierungs-Entscheidungen: TARGETS zeigt, wie sich die Last
-# ändert, REPLICAS zeigt, wie viele Repliken sie daraufhin angefordert hat.
+# The same watching, but of the autoscaling decisions: TARGETS shows how the load
+# changes, REPLICAS shows how many replicas it requested in response.
 kubectl get hpa rickroll -w
 ```
 
@@ -410,13 +410,13 @@ Drücken Sie **Start**.
 ⚠️ **Falls die Felder in Ihrer Version von Fortio anders heißen** (zum Beispiel ist die Anzahl der Verbindungen mit `Threads` beschriftet), richten Sie sich nach der Bedeutung: URL, Anfragerate, Dauer, Parallelität. Dieselbe Last können Sie auch per Befehl aufbringen, am Browser vorbei:
 
 ```bash
-# exec führt einen Befehl innerhalb eines bereits laufenden Pods aus, nicht auf Ihrem Bastion.
-#   deploy/fortio   in einem Pod dieser Anwendung; welcher Pod genau — kubectl wählt selbst
-#   --              alles nach diesem Trenner ist der Befehl für den Pod
-#   -qps 1200       zwölfhundert Anfragen pro Sekunde
-#   -c 80           achtzig parallele Verbindungen
-#   -t 90s          die Last anderthalb Minuten halten
-# Das letzte Argument ist das Ziel: der Service-Name unserer Anwendung.
+# exec runs a command inside an already-running pod, not on your bastion.
+#   deploy/fortio   in a pod of this application; which pod exactly — kubectl picks itself
+#   --              everything after this separator is the command for the pod
+#   -qps 1200       twelve hundred requests per second
+#   -c 80           eighty parallel connections
+#   -t 90s          hold the load for a minute and a half
+# The last argument is the target: the Service name of our application.
 kubectl exec deploy/fortio -- fortio load -qps 1200 -c 80 -t 90s http://rickroll/
 ```
 
@@ -439,7 +439,7 @@ Dann noch zwei, dann noch eine. Innerhalb einer Minute sind es sechs Repliken.
 📍 **Sehen Sie sich den HPA an** — was er sieht und was er entschieden hat:
 
 ```bash
-# TARGETS ist die aktuelle durchschnittliche Last gegenüber dem Ziel, REPLICAS ist, wie viele Repliken angefordert sind.
+# TARGETS is the current average load against the target, REPLICAS is how many replicas are requested.
 kubectl get hpa rickroll
 ```
 
@@ -459,8 +459,8 @@ Der Node ist dabei alles andere als frei: `u1.medium` ist ein Kern, und in diese
 Prüfen Sie die Arithmetik des HPA selbst nach:
 
 ```bash
-# Der Verbrauch jeder Replik einzeln. CPU(cores) wird in Millicpu ausgegeben:
-# 100m ist ein Hundertstel eines Kerns, 1000m ist ein ganzer Kern.
+# The consumption of each replica separately. CPU(cores) is printed in millicpu:
+# 100m is a hundredth of a core, 1000m is a whole core.
 kubectl top pods -l app=rickroll
 ```
 
@@ -497,8 +497,8 @@ Das Skript prüft nicht die Tatsache, dass das Manifest angewendet wurde, sonder
 ⚠️ **Unter Windows wird das Skript aus WSL ausgeführt**, nicht aus PowerShell — wie man es installiert, steht am Anfang von Lab 0. Ohne WSL können Sie das Lab abschließen, aber es gibt kein Bericht-Artefakt.
 
 ```bash
-# ./ bedeutet „eine Datei aus dem aktuellen Ordner", nicht ein Befehl aus dem System-PATH.
-# Das Skript ändert nichts im Cluster: Es liest nur und gibt einen Bericht aus.
+# ./ means "a file from the current folder," not a command from the system PATH.
+# The script changes nothing in the cluster: it only reads and prints a report.
 ./check.sh
 ```
 
@@ -507,15 +507,15 @@ Das Skript prüft nicht die Tatsache, dass das Manifest angewendet wurde, sonder
 **Löschen Sie den HPA.** In Lab 4 rollen wir eine neue Version unter Last aus, und ein zusätzlicher Mechanismus, der gleichzeitig die Replikenzahl ändert, würde das Bild nur trüben:
 
 ```bash
-# delete -f = „entferne aus dem Cluster, was in dieser Datei beschrieben ist". Die Anwendung bleibt:
-# In der Datei ist nur der HPA beschrieben. Nach dem Löschen friert die Replikenzahl beim aktuellen Wert ein.
+# delete -f = "remove from the cluster what's described in this file." The application stays:
+# only the HPA is described in the file. After deletion the replica count freezes at the current value.
 kubectl delete -f hpa.yaml
 ```
 
 **Behalten Sie Fortio** — es wird in Lab 4 als Lastquelle gebraucht. Wenn Sie Lab 4 nicht planen, entfernen Sie es ebenfalls:
 
 ```bash
-# Entfernt beide Objekte aus der Datei — das Deployment des Generators und seinen Service.
+# Removes both objects from the file — the generator's Deployment and its Service.
 kubectl delete -f fortio.yaml
 ```
 

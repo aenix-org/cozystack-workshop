@@ -30,7 +30,7 @@
 Усі файли вже у вас — ви забрали їх разом з репозиторієм. Створювати й друкувати заново нічого не потрібно: там, де нижче написано `kubectl apply -f name.yaml`, файл береться звідси.
 
 ```bash
-# Усі команди лаби виконуються з цієї папки — інакше імена файлів у них не знайдуться.
+# Every command in this lab is run from this folder — otherwise the file names in them won't be found.
 cd labs/03-scale
 ```
 
@@ -47,19 +47,19 @@ cd labs/03-scale
 Уся лаба побудована на тому, що реплік стане помітно більше. Отже, почати треба з однієї — інакше зростання не буде з чим порівняти. Дивимося, скільки реплік працює зараз.
 
 ```bash
-# KUBECONFIG — шлях до файлу з адресою кластера й даними для входу.
-# Поки змінну не задано, kubectl шукає кластер на самому бастіоні й не знаходить його.
+# KUBECONFIG is the path to the file with the cluster's address and login details.
+# Until the variable is set, kubectl looks for the cluster on the bastion itself and doesn't find it.
 export KUBECONFIG=~/lab.kubeconfig
 
-# Колонка READY читається як «готово / замовлено»: 1/1 — одну репліку замовлено й вона працює.
+# The READY column reads as "ready / requested": 1/1 means one replica requested and running.
 kubectl get deployment rickroll
 ```
 
 Має бути `1/1`. Якщо більше — поверніть одну, інакше зростання буде не таким помітним:
 
 ```bash
-# scale змінює рівно одне поле в записі про застосунок — кількість реплік.
-# Зайві репліки кластер погасить сам, за секунди.
+# scale changes exactly one field in the application's record — the replica count.
+# The cluster will retire the extra replicas on its own, within seconds.
 kubectl scale deployment rickroll --replicas=1
 ```
 
@@ -68,11 +68,11 @@ kubectl scale deployment rickroll --replicas=1
 Перш ніж налаштовувати автомасштабування, треба зрозуміти, від чого воно рахуватиме відсотки.
 
 ```bash
-# У об'єкта в кластері полів сотні, у таблиці їх не видно. jsonpath дістає з відповіді
-# рівно одне місце. Шлях читається згори вниз: spec.template — шаблон, за яким
-# створюються репліки, containers[0] — перший контейнер у ньому, resources — його заявка
-# і стеля за процесором і пам'яттю. Хвіст {"\n"} — перенесення рядка, щоб відповідь
-# не злиплася з наступним запрошенням командного рядка.
+# An object in the cluster has hundreds of fields; the table doesn't show them. jsonpath extracts
+# exactly one spot from the response. Read the path top to bottom: spec.template is the template
+# from which replicas are created, containers[0] is the first container in it, resources is its
+# request and ceiling for CPU and memory. The tail {"\n"} is a newline, so the response
+# doesn't run into the next command prompt.
 kubectl get deployment rickroll \
   -o jsonpath='{.spec.template.spec.containers[0].resources}{"\n"}'
 ```
@@ -147,7 +147,7 @@ spec:
 Слово «середнє» тут ключове, і від нього залежить уся арифметика. HPA рахує так:
 
 ```
-потрібно реплік = ceil( зараз реплік × поточне навантаження ÷ цільове навантаження )
+replicas needed = ceil( current replicas × current load ÷ target load )
 ```
 
 Одна репліка при навантаженні 645% і цілі 50% дає `ceil(1 × 645 / 50) = 13`. Тринадцять більше шести, тому HPA впреться в `maxReplicas`.
@@ -184,8 +184,8 @@ spec:
 Застосовуємо:
 
 ```bash
-# apply = «приведи кластер до того, що описано у файлі». Об'єкт HPA з'явиться одразу,
-# а от рахувати він почне не одразу — на цьому ми спіткнемося на наступному кроці.
+# apply = "bring the cluster to what's described in the file." The HPA object will appear at once,
+# but it won't start computing right away — that's what we'll trip over in the next step.
 kubectl apply -f hpa.yaml
 ```
 
@@ -194,9 +194,9 @@ kubectl apply -f hpa.yaml
 Дивимося, що вийшло:
 
 ```bash
-# hpa — скорочення для horizontalpodautoscaler, kubectl розуміє обидва написання.
-# Колонка TARGETS читається як «поточне навантаження / цільове», REPLICAS — скільки
-# реплік замовлено прямо зараз.
+# hpa is shorthand for horizontalpodautoscaler; kubectl understands both spellings.
+# The TARGETS column reads as "current load / target," REPLICAS is how many
+# replicas are requested right now.
 kubectl get hpa rickroll
 ```
 
@@ -223,7 +223,7 @@ rickroll   Deployment/rickroll   cpu: <unknown>/50%   1         6         1     
 Не вистачає часу. Зачекайте півтори-дві хвилини й подивіться ще раз:
 
 ```bash
-# Та сама команда, що й вище. Дивимося ту саму колонку TARGETS.
+# The same command as above. We're looking at the same TARGETS column.
 kubectl get hpa rickroll
 ```
 
@@ -237,9 +237,9 @@ rickroll   Deployment/rickroll   cpu: 0%/50%     1         6         1          
 Перевірити, що метрики поїхали, можна напряму:
 
 ```bash
-# top = «скільки ресурсів ці Pod'и їдять прямо зараз». Цифри команда бере
-# у того самого metrics-server, що годує й автомасштабування: відповідає top —
-# значить, джерело даних живе, і річ лише в часі.
+# top = "how many resources these pods are eating right now." The numbers come from
+# the same metrics-server that feeds autoscaling: if top answers, then the
+# data source is alive and it's only a matter of time.
 kubectl top pods -l app=rickroll
 ```
 
@@ -253,9 +253,9 @@ rickroll-6f4b9c8d57-p9wqt   1m           4Mi
 `metrics-server` ставиться в кластер сам, разом із ним — окремо вмикати його не потрібно. Живе він у namespace `cozy-monitoring`, перевірити можна так:
 
 ```bash
-# -n = у якому namespace шукати. namespace — це розділ кластера;
-# за замовчуванням kubectl дивиться в default і службових Pod'ів там не бачить.
-# deploy — скорочення для deployment.
+# -n = which namespace to look in. A namespace is a section of the cluster;
+# by default kubectl looks in default and doesn't see the system pods there.
+# deploy is shorthand for deployment.
 kubectl -n cozy-monitoring get deploy metrics-server
 ```
 
@@ -264,8 +264,8 @@ kubectl -n cozy-monitoring get deploy metrics-server
 Точну причину скаже:
 
 ```bash
-# describe = розгорнута картка об'єкта: усі поля, події й умови,
-# на відміну від get, який друкує кілька колонок таблиці.
+# describe = the object's full card: all fields, events, and conditions,
+# unlike get, which prints a few table columns.
 kubectl describe hpa rickroll
 ```
 
@@ -341,12 +341,12 @@ spec:
 Застосовуємо і чекаємо:
 
 ```bash
-# У файлі два об'єкти одразу: Deployment з генератором і Service — постійна адреса
-# для його веб-інтерфейсу.
+# There are two objects at once in the file: the Deployment with the generator and a Service — a
+# stable address for its web interface.
 kubectl apply -f fortio.yaml
 
-# rollout status тримає термінал і друкує хід справи, поки репліка не стане готова.
-# Чекаємо тут навмисно: поки генератор не піднявся, навантажувати нема чим.
+# rollout status holds the terminal and prints progress until the replica is ready.
+# We wait here on purpose: until the generator is up, there's nothing to drive load with.
 kubectl rollout status deployment/fortio
 ```
 
@@ -357,10 +357,10 @@ kubectl rollout status deployment/fortio
 ```bash
 export KUBECONFIG=~/lab.kubeconfig
 
-# port-forward прокидає тунель з бастіона всередину кластера.
-#   svc/fortio    до чого підключаємось: Service з іменем fortio
-#   8081:8080     читається як «порт у вас : порт у кластері» — звернення
-#                 на localhost:8081 йде на порт 8080 цього Service
+# port-forward runs a tunnel from the bastion into the cluster.
+#   svc/fortio    what we connect to: the Service named fortio
+#   8081:8080     reads as "port on your side : port in the cluster" — a request
+#                 to localhost:8081 goes to port 8080 of this Service
 kubectl port-forward svc/fortio 8081:8080
 ```
 
@@ -379,16 +379,16 @@ kubectl port-forward svc/fortio 8081:8080
 ```bash
 export KUBECONFIG=~/lab.kubeconfig
 
-# Стежимо за репліками rickroll: кожен новий рядок — зміна стану однієї з них.
-# Команда не завершується; вийти — Ctrl+C, на самі репліки це ніяк не впливає.
+# We watch rickroll's replicas: each new line is a state change of one of them.
+# The command doesn't finish; to exit, Ctrl+C — this has no effect on the replicas themselves.
 kubectl get pods -l app=rickroll -w
 ```
 
 Якщо у вас є третє вікно, покладіть туди ще й це — так видно сам процес прийняття рішення:
 
 ```bash
-# Те саме стеження, але за рішеннями автомасштабування: у TARGETS видно, як змінюється
-# навантаження, у REPLICAS — скільки реплік воно замовило у відповідь.
+# The same watching, but of the autoscaling decisions: TARGETS shows how the load
+# changes, REPLICAS shows how many replicas it requested in response.
 kubectl get hpa rickroll -w
 ```
 
@@ -410,13 +410,13 @@ kubectl get hpa rickroll -w
 ⚠️ **Якщо у вашій версії Fortio поля називаються інакше** (наприклад, число з'єднань підписано `Threads`), орієнтуйтеся за змістом: URL, частота запитів, тривалість, паралельність. Те саме навантаження можна дати й командою, минаючи браузер:
 
 ```bash
-# exec запускає команду всередині вже працюючого Pod'а, а не у вас на бастіоні.
-#   deploy/fortio   у Pod'і цього застосунку; який саме Pod — kubectl вибере сам
-#   --              усе, що після цього роздільника, — команда для Pod'а
-#   -qps 1200       тисяча двісті запитів за секунду
-#   -c 80           вісімдесят паралельних з'єднань
-#   -t 90s          тримати навантаження півтори хвилини
-# Останній аргумент — ціль: ім'я Service нашого застосунку.
+# exec runs a command inside an already-running pod, not on your bastion.
+#   deploy/fortio   in a pod of this application; which pod exactly — kubectl picks itself
+#   --              everything after this separator is the command for the pod
+#   -qps 1200       twelve hundred requests per second
+#   -c 80           eighty parallel connections
+#   -t 90s          hold the load for a minute and a half
+# The last argument is the target: the Service name of our application.
 kubectl exec deploy/fortio -- fortio load -qps 1200 -c 80 -t 90s http://rickroll/
 ```
 
@@ -439,7 +439,7 @@ rickroll-6f4b9c8d57-t8zxc   1/1     Running             3s
 📍 **Дивимося HPA** — що він бачить і що вирішив:
 
 ```bash
-# TARGETS — поточне середнє навантаження проти цілі, REPLICAS — скільки реплік замовлено.
+# TARGETS is the current average load against the target, REPLICAS is how many replicas are requested.
 kubectl get hpa rickroll
 ```
 
@@ -459,8 +459,8 @@ rickroll   Deployment/rickroll   cpu: 645%/50%   1         6         6          
 Перевірте арифметику HPA самі:
 
 ```bash
-# Споживання кожної репліки окремо. CPU(cores) друкується в міліпроцесорах:
-# 100m — це сота частка ядра, 1000m — ціле ядро.
+# The consumption of each replica separately. CPU(cores) is printed in millicpu:
+# 100m is a hundredth of a core, 1000m is a whole core.
 kubectl top pods -l app=rickroll
 ```
 
@@ -497,8 +497,8 @@ rickroll-6f4b9c8d57-mn4kd   1/1     Terminating   4m
 ⚠️ **На Windows скрипт запускається з WSL**, а не з PowerShell — як його поставити, написано на початку лаби 0. Без WSL лабу можна пройти, але звіту-артефакту не буде.
 
 ```bash
-# ./ означає «файл з поточної папки», а не команду з системного PATH.
-# Скрипт нічого в кластері не змінює: він лише читає й друкує звіт.
+# ./ means "a file from the current folder," not a command from the system PATH.
+# The script changes nothing in the cluster: it only reads and prints a report.
 ./check.sh
 ```
 
@@ -507,15 +507,15 @@ rickroll-6f4b9c8d57-mn4kd   1/1     Terminating   4m
 **HPA видаляємо.** У лабі 4 ми будемо викочувати нову версію під навантаженням, і зайвий механізм, який у цей же час змінює кількість реплік, тільки заплутає картину:
 
 ```bash
-# delete -f = «прибери з кластера те, що описано в цьому файлі». Застосунок залишиться:
-# у файлі описано лише HPA. Кількість реплік після видалення завмре на поточному.
+# delete -f = "remove from the cluster what's described in this file." The application stays:
+# only the HPA is described in the file. After deletion the replica count freezes at the current value.
 kubectl delete -f hpa.yaml
 ```
 
 **Fortio залишаємо** — він знадобиться в лабі 4 як джерело навантаження. Якщо лабу 4 у вас не заплановано, приберіть і його:
 
 ```bash
-# Прибере обидва об'єкти з файлу — і Deployment генератора, і його Service.
+# Removes both objects from the file — the generator's Deployment and its Service.
 kubectl delete -f fortio.yaml
 ```
 

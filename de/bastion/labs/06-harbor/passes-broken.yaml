@@ -1,32 +1,32 @@
 ---
-# Lab 6 · Deine eigene private Image-Registry. DIESE DATEI IST ABSICHTLICH UNVOLLSTÄNDIG.
+# Lab 6 · Your own private image registry. THIS FILE IS DELIBERATELY INCOMPLETE.
 #
-# Sie wird nicht funktionieren, und das ist Absicht: Du sollst das Scheitern mit eigenen Augen
-# sehen und selbst herausfinden, was dem Cluster gefehlt hat. Nur eines fehlt hier — das, womit
-# sich der Cluster gegenüber der geschlossenen Registry ausweist, wenn er ein Image abholt. Die
-# Registry gibt Images nicht an jeden heraus, und in dieser Beschreibung gibt es nichts, was dem
-# Cluster helfen würde, sein Recht nachzuweisen. Welche Zeile genau das behebt — das erarbeitest du
-# im Laufe der Lab; die funktionierende Version liegt daneben, in passes.yaml, und es hat keinen
-# Sinn, sie vor der Durchsprache zu öffnen.
+# It will not work, and that is intended: you should see the failure with your own eyes and
+# figure out for yourself what the cluster was missing. Only one thing is missing here — what
+# the cluster calls itself to the closed registry when it comes for an image. The registry does
+# not hand out images to just anyone, and there is nothing in this description that would help
+# the cluster prove its right. Which exact line fixes it — you will work out over the course of
+# the lab; the working version sits next to it, in passes.yaml, and there is no point opening it
+# before the walkthrough.
 #
-# Hier gibt es nur ein Deployment, keinen Service: ein stabiler Name für den Service wird noch nicht
-# benötigt — wir kommen ohnehin nicht bis zu einem antwortenden Pod, da das Image nicht geladen wird.
+# Here there is only a Deployment, no Service: a stable name for the service is not needed yet —
+# we will not get as far as a responding pod anyway, since the image will not download.
 #
-# Angewendet auf deinem `lab`-Cluster, im Standard-Namespace:
+# Applied on your `lab` cluster, in the default namespace:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl apply -f passes-broken.yaml
 #     kubectl get pods -l app=passes-api -w
 #
-# ACHTUNG: HARBOR-HOST ist ein Platzhalter, keine funktionierende Adresse. Setze die Adresse deines Harbor ein,
-# sonst bekommst du einen anderen Fehler als den, für den diese Datei geschrieben wurde (es gibt zwei Zeilen mit dem Platzhalter):
+# NOTE: HARBOR-HOST is a placeholder, not a working address. Substitute the address of your Harbor,
+# otherwise you will get a different error than the one this file was written for (there are two lines with the placeholder):
 #   sed -i    's|HARBOR-HOST|harbor.workshop03.example.org|g' passes-broken.yaml   # Linux
 #   sed -i '' 's|HARBOR-HOST|harbor.workshop03.example.org|g' passes-broken.yaml   # macOS
 #
-# Im Objekt unten: apiVersion — die Version des Beschreibungsschemas, kind — was wir erstellen,
-# metadata.name — der Objektname. Weiter unten nicht mehr gesondert erklärt.
+# In the object below: apiVersion — the version of the description schema, kind — what we are creating,
+# metadata.name — the object name. Not explained separately further down.
 #
-# Ein Deployment ist nicht "starte einen Container", sondern "halte so viele Kopien dieses Containers am Laufen".
-# Verschwindet eine Kopie — erstellt der Cluster eine neue, ohne zu fragen.
+# A Deployment is not "run a container" but "keep so many copies of this container running".
+# A copy disappears — the cluster creates a new one without asking.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -34,23 +34,23 @@ metadata:
   labels:
     app: passes-api
 spec:
-  # Eine Kopie: um das Scheitern durchzugehen, reicht eine, und in den Logs und in der Ausgabe
-  # von kubectl describe gibt es weniger Rauschen.
+  # One copy: to walk through the failure, one is enough, and there will be less noise in the logs
+  # and in the output of kubectl describe.
   replicas: 1
-  # Die Bedingung "meine Kopien sind Pods mit dem Label app: passes-api". Das Label in der Pod-Vorlage unten
-  # muss mit diesem übereinstimmen, sonst weist der Cluster das Manifest zurück.
+  # The condition "my copies are pods with the label app: passes-api". The label in the pod template below
+  # must match this one, otherwise the cluster will reject the manifest.
   selector:
     matchLabels:
       app: passes-api
-  # Die Vorlage, aus der Kopien gestanzt werden. Alles darin beschreibt einen einzelnen Pod.
+  # The template from which copies are stamped out. Everything inside describes a single pod.
   template:
     metadata:
       labels:
         app: passes-api
     spec:
-      # Sicherheitsbeschränkungen für den ganzen Pod: nicht als root laufen, als
-      # unprivilegierter Benutzer 10001 arbeiten, den Satz an Systemaufrufen auf das
-      # Standardprofil beschränken. Das Image ist ebenfalls dafür gebaut (siehe app/Dockerfile, die USER-Zeile).
+      # Security constraints for the whole pod: do not run as root, work as the
+      # unprivileged user 10001, restrict the set of system calls to the
+      # standard profile. The image is built for this too (see app/Dockerfile, the USER line).
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
@@ -58,25 +58,25 @@ spec:
           type: RuntimeDefault
       containers:
         - name: api
-          # Rechte auf Container-Ebene: sich keine zusätzlichen Privilegien geben und alle besonderen
-          # Kernel-Capabilities abgeben. Die Anwendung braucht einen einzigen Netzwerkport, der Rest ist unnötig.
+          # Container-level rights: do not grant itself extra privileges and drop all special
+          # kernel capabilities. The application needs a single network port, the rest is unnecessary.
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # Der erste Teil des Image-Namens ist die Registry-Adresse. Genau deshalb ändert der Umzug auf deine eigene
-          # Registry die Manifeste: der Image-Name wird ein anderer. Gäbe es keine Adresse,
-          # ginge der Cluster für das Image zu Docker Hub — also dorthin, wohin es die Security-Abteilung verboten hat.
+          # The first part of the image name is the registry address. That is exactly why moving to your own
+          # registry changes the manifests: the image name becomes different. Were there no address,
+          # the cluster would go for the image to Docker Hub — that is, to where the security team forbade.
           image: HARBOR-HOST/passes/passes-api:v1
-          # Der Anwendungsport. Der Name `http` wird weiter unten von der Readiness-Probe verwendet,
-          # sodass die Portnummer an einer Stelle gesetzt wird, nicht an zwei.
+          # The application port. The name `http` is used further down by the readiness probe,
+          # so the port number is set in one place, not in two.
           ports:
             - containerPort: 8080
               name: http
-          # Umgebungsvariablen, aus denen die Anwendung erfährt, wer sie ist und woher sie kam.
-          # Genau diese gibt sie in der Antwort aus (siehe app/main.go, die identity-Struktur).
-          # APP_VERSION und IMAGE_REGISTRY sind als Text gesetzt — die schreiben wir selbst; die nächsten drei
-          # füllt der Cluster selbst im Moment des Starts einer Kopie, die Anwendung kann sie nicht kennen.
+          # Environment variables from which the application learns who it is and where it came from.
+          # It prints exactly these in the response (see app/main.go, the identity struct).
+          # APP_VERSION and IMAGE_REGISTRY are set as text — we write them ourselves; the next three
+          # are filled in by the cluster itself at the moment a copy starts, the application has no way to know them.
           env:
             - name: APP_VERSION
               value: "v1"
@@ -94,10 +94,10 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
-          # requests — was für eine Kopie reserviert wird: anhand dieser Zahlen wählt der Scheduler einen
-          # Knoten. limits — die Obergrenze: bei Speicher über der Obergrenze wird der Container getötet, bei
-          # CPU wird er gedrosselt. 16Mi reicht, weil die Anwendung in Go ohne
-          # Abhängigkeiten ist. 20m sind zwanzig Tausendstel eines CPU-Kerns.
+          # requests — what to reserve for a copy: the scheduler picks a node by these numbers.
+          # limits — the ceiling: for memory above the ceiling the container is killed, for
+          # CPU it is throttled. 16Mi is enough because the application is in Go with no
+          # dependencies. 20m is twenty thousandths of a CPU core.
           resources:
             requests:
               cpu: 20m
@@ -105,9 +105,9 @@ spec:
             limits:
               cpu: 300m
               memory: 64Mi
-          # Readiness-Probe: solange die Anwendung nicht auf /healthz antwortet, fließt kein Traffic zur
-          # Kopie. Heute kommt es nicht dazu — sie prüft einen bereits laufenden
-          # Prozess, und bei uns bleibt ein früherer Schritt hängen, das Herunterladen des Images.
+          # Readiness probe: until the application responds on /healthz, traffic to the copy
+          # will not flow. Today it will not come to this — it checks an already running
+          # process, and for us an earlier step will get stuck, the image download.
           readinessProbe:
             httpGet:
               path: /healthz

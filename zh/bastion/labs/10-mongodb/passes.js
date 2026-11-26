@@ -1,93 +1,95 @@
-// 实验 10 · passes 集合中四种不同形态的四张通行证。
+// Lab 10 · four passes of four different shapes in the passes collection.
 //
-// 这不是配置文件，而是一段供 mongosh 运行的程序 —— mongosh 是 MongoDB 的
-// shell，它能理解 JavaScript。它在虚拟机上、在实验集群中运行，通过 README 里
-// 那条简短的命令 `mo` 启动（它会在工作 Pod 内部启动 mongosh）：
+// This is not a config file but a program for mongosh — the MongoDB shell, which
+// understands JavaScript. It runs on the VM, in the lab cluster, via the short
+// command `mo` from the README (it launches mongosh inside the working pod):
 //     cd labs/10-mongodb && mo < passes.js
-// 作为响应，你会看到这样一行「集合中的文档数: 4」。
+// In response you will see the line «documents in collection: 4».
 //
-// 把这个文件运行两次，文档就会变成八个：insertMany 只会追加。
+// Run the file twice and there will be eight documents: insertMany only appends.
 
-// db 是你所连接的数据库；passes 是其中的一个集合（最接近表的类比）；
-// insertMany 意为「添加这些文档」。无需事先创建任何表，也没有地方去描述字段：
-// 集合在第一次插入的那一刻才出现，而数据库默认对文档可以有哪些字段
-// 不持任何意见。
-// 正因如此，下面这四个文档拥有不同的字段集合，却仍并排躺在同一个集合里。
-// 文档模型存在的意义正在于此：没有空列，没有为四种通行证类型准备的四张表，
-// 也没有第五张用来把它们关联起来的表。
+// db is the database you are connected to; passes is a collection in it (the closest
+// analog of a table); insertMany means «add these documents». No table needs to be
+// created in advance and there is nowhere to describe fields: the collection appears
+// at the moment of the first insert, and by default the database has no opinion about
+// which fields a document may have.
+// That is why the four documents below have different sets of fields yet lie side by
+// side, in one collection. This is exactly what the document model exists for: no empty
+// columns, no four tables for four pass types, no fifth one to link them.
 db.passes.insertMany([
   {
-    // 一次性通行证 —— 最短的形态：六个字段，全都是简单值。
-    // 在普通的表里，这就是一条普通的行。
-    // ISODate(...) 不是字符串，而正是一个日期。MongoDB 以二进制 BSON 格式
-    // 存储文档，其中的值都带有类型：日期、整数、浮点数、布尔值。
-    // 按日期可以比较和排序，而按字符串「2026-09-01」只有在记录格式
-    // 恰好走运时才行。
-    type: "一次性",
-    guest: "王建国",
+    // A single-entry pass — the shortest shape: six fields, all simple values.
+    // In an ordinary table this would be an ordinary row.
+    // ISODate(...) is not a string but exactly a date. MongoDB stores documents in the
+    // binary BSON format, where a value has a type: date, integer, float, boolean.
+    // By date you can compare and sort; by the string «2026-09-01» only if you got
+    // lucky with the recording format.
+    type: "single-use",
+    guest: "James P. Whitfield",
     host: "petrov@corp.example",
-    entrance: "北门",
+    entrance: "North",
     valid_on: ISODate("2026-09-01T09:00:00Z"),
-    purpose: "面试"
+    purpose: "job interview"
   },
   {
-    // 周通行证。这里没有 valid_on，取而代之的是 valid_from 和 valid_to 这一对；
-    // 也不是单个入口，而是把 entrances 列表直接放在字段里。在表里，这样一个列表
-    // 要么需要一张单独的「通行证 — 入口」表，要么用逗号分隔的字符串，
-    // 而那样之后就无法正常检索了。
-    // 出现了一个 badge_returned 字段，一次性通行证里根本没有它：
-    // 不是 NULL 也不是空，而是那份文档里就是没有这个字段。这是不同的
-    // 概念，检索方式也不一样。
-    type: "每周",
-    guest: "林晓梅",
+    // A weekly pass. Instead of valid_on there is a pair valid_from and valid_to,
+    // instead of a single entrance a list of entrances right in the field. In a table
+    // such a list would need either a separate «pass — entrance» table, or a
+    // comma-separated string that you then cannot search properly.
+    // A badge_returned field has appeared, which the single-entry pass does not have at
+    // all: not NULL and not empty, but literally no such field in that document. These
+    // are different things, and they are searched for differently.
+    type: "weekly",
+    guest: "Emma L. Prescott",
     host: "petrov@corp.example",
-    entrances: ["北门", "南门"],
+    entrances: ["North", "South"],
     valid_from: ISODate("2026-09-01T00:00:00Z"),
     valid_to: ISODate("2026-09-07T23:59:59Z"),
-    purpose: "外部审计",
+    purpose: "external audit",
     badge_returned: false
   },
   {
-    // 车辆通行证。所有与车相关的内容都放在一个字段 car 里面。
-    // 这不是一个内部塞着 JSON 的字符串，而是一个完整的嵌套结构：
-    // 按 car.plate 可以检索，也可以为它建立索引。
-    type: "车辆",
-    guest: "陈志强",
+    // A vehicle pass. Everything related to the car lies inside a single field
+    // car. This is not a string with JSON inside but a full-fledged nested structure:
+    // by car.plate you can search and build an index on it.
+    type: "vehicle",
+    guest: "Victor S. Marsh",
     host: "logistics@corp.example",
-    entrance: "西门",
+    entrance: "West",
     valid_on: ISODate("2026-09-02T07:30:00Z"),
     car: {
-      plate: "京A12345",
-      model: "福特全顺",
+      plate: "AB-1174-CD",
+      model: "Ford Transit",
       trailer: false,
       weight_kg: 3500
     },
     parking: "P2"
   },
   {
-    // 团体通行证。这里是一个对象列表：每个成员都有各自的字段，
-    // 列表的长度是任意的。
-    // 而最关键的是 —— 这份文档里根本没有 guest 字段：取代访客的是
-    // 一个组织和一个联系人。它的形态与其它文档的差别不在于某一个字段，
-    // 而是本质上的不同。这一点在实验后面会有回响：文档校验规则
-    // 无法要求所有人都有 guest，否则一张合法的团体通行证就通不过了。
-    type: "团体",
-    organization: "市第一中学",
-    contact: "赵丽娟",
+    // A group pass. Here there is a list of objects: each member has its own fields,
+    // the length of the list is arbitrary.
+    // And most importantly — this document has no guest field at all: instead of a
+    // guest, an organization and a contact person. The shape differs from the others
+    // not by one field but in essence. This will echo further in the lab: the document
+    // validation rule will not be able to require guest from everyone, otherwise a
+    // legitimate group pass would not pass.
+    type: "group",
+    organization: "City High School No. 1",
+    contact: "Olivia W. Grant",
     host: "hr@corp.example",
-    entrance: "北门",
+    entrance: "North",
     valid_on: ISODate("2026-09-03T10:00:00Z"),
-    escort: "刘伟明",
+    escort: "Alan A. Foster",
     members: [
-      { name: "孙鹏", age: 16 },
-      { name: "周敏", age: 15 },
-      { name: "吴浩", age: 17 }
+      { name: "Peter Hale", age: 16 },
+      { name: "Mary Fenwick", age: 15 },
+      { name: "Isaac Hart", age: 17 }
     ]
   }
 ]);
 
-// countDocuments({}) —— 统计符合条件的文档；空条件意味着「全部」。
-// 之所以需要打印，是为了让这个文件有一个可见的结果：insertMany 本身
-// 返回的是一份已签发标识符的列表，在其中很容易看不出到底有多少
-// 文档真正落库了。
-print("集合中的文档数: " + db.passes.countDocuments({}));
+// countDocuments({}) counts documents matching a condition; an empty condition means
+// «all». The print is needed so the file has a visible result: insertMany itself
+// responds with a list of issued identifiers, and in it it is easy to miss how many
+// documents actually landed.
+print("documents in collection: " + db.passes.countDocuments({}));

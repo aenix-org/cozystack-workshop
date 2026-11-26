@@ -89,9 +89,9 @@ El recorrido va en un spoiler, para que el flujo principal no se hinche:
 
 ```markdown
 <details>
-<summary><b>Recorremos el manifiesto línea por línea</b></summary>
+<summary><b>Walking through the manifest line by line</b></summary>
 
-...línea por línea, en prosa...
+...line by line, in prose...
 
 </details>
 ```
@@ -120,9 +120,9 @@ La parada es siempre una cita destacada (block-quote), sin ⚠️ (ese marcador 
 las trampas):
 
 ```markdown
-> **Deténgase y piense antes de seguir leyendo.**
+> **Stop and think before you read on.**
 >
-> Una pregunta. Una segunda pregunta, si la hay.
+> A question. A second question, if there is one.
 ```
 
 El encabezado del spoiler es siempre `La respuesta, y una lección más amplia que este error`.

@@ -106,14 +106,14 @@ cd labs/11-android
 और आपको टेनेंट का एक्सेस फ़ाइल चाहिए, `lab` क्लस्टर वाला नहीं।
 
 ```bash
-# KUBECONFIG — kubectl कौन-सा एक्सेस फ़ाइल इस्तेमाल करता है। यहाँ टेनेंट वाला: बकेट
-# प्रबंधन क्लस्टर पर ऑर्डर होता है, lab क्लस्टर में नहीं
+# KUBECONFIG — which access file kubectl uses. Here it's the tenant's: the bucket
+# is ordered on the management cluster, not in the lab cluster
 export KUBECONFIG=~/.kube/workshop
 
-# apply = "क्लस्टर को वैसा बना दो जैसा फ़ाइल में वर्णित है"। यह कमांड स्टोरेज ख़ुद
-# नहीं बनाती — यह ऑर्डर प्लेटफ़ॉर्म को सौंपती है।
-#   -f bucket.yaml   कौन-सी फ़ाइल लागू करनी है। इससे पहले उसमें
-#                    tenant-workshopXX को अपने namespace से बदलें, वरना ऑर्डर कहीं और चला जाएगा
+# apply = "bring the cluster to what's described in the file." The command doesn't create
+# the storage itself — it hands the order to the platform.
+#   -f bucket.yaml   which file to apply. Before this, replace
+#                    tenant-workshopXX in it with your namespace, or the order goes elsewhere
 kubectl apply -f bucket.yaml
 ```
 
@@ -179,15 +179,15 @@ spec:
 बाक़ी उसी तरह लाए जाते हैं, बस फ़ील्ड का नाम बदलता है।
 
 ```bash
-# हम उसी टेनेंट एक्सेस के साथ काम करते हैं जैसा पिछले स्टेप में: सीक्रेट टेनेंट में रहता है।
-# get secret = "पासवर्ड और की वाला ऑब्जेक्ट दिखाओ"। सीक्रेट के भीतर के मान
-# base64 में एन्कोडेड होते हैं — यह एन्क्रिप्शन नहीं, बस बाइनरी डेटा को टेक्स्ट के रूप में लिखने का तरीक़ा है।
-#   -n tenant-workshopXX   किस namespace में देखना है
-#   -o jsonpath='...'      पूरा ऑब्जेक्ट नहीं, बल्कि उसमें से एक ही फ़ील्ड लौटाओ:
-#                          .data.accessKey — data सेक्शन के भीतर का accessKey फ़ील्ड
-#   base64 -d              इसे वापस पढ़ने योग्य रूप में डिकोड करो (d = decode)
-#   ; echo                 एक लाइन ब्रेक जोड़ो: इसके बिना मान अगले टर्मिनल प्रॉम्प्ट
-#                          से जुड़ जाएगा
+# We work with the same tenant access as in the previous step: the secret lives in the tenant.
+# get secret = "show the object with passwords and keys." The values inside the secret are
+# base64-encoded — this isn't encryption, just a way of writing binary data as text.
+#   -n tenant-workshopXX   which namespace to look in
+#   -o jsonpath='...'      return not the whole object, but a single field from it:
+#                          .data.accessKey — the accessKey field inside the data section
+#   base64 -d              decode it back into readable form (d = decode)
+#   ; echo                 add a line break: without it the value would run into
+#                          the next terminal prompt
 kubectl -n tenant-workshopXX get secret bucket-builds-ci-credentials \
   -o jsonpath='{.data.accessKey}' | base64 -d; echo
 ```
@@ -207,20 +207,20 @@ secrets` `no` जवाब देगा। अधिकार सीमित �
 नाम न बदलें: बिल्ड स्क्रिप्ट ठीक इन्हीं नामों वाले वेरिएबल ढूँढती है।
 
 ```bash
-# यहाँ से लैब के अंत तक हम lab क्लस्टर के साथ काम करते हैं, टेनेंट के साथ नहीं
+# From here to the end of the lab we work with the lab cluster, not the tenant
 export KUBECONFIG=~/lab.kubeconfig
 
-# create secret generic = "जिन मानों को मैं अभी सूचीबद्ध करूँगा, उनसे एक सीक्रेट बनाओ"।
-# generic का मतलब "नाम-मान जोड़ों का एक मनमाना सेट", किसी इमेज-रजिस्ट्री पासवर्ड या
-# TLS सर्टिफ़िकेट के लिए कोई तैयार टाइप नहीं।
-#   bucket-creds        सीक्रेट का नाम। Job इसी नाम से इसे संदर्भित करेगा
-#   --from-literal=name='value'   एक जोड़ी। ВСТАВЬТЕ_... की जगह, डैशबोर्ड में
-#                       बकेट के कार्ड से मान प्रतिस्थापित करें
+# create secret generic = "create a secret from the values I'm about to list."
+# generic means "an arbitrary set of name-value pairs," not a ready-made type
+# for an image-registry password or a TLS certificate.
+#   bucket-creds        the secret's name. The Job will reference it by this name
+#   --from-literal=name='value'   one pair. In place of PASTE_..., substitute
+#                       the values from the bucket's card in the dashboard
 kubectl create secret generic bucket-creds \
-  --from-literal=endpoint='ВСТАВЬТЕ_endpoint' \
-  --from-literal=bucketName='ВСТАВЬТЕ_bucketName' \
-  --from-literal=accessKey='ВСТАВЬТЕ_accessKey' \
-  --from-literal=secretKey='ВСТАВЬТЕ_secretKey'
+  --from-literal=endpoint='PASTE_endpoint' \
+  --from-literal=bucketName='PASTE_bucketName' \
+  --from-literal=accessKey='PASTE_accessKey' \
+  --from-literal=secretKey='PASTE_secretKey'
 ```
 
 **आपको क्या दिखना चाहिए:**
@@ -342,7 +342,7 @@ class MainActivity : Activity() {
 अगले स्टेप पर चाहिए होंगी।
 
 ```bash
-# अंदर छह फ़ाइलों वाला एक ConfigMap बनाता है। जाँचने के लिए कि यह मौजूद है:
+# Creates a ConfigMap with six files inside. To check it's in place:
 # kubectl get configmap propusk-src
 kubectl apply -f propusk-src.yaml
 ```
@@ -379,10 +379,10 @@ SDK और की बिल्ड कमांड खींच लाती ह�
 तीन पंक्तियाँ क़रीब से देखने लायक़ हैं।
 
 ```bash
-# yes — एक कमांड जो अंतहीन रूप से "y" प्रिंट करती है: इस तरह "लाइसेंस स्वीकार
-# करें? [y/n]" सवालों का पूरा जत्था बिना किसी इंसान के जवाब पा जाता है।
-#   >/dev/null 2>&1   सामान्य आउटपुट और त्रुटि आउटपुट दोनों फेंक दो: यहाँ इसकी ज़रूरत नहीं
-#   || true           "भले ही कमांड ने त्रुटि लौटाई हो, इसे ठीक मानो"
+# yes — a command that prints "y" endlessly: this way a batch of "accept the
+# license? [y/n]" questions gets answered without a human.
+#   >/dev/null 2>&1   discard both normal output and error output: it's not needed here
+#   || true           "even if the command returned an error, treat it as fine"
 yes | sdkmanager --sdk_root="$ANDROID_SDK_ROOT" --licenses >/dev/null 2>&1 || true
 ```
 
@@ -392,11 +392,11 @@ yes | sdkmanager --sdk_root="$ANDROID_SDK_ROOT" --licenses >/dev/null 2>&1 || tr
 करने से इनकार कर देगी, इसलिए हम त्रुटि छिपा नहीं रहे।
 
 ```bash
-# alias set = "स्टोरेज का पता और की को छोटे नाम builds के तहत याद रखो", ताकि
-# आगे आने वाली हर कॉपी कमांड में उन्हें दोहराना न पड़े।
-#   "https://${endpoint}"   पता: https:// प्रीफ़िक्स हम ख़ुद जोड़ते हैं, सीक्रेट में यह नहीं है
-#   ${accessKey} ${secretKey}   S3 की भाषा में लॉगिन और पासवर्ड, ये सीक्रेट से आते हैं
-#   >/dev/null              आउटपुट दबा दो
+# alias set = "remember the storage address and keys under the short name builds," so
+# we don't repeat them in every copy command that follows.
+#   "https://${endpoint}"   the address: we add the https:// prefix ourselves, it's not in the secret
+#   ${accessKey} ${secretKey}   the login and password in S3 terms, they come from the secret
+#   >/dev/null              suppress the output
 mc alias set builds "https://${endpoint}" "${accessKey}" "${secretKey}" >/dev/null
 ```
 
@@ -404,8 +404,8 @@ mc alias set builds "https://${endpoint}" "${accessKey}" "${secretKey}" >/dev/nu
 क्लस्टर तक पहुँच रखने वाले हर व्यक्ति को दिखते हैं, और की वहाँ नहीं पहुँचनी चाहिए।
 
 ```bash
-# echo काम के लॉग में एक पंक्ति प्रिंट करता है। यह कोई काम नहीं करता — यह एक मार्कर है
-# कि पिछली कॉपी कमांड पूरी तरह चल गई
+# echo prints a line to the task's log. It does no work — it's a marker
+# that the previous copy command ran to completion
 echo "APK-UPLOADED ${bucketName}/propusk/propusk-${STAMP}.apk"
 ```
 
@@ -505,14 +505,14 @@ ConfigMap की में स्लैश नहीं हो सकता, प
 हम job लागू करते हैं और तुरंत उस Pod को देखते हैं जो उसने बनाया।
 
 ```bash
-# फ़ाइल से दो ऑब्जेक्ट बनाता है: स्क्रिप्ट वाला एक ConfigMap और ख़ुद Job।
-# इस पल से क्लस्टर बाध्य है कि बिल्ड के लिए एक नोड ढूँढे और उसे शुरू करे
+# Creates two objects from the file: a ConfigMap with the script and the Job itself.
+# From this moment the cluster is obliged to find a node for the build and start it
 kubectl apply -f android-build.yaml
 
-# get pods = "Pod दिखाओ"। काम के Pod का अपना कोई नाम नहीं होता — Job उसे ख़ुद
-# गढ़ता है, अपने नाम के आगे एक यादृच्छिक पूँछ जोड़कर। इसलिए हम नाम से नहीं, बल्कि लेबल से ढूँढते हैं:
-#   -l job-name=propusk-build   job-name लेबल वाले वे Pod चुनो जिनका मान job के नाम के बराबर हो।
-#                               यह लेबल Job अपने Pod पर ख़ुद लगाता है
+# get pods = "show the Pods." The task's Pod has no name of its own — the Job invents it
+# itself, appending a random tail to its own name. So we search not by name but by label:
+#   -l job-name=propusk-build   select Pods with the job-name label equal to the job's name.
+#                               The Job attaches this label to its Pods itself
 kubectl get pods -l job-name=propusk-build
 ```
 
@@ -527,10 +527,10 @@ propusk-build-x7k2p    0/1     Pending   0          40s
 क्लस्टर वजह Pod की events में लिखता है — यह उसका लॉग है कि किसने उसके साथ क्या करने की कोशिश की।
 
 ```bash
-# describe = "ऑब्जेक्ट के बारे में जो कुछ भी पता है वह दिखाओ": सेटिंग्स, स्थिति, events।
-# आउटपुट लंबा है, इसलिए हम उसका सिर्फ़ आख़िरी हिस्सा रखते हैं:
-#   sed -n '/Events:/,$p'   उस पंक्ति से जहाँ "Events:" आता है, आउटपुट के अंत तक
-#                           की पंक्तियाँ प्रिंट करो ($ — अंत)
+# describe = "show everything known about the object": settings, state, events.
+# The output is long, so we keep only its tail:
+#   sed -n '/Events:/,$p'   print lines from the one where "Events:" appears,
+#                           through the end of the output ($ — end)
 kubectl describe pod -l job-name=propusk-build | sed -n '/Events:/,$p'
 ```
 
@@ -599,11 +599,11 @@ vSphere में आप दोनों से परिचित हैं: �
 से देखते हैं:
 
 ```bash
-# get nodes = "क्लस्टर के नोड दिखाओ" — वही वर्चुअल मशीनें जिन पर
-# Pod चलते हैं।
-#   -w   watch, "बाहर मत निकलो; हर बदलाव पर पंक्तियाँ जोड़ते जाओ"। पुराना नोड
-#        सूची से हट जाएगा, नया आएगा और STATUS=Ready तक पहुँचेगा।
-#        watch से निकलने के लिए — Ctrl+C, जिसका क्लस्टर पर कोई असर नहीं
+# get nodes = "show the cluster's nodes" — those very virtual machines on which
+# the Pods run.
+#   -w   watch, "don't exit; append lines on every change." The old node
+#        will drop from the list, a new one will appear and reach STATUS=Ready.
+#        To leave the watch — Ctrl+C, which has no effect on the cluster
 kubectl get nodes -w
 ```
 
@@ -611,8 +611,8 @@ kubectl get nodes -w
 Pod को लगातार दोबारा देखता रहता है, उसे कहने की ज़रूरत नहीं। हम जाँचते हैं कि वह चल पड़ा:
 
 ```bash
-# नोड बदलने से पहले वाला वही क्वेरी। अब STATUS कॉलम में
-# ContainerCreating दिखना चाहिए, और एक-दो मिनट में Running
+# The same query as before the node edit. Now the STATUS column should show
+# ContainerCreating, and in a minute or two Running
 kubectl get pods -l job-name=propusk-build
 ```
 
@@ -624,10 +624,10 @@ kubectl get pods -l job-name=propusk-build
 करती है।
 
 ```bash
-# logs = "जो काम ने प्रिंट किया वह दिखाओ"।
-#   -f                  follow: बाहर मत निकलो, बल्कि पंक्तियाँ जैसे-जैसे आएँ जोड़ते जाओ।
-#                       बाहर निकलना — Ctrl+C, बिल्ड फिर भी चलती रहती है
-#   job/propusk-build   आप Pod नहीं, बल्कि ख़ुद Job की ओर इशारा कर सकते हैं: kubectl उसका Pod ख़ुद ढूँढ लेगा
+# logs = "show what the task printed."
+#   -f                  follow: don't exit, but append lines as they appear.
+#                       Exit — Ctrl+C, the build keeps going regardless
+#   job/propusk-build   you can point at the Job itself, not the Pod: kubectl will find its Pod on its own
 kubectl logs -f job/propusk-build
 ```
 
@@ -647,8 +647,8 @@ kubectl logs -f job/propusk-build
 Pod CPU और मेमोरी खा रहा है या नहीं:
 
 ```bash
-# top = "अभी यह कितना खपत कर रहा है"। requests का दावा नहीं, बल्कि ठीक इसी क्षण की
-# वास्तविक खपत। ग़ैर-शून्य CPU का मतलब है कि अंदर काम हो रहा है
+# top = "how much it's consuming right now." Not the requests claim, but actual usage
+# this very second. Non-zero CPU means work is happening inside
 kubectl top pod -l job-name=propusk-build
 ```
 
@@ -656,7 +656,7 @@ Job तब पूरा माना जाता है जब Pod कोड 0 
 स्वीकृत "बिना त्रुटियों के चला" है):
 
 ```bash
-# हम Pod नहीं, बल्कि ख़ुद job को देखते हैं: इसमें ऐसे कॉलम हैं जो Pod में नहीं
+# We look not at the Pod but at the job itself: it has columns the Pod doesn't
 kubectl get job propusk-build
 ```
 
@@ -708,8 +708,8 @@ propusk/propusk-latest.apk
 📍 **कहाँ:** आपके लैपटॉप पर, उसी टर्मिनल विंडो में जहाँ आपने `kubectl` के साथ काम किया।
 
 ```bash
-# स्क्रिप्ट lab क्लस्टर तक उसी एक्सेस फ़ाइल से पहुँचती है जिससे आप। बकेट के
-# क्रेडेंशियल यह bucket-creds सीक्रेट से लेती है — आपको अलग से कुछ दर्ज करने की ज़रूरत नहीं
+# The script reaches the lab cluster with the same access file as you. The bucket
+# credentials it takes from the bucket-creds secret — you don't need to enter anything separately
 export KUBECONFIG=~/lab.kubeconfig
 ./check.sh
 ```
@@ -731,11 +731,11 @@ export KUBECONFIG=~/lab.kubeconfig
 इसे तुरंत हटाने की ज़रूरत नहीं; लॉग अभी भी काम आएँगे। जब आप ख़त्म कर लें:
 
 ```bash
-# delete -f = "जो इस फ़ाइल में वर्णित है उसे क्लस्टर से हटाओ"। Job के साथ
-# उसके लॉग भी ग़ायब हो जाएँगे, इसलिए यह कमांड समय में आख़िरी आती है, पहली नहीं
+# delete -f = "remove from the cluster what's described in this file." Along with the Job
+# its logs will disappear too, so this command comes last in time, not first
 kubectl delete -f android-build.yaml
 kubectl delete -f propusk-src.yaml
-# सीक्रेट हम अलग से हटाते हैं: इसके लिए कोई फ़ाइल नहीं, आपने इसे एक कमांड से बनाया था
+# We delete the secret separately: there's no file for it, you created it with a command
 kubectl delete secret bucket-creds
 ```
 

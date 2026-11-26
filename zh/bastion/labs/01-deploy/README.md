@@ -34,7 +34,7 @@
 下面凡是写着 `kubectl apply -f name.yaml` 的地方，文件都是从这里取的。
 
 ```bash
-# 路径是相对于你在实验 0 中拉取的仓库根目录
+# the path is relative to the root of the repository you pulled in lab 0
 cd labs/01-deploy
 ```
 
@@ -62,10 +62,10 @@ API 服务器，并向你展示此刻里面有什么。
 我们来连接：
 
 ```bash
-# KUBECONFIG —— kubectl 读取这个变量来得知该使用哪个访问文件。
-# 这里指的是访问 lab 集群，而不是租户：文件不同，集群不同。
+# KUBECONFIG — the variable kubectl reads to learn which access file to use.
+# Here that's access to the lab cluster, not to the tenant: different files, different clusters.
 export KUBECONFIG=~/lab.kubeconfig
-# get nodes =「显示节点」。回应确认 kubectl 连的是正确的地方。
+# get nodes = "show the nodes". The answer confirms kubectl is talking to the right place.
 kubectl get nodes
 ```
 
@@ -126,7 +126,7 @@ metadata:
   name: rickroll-page-v1
 data:
   index.html: |
-    ...<div class="pod">为您服务的 Pod<b>__POD__</b></div>...
+    ...<div class="pod">served by pod<b>__POD__</b></div>...
 ```
 
 就是那个将被 nginx 替换的 `__POD__`。名字里的 `-v1` 并非偶然：在关于滚动发布版本的
@@ -237,9 +237,9 @@ Service 和 Pod 之间的联系不是一份地址清单，而是一个**条件**
 现在我们来应用它：
 
 ```bash
-# apply =「把集群带到文件里所描述的样子」。四个对象用一条命令
-# 一并创建；文件内部的顺序由集群自己搞定。
-#   -f   从文件中取得描述
+# apply = "bring the cluster to what's described in the file". All four objects are created
+# with a single command; the cluster works out the order within the file on its own.
+#   -f   take the description from a file
 kubectl apply -f rickroll.yaml
 ```
 
@@ -255,8 +255,8 @@ service/rickroll created
 等待副本启动：
 
 ```bash
-# rollout status 会一直等到 Deployment 把事情办成：所需数量的副本
-# 正在运行、并已就绪可以接收请求。到那时命令会自行结束。
+# rollout status waits until the Deployment sees the job through: the required number of copies
+# is running and ready to accept requests. The command finishes on its own when that happens.
 kubectl rollout status deployment/rickroll
 ```
 
@@ -272,8 +272,8 @@ kubectl rollout status deployment/rickroll
 现在是什么样子：
 
 ```bash
-# get deployment rickroll = 按类型和名字显示单个对象。
-#   -o yaml   把它完整打印出来，形式和你可以手写出来的那种一样
+# get deployment rickroll = show a single object by type and name.
+#   -o yaml   print it in full, in the same form you could write it by hand
 kubectl get deployment rickroll -o yaml
 ```
 
@@ -306,10 +306,10 @@ spec:
 往里开一条隧道。
 
 ```bash
-# port-forward = 从 bastion 通往集群内部的一条隧道，只要命令在运行它就存活。
-#   svc/rickroll   把隧道接到名为 rickroll 的 Service 上，而它再把
-#                  请求转发到应用的一份存活副本
-#   8080:80        左边的数字是 bastion 上的端口，右边是集群里 Service 的端口
+# port-forward = a tunnel from the bastion into the cluster, alive as long as the command runs.
+#   svc/rickroll   run the tunnel to the Service named rickroll, which in turn routes
+#                  the request to a live copy of the application
+#   8080:80        the left number is the port on the bastion, the right is the Service port in the cluster
 kubectl port-forward svc/rickroll 8080:80
 ```
 
@@ -327,9 +327,9 @@ export KUBECONFIG=~/lab.kubeconfig
 ```
 
 ```bash
-# get pods =「显示正在运行的副本」。
-#   -l app=rickroll   不显示全部 Pod，只显示带标签 app=rickroll 的——
-#                     正是 Service 用来找到它们的那个
+# get pods = "show the running copies".
+#   -l app=rickroll   show not all Pods, but only those with the label app=rickroll —
+#                     the very one the Service uses to find them
 kubectl get pods -l app=rickroll
 ```
 
@@ -342,8 +342,8 @@ kubectl get pods -l app=rickroll
 📍 **位置：** 在 bastion 上，在你之前操作 `kubectl` 的那同一个终端窗口里。
 
 ```bash
-# 从实验文件夹里运行它：脚本会在自己旁边找它需要的文件。
-# 名字前面的 ./ 意思是「就从这里运行这个文件」，而不是去系统文件夹里找它
+# run it from the lab folder: the script looks for its files next to itself.
+# the ./ before the name means "run the file from right here", not look for it in system folders
 ./check.sh
 ```
 

@@ -1,21 +1,21 @@
 ---
-# 实验 7 · 本补丁故意是不完整的。它的存在是为了让你看到
-# “缓存好像启用了，但速度并没有变快”是什么样子。可用的版本在 cache-patch.yaml 中。
+# Lab 7 · THIS PATCH IS INTENTIONALLY INCOMPLETE. It exists so that you can see what
+# "we sort of enabled the cache, but it didn't get any faster" looks like. The working version is in cache-patch.yaml.
 #
-# 在你的 `lab` 集群中应用（export KUBECONFIG=~/lab.kubeconfig）：
+# Applied in your `lab` cluster (export KUBECONFIG=~/lab.kubeconfig):
 #   kubectl patch deployment passes-api --patch-file cache-patch-broken.yaml
 #
-# 不要偷看答案。应用它，发几次请求，然后查看应用日志：
-# kubectl logs -l app=passes-api。应用会告诉你它出了什么问题，
-# 关键在于读懂这条消息，弄清楚这个文件里缺了什么。
+# No peeking at the answer. Apply it, make a couple of requests, and look at the
+# application logs: kubectl logs -l app=passes-api. The application tells you what's wrong with it
+# — the point is to read the message and figure out what's missing from this file.
 #
-# 把 REDIS-ADDR 替换成你自己的 Redis 地址（见查找地址的那一步）。
-# 不能保留占位符：否则你会得到另一种错误，而不是这一切原本要复现的那个。
+# Substitute your own Redis address in place of REDIS-ADDR (see the step about finding the address).
+# You can't leave the placeholder: then you'll get the wrong error, not the one this whole thing was set up for.
 spec:
   template:
     spec:
       containers:
-        # 容器名是集群用来定位待修改位置的地址。
+        # The container name is the address by which the cluster finds the place to edit.
         - name: api
           env:
             - name: REDIS_ADDR

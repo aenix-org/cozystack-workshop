@@ -10,7 +10,7 @@
 
 Забираем скрипт с гитхаба прямо в машину:
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/laptop/scripts/convert.sh
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/laptop/scripts/convert.sh
 ```
 
 Открываем его:
@@ -23,9 +23,9 @@ nano convert.sh
 кавычки на месте:
 
 ```
-BUCKET="имя-вашего-бакета"
-ACCESS_KEY="ваш-accessKey"
-SECRET_KEY="ваш-secretKey"
+BUCKET="your-bucket-name"
+ACCESS_KEY="your-accessKey"
+SECRET_KEY="your-secretKey"
 ```
 
 Строку `S3_ENDPOINT` и ссылку на исходный образ не трогайте — они уже правильные
@@ -34,7 +34,7 @@ SECRET_KEY="ваш-secretKey"
 Сохранить в nano: `Ctrl+O`, затем `Enter`, затем `Ctrl+X` для выхода. Проверить, что
 заглушек не осталось:
 ```bash
-grep ВСТАВЬТЕ convert.sh || echo "всё заполнено, можно запускать"
+grep PASTE_ convert.sh || echo "all filled in, ready to run"
 ```
 
 Запускаем — обязательно через `sudo`, скрипту нужны права root:
@@ -57,7 +57,7 @@ sudo bash convert.sh
 
 **Что с ней делать:** скопируйте её в тот же блокнот. На следующем шаге вы вернётесь
 на ноутбук, откроете `manifests/03-app-vm.yaml` и вставите её в поле `url` — туда, где
-сейчас стоит заглушка `ВСТАВЬТЕ_PRESIGNED_URL`. Та самая, про которую я предупреждал,
+сейчас стоит заглушка `PASTE_PRESIGNED_URL`. Та самая, про которую я предупреждал,
 когда мы подставляли номера.
 
 Это временная подписанная ссылка: хранилище наружу не открыто, а ссылку вы сделали

@@ -49,9 +49,9 @@ kubectl get buckets.apps.cozystack.io -n tenant-workshopXX
 а в нём — блок «ВСТАВЬТЕ СВОИ ЗНАЧЕНИЯ» из трёх строк:
 
 ```
-BUCKET="ВСТАВЬТЕ_bucketName"
-ACCESS_KEY="ВСТАВЬТЕ_accessKey"
-SECRET_KEY="ВСТАВЬТЕ_secretKey"
+BUCKET="PASTE_bucketName"
+ACCESS_KEY="PASTE_accessKey"
+SECRET_KEY="PASTE_secretKey"
 ```
 
 Ровно эти три значения туда и вставите, каждое в свои кавычки. Больше они нигде

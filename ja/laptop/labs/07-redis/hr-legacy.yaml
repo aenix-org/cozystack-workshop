@@ -1,20 +1,20 @@
 ---
-# ラボ 7 · レガシーな従業員ディレクトリのスタブ。
-# 現実にはこれは他人のシステムで、書き換えを任されることはありません。応答に 800 ミリ秒かかり、
-# それと何とか付き合っていくしかありません。ここでは、測定できるように同じ挙動を持つスタブを用意します。
+# Lab 7 · a stub for the legacy employee directory.
+# In real life this is someone else's system that you won't be allowed to rewrite: it responds in 800 ms,
+# and you have to live with that somehow. Here is a stub with the same behavior, so there is something to measure.
 #
-# 適用先: あなたの `lab` クラスタ (export KUBECONFIG=~/lab.kubeconfig)、Cozystack の
-# 管理クラスタではありません。コマンド: kubectl apply -f hr-legacy.yaml
+# Where it applies: your `lab` cluster (export KUBECONFIG=~/lab.kubeconfig), not the Cozystack
+# management cluster. Command: kubectl apply -f hr-legacy.yaml
 #
-# HARBOR-HOST はアドレスではなくプレースホルダです。自分の Harbor のアドレスに置き換えてください。さもないとクラスタは
-# 存在しないホストからイメージを取得しようとします:
+# HARBOR-HOST is a placeholder, not an address. Substitute the address of your own Harbor, otherwise the cluster
+# will try to pull the image from a nonexistent host:
 #   sed -i    's|HARBOR-HOST|harbor.workshop03.example.org|g' *.yaml   # Linux
 #   sed -i '' 's|HARBOR-HOST|harbor.workshop03.example.org|g' *.yaml   # macOS
 #
-# このファイルには `---` 行で区切られた 2 つのオブジェクトがあります: Deployment (何が、いくつの
-# コピーで動くか) と Service (それらのコピーに到達するための恒久的な名前)。各オブジェクトの
-# apiVersion と kind はそれがどんな種類のオブジェクトかを示し、metadata.name はその名前です。
-# これより下では、この 3 つのフィールドにはコメントを付けません。
+# The file has two objects separated by a `---` line: a Deployment (what runs and in how many
+# copies) and a Service (a permanent name used to reach those copies). For each object
+# apiVersion and kind say what kind of object it is, and metadata.name is what it's called;
+# further down these three fields are not commented.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -22,72 +22,72 @@ metadata:
   labels:
     app: hr-legacy
 spec:
-  # いくつのコピーを起動したままにするか。コピーが消えると、クラスタは尋ねることなく
-  # 新しいものを作ります。ディレクトリには 1 つで十分です。ここにあるのは負荷のためではなく、測定のためです。
+  # How many copies to keep running. If a copy disappears, the cluster will create a new one without
+  # asking. One is enough for the directory: it's here not for load, but for measurement.
   replicas: 1
-  # このラベルによって、Deployment はクラスタ内の他のすべての中から自分のポッドを見分けます。
-  # selector 内のラベルと下の template 内のラベルは一致していなければならず、さもないとオブジェクトは
-  # 自分自身が作ったものを見つけられません。
+  # By this label the Deployment recognizes its pods among all the others in the cluster.
+  # The label in selector and the label in template below must match, otherwise the object
+  # won't find what it created itself.
   selector:
     matchLabels:
       app: hr-legacy
-  # template はポッドのテンプレートです。以下のすべてが 1 つのコピーを記述します: 何から組み立てるか、
-  # どんな権限で起動するか、そしてリクエストを受け付ける準備ができたことをどう判断するか。
+  # template is the pod template. Everything below describes one copy: what to build it from,
+  # with which privileges to run it, and how to tell that it's ready to accept requests.
   template:
     metadata:
       labels:
         app: hr-legacy
     spec:
-      # ポッドレベルのセキュリティ要件。プロセスは root ではなく (uid 10001) 動作し、
-      # seccomp プロファイルはアプリケーションが必要としないシステムコールを遮断します。
-      # ポリシーが有効なクラスタでは、これらのフィールドがないポッドはそもそも起動しません。
+      # Pod-level security requirements. The process runs not as root (uid 10001),
+      # the seccomp profile cuts off system calls the application doesn't need.
+      # In a cluster with policies enabled, a pod without these fields won't start at all.
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
         seccompProfile:
           type: RuntimeDefault
-      # Harbor はログインとパスワードで閉じられており、クラスタは何かで自分を名乗る必要があります。
-      # `harbor` シークレットはレジストリのラボで用意したものです。この参照がないとイメージは取得されず、
-      # ポッドは ImagePullBackOff の状態のままになります。
+      # Harbor is closed off by a login and password, and the cluster needs something to identify itself with. The
+      # `harbor` secret you set up in the registry lab. Without this reference the image won't be pulled,
+      # and the pod will stay in the ImagePullBackOff state.
       imagePullSecrets:
         - name: harbor
       containers:
         - name: hr
-          # ポッドレベルと同じですが、特定のコンテナに対するものです: 権限昇格を禁止し、
-          # すべてのカーネル権限を剥奪します。Go アプリケーションには
-          # そのどれも必要ありません。
+          # The same as at the pod level, but for a specific container: we forbid
+          # privilege escalation and drop all kernel capabilities. The Go application
+          # needs none of them.
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # イメージはディレクトリと「ゲストパス」サービス本体で同じものです。
-          # どのプロセスが実際に起動するかは、下の MODE 変数が決めます。
+          # The image is the same for the directory and for the "Guest Pass" service itself.
+          # Which process actually starts is decided by the MODE variable below.
           image: HARBOR-HOST/passes/passes-api:v2
-          # ポートには番号だけでなく名前があります: レディネスプローブと下の Service は
-          # 名前を参照します。番号が変わっても、修正するのは 1 か所だけで済みます。
+          # The port has a name, not just a number: the readiness probe and the Service below
+          # reference the name. If the number changes, you'll edit it in one place.
           ports:
             - containerPort: 8080
               name: http
-          # 環境変数はこのアプリケーションを設定する唯一の方法です。
-          # 挙動を変えるためにイメージを再ビルドする必要はありません。
+          # Environment variables are the only way to configure this application.
+          # There's no need to rebuild the image to change behavior.
           env:
-            # MODE=hr — このインスタンスは人事システムのふりをします: 待ってから応答します。
+            # MODE=hr — the instance pretends to be an HR system: it waits and responds.
             - name: MODE
               value: "hr"
-            # 本物のディレクトリが示すのとまったく同じ遅延です。
-            # これを変えると「どれだけ悪い状況か」が変わります — あとで 2s を試してみてください。
+            # Exactly the delay that the real directory shows.
+            # By changing it, you change "how bad things are" — try 2s afterwards.
             - name: HR_DELAY
               value: "800ms"
-            # ポッドは自分の名前を事前には知りません — クラスタが作成時に割り当てます。
-            # fieldRef が起動時にこの名前を変数へ差し込み、それが
-            # サービスの応答に含まれます: どのコピーが応答したかが分かります。
+            # A pod doesn't know its own name in advance — the cluster assigns it on creation.
+            # fieldRef substitutes this name into the variable at startup, and it
+            # ends up in the service's response: you can see which copy answered.
             - name: POD_NAME
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
-          # requests — ノードを選ぶ際にコンテナのために予約されるリソース量、
-          # limits — それを超えることが許されない上限。vSphere の reservation と
-          # limit に似ていますが、仮想マシンごとではなくコンテナごとに設定します。
+          # requests — how many resources are reserved for the container when choosing a node,
+          # limits — the ceiling it won't be allowed to exceed. Similar to reservation
+          # and limit in vSphere, but set per container, not per virtual machine.
           resources:
             requests:
               cpu: 50m
@@ -95,9 +95,9 @@ spec:
             limits:
               cpu: "1"
               memory: 64Mi
-          # レディネスプローブ。/healthz が応答するまで、Service はこのコピーに
-          # 1 つのリクエストも送りません。プローブがないと、トラフィックはまだ起動していないプロセスに向かい、
-          # 何もないところでエラーが見えます — 「すべてがロールアウトされた」にもかかわらず。
+          # Readiness probe. Until /healthz responds, the Service won't send a single request
+          # to this copy. Without the probe, traffic would go to a process that hasn't started yet,
+          # and you'd see errors out of nowhere — even though "everything rolled out".
           readinessProbe:
             httpGet:
               path: /healthz
@@ -105,19 +105,19 @@ spec:
             initialDelaySeconds: 2
             periodSeconds: 5
 ---
-# Service — 一連のポッドのための恒久的な名前と恒久的なアドレス。ポッドは再作成され、
-# そのたびに新しい IP を受け取りますが、hr-legacy という名前は同じままです。ロードバランサの
-# VIP に似ていますが、4 行で用意でき、クラスタ内部で生きています。
+# Service — a permanent name and permanent address for a set of pods. Pods get recreated
+# and each time receive a new IP, but the name hr-legacy stays the same. Similar to a load
+# balancer VIP, but set up in four lines and living inside the cluster.
 apiVersion: v1
 kind: Service
 metadata:
   name: hr-legacy
 spec:
-  # このラベルによって、Service は生きているコピーのリストを集めます。上のポッドと同じラベルです:
-  # 一致しなければ、Service は存在してもどこにもつながりません。
+  # By this label the Service gathers the list of live copies. The same label as on the pods above:
+  # if it doesn't match, the Service will exist and lead nowhere.
   selector:
     app: hr-legacy
   ports:
-    # リクエストは 80 番ポートで受け付け、ポッド内部では http という名前のポート (8080) に送られます。
+    # Requests come in on port 80, inside the pod this goes to the port named http (8080).
     - port: 80
       targetPort: http

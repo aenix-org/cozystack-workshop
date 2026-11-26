@@ -7,8 +7,8 @@
 **你的登录凭据：**
 ```
 dashboard: https://dashboard.workshop.aenix.io
-login:     workshopXX      ← 你的编号，我会当面告诉你
-password:  ...             ← 我会当面告诉你
+login:     workshopXX      ← your number, I'll tell you in person
+password:  ...             ← I'll tell you in person
 ```
 
 1. 通过上面的链接打开控制台。
@@ -20,13 +20,13 @@ password:  ...             ← 我会当面告诉你
 **macOS 和 Linux**
 ```bash
 mkdir -p ~/.kube
-nano ~/.kube/workshop      # 粘贴刚才复制的内容，然后保存
+nano ~/.kube/workshop      # paste what you copied, then save
 export KUBECONFIG=~/.kube/workshop
 ```
 
 **Windows**（PowerShell）
 ```powershell
-notepad $HOME\.kube\workshop   # 粘贴，然后保存
+notepad $HOME\.kube\workshop   # paste, then save
 $env:KUBECONFIG = "$HOME\.kube\workshop"
 ```
 
@@ -50,13 +50,13 @@ kubeconfig 里的 `certificate-authority-data` 字段中，而默认文件里没
 我们在 PowerShell 里一步步排查：
 ```powershell
 $env:KUBECONFIG
-# 为空 —— 说明用的是默认文件，而不是发给你的那个
+# empty — means it's using the default file, not the one you were given
 
 Select-String -Path "$HOME\.kube\workshop" -Pattern "certificate-authority-data" -Quiet
-# False —— 文件保存得不完整；请从控制台重新下载这个 secret
+# False — the file was saved incompletely; download the secret from the dashboard again
 
 Get-Content "$HOME\.kube\workshop" -TotalCount 1
-# 应当以 apiVersion 开头；出现小方块或空白，说明文件是 UTF-16 编码
+# should start with apiVersion; little squares or emptiness mean the file is in UTF-16
 ```
 
 第三点是 Windows 上最阴险的陷阱。记事本和 `>` 重定向会把文件保存成

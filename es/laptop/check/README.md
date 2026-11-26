@@ -43,7 +43,7 @@ visibles desde dentro en `/mnt/c/...`. Sustituye tu nombre de usuario de Windows
 lo guardaste:
 
 ```bash
-export KUBECONFIG=/mnt/c/Users/<tu-nombre>/lab.kubeconfig
+export KUBECONFIG=/mnt/c/Users/<your-name>/lab.kubeconfig
 ```
 
 ⚠️ **Si no se puede instalar WSL** — una situación frecuente en una laptop corporativa — aún puedes

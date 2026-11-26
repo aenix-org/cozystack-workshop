@@ -28,7 +28,7 @@ bastion そのものでは実行しません — bastion では `kubectl` でマ
 **変換用マシン**にはネットワークがあるので、自分でファイルをダウンロードします。リポジトリは
 公開されていて、鍵は不要です:
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/bastion/scripts/convert.sh
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/bastion/scripts/convert.sh
 ```
 
 **あなたの app-VM は最初はネットワークがまったくありません** — その壊れた状態こそ、
@@ -41,6 +41,6 @@ curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-work
 ⚠️ **マニフェスト内のテナント番号はすでに埋め込み済みです** — bastion を準備している間に、
 `tenant-workshopXX` のプレースホルダーがあなたの番号に置き換えられています。手で何かを
 入力する必要はありません。自分で埋めるのは、`convert.sh` の中の `bucketName`、`accessKey`、
-`secretKey`（このファイルは変換用マシンに新しくダウンロードされ、`ВСТАВЬТЕ_...` の
+`secretKey`（このファイルは変換用マシンに新しくダウンロードされ、`PASTE_...` の
 プレースホルダーが入っています）と、ステップ 4 で `manifests/03-app-vm.yaml` に入れる署名付き
 リンクだけです。

@@ -7,15 +7,15 @@
 **여러분의 접속 정보** (로그인과 비밀번호는 세 곳 모두 동일합니다):
 ```
 dashboard: https://dashboard.workshop.aenix.io
-bastion:   ssh workshopXX@<bastion-주소>
-login:     workshopXX      ← 여러분의 번호, 직접 알려드립니다
-password:  ...             ← 직접 알려드립니다
+bastion:   ssh workshopXX@<bastion-address>
+login:     workshopXX      ← your number, I'll tell you in person
+password:  ...             ← I'll tell you in person
 ```
 
 bastion에 로그인합니다 — 비밀번호는 대시보드와 동일하며, **SSH 키는 필요하지 않습니다**:
 
 ```bash
-ssh workshopXX@<bastion-주소>
+ssh workshopXX@<bastion-address>
 ```
 
 접속하면 클러스터 접근이 이미 설정되어 있습니다: kubeconfig는 `~/.kube/config`에 있고, `kubectl`은
