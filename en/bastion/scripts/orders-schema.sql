@@ -1,17 +1,12 @@
--- orders schema for managed Postgres (table + history seed).
+-- Orders schema for the managed PostgreSQL from the catalog: one table and one row of history.
 --
--- The `orders` role and `orders` DB are created by the Postgres chart (Postgres CR), so
--- there is NO CREATE USER / CREATE DATABASE here — only the table and a bit of history.
+-- The `orders` user and the `orders` database come from the Postgres declaration, so there is
+-- no CREATE USER or CREATE DATABASE here. Without the table the application answers 500 on
+-- POST /api/orders while its health check stays 200: the check only opens a connection.
 --
--- IMPORTANT (PG 15+): the orders role cannot create tables in the public schema without
--- a grant. First, once, as superuser (secret postgres-db-superuser):
---     GRANT CREATE,USAGE ON SCHEMA public TO orders;
--- and only then apply this file as the orders role. Without the table the application
--- returns 500 on POST /api/orders (health stays 200 — it only checks the
--- connection to PG, not the presence of the table).
---
--- Run (from the app-VM or any machine with access to managed PG):
---     PGPASSWORD='<orders-pw>' psql -h postgres-db-rw -U orders -d orders -f orders-schema.sql
+-- Apply it from the platform side, in the primary database pod, as the `orders` role:
+--     ( echo 'SET ROLE orders;'; cat orders-schema.sql ) | \
+--       kubectl exec -i postgres-orders-1 -c postgres -- psql -d orders -v ON_ERROR_STOP=1
 
 CREATE TABLE IF NOT EXISTS orders (
     id           BIGSERIAL PRIMARY KEY,
