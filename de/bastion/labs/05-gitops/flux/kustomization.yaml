@@ -1,49 +1,49 @@
 ---
-# Lab 5 · Infrastruktur in Git. Aufgabe: was genau aus dem Repository in den Cluster anzuwenden ist.
+# Lab 5 · Infrastructure in Git. Task: what exactly from the repository to apply to the cluster.
 #
-# Wird auf Ihrem Cluster `lab` zusammen mit dem benachbarten gitrepository.yaml angewendet:
+# Applied on your `lab` cluster together with the neighboring gitrepository.yaml:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl apply -f flux/
 #
-# In jedem Objekt: apiVersion — die Version des Beschreibungsschemas, kind — was wir erstellen,
-# metadata.name — der Name des Objekts. Unten werden sie nicht gesondert erläutert.
+# In each object: apiVersion — the version of the description schema, kind — what we create,
+# metadata.name — the object's name. Not explained separately below.
 #
-# Aufgabenteilung: GitRepository lädt das Repository herunter und wendet nichts an,
-# dieses Objekt nimmt das Heruntergeladene und bringt den Cluster damit in Übereinstimmung. Der Name Kustomization stimmt
-# mit dem Namen des Werkzeugs kustomize überein, aber das sind verschiedene Dinge — hier ist es ein Objekt im Cluster.
+# Separation of duties: GitRepository downloads the repository and applies nothing,
+# this object takes what was downloaded and brings the cluster in line with it. The name Kustomization matches
+# the name of the kustomize utility, but these are different things — here it is an object in the cluster.
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
   name: passes
-  # Lebt dort, wo die Flux-Dienste sind — sonst nimmt der kustomize-controller es nicht auf.
+  # Lives in the same place as the Flux services — otherwise kustomize-controller won't pick it up.
   namespace: flux-system
 spec:
-  # Wie oft der tatsächliche Zustand des Clusters mit dem in Git beschriebenen abgeglichen wird.
-  # Das ist nicht „einmal pro Minute erneut anwenden" — es ist „einmal pro Minute vergleichen und
-  # Abweichungen korrigieren". Selbst wenn sich in Git nichts geändert hat, wird eine von
-  # Hand über kubectl edit gemachte Änderung stillschweigend zurückgerollt. Den Unterschied sehen Sie
-  # etwas weiter im Lab, wenn Sie selbst etwas im Cluster an Git vorbei ändern.
+  # How often to reconcile the actual state of the cluster with the one described in Git.
+  # This is not "apply again once a minute" — it is "compare and fix
+  # discrepancies once a minute". Even if nothing changed in Git, an edit made
+  # by hand via kubectl edit will be silently rolled back. You will see the difference
+  # a bit later in the lab, when you change something in the cluster yourself, bypassing Git.
   interval: 1m
-  # Der Ordner innerhalb des Repositorys. Alles, was darin liegt, gelangt in den Cluster; Dateien daneben
-  # — zum Beispiel README.md im Wurzelverzeichnis — werden nicht angerührt. Der Name `apps` ist von uns gewählt, aber er
-  # muss mit dem Ordner übereinstimmen, in den Sie die Manifeste in Ihrem Repository legen.
+  # A folder inside the repository. Everything in it will end up in the cluster; files next
+  # to it — for example README.md in the root — won't be touched. The name `apps` was chosen by us, but it
+  # must match the folder into which you put manifests in your repository.
   path: ./apps
-  # Aus dem Cluster die Objekte löschen, die aus Git verschwunden sind.
-  # Ohne dies hört Git auf, eine vollständige Beschreibung zu sein: aus dem Repository Gelöschtes
-  # würde weiter im Cluster laufen, und niemand wüsste davon.
+  # Delete from the cluster objects that have disappeared from Git.
+  # Without this Git stops being a complete description: what was deleted from the repository
+  # would keep running in the cluster, and no one would know about it.
   prune: true
-  # Auf welche Quelle geschaut wird. Der Name `passes` ist der metadata.name aus gitrepository.yaml,
-  # nicht der Name des Repositorys auf GitHub. Benennen Sie ihn dort um — korrigieren Sie es auch hier, sonst wartet Flux
-  # auf eine Quelle, die es nicht gibt, und die Kustomization wird nicht bereit.
+  # Which source to look at. The name `passes` is the metadata.name from gitrepository.yaml,
+  # not the repository's name on GitHub. Rename it there — fix it here too, otherwise Flux
+  # will wait for a source that doesn't exist, and the Kustomization won't become ready.
   sourceRef:
     kind: GitRepository
     name: passes
-  # Auf die Bereitschaft des Angewendeten warten, statt gleich nach dem apply Erfolg zu melden.
-  # Der Unterschied ist genau derselbe wie zwischen „den Antrag eingereicht" und „der Antrag ist erledigt": ohne wait
-  # meldet Flux Erfolg, selbst wenn die Pods danach nicht hochkommen.
+  # Wait for the applied resources to become ready, rather than reporting success right after apply.
+  # The difference is exactly the same as between "request submitted" and "request completed": without wait
+  # Flux will report success even if the pods don't come up afterward.
   wait: true
-  # Wie lange auf diese Bereitschaft gewartet wird, bevor die Anwendung als erfolglos gilt.
-  # Drei Minuten — mit Reserve für das Herunterladen des Images auf einem leeren Node. Ein zu kleiner
-  # Wert führt zu falschen Fehlschlägen in einem langsamen Netz, ein zu großer — Sie schauen
-  # lange auf „in Bearbeitung" statt auf einen klaren Fehler.
+  # How long to wait for that readiness before declaring the apply unsuccessful.
+  # Three minutes — with a margin for pulling the image on an empty node. Too small a
+  # value will give false failures on a slow network, too large — you will
+  # stare at "in progress" for a long time instead of a clear error.
   timeout: 3m

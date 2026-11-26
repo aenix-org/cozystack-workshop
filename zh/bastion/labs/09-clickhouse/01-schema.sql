@@ -1,59 +1,59 @@
--- 实验 9 · 通行记录表：每一次闸机刷卡对应一行。
+-- Lab 9 · pass log table: one row per turnstile tap.
 --
--- 在哪里执行：在虚拟机上、实验集群里，用 README 中的简短命令 `ch`
--- 执行——它会把 SQL 作为普通 POST 请求的正文发送给 ClickHouse：
+-- Where it runs: on the VM, in the lab cluster, via the short `ch` command
+-- from the README — it sends SQL to ClickHouse as the body of a plain POST request:
 --     cd labs/09-clickhouse && ch < 01-schema.sql
--- CREATE TABLE 的返回为空——这就是成功的样子。
+-- The response for CREATE TABLE is empty — that is what success looks like.
 --
--- 这里既没有 CREATE DATABASE，也没有 CREATE USER：数据库和用户是在下单时由
--- 服务本身建立的（仪表盘，或本文件夹中的 clickhouse.yaml 文件）。
+-- There is no CREATE DATABASE or CREATE USER here: the database and user were set up
+-- by the service itself when it was ordered (the dashboard or the clickhouse.yaml file in this same folder).
 
--- IF NOT EXISTS——如果表已存在也不报错。此文件可以重复应用两次。
+-- IF NOT EXISTS — don't complain if the table already exists. The file can be applied twice.
 CREATE TABLE IF NOT EXISTS passes
 (
-    -- 通行证编号。UInt64 和 UInt16——分别是 8 字节和 2 字节的无符号整数。
-    -- 在 ClickHouse 中类型的大小是刻意选择的：在十亿行的规模下，列里每多一个
-    -- 字节，就会在磁盘上变成多出的一个吉字节。
+    -- Pass number. UInt64 and UInt16 — unsigned integers of 8 and 2 bytes.
+    -- In ClickHouse the size of a type is chosen deliberately: over a billion rows every extra
+    -- byte in a column turns into an extra gigabyte on disk.
     pass_id      UInt64,
-    -- 人员通过闸机的时刻。整个报表都是围绕这一列构建的。
+    -- When the person passed through the turnstile. The whole report is built around this column.
     created_at   DateTime,
-    -- 访客姓名。几乎每一行都各不相同，所以用普通的 String。
+    -- Guest name. Almost every row has its own, so a plain String.
     guest_name   String,
-    -- 下面三列是 LowCardinality(String)：一种取值种类很少的字符串（部门五个、
-    -- 入口三个、通行证类型四种）。ClickHouse 会为这样的列维护一个字典，往磁盘上
-    -- 写入的是编号，而不是重复了一百万次的
-    -- 那些词。
-    -- 规则：不同取值在几千个以内——用 LowCardinality，超过就用
-    -- 普通的 String。这样去包装 guest_name 反而比不包装更糟：
-    -- 一百万个唯一姓名组成的字典，会比数据本身还要大。
+    -- The three columns below are LowCardinality(String): a string that has few distinct
+    -- values (five departments, three entrances, four pass types). ClickHouse
+    -- keeps a dictionary for such a column and writes numbers to disk instead of the same
+    -- words repeated a million times.
+    -- Rule: up to a few thousand distinct values — LowCardinality, more than that —
+    -- a plain String. Wrapping guest_name this way would be worse than not wrapping it:
+    -- a dictionary of a million unique names would end up larger than the data itself.
     host_dept    LowCardinality(String),
     entrance     LowCardinality(String),
     pass_type    LowCardinality(String),
-    -- 访客在里面停留了多少分钟。两个字节绰绰有余。
+    -- How many minutes the guest stayed inside. Two bytes are more than enough.
     duration_min UInt16
 )
--- 表引擎——即 ClickHouse 在磁盘上存储数据的方式。在常见的数据库里
--- 并没有这种选择，而这里有，并且是在创建表时做出的。
--- MergeTree：每次插入都会在磁盘上放下一个新的数据块，数据块会在后台合并
--- 成更大的块。因此有一条实用规则——按大批量的行成批插入。
--- 一百万次逐行插入会产生一百万个数据块，把服务器压垮。
+-- The table engine — how ClickHouse stores the data on disk. In familiar databases
+-- there is no such choice; here there is, and it is made when the table is created.
+-- MergeTree: each insert lays a new part on disk, and parts merge in the background
+-- into larger ones. Hence the practical rule — insert in batches of many rows.
+-- A million single-row inserts would create a million parts and bring the server down.
 ENGINE = MergeTree
--- 文件中最重要的一行，而且它是在任何数据进入表之前就选定的。
--- ORDER BY 规定了行在磁盘上物理排列的顺序，它同时
--- 充当唯一真正的索引：ClickHouse 每隔
--- 几千行存一个标记，据此判断文件的哪些部分可以整块跳过不读。
+-- The most important line of the file, and it is chosen before any data enters the table.
+-- ORDER BY sets the order in which rows physically lie on disk, and it also
+-- serves as the only real index: ClickHouse stores marks every
+-- few thousand rows and from them figures out which parts of the file can be skipped entirely.
 --
--- 由此产生的结果：「三月里有多少次通行」变成读取文件的一段区间，
--- 而「找到编号为 424242 的通行证」则变成读取整个 pass_id 列，
--- 因为 pass_id 不在排序键里。这不是缺陷，而是它的设计。
+-- Consequence: "how many passes were there in March" turns into reading one stretch of
+-- the file, while "find the pass with number 424242" turns into reading the whole pass_id column,
+-- because pass_id is not in the sort key. This is not a shortcoming, it is by design.
 --
--- 用熟悉的世界打个比方：这和纸质档案里的做法如出一辙——把
--- 通行证按日期或按姓氏归档。按日期归档，三月的卷宗
--- 就能立刻取出，而某一个具体的伊万诺夫则要逐条翻找。而且没人会
--- 事后把一百万张纸重新归档一遍。
+-- From the familiar world: the same decision as in a paper archive — filing
+-- passes by date or by surname. File them by date and the March folder is
+-- retrieved instantly, while one particular Ivanov is found by scanning through. And nobody
+-- is going to re-file a million sheets of paper after the fact.
 --
--- 文件里故意没有 PARTITION BY。分区是一组独立的数据块（通常
--- 是一个月），可以用一条命令丢弃；这对于「只保留两年、不多留」这类
--- 规则很方便。在八个月的教学数据上，分区只会带来
--- 多余的数据块而毫无用处，而在这里，减少不必要的读取由排序键就能胜任。
+-- There is deliberately no PARTITION BY in the file. A partition is a separate set of parts (usually
+-- one month) that can be dropped with a single command; this is handy for the rule
+-- "keep two years and no more". Over eight months of training data partitions would give
+-- extra parts with no benefit, and cutting out unnecessary reads is something the sort key handles here.
 ORDER BY (created_at, entrance)

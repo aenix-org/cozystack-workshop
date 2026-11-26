@@ -82,9 +82,9 @@ lab 0–4 असली काम शुरू होने से पहले �
 
 ```markdown
 <details>
-<summary><b>manifest को लाइन-दर-लाइन समझना</b></summary>
+<summary><b>Walking through the manifest line by line</b></summary>
 
-...लाइन-दर-लाइन, गद्य में...
+...line by line, in prose...
 
 </details>
 ```
@@ -110,9 +110,9 @@ lab 0–4 असली काम शुरू होने से पहले �
 रुकावट हमेशा एक block-quote callout होती है, ⚠️ के बिना (वह मार्कर नुकसानदेह जगहों के लिए आरक्षित है):
 
 ```markdown
-> **आगे पढ़ने से पहले रुककर सोचिए।**
+> **Stop and think before you read on.**
 >
-> एक सवाल। एक दूसरा सवाल, अगर कोई हो।
+> A question. A second question, if there is one.
 ```
 
 spoiler का शीर्षक हमेशा `उत्तर, और इस त्रुटि से कहीं व्यापक एक सबक` होता है।

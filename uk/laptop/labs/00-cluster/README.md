@@ -37,20 +37,20 @@
 Вирішується це **WSL** — підсистемою Linux усередині Windows. Ставиться однією командою в PowerShell, запущеному від імені адміністратора:
 
 ```powershell
-# ставить підсистему Linux усередину Windows: ядро, службу і дистрибутив Ubuntu
-# за замовчуванням. Після встановлення Windows попросить перезавантажитися.
+# installs the Linux subsystem inside Windows: the kernel, the service and the default
+# Ubuntu distribution. After installation Windows will ask you to reboot.
 wsl --install
 ```
 
 Після перезавантаження у вас з'явиться консоль Ubuntu — і далі ви працюєте в ній, як усі інші. Усередині WSL знадобиться свій `kubectl` — команда, якою ви звертаєтеся до кластера:
 
 ```bash
-# snap — менеджер пакетів Ubuntu. --classic ставить пакет без ізоляції:
-# в ізольованому вигляді kubectl не побачить файл доступу у вашій домашній теці.
+# snap is Ubuntu's package manager. --classic installs the package without isolation:
+# in isolated mode kubectl won't see the access file in your home folder.
 sudo snap install kubectl --classic
 ```
 
-Диски Windows видно з WSL за шляхом `/mnt/c/...`, тому файли, завантажені звичайним браузером, доступні й усередині — копіювати їх нікуди не потрібно. Знадобиться це трохи далі, коли ви отримаєте файл доступу до кластера: якщо збережете його в Windows, з WSL він лежатиме за адресою на кшталт `/mnt/c/Users/Іван/Downloads/ім'я-файла`.
+Диски Windows видно з WSL за шляхом `/mnt/c/...`, тому файли, завантажені звичайним браузером, доступні й усередині — копіювати їх нікуди не потрібно. Знадобиться це трохи далі, коли ви отримаєте файл доступу до кластера: якщо збережете його в Windows, з WSL він лежатиме за адресою на кшталт `/mnt/c/Users/Ivan/Downloads/filename`.
 
 ⚠️ **Якщо WSL заборонений політикою безпеки** — на корпоративному ноутбуці це звичайна річ — лаби все одно проходяться: усе, що робиться в дашборді, від операційної системи не залежить. Не вийде тільки запускати скрипти перевірки і кілька кроків, що цілком складаються з команд. Такі місця позначені окремо.
 
@@ -59,7 +59,7 @@ sudo snap install kubectl --classic
 Усі файли вже у вас — ви забрали їх разом з репозиторієм. Створювати й друкувати заново нічого не потрібно: там, де нижче написано `kubectl apply -f name.yaml`, файл береться звідси.
 
 ```bash
-# шлях відлічується від кореня репозиторію — його ви забираєте на наступному кроці
+# the path is counted from the repository root — you fetch it in the next step
 cd labs/00-cluster
 ```
 
@@ -75,8 +75,8 @@ cd labs/00-cluster
 У репозиторії лежать маніфести — файли з описом того, що створити в кластері, — і скрипти перевірки. Вони потрібні починаючи з цієї лаби:
 
 ```bash
-# clone = завантажити репозиторій цілком, разом з історією змін.
-# Поруч з'явиться тека cozystack-migration-workshop, у неї й переходимо.
+# clone = download the entire repository, together with its change history.
+# A folder cozystack-migration-workshop appears alongside; we move into it.
 git clone https://github.com/aenix-org/cozystack-migration-workshop.git
 cd cozystack-migration-workshop
 ```
@@ -92,8 +92,8 @@ cd cozystack-migration-workshop
 Цей шлях використовується в усіх лабах — якщо збережете файл в інше місце, далі доведеться щоразу підставляти свій.
 
 ```bash
-# Перевіряємо, що файл читається і кластер відповідає.
-# --kubeconfig каже kubectl, яким файлом доступу користуватися в цій команді.
+# Check that the file is readable and the cluster answers.
+# --kubeconfig tells kubectl which access file to use in this command.
 kubectl --kubeconfig ~/.kube/workshop get kubernetes.apps.cozystack.io -n tenant-workshopXX
 ```
 
@@ -162,18 +162,19 @@ spec:
 ⚠️ Команди нижче виконуються **на кластері керування** — тим доступом, який вам видали разом із тенантом. Файла доступу до самого кластера `lab` поки не існує: він з'явиться тільки після того, як кластер підніметься.
 
 ```bash
-# переходимо в теку лаби — далі всі файли беруться звідси
+# move into the lab folder — from here on all files are taken from here
 cd labs/00-cluster
-# перед застосуванням підставте у файлі свій номер тенанта замість XX.
-# apply = «приведи кластер до того, що описано у файлі». Кластер команда не піднімає
-# сама — вона передає замовлення платформі, а та вирішує, що і в якому порядку створити.
-#   -f   узяти опис із файла
+# before applying, substitute your own tenant number in the file in place of XX.
+# apply = "bring the cluster to what's described in the file". The command doesn't bring
+# the cluster up itself — it hands the order to the platform, which decides what to
+# create and in what order.
+#   -f   take the description from the file
 kubectl apply -f cluster.yaml
-# get = «покажи, що є». kubernetes.apps.cozystack.io — повне ім'я типу об'єкта,
-# того самого, що описаний у файлі (kind: Kubernetes), lab — ім'я вашого замовлення.
-#   -n   у якому namespace шукати; без прапорця kubectl дивиться в namespace за замовчуванням
-#   -w   стежити й друкувати зміни. Вийти — Ctrl+C, установка від цього не перерветься
-# Чекаємо, поки в колонці READY з'явиться True.
+# get = "show what's there". kubernetes.apps.cozystack.io is the full name of the object
+# type, the very one described in the file (kind: Kubernetes), lab is the name of your order.
+#   -n   which namespace to look in; without the flag kubectl looks in the default namespace
+#   -w   watch and print changes. To exit — Ctrl+C, the installation won't be interrupted by it
+# Wait until True appears in the READY column.
 kubectl -n tenant-workshopXX get kubernetes.apps.cozystack.io lab -w
 ```
 
@@ -186,9 +187,9 @@ kubectl -n tenant-workshopXX get kubernetes.apps.cozystack.io lab -w
 ⚠️ **Якщо минуло більше двадцяти хвилин і статус не змінюється — причина може бути не у вашому кластері.** Установку всіх застосунків на платформі веде спільна черга, і якщо в ній стоїть чиясь довга операція, ваш кластер чекає своєї. Подивитися, чи взяли його в роботу:
 
 ```bash
-# Дивимося на саме замовлення і на те, що платформа про нього пише.
-# Розділ status.conditions наприкінці виводу — це її звіт: чи взяли в роботу,
-# що заважає, чого чекає.
+# Look at the order itself and at what the platform writes about it.
+# The status.conditions section at the end of the output is its report: whether it's been
+# picked up for work, what's blocking, what it's waiting for.
 kubectl --kubeconfig ~/.kube/workshop -n tenant-workshopXX \
   get kubernetes.apps.cozystack.io lab -o yaml
 ```
@@ -196,7 +197,7 @@ kubectl --kubeconfig ~/.kube/workshop -n tenant-workshopXX \
 Якщо й там нічого зрозумілого — подивіться події тенанта. Це журнал того, що платформа робила з вашими об'єктами:
 
 ```bash
-# events = журнал подій. Сортуємо за часом, щоб свіже було внизу.
+# events = a log of incidents. We sort by time so the freshest is at the bottom.
 kubectl --kubeconfig ~/.kube/workshop -n tenant-workshopXX \
   get events --sort-by=.lastTimestamp | tail -20
 ```
@@ -226,12 +227,12 @@ kubectl --kubeconfig ~/.kube/workshop -n tenant-workshopXX \
 **Основний спосіб — командою.** Cozystack заводить на ваш кластер окреме правило доступу, що дозволяє читати рівно цей Secret і нічого більше. Команда виконується **на кластері керування**, тим доступом, який вам видали разом із тенантом, а результат кладеться у файл на ноутбуці:
 
 ```bash
-# get secret = показати Secret; -o go-template — не друкувати його цілком,
-# а дістати з нього одне поле і вивести як текст:
-#   index .data "admin.conf"   узяти з Secret ключ admin.conf
-#   base64decode               вміст Secret зберігається закодованим у base64,
-#                              ця функція повертає вихідний текст
-#   > ~/lab.kubeconfig         записати вивід у файл замість екрана
+# get secret = show the Secret; -o go-template — don't print it whole,
+# but pull one field out of it and output it as text:
+#   index .data "admin.conf"   take the admin.conf key from the Secret
+#   base64decode               the contents of Secrets are stored base64-encoded,
+#                              this function returns the original text
+#   > ~/lab.kubeconfig         write the output to a file instead of the screen
 kubectl -n tenant-workshopXX get secret kubernetes-lab-admin-kubeconfig \
   -o go-template='{{ printf "%s\n" (index .data "admin.conf" | base64decode) }}' > ~/lab.kubeconfig
 ```
@@ -247,18 +248,18 @@ kubectl -n tenant-workshopXX get secret kubernetes-lab-admin-kubeconfig \
 macOS і Linux:
 
 ```bash
-# KUBECONFIG — змінна, з якої kubectl дізнається, який файл доступу брати.
-# export робить її видимою всім командам, запущеним далі в цьому вікні термінала.
+# KUBECONFIG is the variable from which kubectl learns which access file to take.
+# export makes it visible to all commands run further in this terminal window.
 export KUBECONFIG=~/lab.kubeconfig
-# nodes — вузли кластера, ті самі віртуальні машини, на яких підуть ваші
-# застосунки. Відповідь заодно доводить, що файл доступу робочий.
+# nodes are the cluster's nodes, the very virtual machines your applications will run on.
+# The answer also proves the access file works.
 kubectl get nodes
 ```
 
 Windows PowerShell — тільки якщо WSL поставити не вдалося:
 
 ```powershell
-# у PowerShell змінні оточення задаються через $env: і живуть до закриття вікна
+# in PowerShell environment variables are set via $env: and live until the window closes
 $env:KUBECONFIG="$HOME\lab.kubeconfig"
 kubectl get nodes
 ```
@@ -279,10 +280,10 @@ kubernetes-lab-md0-xxxxx    Ready    <none>   3m    v1.35.6
 📍 **Де:** на ноутбуці, у тому самому вікні термінала, де ви працювали з `kubectl`.
 
 ```bash
-# скрипт запускається з теки лаби: файли він шукає поряд із собою
+# the script runs from the lab folder: it looks for files next to itself
 cd labs/00-cluster
-# ./ перед іменем означає «запусти файл ось звідси»; без цього оболонка
-# шукатиме команду check.sh серед системних тек і не знайде
+# ./ before the name means "run the file right from here"; without it the shell
+# will look for the check.sh command among the system folders and won't find it
 ./check.sh
 ```
 

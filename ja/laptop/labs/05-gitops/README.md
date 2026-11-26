@@ -50,7 +50,7 @@
 ファイルはすべて、もうあなたのものです。リポジトリと一緒に手に入れました。作ったり打ち直したりするものは何もありません。以下で `kubectl apply -f name.yaml` と書かれていれば、そのファイルはここにあります。
 
 ```bash
-# ここから先、すべてのコマンドはこのフォルダから実行します。`kubectl apply -f` のパスはここからの相対です。
+# From here on, all commands run from this folder: the paths in `kubectl apply -f` are relative to it.
 cd labs/05-gitops
 ```
 
@@ -79,11 +79,11 @@ cd labs/05-gitops
 リポジトリを自分のマシンに取り込みます。
 
 ```bash
-# clone = リポジトリを、その編集の全履歴もろとも丸ごとダウンロードすること。共有フォルダへの
-# アクセスではなく、ディスク上の自分だけの完全なコピーが手に入ります。オフラインでも作業できます。
-# `YOUR-LOGIN` を自分の GitHub ログインに置き換えてください。さもないと他人のリポジトリに行ってしまいます。
+# clone = download the repository in full, together with its entire edit history. You get
+# not access to a shared folder but your own full copy on disk: you can work with it offline.
+# Replace `YOUR-LOGIN` with your own GitHub login, or the command will go to someone else's repository.
 git clone https://github.com/YOUR-LOGIN/passes-gitops.git
-# clone はリポジトリと同じ名前のフォルダを作ります。ここから先はその中で作業します。
+# clone creates a folder named after the repository. From here on we work inside it.
 cd passes-gitops
 ```
 
@@ -94,12 +94,12 @@ cd passes-gitops
 このラボのフォルダには二つのファイルがあります。`app/namespace.yaml` と `app/passes.yaml` です。これらを自分のリポジトリの `apps` フォルダにコピーします。
 
 ```bash
-# apps — Flux が記述を取り込むフォルダ。名前は私たちが選んだもので、Flux の設定で名指しされている
-# のとまったく同じ名前です。だから理由なく変える必要はありません。
-#   -p  フォルダがすでに存在してもエラー扱いにしない
+# apps — the folder Flux will pull descriptions from. We chose the name, and it's the exact
+# same one named in the Flux configuration, so there's no reason to change it without cause.
+#   -p  don't treat it as an error if the folder already exists
 mkdir -p apps
-# 両方のファイルを自分のリポジトリにコピーします。`/path/to/` は、ラボのリポジトリを
-# クローンした場所に置き換えてください。`*.yaml` で二つのファイルを一度に取ります。
+# Copy both files into your own repository. Replace `/path/to/` with the place where you
+# cloned the labs repository; `*.yaml` will take both files at once.
 cp /path/to/labs/05-gitops/app/*.yaml apps/
 ```
 
@@ -163,13 +163,13 @@ spec:
 GitHub に送ります。Git は手当たり次第に何でも覚えるのではなく、明示的に示されたものを覚えます。だからこそコマンドが三つあり、それぞれが自分の役目を果たします。
 
 ```bash
-# add = 次の履歴の一項目に入るファイルに印をつける。
+# add = mark the files that will go into the next history entry.
 git add apps
-# commit = 印のついたものを一つの項目として保存する。中身、著者、時刻、理由。
-#   -m "..."  まさにその理由。履歴に永遠に残り、人が読みます。
-# commit はまだあなたのノートPCの上だけにあります。GitHub にはまだありません。
+# commit = save what's marked as one entry: contents, author, time, and reason.
+#   -m "..."  that very reason. It stays in the history forever, and people will read it.
+# The commit lives only on your laptop for now — it's not yet in GitHub.
 git commit -m "add passes service v1"
-# push = 溜まった commit を GitHub へ送る。このコマンドまで、向こうでは何も変わりません。
+# push = send the accumulated commits to GitHub. Until this command, nothing there changes.
 git push
 ```
 
@@ -188,37 +188,36 @@ Flux はあなたのクラスター内のいくつかのサービスです。一
 macOS:
 
 ```bash
-# Homebrew は Flux プロジェクトのリポジトリから formula を取り、実行ファイルを一つ置きます。
+# Homebrew takes the formula from the Flux project's repository and drops one executable file.
 brew install fluxcd/tap/flux
 ```
 
 Linux:
 
 ```bash
-# Flux サイトのスクリプトはアーキテクチャを判別し、ファイルを /usr/local/bin に置きます。
-#   -s          curl はダウンロード表示なしで静かに動く
-#   | sudo bash ダウンロードしたテキストを管理者権限でそのまま実行する。システムフォルダへの
-#               書き込みのために必要
+# The script from the Flux site detects your architecture and drops the file into /usr/local/bin.
+#   -s          curl works silently, without a download indicator
+#   | sudo bash the downloaded text is executed straight away with administrator rights — they're
+#               needed because of the write into a system folder
 curl -s https://fluxcd.io/install.sh | sudo bash
 ```
 
 Windows(PowerShell、Chocolatey が入っている場合):
 
 ```powershell
-# choco — Windows 向けのサードパーティ製パッケージマネージャー。同じ単一の flux.exe を入れます。
+# choco — a third-party package manager for Windows; it installs the same single flux.exe file.
 choco install flux
 ```
 
 さて、サービス本体をクラスターにインストールします。
 
 ```bash
-# アクセスファイルを設定します。下のコマンドはクラスターにオブジェクトを作るので、どのクラスターか
-# が重要です。
+# Set the access file: the command below creates objects in the cluster, and it matters in which one.
 export KUBECONFIG=~/lab.kubeconfig
-# flux install はクラスターに `flux-system` namespace を用意し、そこにサービスをデプロイします。
-#   --components=...  具体的にどれをインストールするか:
-#     source-controller     Git に手を伸ばし、リポジトリの新鮮なコピーを保つ
-#     kustomize-controller  ダウンロードしたものをクラスターに適用し、ずれを見張る
+# flux install sets up a `flux-system` namespace in the cluster and deploys the services into it.
+#   --components=...  which ones exactly to install:
+#     source-controller     reaches into Git and keeps a fresh copy of the repository
+#     kustomize-controller  applies what was downloaded to the cluster and watches for divergences
 flux install --components=source-controller,kustomize-controller
 ```
 
@@ -235,8 +234,8 @@ flux install --components=source-controller,kustomize-controller
 サービスが立ち上がったことを確認します。
 
 ```bash
-# -n flux-system — Flux が落ち着いた namespace。このフラグがないと kubectl は default namespace を
-# 見て何も表示しません。
+# -n flux-system — the namespace Flux settled into. Without this flag kubectl looks in the
+# default namespace and shows nothing.
 kubectl get pods -n flux-system
 ```
 
@@ -248,8 +247,8 @@ kubectl get pods -n flux-system
 まったく同じものが、ツールなしで、普通のマニフェストでインストールできます。
 
 ```bash
-# 同じサービス一式を、ただし出来合いの記述として。-f はディスク上のパスだけでなくリンクも受け付けます。
-# kubectl はファイルをダウンロードして中身を適用します。
+# The same set of services, but as a ready-made description: -f accepts not only a path on disk
+# but also a link. kubectl will download the file and apply its contents.
 kubectl apply -f https://github.com/fluxcd/flux2/releases/latest/download/install.yaml
 ```
 
@@ -316,18 +315,18 @@ spec:
 両方を適用します。
 
 ```bash
-# -f はファイルではなくフォルダを指します。その中のすべてのマニフェストが適用されます —
-# GitRepository も Kustomization も。どちらも flux-system namespace に作られます。
+# -f points at a folder, not a file: all the manifests in it will be applied —
+# both GitRepository and Kustomization. Both are created in the flux-system namespace.
 kubectl apply -f flux/
 ```
 
 どうなったか見てみましょう。
 
 ```bash
-# Flux にリコンサイルの状態を尋ねます。
-#   --watch  ウィンドウを占有し続け、変化に応じて行を更新する
-# READY: True はリポジトリの中身がクラスターに届き、適用されたことを意味します。
-# REVISION — ブランチと、いま適用されている commit の短い識別子。
+# We ask Flux about the reconciliation state.
+#   --watch  keep the window busy and refresh the line as things change
+# READY: True means the repository's contents reached the cluster and were applied.
+# REVISION — the branch and the short identifier of the commit currently applied.
 flux get kustomizations --watch
 ```
 
@@ -341,8 +340,8 @@ passes   main@sha1:a1b2c3d   False      True   Applied revision: main@sha1:a1b2c
 `Ctrl+C` で watch を止め、クラスターに何が現れたか見ます。
 
 ```bash
-# all — Pod、Deployment、Service など主要なオブジェクト種別をまとめて指す略記です。
-# `passes` namespace はあなたが手で作ったのではありません。アプリケーションと一緒にリポジトリから届いたのです。
+# all — a shorthand for the main object types at once: Pods, Deployment, Service, and the rest.
+# You didn't create the `passes` namespace by hand: it arrived from the repository along with the application.
 kubectl get all -n passes
 ```
 
@@ -366,7 +365,7 @@ spec:
 送り出します。
 
 ```bash
-# 最初の送信と同じ三ステップ: ファイルに印をつけ、理由とともに保存し、送る。
+# The same three steps as in the first send: mark the file, save with a reason, send.
 git add apps/passes.yaml
 git commit -m "passes: two replicas so the gate does not go dark during rollout"
 git push
@@ -375,8 +374,8 @@ git push
 さあクラスターを見て待ちます。
 
 ```bash
-# -w = 「見張って追記し続ける」: ウィンドウは占有され続け、コピーの状態が変わるたびに新しい行が
-# 現れます。Ctrl+C で抜けます。
+# -w = "watch and keep appending": the window stays busy, a new line appears every time
+# the state of the copies changes. Exit with Ctrl+C.
 kubectl get pods -n passes -w
 ```
 
@@ -385,19 +384,19 @@ kubectl get pods -n passes -w
 一分待ちたくなければ、Flux に今すぐリコンサイルするよう頼めます。
 
 ```bash
-# reconcile = 「次の一分を待たず、今すぐリコンサイルする」。
-#   kustomization passes  どのオブジェクトをリコンサイルするか
-#   --with-source         まず Git へ新鮮な commit を取りに行き、それから適用する。
-#                         このフラグがないと、以前ダウンロードしたコピーを元にリコンサイルする
+# reconcile = "reconcile right now, without waiting for the next minute."
+#   kustomization passes  which object to reconcile
+#   --with-source         first go to Git for the fresh commit and only then apply;
+#                         without this flag the reconciliation goes off the copy downloaded earlier
 flux reconcile kustomization passes --with-source
 ```
 
 commit のメッセージに注目してください。`two replicas so the gate does not go dark during rollout` — これが理由です。半年後に誰かが「なぜここは一つでなく二つなのか」と尋ねたとき、答えは五秒で見つかります。
 
 ```bash
-# log = commit の履歴。新しいものが上。
-#   --oneline         commit ごとに一行: 短い識別子と理由のテキスト
-#   apps/passes.yaml  このファイルに触れた commit だけを表示する
+# log = the history of commits, freshest on top.
+#   --oneline         one line per commit: a short identifier and the reason text
+#   apps/passes.yaml  show only the commits that touched this exact file
 git log --oneline apps/passes.yaml
 ```
 
@@ -410,8 +409,8 @@ git log --oneline apps/passes.yaml
 夜、インシデント、サービスはコピーが足りない。あなたはいつもどおりのことをします。
 
 ```bash
-# コピー数を Git を迂回してクラスターの中で直接変える — 今日までそうしていたように。
-#   -n passes  アプリケーションはこの namespace に住む。フラグがないとコマンドは見つけられない
+# Change the number of copies right in the cluster, bypassing Git — as you did until today.
+#   -n passes  the application lives in this namespace; without the flag the command won't find it
 kubectl scale deployment passes -n passes --replicas=5
 ```
 
@@ -422,14 +421,14 @@ deployment.apps/passes scaled
 うまくいきました。確認しましょう。
 
 ```bash
-# READY 列は「レディ/注文数」と読みます: 何個のコピーが応答し、何個あるべきか。
+# The READY column reads as "ready/ordered": how many copies respond and how many there should be.
 kubectl get deployment passes -n passes
 ```
 
 コピーは五つ。一分待ってもう一度見ます。
 
 ```bash
-# 同じコマンド。違うのは、二回の実行の間に一分が経ったことだけ。
+# The same command. The only difference is that a minute passed between the two runs.
 kubectl get deployment passes -n passes
 ```
 
@@ -469,15 +468,15 @@ Flux が取り消しました。それこそが、これがインストールさ
 **それが邪魔になるとき。** 邪魔になるのはインシデントのときです。本当に今すぐ何かを変えなければならず、話し合っている時間がない。そういう場合のために、Flux は一時停止できます。
 
 ```bash
-# suspend = このオブジェクトのリコンサイルを一時停止する。Flux はクラスターを記述へ合わせるのを
-# やめ、手作業の変更が生き始めます。その間、Git の中身は変わりません。
+# suspend = pause reconciliation for this object. Flux stops bringing the cluster to the
+# description, and manual changes start to live. The contents of Git don't change meanwhile.
 flux suspend kustomization passes
 ```
 
 これ以降リコンサイルは走らず、手で何でもできます。元に戻すには:
 
 ```bash
-# resume = リコンサイルを再びオンにする。次のリコンサイルが、手で行ったすべてを取り除きます。
+# resume = turn reconciliation back on. The very next reconciliation removes everything done by hand.
 flux resume kustomization passes
 ```
 
@@ -506,8 +505,8 @@ flux resume kustomization passes
 送ります。承知のうえでのまずい変更も、良い変更とまったく同じ道を通ります。いまは `push` とクラスターの間にチェックがありません — そしてそれがこのステップの狙いです。
 
 ```bash
-# 同じ add、commit、push。commit の理由は正直に書きます。五分後、この変更を取り消さなければ
-# ならなくなったとき、役に立ちます。
+# The same add, commit, push. The reason in the commit is written honestly — it'll come in handy
+# in five minutes, when the change has to be undone.
 git add apps/passes.yaml
 git commit -m "passes: trim memory limit"
 git push
@@ -516,14 +515,14 @@ git push
 待って見張ります。
 
 ```bash
-# リコンサイルが新しい記述を持ってくるまで、コピーを見張ります。
+# Watch the copies until the reconciliation brings the new description.
 kubectl get pods -n passes -w
 ```
 
 **見えるはず** のもの — 新しいコピーが立ち上がりません。`OOMKilled` 状態はメモリ上限を超えたためにプロセスが killされたことを意味し、`CrashLoopBackOff` はクラスターがすでにコピーを何度も続けて再起動し、いまや次の試行まで待ち時間をどんどん長くしていることを意味します。nginx は四メガバイトに収まらず、起動直後に死にます。
 
 ```bash
-# 同じ一覧を、ただし watch なしの一枚のスナップショットとして。
+# The same list, but as a single snapshot, without watching.
 kubectl get pods -n passes
 ```
 
@@ -538,7 +537,7 @@ passes-7f8a1b2c3-qq7lp    0/1     CrashLoopBackOff   3          90s
 **以前ならどう切り戻したか:**
 
 ```bash
-# undo は Deployment を前のリビジョンへ — 編集前の設定へ戻します。
+# undo would return the Deployment to the previous revision — to the settings from before the edit.
 kubectl rollout undo deployment/passes -n passes
 ```
 
@@ -547,20 +546,20 @@ kubectl rollout undo deployment/passes -n passes
 **`rollout undo` をしてはいけません。真実の住む場所で切り戻す** — Git で:
 
 ```bash
-# revert = 指定した commit の変更を打ち消す新しい commit を追加する。
-#   HEAD       「現在のブランチの最後の commit」 — まさにあのまずい上限の commit
-#   --no-edit  commit メッセージ用のエディタを開かない。ヘッダは Git が自分で書く
+# revert = add a new commit that undoes the changes of the specified one.
+#   HEAD       "the last commit of the current branch" — the very one with the bad limit
+#   --no-edit  don't open an editor for the commit message; Git writes the header itself
 git revert --no-edit HEAD
-# 打ち消しの commit が GitHub に送られるまで、Flux はそれを何も知りません。
+# Until the reverting commit is sent to GitHub, Flux knows nothing about it.
 git push
 ```
 
 **見えるはず** のもの — `Revert "passes: trim memory limit"` というヘッダの新しい commit と、一分以内にクラスターで再び二つの動くコピー。
 
 ```bash
-# コピーが再び立ち上がります: 動作するメモリ上限が戻りました。
+# The copies come up again: the working memory limit is back.
 kubectl get pods -n passes
-# そしてここで、いまどの commit が適用されているか見られます — 打ち消しの commit と一致するはずです。
+# And here you can see which commit is applied now — it should match the reverting one.
 flux get kustomizations
 ```
 
@@ -570,7 +569,7 @@ flux get kustomizations
 `git revert` はまずい commit を消しません。まずい commit の変更を打ち消す **新しい** commit を追加します。すべてが履歴に残ります。何が壊れ、いつ気づかれ、何が切り戻されたか。
 
 ```bash
-# -4 — 直近の四つの commit を表示する。一番上が一番新しい。
+# -4 — show the four most recent commits; the top one is the freshest.
 git log --oneline -4
 ```
 
@@ -598,9 +597,9 @@ c71a4f9 passes: two replicas so the gate does not go dark during rollout
 変更のためのブランチを立てます。
 
 ```bash
-# checkout -b = 新しいブランチを立て、すぐそれに切り替える。ブランチは変更の別の一本の流れ:
-# そこで行われた commit は `main` に届かず、したがってクラスターにも届きません。
-#   passes/version-line  ブランチ名。名前のスラッシュは許され、グループ分けの役に立つ
+# checkout -b = start a new branch and switch to it right away. A branch is a separate line
+# of changes: commits made in it don't reach `main`, and therefore don't reach the cluster either.
+#   passes/version-line  the branch name; a slash in the name is allowed and serves for grouping
 git checkout -b passes/version-line
 ```
 
@@ -609,9 +608,9 @@ git checkout -b passes/version-line
 ```bash
 git add apps/passes.yaml
 git commit -m "passes: bump the version shown on the page"
-# origin — リポジトリをクローンした元のアドレスを Git が覚えている名前。
-#   -u origin passes/version-line  GitHub に同名のブランチを作り、それとの結びつきを覚えて、
-#                                  以降は素の `git push` で足りるようにする
+# origin — the name under which Git remembers the address you cloned the repository from.
+#   -u origin passes/version-line  create a branch of the same name in GitHub and remember
+#                                  the link with it, so that a bare `git push` is enough later
 git push -u origin passes/version-line
 ```
 
@@ -624,10 +623,10 @@ git push -u origin passes/version-line
 **Merge pull request** をクリックすると — 変更は `main` に着地し、次のリコンサイルがそれをクラスターへ持っていきます。一分後、トンネルを開いてサービスが何を配信するか見ます。
 
 ```bash
-# port-forward = ノートPC からクラスターへの一時的なトンネル。
-#   -n passes     サービスが住む namespace
-#   svc/passes    どこへ導くか: 特定のコピーではなく Service へ
-#   8080:80       左が ノートPC のポート、右がクラスター内部のサービスのポート
+# port-forward = a temporary tunnel from your laptop into the cluster.
+#   -n passes     the namespace the service lives in
+#   svc/passes    where we lead: to the Service, not a specific copy
+#   8080:80       on the left the port on your laptop, on the right the service's port inside the cluster
 kubectl port-forward -n passes svc/passes 8080:80
 ```
 
@@ -655,10 +654,10 @@ kubectl port-forward -n passes svc/passes 8080:80
 📍 **どこで:** ノートPC上、`kubectl` で作業したのと同じターミナルウィンドウで。
 
 ```bash
-# ラボのフォルダに戻ります: スクリプトはそこにあり、あなたは自分のリポジトリのフォルダで作業していました。
+# Return to the lab folder: the script lives there, and you worked in your own repository's folder.
 cd labs/05-gitops
 export KUBECONFIG=~/lab.kubeconfig
-# スクリプトはクラスターの何も変えません: 状態を読んでレポートを表示するだけです。
+# The script changes nothing in the cluster: it only reads the state and prints a report.
 ./check.sh
 ```
 
@@ -669,8 +668,8 @@ export KUBECONFIG=~/lab.kubeconfig
 スクリプトにあなたのリポジトリの履歴も見てほしければ — クローンがどこにあるかを教えます。
 
 ```bash
-# LAB_REPO — スクリプトがあなたのリポジトリのクローンの場所を知るための変数。
-# ホームフォルダ以外にクローンしたなら、自分のパスを入れてください。
+# LAB_REPO — the variable from which the script learns where the clone of your repository lives.
+# Put in your own path if you cloned it somewhere other than the home folder.
 export LAB_REPO=~/passes-gitops
 ./check.sh
 ```
@@ -684,8 +683,8 @@ export LAB_REPO=~/passes-gitops
 すべてのラボを終えたら、一度にまとめてこう取り除けます。
 
 ```bash
-# delete kustomization = リコンサイルのオブジェクトをクラスターから取り除く。
-#   --silent  もう一度確認を尋ねない
+# delete kustomization = remove the reconciliation object from the cluster.
+#   --silent  don't ask for confirmation again
 flux delete kustomization passes --silent
 ```
 

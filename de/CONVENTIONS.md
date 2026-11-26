@@ -94,9 +94,9 @@ Die Durchsprache kommt in einen Spoiler, damit der Hauptfluss nicht aufbläht:
 
 ```markdown
 <details>
-<summary><b>Das Manifest Zeile für Zeile durchgehen</b></summary>
+<summary><b>Walking through the manifest line by line</b></summary>
 
-... Zeile für Zeile, in Prosa ...
+...line by line, in prose...
 
 </details>
 ```
@@ -127,9 +127,9 @@ Der Stopp ist immer ein Blockzitat-Callout, ohne ⚠️ (dieser Marker ist Falls
 vorbehalten):
 
 ```markdown
-> **Halten Sie inne und denken Sie nach, bevor Sie weiterlesen.**
+> **Stop and think before you read on.**
 >
-> Eine Frage. Eine zweite Frage, falls es eine gibt.
+> A question. A second question, if there is one.
 ```
 
 Die Überschrift des Spoilers lautet immer `Die Antwort und eine Lehre, die über diesen Fehler

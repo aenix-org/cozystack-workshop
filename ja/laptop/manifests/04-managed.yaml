@@ -1,5 +1,5 @@
-# 適用する前に、tenant-workshopXX を自分の namespace に置き換えてください。
-# 全ファイルまとめて行う方が簡単です: README の番号の置換に関するセクションを参照してください。
+# Before applying, replace tenant-workshopXX with your own namespace.
+# Easier to do across all files at once: see README, the section on substituting the number.
 #
 apiVersion: apps.cozystack.io/v1alpha1
 kind: Postgres

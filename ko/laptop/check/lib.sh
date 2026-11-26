@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# 실습 검사 스크립트를 위한 공용 라이브러리.
-# 다음과 같이 불러옵니다:  . "$(dirname "$0")/../../check/lib.sh"
+# Shared library for the lab check scripts.
+# Sourced like this:  . "$(dirname "$0")/../../check/lib.sh"
 #
-# `set -e`는 의도적으로 사용하지 않습니다: 스크립트는 모든 검사를 끝까지 수행하여
-# 전체 그림을 보여줘야 하며, 첫 실패에서 멈추면 안 됩니다. 독자는 막혔을 때 바로
-# 이 스크립트를 실행하므로, 중간에 끊는 것은 답의 절반을 감추는 것과 같습니다.
+# `set -e` is deliberately NOT used: the script must run every check and show
+# the full picture, not stop at the first failure. The reader runs it exactly
+# when they are stuck — cutting it off halfway hides half the answer.
 
 LAB_NAME="${LAB_NAME:-unknown}"
 LAB_TITLE="${LAB_TITLE:-$LAB_NAME}"
@@ -15,27 +15,29 @@ _warn=0
 _lines=()
 _evidence=()
 
-# 색상은 출력이 터미널로 갈 때만 사용합니다: 파일이나 CI에서는 escape 시퀀스가
-# 쓰레기 문자로 읽힙니다.
+# Colors only when output goes to a terminal: in a file and in CI the escape
+# sequences read as garbage.
 if [ -t 1 ]; then
   _C_OK=$'\033[32m'; _C_FAIL=$'\033[31m'; _C_WARN=$'\033[33m'; _C_DIM=$'\033[2m'; _C_OFF=$'\033[0m'
 else
   _C_OK=''; _C_FAIL=''; _C_WARN=''; _C_DIM=''; _C_OFF=''
 fi
 
-# --- 기계가 읽을 수 있는 결과 ------------------------------------------------
-# result-<실습>.json은 사람이 읽는 리포트와 함께 생성되며 검사 식별자와 그 결과만
-# 담습니다. 문구, 명령 출력, 증거는 여기에 들어가지 않습니다: markdown 리포트에는
-# 컨테이너 로그 꼬리, 외부 로드밸런서 주소, 노드 주소, 그리고 사용자 이름과 함께
-# 접근 파일 경로가 쌓입니다. 이를 정규식으로 씻어내는 것은 미덥지 않습니다 —
-# 미더운 방법은 애초에 만들지 않는 것입니다.
+# --- machine-readable result -------------------------------------------------
+# result-<lab>.json is built alongside the human report and contains ONLY the
+# check identifier and its outcome. The wording, command output, and evidence do
+# not go there: the markdown report accumulates container log tails, external
+# load balancer addresses, node addresses, and the path to the access file along
+# with the user name. Scrubbing that with regexes is unreliable — the reliable
+# way is not to produce it.
 #
-# 식별자는 스스로 도출됩니다: 실습 내 검사의 순번에 문구의 짧은 해시를 더한 것입니다.
-# 순번은 안정성을 주고, 해시는 텍스트의 은밀한 수정을 잡아냅니다 — 문구가 바뀌면
-# 서비스가 이를 알아채고 같은 검사로 조용히 인정하지 않습니다.
+# The identifier derives itself: the check's ordinal number in the lab plus a
+# short hash of the wording. The number gives stability, the hash catches a
+# silent edit of the text — if the wording was changed, the service will see it
+# and will not silently accept it as the same check.
 _checks=()
 _seq=0
-_record() {   # _record <상태> <문구>
+_record() {   # _record <status> <message>
   _seq=$((_seq + 1))
   local h
   h="$(printf '%s' "$2" | shasum -a 256 2>/dev/null | cut -c1-8)"
@@ -50,14 +52,14 @@ ok() {
   _lines+=("- **OK** — $1")
 }
 
-# fail "무엇이 잘못됐는지" "그것을 어떻게 할지"
+# fail "what is wrong" "what to do about it"
 fail() {
   _record fail "$1"
   _fail=$((_fail + 1))
   printf '%s[ FAIL ]%s %s\n' "$_C_FAIL" "$_C_OFF" "$1"
   [ -n "${2:-}" ] && printf '         %s%s%s\n' "$_C_DIM" "$2" "$_C_OFF"
   _lines+=("- **FAIL** — $1")
-  [ -n "${2:-}" ] && _lines+=("  - 할 일: $2")
+  [ -n "${2:-}" ] && _lines+=("  - what to do: $2")
 }
 
 warn() {
@@ -66,11 +68,11 @@ warn() {
   printf '%s[ WARN ]%s %s\n' "$_C_WARN" "$_C_OFF" "$1"
   [ -n "${2:-}" ] && printf '         %s%s%s\n' "$_C_DIM" "$2" "$_C_OFF"
   _lines+=("- **WARN** — $1")
-  [ -n "${2:-}" ] && _lines+=("  - 참고: $2")
+  [ -n "${2:-}" ] && _lines+=("  - note: $2")
 }
 
-# evidence "제목" "값" — 산출물에 들어가며 터미널에는 출력되지 않습니다.
-# 증거는 리포트를 누군가에게 보여줬을 때 그것이 실제로 의미를 갖도록 존재합니다.
+# evidence "title" "value" — goes into the artifact, is not printed to the terminal.
+# Evidence exists so the report can be shown to someone and actually mean something.
 evidence() {
   _evidence+=("### $1")
   _evidence+=('```')
@@ -78,44 +80,46 @@ evidence() {
   _evidence+=('```')
 }
 
-# 조기 종료도 반드시 리포트를 남겨야 합니다: README는 "커뮤니티에 스크립트 리포트를
-# 첨부해서 오라"고 안내하지만, 예전에는 클러스터에 접근할 수 없을 때 첨부할 것이
-# 없었습니다 — 즉 리포트가 필요한 바로 그 경우에 리포트가 없었던 것입니다.
+# Early exits must still leave a report: the README advises "come to the community
+# and attach the script's report", yet before, when the cluster was unreachable there
+# was nothing to attach — that is, there was no report precisely in the case it exists for.
 need_kubeconfig() {
   if [ -z "${KUBECONFIG:-}" ]; then
-    fail "KUBECONFIG 변수가 설정되지 않았습니다" \
-         "먼저: export KUBECONFIG=~/lab.kubeconfig (새 터미널 창마다)"
+    fail "the KUBECONFIG variable is not set" \
+         "first: export KUBECONFIG=~/lab.kubeconfig (in every new terminal window)"
     finish; exit 1
   fi
   if ! kubectl version -o json >/dev/null 2>&1; then
-    fail "KUBECONFIG=${KUBECONFIG}로 클러스터가 응답하지 않습니다" \
-         "kubectl get nodes가 응답 없이 멈춘다면 — 클러스터 컨트롤 플레인이 올라오지 않은 것입니다; 대시보드에서 Kubernetes 애플리케이션 상태와 쿼터 초과(exceeded quota)에 대한 테넌트 이벤트를 확인하세요"
-    evidence "접근 파일" "$KUBECONFIG"
-    evidence "클러스터 응답" "$(kubectl get nodes 2>&1 | head -5)"
+    fail "the cluster does not respond with KUBECONFIG=${KUBECONFIG}" \
+         "if kubectl get nodes hangs with no response — the cluster control plane did not come up; check the Kubernetes application status in the dashboard and the tenant events for an exceeded quota"
+    evidence "Access file" "$KUBECONFIG"
+    evidence "Cluster response" "$(kubectl get nodes 2>&1 | head -5)"
     finish; exit 1
   fi
 }
 
 need_tenant() {
   if [ -z "${COZY_TENANT:-}" ]; then
-    printf '%s[ FAIL ]%s COZY_TENANT 변수가 설정되지 않았습니다\n' "$_C_FAIL" "$_C_OFF"
-    printf '         %s예: export COZY_TENANT=workshop07%s\n' "$_C_DIM" "$_C_OFF"
+    printf '%s[ FAIL ]%s the COZY_TENANT variable is not set\n' "$_C_FAIL" "$_C_OFF"
+    printf '         %sfor example: export COZY_TENANT=workshop07%s\n' "$_C_DIM" "$_C_OFF"
     exit 1
   fi
 }
 
-# GNU 확장 없는 시간 처리: macOS의 BSD date는 `-d`를 이해하지 못합니다.
+# Time without GNU extensions: BSD date on macOS does not understand `-d`.
 _now() { date -u '+%Y-%m-%d %H:%M:%S UTC'; }
 _stamp() { date -u '+%Y%m%d-%H%M%S'; }
 
-# 기계가 읽는 결과가 저장되는 위치. 의도적으로 저장소 밖에 둡니다: 클론 안에 두면
-# 첫 `git pull`이나 브랜치 전환에 지워지는데, 이 결과들은 여러 주에 걸쳐 모입니다.
+# Where machine-readable results are stored. Outside the repo on purpose: inside
+# a clone the first `git pull` or branch switch would wipe them, and they are
+# collected over weeks.
 LAB_RESULTS_DIR="${COZY_LAB_RESULTS:-$HOME/.cozystack-labs/results}"
 
 _write_result_json() {
   mkdir -p "$LAB_RESULTS_DIR" 2>/dev/null || return 0
-  # 클러스터 식별자 — kube-system 네임스페이스의 uid. 한 클러스터의 모든 실행에서
-  # 동일하고 사람마다 다르며, 무엇보다 테넌트 이름과 달리 "손으로 입력"할 수 없습니다.
+  # Cluster identifier — the uid of the kube-system namespace. It is the same for
+  # all runs on one cluster and different across people, and crucially it cannot
+  # be "typed in by hand", unlike the tenant name.
   local cluster_uid=""
   cluster_uid="$(kubectl get ns kube-system -o jsonpath='{.metadata.uid}' 2>/dev/null || true)"
   local kver=""
@@ -155,15 +159,15 @@ finish() {
   local verdict
 
   if [ "$_fail" -eq 0 ]; then
-    verdict="실습 통과"
+    verdict="LAB PASSED"
   else
-    verdict="미해결 항목 있음"
+    verdict="OPEN ITEMS REMAIN"
   fi
 
   _write_result_json "$([ "$_fail" -eq 0 ] && echo passed || echo failed)"
 
   printf '\n'
-  printf '검사: %d · 통과: %d · 실패: %d · 경고: %d\n' \
+  printf 'checks: %d · passed: %d · failed: %d · warnings: %d\n' \
     "$total" "$_pass" "$_fail" "$_warn"
   if [ "$_fail" -eq 0 ]; then
     printf '%s%s%s\n' "$_C_OK" "$verdict" "$_C_OFF"
@@ -172,44 +176,44 @@ finish() {
   fi
 
   {
-    echo "# 리포트: ${LAB_TITLE}"
+    echo "# Report: ${LAB_TITLE}"
     echo
-    echo "- 날짜: $(_now)"
-    echo "- 결과: **${verdict}**"
-    echo "- 검사: ${total} (통과 ${_pass}, 실패 ${_fail}, 경고 ${_warn})"
-    [ -n "${COZY_TENANT:-}" ] && echo "- 테넌트: \`${COZY_TENANT}\`"
+    echo "- Date: $(_now)"
+    echo "- Result: **${verdict}**"
+    echo "- Checks: ${total} (passed ${_pass}, failed ${_fail}, warnings ${_warn})"
+    [ -n "${COZY_TENANT:-}" ] && echo "- Tenant: \`${COZY_TENANT}\`"
     echo
-    echo "## 검사"
+    echo "## Checks"
     echo
     printf '%s\n' "${_lines[@]}"
     if [ "${#_evidence[@]}" -gt 0 ]; then
       echo
-      echo "## 증거"
+      echo "## Evidence"
       echo
       printf '%s\n' "${_evidence[@]}"
     fi
     echo
     echo "---"
     echo
-    echo "이 리포트는 Cozystack 실습의 \`check.sh\` 스크립트가 생성했습니다."
-    echo "매니페스트가 적용됐다는 사실이 아니라 실제 동작을 본질적으로 검증했습니다."
+    echo "This report was produced by the \`check.sh\` script from the Cozystack labs."
+    echo "It verified real functionality on the merits, not the mere fact that manifests were applied."
   } > "$report"
 
-  printf '리포트: %s\n' "$report"
+  printf 'report: %s\n' "$report"
   [ "$_fail" -eq 0 ] && return 0 || return 1
 }
 
-# 정확히 서버 버전. `kubectl version -o json`은 클라이언트와 서버 버전을 모두
-# 출력하는데, gitVersion에 대한 순진한 grep은 첫 번째로 걸리는 것 — 클라이언트 —
-# 을 가져가고 리포트가 클러스터 버전에 대해 거짓말을 하기 시작합니다. 여기서
-# 실수하기 쉬우므로 라이브러리로 빼냈습니다.
+# The SERVER version specifically. `kubectl version -o json` prints both the client
+# and the server one; a naive grep on gitVersion takes the first match — the client
+# one — and the report starts lying about the cluster version. It is easy to get this
+# wrong, so it is moved into the library.
 server_version() {
   kubectl version -o json 2>/dev/null \
     | python3 -c 'import sys,json;print(json.load(sys.stdin)["serverVersion"]["gitVersion"])' 2>/dev/null
 }
 
-# 사람이 읽을 수 있는 크기: Kubernetes는 allocatable을 Ki로 줄 때도, 순수 바이트로
-# 줄 때도 있으며, 리포트의 "3258002390"은 독자에게 아무것도 말해주지 않습니다.
+# Human-readable size: Kubernetes reports allocatable sometimes in Ki, sometimes in
+# bare bytes, and "3258002390" in the report tells the reader nothing.
 human_bytes() {
   python3 - "$1" <<'PY' 2>/dev/null
 import sys, re
@@ -229,23 +233,24 @@ else:
 PY
 }
 
-# 일회용 파드에서 명령을 실행하되, 비밀 값을 명령줄 인자가 아니라 임시 Secret에서
-# 설정한 환경 변수를 통해 전달합니다.
+# Run a command in a throwaway pod, passing secrets through environment variables
+# set from a temporary Secret rather than command-line arguments.
 #
-# 왜 이렇게 하는가. 파드의 args에 들어가는 것은 `get pods` 권한이 있는 누구에게나
-# 보이고, etcd에 저장되며, audit log로 들어가고, 노드의 `ps`에 드러납니다. 데이터베이스
-# 실습들은 명령줄의 비밀번호가 나쁜 관행이라고 따로 설명합니다; 바로 그 짓을 하는
-# 스크립트로 그것을 검사한다면 이중 잣대가 될 것입니다.
+# Why this way. Everything that goes into a pod's args is visible to anyone with
+# `get pods`, sits in etcd, ends up in the audit log, and shows up in `ps` on the
+# node. The database labs separately explain that a password on the command line
+# is bad practice; checking them with a script that does exactly that would be a
+# double standard.
 #
-# 사용법:
+# Usage:
 #   in_cluster_with_secrets "<image>" "KEY1=val1
-#   KEY2=val2" sh -c '$KEY1을 읽는 명령'
+#   KEY2=val2" sh -c 'command that reads $KEY1'
 in_cluster_with_secrets() {
   local image="$1" envs="$2"; shift 2
   local name="check-$$-$RANDOM"
   local sec="${name}-env"
 
-  # Secret은 stdin에서 생성되므로 값이 kubectl 인자에 들어가지 않습니다.
+  # The Secret is created from stdin, so the values do not end up in kubectl arguments.
   local args=()
   while IFS= read -r line; do
     [ -n "$line" ] && args+=(--from-literal="$line")
@@ -254,8 +259,9 @@ $envs
 EOF
   kubectl create secret generic "$sec" "${args[@]}" >/dev/null 2>&1 || return 1
 
-  # 여기서도 securityContext는 필수입니다: 없으면 `restricted` 프로파일의 클러스터에서
-  # 파드가 생성되지 않고, 데이터베이스 실습의 검사가 동작하지 않습니다.
+  # securityContext is also mandatory here: without it the pod will not be created
+  # in a cluster with the `restricted` profile, and the checks for the database labs
+  # will not run.
   local cmd_json
   cmd_json="$(printf '%s\n' "$@" | python3 -c 'import sys,json;print(json.dumps([l.rstrip("\n") for l in sys.stdin]))')"
   kubectl run "$name" --rm -i --restart=Never --quiet \
@@ -269,12 +275,12 @@ EOF
   return $rc
 }
 
-# `restricted` 프로파일을 통과하는 securityContext가 포함된 override를 만듭니다.
-# 따로 빼낸 이유: 동일한 부가 설정이 모든 일회용 파드에 필요하며, 이것이 없으면
-# 검사 스크립트가 엄격한 클러스터에서 동작하지 않습니다.
-# 명령 인자는 각각 개별적으로 전달되고 JSON은 python이 조립합니다:
-# bash에서 따옴표를 수동으로 이스케이프하다가 이미 override가 깨지고 파드가 조용히
-# 실패한 적이 있으며 — 그 오류는 2>/dev/null이 삼켜버렸습니다.
+# Build an override with a securityContext that passes the `restricted` profile.
+# Broken out separately: the same add-on is needed by every throwaway pod, and
+# without it the check scripts do not work in strict clusters.
+# The command arguments are passed EACH SEPARATELY, and the JSON is assembled by
+# python: hand-escaping quotes in bash has already led to a broken override and a
+# silent failure of the pod — with the error swallowed by 2>/dev/null.
 _restricted_overrides() {
   local name="$1" image="$2"; shift 2
   python3 - "$name" "$image" "$@" <<'PYJSON'
@@ -290,33 +296,34 @@ print(json.dumps({"spec": {
 PYJSON
 }
 
-# 일회용 파드에서 명령을 실행하고 그 출력을 반환합니다.
-# 클러스터 내부에서 서비스 도달 가능성을 검사하는 곳에서 필요합니다: 노트북에서는
-# ClusterIP가 보이지 않습니다. 파드는 어떤 경우에도 스스로 정리됩니다.
+# Run a command in a throwaway pod and return its output.
+# Needed where service reachability from inside the cluster is checked: from the
+# laptop the ClusterIP is not visible. The pod cleans up after itself in any case.
 in_cluster_curl() {
   local url="$1" extra="${2:-}"
   local name="check-$$-$RANDOM"
-  # securityContext는 필수입니다: `restricted` 프로파일의 클러스터에서는 이것이 없는
-  # 파드가 생성되지 않으며, 참가자가 실습을 아예 검사할 수 없습니다.
+  # securityContext is mandatory: in a cluster with the `restricted` profile a pod
+  # without it will not be created, and the participant will not be able to check
+  # the lab at all.
   kubectl run "$name" --rm -i --restart=Never --quiet \
     --image=curlimages/curl:8.11.1 --pod-running-timeout=90s \
     --overrides="$(_restricted_overrides "$name" curlimages/curl:8.11.1 \
       curl -s --max-time 10 $extra "$url")" \
     2>/dev/null
   local rc=$?
-  # `--rm`은 클라이언트가 붙어 있는 동안에만 파드를 삭제합니다: 연결 끊김, 타임아웃,
-  # Ctrl+C는 파드를 남겨둡니다. 명시적 삭제는 스크립트가 클러스터를 어지럽히지
-  # 않도록 하기 위함입니다.
+  # `--rm` deletes the pod only while the client stays attached: a disconnect, a
+  # timeout, or Ctrl+C leaves it hanging. The explicit delete keeps the script from
+  # littering the cluster.
   kubectl delete pod "$name" --ignore-not-found --wait=false >/dev/null 2>&1
   return $rc
 }
 
-# 여러 요청의 응답을 연달아, 한 줄에 하나씩 모읍니다.
+# Collect responses from SEVERAL requests in a row, one per line.
 #
-# 서비스 뒤에 복제본이 여러 개일 때 요청 하나는 복권과 같습니다: 같은 레이블을 가진
-# 엉뚱한 파드가 로드 밸런싱에 끼어들지만, 단일 표본은 그것을 놓칠 수 있고, 검사는
-# 바꿔치기된 콘텐츠에서 신나게 초록불이 됩니다. 확인됨: 스무 번 중 여덟 번의 요청이
-# 사칭 파드로 갔고, 검사는 네 번 연속 "통과"라고 말했습니다.
+# A single request with several replicas behind a service is a lottery: a stray pod
+# with the same label gets into the load balancing, but a single sample may miss it,
+# and the check happily turns green on substituted content. Verified: eight of twenty
+# requests went to the impostor, and the check said "passed" four times in a row.
 in_cluster_curl_many() {
   local url="$1" times="${2:-8}"
   local name="check-$$-$RANDOM"

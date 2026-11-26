@@ -1,30 +1,30 @@
 ---
-# ラボ 5 · Git によるインフラ管理。「ゲストパス」サービス用の名前空間。
+# Lab 5 · Infrastructure in Git. Namespace for the "Passes" service.
 #
-# このファイルは手動でクラスタに適用しません。GitHub 上の自分のリポジトリの apps/
-# フォルダに置くと、Flux がスケジュールに従って自動で `lab` クラスタへ反映します。
+# You do not apply this file to the cluster by hand. You put it into your repository on
+# GitHub, in the apps/ folder, and Flux moves it into the `lab` cluster itself, on schedule:
 #     cp app/*.yaml ~/passes-gitops/apps/
 #     cd ~/passes-gitops && git add apps && git commit -m "add passes service v1" && git push
 #
-# あらゆるマニフェストの読み方: apiVersion — 記述スキーマのバージョン（これにより
-# クラスタはオブジェクトの解釈方法を判断します）、kind — 何を作るか、metadata.name — 後で
-# オブジェクトを探すための名前。この 3 つのフィールドはどのオブジェクトにも存在し、以下では
-# 個別に説明しません。
+# How to read any manifest: apiVersion — the version of the description schema (the cluster
+# uses it to know how to parse the object), kind — what we are creating, metadata.name — the
+# name by which the object is later found. These three fields are present in every object and
+# are not explained separately below.
 #
-# 名前空間（namespace）は 1 つのクラスタ内部の論理的な仕切りです。独自の名前スコープ、独自の
-# 権限、独自のクォータを持ちます。vSphere で最も近いのは vCenter ツリーのフォルダ、または
-# リソースプールです。
+# A namespace is a logical partition inside a single cluster: its own name scope, its own
+# permissions, its own quotas. The closest thing in vSphere is a folder in the vCenter tree
+# or a resource pool.
 #
-# なぜアプリケーションと一緒に Git に置き、手動で作成しないのか: サービスがリポジトリから
-# 消えると、Flux が名前空間も削除します。半年後に誰も理由を思い出せない空の仕切りが
-# 残ることはありません。
+# Why it lives in Git together with the application rather than being created by hand: when
+# the service leaves the repository, Flux will remove the namespace too. No empty partition
+# will be left behind that in six months nobody remembers why it was set up.
 apiVersion: v1
 kind: Namespace
 metadata:
   name: passes
-  # このラベルはサービスの動作には影響しません。「ゲストパス」に関連するすべてを 1 つの
-  # コマンドで探すために必要です: kubectl get all -A -l app.kubernetes.io/part-of=passes。
-  # part-of という名前は私たちが考案したものではなく、Kubernetes の共通ラベルセットから
-  # 取ったものです: 外部ツール（監視、エクスポート）はまさにこれを探します。
+  # The label does not affect how the service runs — it is needed so that a single command
+  # can find everything related to "Passes": kubectl get all -A -l app.kubernetes.io/part-of=passes.
+  # The part-of name is taken from the common Kubernetes set of labels, not invented by us:
+  # external tools (monitoring, exports) look for exactly this one.
   labels:
     app.kubernetes.io/part-of: passes

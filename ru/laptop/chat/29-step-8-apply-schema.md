@@ -2,10 +2,10 @@
 
 **Доступ к базе:**
 ```
-хост:   postgres-db-rw.tenant-workshopXX.svc.cozy.local
-база:   orders
-логин:  orders
-пароль: Orders2019!
+host:     postgres-db-rw.tenant-workshopXX.svc.cozy.local
+database: orders
+login:    orders
+password: Orders2019!
 ```
 Пароль задан в `manifests/04-managed.yaml`, искать его нигде не надо.
 
@@ -17,14 +17,14 @@
 Три команды подряд, по одной причине на каждую:
 
 ```bash
-# 1. Подключаем репозиторий PGDG — источник пакетов PostgreSQL.
+# 1. Wire up the PGDG repository — the source of PostgreSQL packages.
 yum install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm
 
-# 2. Библиотека libzstd, без неё клиент не поставится. В репозиториях CentOS 7 её нет,
-#    берём из архива EPEL.
+# 2. The libzstd library, without which the client won't install. It's not in the CentOS 7
+#    repositories, so we take it from the EPEL archive.
 yum install -y https://archives.fedoraproject.org/pub/archive/epel/7/x86_64/Packages/l/libzstd-1.5.5-1.el7.x86_64.rpm
 
-# 3. Сам клиент — только из живого репозитория pgdg15.
+# 3. The client itself — only from the live pgdg15 repository.
 yum install -y --disablerepo='pgdg*' --enablerepo=pgdg15 postgresql15
 ```
 
@@ -55,7 +55,7 @@ psql --version
 **Забираем файл схемы** — сеть у машины уже есть:
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/laptop/scripts/orders-schema.sql
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/laptop/scripts/orders-schema.sql
 ```
 
 **Накатываем.** Разберём команду по частям, чтобы не вводить вслепую:

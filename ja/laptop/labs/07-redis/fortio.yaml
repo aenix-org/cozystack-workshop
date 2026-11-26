@@ -1,17 +1,17 @@
 ---
-# ラボ7 · Web UI 付きの負荷生成ツール。
-# スケーリングのラボで使ったものと同じ。負荷はブラウザのボタンで開始し、
-# 遅延ヒストグラムはその場で確認できる。すでにデプロイ済みなら、この
-# ファイルを適用する必要はなく、kubectl は「unchanged」と返す。
+# Lab 7 · load generator with a web UI.
+# The same one as in the scaling lab: you start the load with a button in the browser,
+# and the latency histogram is visible right there. If it is already deployed for you,
+# there is no need to apply this file — kubectl will answer "unchanged".
 #
-# 適用先: あなたの `lab` クラスタ（export KUBECONFIG=~/lab.kubeconfig）。
-# コマンド: kubectl apply -f fortio.yaml
+# Where it is applied: your `lab` cluster (export KUBECONFIG=~/lab.kubeconfig).
+# Command: kubectl apply -f fortio.yaml
 #
-# `---` で区切られた2つのオブジェクト: Deployment（生成ツール本体）と Service（それに
-# 到達するための名前）。apiVersion、kind、metadata.name は以降コメントしない。
+# Two objects separated by `---`: a Deployment (the generator itself) and a Service (the name
+# by which you reach it). apiVersion, kind and metadata.name are not commented on further.
 #
-# イメージはあなたの Harbor ではなく公開 Docker Hub から取得される: Fortio は「ゲストパス」
-# サービスの一部ではなく、クラスタに一時的に住む計測器だからだ。
+# The image is pulled from the public Docker Hub, not from your Harbor: Fortio is not part
+# of the "Guest Pass" service, but a measurement instrument that lives in the cluster temporarily.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -19,10 +19,10 @@ metadata:
   labels:
     app: fortio
 spec:
-  # 1コピーだけ。負荷生成ツールはスケールする必要がない — 1つが遅延を正直に
-  # 数えてくれることが必要だ。2コピーあれば、まとまらない2つのヒストグラムになる。
+  # A single copy. A load generator does not need to be scaled — you need it to be the one
+  # honestly counting latencies. Two copies would give two unmerged histograms.
   replicas: 1
-  # Deployment が自分の Pod を認識するためのラベル。下の template のラベルと一致する。
+  # The label by which the Deployment recognizes its pod. Matches the label in the template below.
   selector:
     matchLabels:
       app: fortio
@@ -31,8 +31,8 @@ spec:
       labels:
         app: fortio
     spec:
-      # 他のすべてと同じセキュリティ要件: プロセスは root では動かず、
-      # システムコールは seccomp プロファイルで制限される。
+      # The same security requirements as everything else: the process does not run as root,
+      # and system calls are restricted by a seccomp profile.
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
@@ -44,13 +44,13 @@ spec:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # ここでの `latest` タグはワークショップ向けの簡略化であり、自前のレジストリを
-          # 扱うラボが教えることと矛盾する: このタグのイメージは2回の apply の間に気づかぬうちに
-          # 入れ替わることがあり、昨日の計測は再現不能になる。学習用スタンドの負荷生成ツール
-          # なら許容できるが、本番システムでは許容できない。
+          # The `latest` tag here is a simplification for the workshop, and it contradicts what
+          # the lab about your own registry teaches: the image under this tag can silently change
+          # between two applies, and yesterday's measurement becomes non-reproducible. For a
+          # load generator on a training stand this is acceptable, for a production system it is not.
           image: fortio/fortio:latest
-          # `server` は Fortio が Web インターフェイスを立ち上げ、あなたがボタンを押すのを
-          # 待つモード。この引数がないと、イメージは1回限りのコマンドを実行して終了する。
+          # `server` is the mode in which Fortio brings up the web interface and waits for you
+          # to press the button. Without this argument the image runs a one-off command and exits.
           args: ["server"]
           ports:
             - containerPort: 8080
@@ -60,15 +60,15 @@ spec:
               cpu: 100m
               memory: 64Mi
             limits:
-              # 生成ツールには CPU の余裕が必要だ。さもないと自分自身が
-              # ボトルネックになり、アプリではなく Fortio に負荷をかけることになる。
+              # The generator needs CPU headroom, otherwise it will bottleneck
+              # on itself and you will be loading Fortio rather than the application.
               cpu: "1"
               memory: 256Mi
 ---
-# Web インターフェイスを開くには Service が必要だ: 生成ツールには名前を通じてポート
-# フォワーディングで到達する — kubectl port-forward svc/fortio 8081:8080 — そして
-# localhost:8081 にアクセスする。Service なしでも kubectl exec deploy/fortio で
-# サービスを叩けるが、ブラウザでヒストグラムを見られるのはこの経路だけだ。
+# The Service is needed to open the web interface: you reach the generator by name
+# through port forwarding — kubectl port-forward svc/fortio 8081:8080 — and go
+# to localhost:8081. You can also hammer the service without a Service, with
+# kubectl exec deploy/fortio, but only this path gives you the histogram in the browser.
 apiVersion: v1
 kind: Service
 metadata:
@@ -76,8 +76,8 @@ metadata:
 spec:
   selector:
     app: fortio
-  # ここでは Service の番号とコンテナのポートが一致している — 外側が80、内側が8080
-  # というラボの他のサービスとは異なる。違いは利便性だけだ。
+  # Here the Service number and the container port match — unlike the other
+  # services in the lab, where it is 80 outside and 8080 inside. The difference is only convenience.
   ports:
     - port: 8080
       targetPort: http

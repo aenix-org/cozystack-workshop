@@ -8,8 +8,8 @@
 ```
 dashboard: https://dashboard.workshop.aenix.io
 bastion:   ssh workshopXX@<bastion-address>
-login:     workshopXX      ← あなたの番号、直接お伝えします
-password:  ...             ← 直接お伝えします
+login:     workshopXX      ← your number, I'll tell you in person
+password:  ...             ← I'll tell you in person
 ```
 
 bastion にログインします。パスワードはダッシュボードと同じで、**SSH鍵は不要です**:

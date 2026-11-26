@@ -1,16 +1,16 @@
 ---
-# लैब 7 · सेवा «गेस्ट पास», संस्करण v2 — वह जो कैश के साथ काम कर सकता है।
-# कैश यहाँ अभी चालू नहीं है: पहले हम मापते हैं कि इसके बिना कितना बुरा है। यह बाद में चालू होता है,
-# इसी फ़ोल्डर के cache-patch.yaml पैच से।
+# Lab 7 · the "Pass" service, version v2 — the one that can work with a cache.
+# The cache is NOT enabled here yet: first we measure how bad it is without it. It gets enabled later,
+# by the cache-patch.yaml patch from this same folder.
 #
-# कहाँ लागू किया जाता है: आपका `lab` क्लस्टर (export KUBECONFIG=~/lab.kubeconfig).
-# कमांड: kubectl apply -f passes-api.yaml
+# Where it is applied: your `lab` cluster (export KUBECONFIG=~/lab.kubeconfig).
+# Command: kubectl apply -f passes-api.yaml
 #
-# HARBOR-HOST एक प्लेसहोल्डर है, पता नहीं। अपने Harbor का पता डालें (hr-legacy.yaml देखें,
-# वहीं इसे सभी फ़ाइलों में एक साथ बदलने के लिए sed कमांड भी है)।
+# HARBOR-HOST is a placeholder, not an address. Substitute the address of your own Harbor (see hr-legacy.yaml,
+# it also has the sed command to replace it across all files at once).
 #
-# फ़ाइल में `---` से अलग किए गए दो ऑब्जेक्ट हैं: Deployment (एप्लिकेशन की प्रतियाँ) और Service (उनके लिए
-# एक स्थायी नाम)। apiVersion, kind और metadata.name पर आगे फ़ाइल में टिप्पणी नहीं की गई है।
+# The file has two objects separated by `---`: Deployment (copies of the application) and Service (a stable name
+# for them). apiVersion, kind and metadata.name are not commented further down the file.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -18,64 +18,64 @@ metadata:
   labels:
     app: passes-api
 spec:
-  # दो प्रतियाँ, एक नहीं, — ताकि बाद में कैश का मुख्य गुण दिखे: वह साझा है।
-  # एक पॉड ने जवाब Redis में डाला, दूसरे ने उसे वहाँ से लिया, हालाँकि वह खुद डायरेक्टरी तक कभी नहीं गया।
+  # Two copies, not one, so that later the main property of the cache is visible: it is shared.
+  # One pod put the answer into Redis, another took it from there, even though it never went to the directory itself.
   replicas: 2
-  # इस लेबल से Deployment अपने पॉड को दूसरों से अलग पहचानता है। यह नीचे template में मौजूद लेबल से
-  # मेल खाना चाहिए, अन्यथा ऑब्जेक्ट वही नहीं ढूँढ़ पाएगा जो उसने खुद बनाया था।
+  # By this label the Deployment tells its own pods from foreign ones. It must match the label
+  # in the template below, otherwise the object will not find what it created itself.
   selector:
     matchLabels:
       app: passes-api
-  # template — पॉड का टेम्पलेट: हर प्रति किससे इकट्ठा करनी है।
+  # template — the pod template: what to assemble each copy from.
   template:
     metadata:
       labels:
         app: passes-api
     spec:
-      # पॉड-स्तर की सुरक्षा आवश्यकताएँ: root से नहीं, सिस्टम कॉल का सीमित सेट। नीतियाँ चालू वाले
-      # क्लस्टर में इन फ़ील्ड के बिना पॉड स्वीकार नहीं किया जाएगा।
+      # Pod-level security requirements: not from root, a restricted set of system
+      # calls. In a cluster with policies enabled, a pod without these fields will not be accepted.
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
         seccompProfile:
           type: RuntimeDefault
-      # छवि खींचते समय क्लस्टर बंद Harbor के सामने खुद को कैसे प्रस्तुत करेगा। इस सीक्रेट के संदर्भ
-      # के बिना पॉड ImagePullBackOff में अटक जाएगा।
+      # How the cluster will identify itself to the closed Harbor when pulling the image. Without a reference
+      # to this secret the pod will get stuck in ImagePullBackOff.
       imagePullSecrets:
         - name: harbor
       containers:
         - name: api
-          # कंटेनर के अधिकार न्यूनतम तक घटाए गए हैं: बढ़ाना मना है, कोई कर्नेल विशेषाधिकार नहीं।
+          # The container's privileges are cut to a minimum: escalation is forbidden, no kernel privileges.
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # वही छवि जो डायरेक्टरी की है। उन्हें केवल नीचे का MODE अलग करता है।
+          # The same image as the directory. Only the MODE below separates them.
           image: HARBOR-HOST/passes/passes-api:v2
-          # पोर्ट का नाम इसलिए ज़रूरी है ताकि प्रोब और Service संख्या नहीं, नाम का संदर्भ दें।
+          # The port name is needed so that the probe and the Service reference a name, not a number.
           ports:
             - containerPort: 8080
               name: http
-          # एप्लिकेशन का पूरा व्यवहार यहीं तय होता है। ध्यान दें: चर
-          # REDIS_ADDR और REDIS_PASSWORD सूची में नहीं हैं — और ठीक इसीलिए कैश बंद है,
-          # और हर अनुरोध ईमानदारी से धीमी डायरेक्टरी तक जाता है।
+          # All the application's behavior is set here. Note: the variables
+          # REDIS_ADDR and REDIS_PASSWORD are not in the list — and that is exactly why the cache is off,
+          # and every request honestly goes to the slow directory.
           env:
-            # MODE=api — यह इंस्टेंस स्वयं «गेस्ट पास» सेवा के रूप में काम करता है।
+            # MODE=api — this instance works as the "Pass" service itself.
             - name: MODE
               value: "api"
-            # संस्करण और रजिस्ट्री एप्लिकेशन को काम के लिए ज़रूरी नहीं — वे «/» के जवाब में दिखते हैं
-            # और यह भरोसा दिलाते हैं कि ठीक वही चल रहा है जो आपने अभी बनाया।
+            # The application does not need the version and registry to work — they are visible in the response to "/"
+            # and let you confirm that exactly what you just built is running.
             - name: APP_VERSION
               value: "v2"
             - name: IMAGE_REGISTRY
               value: HARBOR-HOST
-            # डेटा के लिए कहाँ जाना है। पता नहीं, सेवा का नाम: डायरेक्टरी की प्रतियाँ
-            # जितनी बार चाहें फिर से बन सकती हैं, नाम नहीं बदलता।
+            # Where to go for data. A service name, not an address: the directory's copies
+            # can be recreated any number of times, the name does not change.
             - name: HR_URL
               value: "http://hr-legacy.default.svc.cluster.local"
-            # अनुरोध कौन और कहाँ निष्पादित करता है। ये तीन मान क्लस्टर खुद डालता है:
-            # इन्हें पहले से कोई नहीं जानता। वे सेवा के जवाब में पहुँचते हैं, और उनसे दिखता है
-            # कि किस नोड पर किस प्रति ने जवाब दिया — यह मापन के समय काम आएगा।
+            # Who executes the request and where. The cluster substitutes these three values itself:
+            # nobody knows them in advance. They end up in the service's response, and from them you can see
+            # which copy on which node answered — this will be useful during measurements.
             - name: POD_NAME
               valueFrom:
                 fieldRef:
@@ -88,9 +88,9 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
-          # requests — नोड चुनते समय जो आरक्षित होता है, limits — अधिकतम सीमा। यहाँ एक कोर की सीमा
-          # लालच नहीं है: लोड में एप्लिकेशन इससे टकराएगा, न कि पूरे नोड को खा जाएगा,
-          # और मापन डायरेक्टरी की देरी दिखाएगा, न कि प्रोसेसर के लिए संघर्ष।
+          # requests — what gets reserved when picking a node, limits — the ceiling. A one-core ceiling
+          # here is not greed: under load the application will hit it rather than eat up
+          # the whole node, and the measurement will show the directory's latency, not a fight for the CPU.
           resources:
             requests:
               cpu: 50m
@@ -98,9 +98,9 @@ spec:
             limits:
               cpu: "1"
               memory: 64Mi
-          # जब तक /healthz जवाब न दे, Service इस प्रति को एक भी अनुरोध नहीं भेजेगा।
-          # अपडेट के समय यही फ़ील्ड आपको ठप होने से बचाता है: पुरानी प्रतियाँ तब तक नहीं हटाई जातीं,
-          # जब तक नई तैयार होने की सूचना न दें।
+          # Until /healthz responds, the Service will not send a single request to this copy.
+          # During an update this same field saves you from an outage: old copies are not removed
+          # until the new ones report readiness.
           readinessProbe:
             httpGet:
               path: /healthz
@@ -108,19 +108,19 @@ spec:
             initialDelaySeconds: 2
             periodSeconds: 5
 ---
-# Service — दोनों प्रतियों के लिए एक स्थायी नाम और उनके बीच अनुरोधों का वितरण।
-# पॉड फिर से बनते हैं और IP बदलते हैं, नाम passes-api बना रहता है। इसी नाम से सेवा तक
-# Fortio और जाँच स्क्रिप्ट दोनों पहुँचते हैं।
+# Service — one stable name for both copies and distribution of requests between them.
+# Pods are recreated and change IPs, the name passes-api stays. By this name both Fortio
+# and the check script reach the service.
 apiVersion: v1
 kind: Service
 metadata:
   name: passes-api
 spec:
-  # वह लेबल जिससे Service जीवित प्रतियों की सूची जुटाता है। पॉड के लेबल से मेल न खाए —
-  # Service मौजूद तो रहेगा पर कहीं नहीं ले जाएगा।
+  # The label by which the Service gathers the list of live copies. If it does not match the pods' label —
+  # the Service will exist and lead nowhere.
   selector:
     app: passes-api
   ports:
-    # बाहर से 80 पर जुड़ते हैं, पॉड के अंदर http नाम वाले पोर्ट (8080) पर जाता है।
+    # From outside they connect on 80, into the pod it goes to the port named http (8080).
     - port: 80
       targetPort: http

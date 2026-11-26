@@ -1,32 +1,32 @@
 #!/bin/bash
-# 移行したアプリケーションを、レガシーなハードコードIPからmanaged DNSエンドポイントへ切り替える。
-# netfix-dhcp.sh + 再起動の後に、app-VM上でrootとして実行すること（そうしないとDNSが解決しない）。
+# Switch the migrated application from legacy hardcoded IPs to managed DNS endpoints.
+# Run in the app-VM as root AFTER netfix-dhcp.sh + reboot (otherwise DNS won't resolve).
 set -e
 CONF=/etc/orders/application.properties
 
 # =========================================================================
-# あなたのmanagedサービスの名前を貼り付けてください。
-#   あなたのテナントでのService DNSの形式（namespace = tenant-<あなたのログイン>）:
-#     Postgres: postgres-<postgresの名前>-rw.<namespace>.svc.cozy.local
-#     Kafka:    kafka-<kafkaの名前>-kafka-bootstrap.<namespace>.svc.cozy.local
-#   サービス名はダッシュボードで確認できます: Postgres/Kafka -> あなたのインスタンス -> Services。
+# PASTE THE NAMES OF YOUR managed services.
+#   Service DNS format in your tenant (namespace = tenant-<your-login>):
+#     Postgres: postgres-<postgres-name>-rw.<namespace>.svc.cozy.local
+#     Kafka:    kafka-<kafka-name>-kafka-bootstrap.<namespace>.svc.cozy.local
+#   Service names are visible in the dashboard: Postgres/Kafka -> your instance -> Services.
 # =========================================================================
-# デフォルト値は manifests/04-managed.yaml と一致します（Postgres=db, Kafka=kafka）。
-# tenant-workshopXX だけを自分のnamespaceに置き換えてください。Postgres/Kafka を別の名前にした場合は —
-# db/kafka を自分の名前に変更してください。
+# default values match manifests/04-managed.yaml (Postgres=db, Kafka=kafka).
+# Replace only tenant-workshopXX with your namespace. If you named Postgres/Kafka differently —
+# change db/kafka to your own names.
 PG_HOST="postgres-db-rw.tenant-workshopXX.svc.cozy.local"
 KAFKA_HOST="kafka-kafka-kafka-bootstrap.tenant-workshopXX.svc.cozy.local"
 # =========================================================================
 
-echo "== 変更前（レガシーなハードコードIP） =="
+echo "== before (legacy hardcoded IP) =="
 grep -E 'datasource.url|bootstrap-servers' "$CONF"
 
 sed -i "s#192.168.10.30:5432#${PG_HOST}:5432#; s#192.168.10.40:9092#${KAFKA_HOST}:9092#" "$CONF"
 
-echo "== 変更後（managed DNS） =="
+echo "== after (managed DNS) =="
 grep -E 'datasource.url|bootstrap-servers' "$CONF"
 
-echo "== アプリケーションを再起動します =="
+echo "== restarting the application =="
 systemctl restart orders-api
 sleep 8
 systemctl is-active orders-api

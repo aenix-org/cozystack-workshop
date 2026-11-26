@@ -32,11 +32,11 @@
 ## लैब फ़ोल्डर में क्या है
 
 सारी फ़ाइलें पहले से आपके पास हैं — आपने उन्हें रिपॉज़िटरी के साथ ही खींच लिया था। बनाने या दोबारा
-टाइप करने के लिए कुछ नहीं है: नीचे जहाँ भी `kubectl apply -f नाम.yaml` लिखा है, फ़ाइल यहीं से ली
+टाइप करने के लिए कुछ नहीं है: नीचे जहाँ भी `kubectl apply -f name.yaml` लिखा है, फ़ाइल यहीं से ली
 जाती है।
 
 ```bash
-# पथ उस रिपॉज़िटरी की जड़ से गिना जाता है जिसे आपने लैब 0 में खींचा था
+# the path is relative to the root of the repository you pulled in lab 0
 cd labs/01-deploy
 ```
 
@@ -66,10 +66,10 @@ Cozystack डैशबोर्ड वह दिखाता है जो आ�
 आइए जुड़ें:
 
 ```bash
-# KUBECONFIG — वह वेरिएबल जिससे kubectl जानता है कि कौन-सी एक्सेस फ़ाइल लेनी है।
-# यहाँ यह lab क्लस्टर की एक्सेस है, टेनेंट की नहीं: फ़ाइलें अलग, क्लस्टर अलग।
+# KUBECONFIG — the variable kubectl reads to learn which access file to use.
+# Here that's access to the lab cluster, not to the tenant: different files, different clusters.
 export KUBECONFIG=~/lab.kubeconfig
-# get nodes = "नोड दिखाओ"। जवाब पुष्टि करता है कि kubectl सही जगह से बात कर रहा है।
+# get nodes = "show the nodes". The answer confirms kubectl is talking to the right place.
 kubectl get nodes
 ```
 
@@ -130,7 +130,7 @@ metadata:
   name: rickroll-page-v1
 data:
   index.html: |
-    ...<div class="pod">सेवा प्रदान करने वाला Pod<b>__POD__</b></div>...
+    ...<div class="pod">served by pod<b>__POD__</b></div>...
 ```
 
 वही `__POD__` जिसे nginx बदल देगा। नाम में `-v1` संयोग नहीं है: संस्करणों की रोलआउट वाली लैब में एक
@@ -247,9 +247,9 @@ Service और Pods के बीच का संबंध पतों की 
 अब इसे लागू करें:
 
 ```bash
-# apply = "क्लस्टर को उस स्थिति में लाओ जो फ़ाइल में वर्णित है"। चारों ऑब्जेक्ट एक ही
-# कमांड से बनते हैं; फ़ाइल के भीतर का क्रम क्लस्टर खुद तय कर लेता है।
-#   -f   विवरण किसी फ़ाइल से लो
+# apply = "bring the cluster to what's described in the file". All four objects are created
+# with a single command; the cluster works out the order within the file on its own.
+#   -f   take the description from a file
 kubectl apply -f rickroll.yaml
 ```
 
@@ -265,8 +265,8 @@ service/rickroll created
 कॉपी के चालू होने का इंतज़ार करें:
 
 ```bash
-# rollout status तब तक इंतज़ार करता है जब तक Deployment काम पूरा नहीं कर लेता: ज़रूरी संख्या में कॉपियाँ
-# चालू हैं और अनुरोध स्वीकारने को तैयार हैं। ऐसा होते ही कमांड अपने-आप खत्म हो जाती है।
+# rollout status waits until the Deployment sees the job through: the required number of copies
+# is running and ready to accept requests. The command finishes on its own when that happens.
 kubectl rollout status deployment/rickroll
 ```
 
@@ -283,8 +283,8 @@ kubectl rollout status deployment/rickroll
 वह अब कैसा दिखता है:
 
 ```bash
-# get deployment rickroll = एक ऑब्जेक्ट को उसके प्रकार और नाम से दिखाओ।
-#   -o yaml   इसे पूरा छापो, उसी रूप में जिसमें आप इसे हाथ से लिख सकते हैं
+# get deployment rickroll = show a single object by type and name.
+#   -o yaml   print it in full, in the same form you could write it by hand
 kubectl get deployment rickroll -o yaml
 ```
 
@@ -319,10 +319,10 @@ spec:
 bastion से भीतर की ओर एक टनल चलाती है।
 
 ```bash
-# port-forward = bastion से क्लस्टर के भीतर एक टनल, जो कमांड के चलने तक जीवित रहती है।
-#   svc/rickroll   टनल को rickroll नामक Service तक ले जाओ, जो आगे अनुरोध को
-#                  एप्लिकेशन की एक जीवित कॉपी पर भेज देती है
-#   8080:80        बायाँ नंबर bastion पर पोर्ट है, दायाँ क्लस्टर में Service का पोर्ट
+# port-forward = a tunnel from the bastion into the cluster, alive as long as the command runs.
+#   svc/rickroll   run the tunnel to the Service named rickroll, which in turn routes
+#                  the request to a live copy of the application
+#   8080:80        the left number is the port on the bastion, the right is the Service port in the cluster
 kubectl port-forward svc/rickroll 8080:80
 ```
 
@@ -341,9 +341,9 @@ export KUBECONFIG=~/lab.kubeconfig
 ```
 
 ```bash
-# get pods = "चालू कॉपियाँ दिखाओ"।
-#   -l app=rickroll   सारे Pods नहीं, बल्कि सिर्फ़ app=rickroll लेबल वाले दिखाओ —
-#                     वही जिससे Service उन्हें ढूँढता है
+# get pods = "show the running copies".
+#   -l app=rickroll   show not all Pods, but only those with the label app=rickroll —
+#                     the very one the Service uses to find them
 kubectl get pods -l app=rickroll
 ```
 
@@ -356,8 +356,8 @@ kubectl get pods -l app=rickroll
 📍 **कहाँ:** bastion पर, उसी टर्मिनल विंडो में जहाँ आप `kubectl` के साथ काम कर रहे थे।
 
 ```bash
-# इसे लैब फ़ोल्डर से चलाएँ: स्क्रिप्ट अपनी फ़ाइलें अपने पास ही ढूँढती है।
-# नाम से पहले ./ का मतलब है "फ़ाइल को ठीक यहीं से चलाओ", न कि उसे सिस्टम फ़ोल्डरों में ढूँढो
+# run it from the lab folder: the script looks for its files next to itself.
+# the ./ before the name means "run the file from right here", not look for it in system folders
 ./check.sh
 ```
 

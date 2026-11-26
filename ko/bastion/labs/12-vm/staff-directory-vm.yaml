@@ -1,32 +1,32 @@
 ---
-# 랩 12. 레거시 직원 명부용 가상 머신: 디스크와 머신 자체,
-# 하나의 파일에 두 개의 객체, `---` 줄로 구분됩니다.
+# Lab 12. A virtual machine for a legacy staff directory: the disk and the machine itself,
+# two objects in one file, separated by a `---` line.
 #
-# 이것들은 테넌트 객체입니다: `lab` 클러스터가 아니라, 관리 클러스터의
-# 여러분 namespace에 존재합니다. 테넌트 kubeconfig가 필요합니다.
+# These are tenant objects: they live NOT in the `lab` cluster, but in your namespace
+# on the management cluster. You need the tenant kubeconfig.
 #
-# 적용하기 전에 tenant-workshopXX를 자신의 namespace로 교체하세요. 그렇지 않으면 주문이
-# 여러분의 테넌트가 아닌 곳으로 갑니다.
+# Before applying, replace tenant-workshopXX with your own namespace, otherwise the order will go
+# to the wrong tenant instead of yours.
 #
 #     export KUBECONFIG=~/.kube/config
 #     kubectl apply -f staff-directory-vm.yaml
 #
-# 같은 작업을 테넌트 대시보드에서 마우스로 할 수 있습니다 (애플리케이션 생성 -> VM Disk,
-# 그다음 VM Instance) — 결과는 동일합니다.
+# The same thing can be done with the mouse in the tenant dashboard (Create application -> VM Disk,
+# then VM Instance) — the result is identical.
 #
-# 주의: 이후에 머신을 부르는 이름은 metadata.name과 일치하지 않으며, 이것은
-# 랩의 오타가 아닙니다. 플랫폼은 이름이 X인 VMInstance 객체를 `vm-instance` 차트로
-# 배포하고, 차트 이름은 릴리스 이름과 결합됩니다: 실행 중인 인스턴스는
-# vm-instance-X로 불립니다. 게다가 대상은 타입 접두사와 함께 지정되는데, 이는
-# 테넌트 권한이 virtualmachines가 아니라 인스턴스(virtualmachineinstances, 즉 vmi)에
-# 부여되었기 때문입니다 — 맨 이름은 forbidden을 반환합니다. 그래서 콘솔 접속 명령은:
+# ATTENTION: the name the machine is called by later does NOT match metadata.name, and this is not
+# a typo in the lab. The platform deploys a VMInstance object named X with the
+# `vm-instance` chart, and the chart name is glued to the release name: the running instance
+# is called vm-instance-X. On top of that, the target is specified with a type prefix, because
+# tenant permissions are granted on instances (virtualmachineinstances, aka vmi), not on
+# virtualmachines — a bare name will return forbidden. Hence the console login command:
 #     virtctl console --namespace=tenant-workshopXX vmi/vm-instance-spravochnik
-# 실행 중인 인스턴스 목록: kubectl get vmi -n tenant-workshopXX
-# 그리고 `kubectl get vminstance spravochnik`은 인스턴스가 아니라 그것에 대한 여러분의 주문을 보여줍니다 —
-# 아래에 설명된 바로 그 객체입니다.
+# List of running instances: kubectl get vmi -n tenant-workshopXX
+# And `kubectl get vminstance spravochnik` shows not the instance, but your order for it —
+# the very object described below.
 #
-# 디스크와 머신은 두 개의 서로 다른 객체이며, 이것은 관료주의가 아닙니다: 디스크는
-# 머신보다 오래 남습니다. 머신은 삭제하고 같은 디스크를 붙여서 다시 만들 수 있습니다.
+# The disk and the machine are TWO DIFFERENT objects, and this is not bureaucracy: the disk outlives
+# the machine. The machine can be deleted and recreated, attaching the same disk.
 apiVersion: apps.cozystack.io/v1alpha1
 kind: VMDisk
 metadata:
@@ -35,16 +35,16 @@ metadata:
 spec:
   source:
     image:
-      # 플랫폼의 공용 이미지 컬렉션에서 가져온 이름이며, URL이 아닙니다.
-      # 목록은 디스크 생성 시 대시보드에서 볼 수 있습니다.
+      # A name from the platform's shared image collection, not a URL.
+      # The list is visible in the dashboard when creating a disk.
       name: ubuntu-22.04
-  # 디스크 크기. 소스 이미지보다 작을 수 없습니다: ubuntu-22.04는 20Gi로 펼쳐지며,
-  # 10Gi 디스크는 플랫폼이 채우기를 거부합니다. 디스크는 나중에 확장할 수 있지만
-  # 축소할 수는 없으므로, 여기서 낮게 잡는 것이 높게 잡는 것보다 비쌉니다.
+  # Disk size. It cannot be smaller than the source image: ubuntu-22.04 expands
+  # to 20Gi, and the platform would refuse to fill a 10Gi disk. The disk can be expanded later,
+  # but not shrunk, so underestimating here costs more than overestimating.
   storage: 20Gi
-  # 스토리지 클래스. `replicated` — 데이터는 플랫폼의 여러 노드에 여러 복사본으로
-  # 기록됩니다: 복사본을 가진 노드가 죽어도 머신은 계속 작동합니다. 의미상 이것은
-  # 미러이지만, 네트워크를 통해 구성된 것입니다. 인접 랩의 데이터베이스도 같은 클래스를 사용합니다.
+  # Storage class. `replicated` — data is written in several copies to different platform
+  # nodes: a node holding a copy can die, and the machine keeps working. In essence this is
+  # a mirror, only assembled over the network. The databases in the neighboring labs use the same class.
   storageClass: replicated
 ---
 apiVersion: apps.cozystack.io/v1alpha1
@@ -53,44 +53,44 @@ metadata:
   name: spravochnik
   namespace: tenant-workshopXX
 spec:
-  # 1 CPU, 4 GB. Kubernetes 노드 크기를 가져오는 것과 같은 카탈로그
-  # 참조입니다: 머신과 노드는 여기서 동일하게 측정됩니다.
+  # 1 CPU, 4 GB. The same catalog reference from which the sizes of
+  # Kubernetes nodes are taken: machines and nodes are measured the same way here.
   instanceType: u1.medium
-  # 게스트 OS 프로필: 머신에 어떤 드라이버와 장치를 제공할지.
+  # Guest OS profile: which drivers and devices to hand to the machine.
   instanceProfile: ubuntu
-  # Always는 "켜진 상태로 유지"를 의미합니다: 스스로 꺼지면 다시 켜집니다.
-  # Halted — 꺼짐, Manual — 남겨둔 대로.
+  # Always means "keep it running": if it shuts down on its own — it will be started again.
+  # Halted — off, Manual — as left.
   runStrategy: Always
-  # 머신에 어떤 디스크를 연결할지. 참조는 위의 VMDisk 객체 이름으로 이루어집니다 — 이
-  # 머신보다 오래 남을 바로 그 객체입니다.
+  # Which disks to attach to the machine. The reference is by the name of the VMDisk object above — the
+  # very one that will outlive this machine.
   disks:
     - name: spravochnik
-  # 참고: 여기에는 replicas 필드가 없으며 앞으로도 없을 것입니다.
-  # 가상 머신은 하나의 객체입니다. 두 개의 머신이 필요하면 — 서로 다른 이름을 가진
-  # 두 개의 객체입니다. 이것은 Deployment와의 근본적인 차이이며,
-  # 이 차이가 어디서 아픈지에 대한 README 섹션을 참조하세요.
-  # 게스트 OS의 초기 설정. cloud-init은 Linux 클라우드 이미지의 표준 메커니즘입니다:
-  # 첫 부팅 시 머신이 이 텍스트를 읽고 자신에게 적용합니다. 역할상
-  # 이것은 vSphere의 게스트 커스터마이징입니다 — 비밀번호, 파일, 서비스 — 다만 마법사가
-  # 아니라 설명으로 합니다. `|` 뒤 들여쓰기 아래의 모든 것은 게스트로 그대로 전달되어
-  # Kubernetes가 아니라 거기서 파싱됩니다.
+  # Note: there is NO replicas field here, and there won't be.
+  # A virtual machine is a single object. Need two machines — two objects
+  # with different names. This is a fundamental difference from Deployment,
+  # see the README section about where this difference hurts.
+  # Initial setup of the guest OS. cloud-init is the standard mechanism of Linux cloud
+  # images: on first boot the machine reads this text and applies it to itself. In its role
+  # it is guest customization in vSphere — passwords, files, services — only by description, not
+  # by a wizard. Everything below the indentation after `|` goes to the guest verbatim and is parsed
+  # there, not by Kubernetes.
   #
-  # 여기서 cloud-init은 명부를 서버로 만듭니다: HTML 페이지를 배치하고 그것을 포트 8080에서
-  # HTTP로 제공하는 서비스를 설정합니다. python3는 이미 ubuntu 이미지에 있습니다 — 이를 위해
-  # 인터넷은 필요 없습니다. 포트 8080은 우연이 아닙니다: 진행자가 미리 여러분의 테넌트에
-  # Service `spravochnik-http` (80 -> 8080)와 Ingress `spravochnik`을 만들어 두었고, 머신 내부의
-  # 서비스가 올라오는 즉시 명부가 테넌트 도메인에 게시됩니다.
+  # Here cloud-init turns the directory into a server: it places an HTML page and sets up a service
+  # that serves it over HTTP on port 8080. python3 is already in the ubuntu image — the internet
+  # is not needed for this. Port 8080 is not random: the instructor has already created a
+  # Service `spravochnik-http` (80 -> 8080) and an Ingress `spravochnik` in your tenant, and as soon as the service
+  # inside the machine comes up, the directory will be published on the tenant domain.
   cloudInit: |
     #cloud-config
-    # 대시보드에서 콘솔에 접속하려면 비밀번호가 필요합니다. 프로덕션 머신에서는
-    # 이렇게 하면 안 됩니다 — 거기서는 sshKeys를 사용합니다.
+    # The password is needed to log in to the console from the dashboard. On a production machine
+    # you should not do this — use sshKeys there.
     password: ubuntu
     chpasswd: { expire: false }
     ssh_pwauth: true
     write_files:
       - path: /opt/directory/index.html
         content: |
-          <!doctype html><html lang="ko"><head><meta charset="utf-8"><title>명부</title></head><body><h1>직원 명부</h1><ul><li>김민○ — 101</li><li>조준○ — 102</li></ul></body></html>
+          <!doctype html><html lang="en"><head><meta charset="utf-8"><title>Directory</title></head><body><h1>Staff directory</h1><ul><li>Whitfield J. — 101</li><li>Petersen P. — 102</li></ul></body></html>
       - path: /etc/systemd/system/directory.service
         content: |
           [Unit]

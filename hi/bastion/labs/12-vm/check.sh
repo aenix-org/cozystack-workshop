@@ -1,124 +1,125 @@
 #!/usr/bin/env bash
-# लैब 12 की जाँच: माइग्रेट की गई वर्चुअल मशीन प्लेटफ़ॉर्म के ingress और डोमेन के ज़रिये
-# बाहर की ओर प्रकाशित है — ठीक वैसे ही जैसे कंटेनरीकृत एप्लिकेशन।
+# Check for lab 12: the migrated virtual machine is published externally through the
+# platform's ingress and domain — exactly like the containerized application.
 #
-# हम «ऑब्जेक्ट बन गए» की नहीं, बल्कि असल, सारगर्भित कामकाज की जाँच करते हैं:
-#   1) टेनेंट के डोमेन नाम पर HTTP 200 आता है और यह डायरेक्टरी पेज है,
-#   2) वर्चुअल मशीन स्वयं चल रही है (Ready),
-#   3) मशीन को प्रकाशित करने वाला Ingress मौजूद है।
-# पहला बिंदु मुख्य है: यही प्रमाण है कि डायरेक्टरी बाहर से दिखाई देती है।
+# We verify not "objects created", but real, substantive operation:
+#   1) the tenant's domain name returns HTTP 200 and it is the directory page,
+#   2) the virtual machine itself is running (Ready),
+#   3) the Ingress that publishes the machine is in place.
+# The first item is the main one: it is the proof that the directory is visible externally.
 #
-# यह VM पर, इसी लैब के फ़ोल्डर से चलता है। इसके लिए टेनेंट एक्सेस और टेनेंट नंबर चाहिए:
+# Runs on the VM, from this lab's folder. Requires tenant access and the tenant number:
 #     export KUBECONFIG=~/.kube/config
 #     export COZY_TENANT=workshopXX
 #     cd labs/12-vm && ./check.sh
-# डोमेन की जाँच टेनेंट एक्सेस के बिना भी काम करती है — इसके लिए curl ही काफ़ी है। टेनेंट
-# एक्सेस के बिना स्क्रिप्ट फ़ेल नहीं होती: वह टेनेंट-साइड जाँचें छोड़ देती है और यह बता देती है।
+# The domain check works even without tenant access — curl is enough for it. Without tenant
+# access the script does not fail: it skips the tenant-side checks and says so.
 #
-# स्क्रिप्ट कुछ नहीं बदलती — यह सिर्फ़ पढ़ती है और HTTP अनुरोध भेजती है। इसे सफ़ाई से पहले चलाएँ:
-# मशीन हटने के बाद जाँचने को कुछ नहीं बचेगा।
+# The script changes nothing — it only reads and sends HTTP requests. Run it before cleanup:
+# once the machine is deleted there is nothing left to check.
 
-# इन दो वेरिएबल को lib.sh उठा लेती है — ये रिपोर्ट के हेडर में और उस
-# report-<लैब>-<तारीख>.md फ़ाइल के नाम में जाते हैं जिसे स्क्रिप्ट अपने पास लिखती है।
+# These two variables are picked up by lib.sh — they go into the report header and into the
+# name of the report-<lab>-<date>.md file that the script writes next to itself.
 LAB_NAME="12-vm"
-LAB_TITLE="लैब 12 · कंटेनरों के बगल में एक वर्चुअल मशीन"
-# साझा जाँच लाइब्रेरी: ok / fail / warn / evidence / finish यहीं से आते हैं।
-# पथ स्क्रिप्ट के अपने स्थान के सापेक्ष हल होता है, इसलिए किसी भी डायरेक्टरी से चलाने पर
-# एक जैसा काम करता है।
+LAB_TITLE="Lab 12 · A virtual machine next to containers"
+# Shared check library: ok / fail / warn / evidence / finish come from here.
+# The path is resolved relative to where the script itself lives, so running from any
+# directory works the same way.
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
-# टेनेंट नंबर अनिवार्य है: इसी से namespace का नाम और वह डोमेन नाम दोनों बनते हैं जिस पर
-# डायरेक्टरी प्रकाशित है। इसके बिना जाँचने को कुछ नहीं।
+# The tenant number is required: both the namespace name and the domain name under which the
+# directory is published are built from it. Without it there is nothing to check.
 need_tenant
 
-# जिन नामों की हम जाँच करते हैं। VM मशीन के ऑर्डर का नाम है, यानी VMInstance ऑब्जेक्ट;
-# `kubectl get vminstance` इसी से पूछा जाता है। वास्तव में चल रहे इंस्टेंस का नाम अलग होता है:
-# प्लेटफ़ॉर्म ऑर्डर को `vm-instance` चार्ट से तैनात करता है, चार्ट का नाम रिलीज़ के नाम से
-# जुड़ जाता है, और मिलता है vm-instance-spravochnik।
+# The names we check. VM is the name of the machine ORDER, i.e. the VMInstance object;
+# `kubectl get vminstance` is queried by it. The actually running instance is named
+# differently: the platform deploys the order with the `vm-instance` chart, the chart name
+# is glued to the release name, and you get vm-instance-spravochnik.
 VM=spravochnik
 NS="tenant-${COZY_TENANT}"
-# वह डोमेन जिस पर मेज़बान ने पहले से Ingress के ज़रिये डायरेक्टरी प्रकाशित की है। वही पता जिसे
-# आप ब्राउज़र में खोलते हैं।
+# The domain on which the host published the directory in advance through Ingress. The same
+# address you open in the browser.
 HOST="spravochnik.${COZY_TENANT}.workshop.aenix.io"
 URL="http://${HOST}"
 
-# टेनेंट एक्सेस अनिवार्य नहीं है: डोमेन को सादे curl से जाँचा जाता है। अगर KUBECONFIG सेट है
-# और टेनेंट जवाब देता है — तो हम मशीन की स्थिति और Ingress की जाँचें जोड़ देते हैं।
+# Tenant access is not mandatory: the domain is checked with a plain curl. If KUBECONFIG is
+# set and the tenant responds — we add checks for the machine state and Ingress.
 TENANT_OK=0
 if [ -n "${KUBECONFIG:-}" ] && kubectl -n "$NS" get vminstance >/dev/null 2>&1; then
   TENANT_OK=1
 fi
 
-# --- मुख्य बात: डायरेक्टरी डोमेन से बाहर की ओर दिखाई देती है ---------
-# हम रिस्पॉन्स कोड और बॉडी अलग-अलग लेते हैं: कोड «ingress के पीछे अभी कोई नहीं» (503) को
-# «गलत जगह इशारा करता है» (404) और «डोमेन है ही नहीं» (000) से अलग करता है,
-# जबकि बॉडी यह पुष्टि करती है कि जवाब देने वाली डायरेक्टरी ही है, कोई यादृच्छिक स्टब नहीं।
+# --- the main thing: the directory is visible externally by domain ---------
+# We take the response code and the body separately: the code distinguishes "nobody behind
+# ingress yet" (503) from "points to the wrong place" (404) and "no domain at all" (000),
+# while the body confirms that it is the directory answering, not a random stub.
 CODE="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$URL" 2>/dev/null)"
 BODY="$(curl -s --max-time 10 "$URL" 2>/dev/null)"
 
 case "$CODE" in
   200)
     case "$BODY" in
-      *"कर्मचारी निर्देशिका"*)
-        ok "डायरेक्टरी प्रकाशित है: ${URL} 200 देता है और डायरेक्टरी पेज परोसता है"
-        evidence "डोमेन का जवाब" "अनुरोध: ${URL}
-रिस्पॉन्स कोड: ${CODE}
+      *"Staff directory"*)
+        ok "directory published: ${URL} responds 200 and serves the directory page"
+        evidence "Domain response" "request: ${URL}
+response code: ${CODE}
 $(printf '%s' "$BODY" | head -3)"
         ;;
       *)
-        fail "${URL} 200 देता है, पर यह डायरेक्टरी पेज नहीं है" \
-             "डोमेन के पीछे कुछ और जवाब दे रहा है; जाँचें कि मशीन के अंदर पोर्ट 8080 पर सुनने वाली डायरेक्टरी ही है"
+        fail "${URL} returns 200, but this is not the directory page" \
+             "something else is answering behind the domain; check that the directory is what listens on port 8080 inside the machine"
         ;;
     esac
     ;;
   503)
-    fail "डोमेन ${URL} 503 देता है — Ingress के पीछे जवाब देने वाला अभी कोई नहीं" \
-         "मशीन अब भी बूट हो रही है या 8080 पर डायरेक्टरी सेवा चालू नहीं हुई; vminstance के Ready होने का इंतज़ार करें और मशीन कंसोल देखें"
+    fail "domain ${URL} responds 503 — there is no one behind the Ingress to answer yet" \
+         "the machine is still booting or the directory service on 8080 has not come up; wait for the vminstance to be Ready and look at the machine console"
     ;;
   000)
-    fail "डोमेन ${URL} बिलकुल जवाब नहीं देता" \
-         "नेटवर्क जाँचें; इस होस्ट वाला Ingress मेज़बान बनाता है — अगर डोमेन है ही नहीं, तो उनसे पूछें"
+    fail "domain ${URL} does not respond at all" \
+         "check the network; the Ingress with this host is created by the host — if there is no domain at all, ask them"
     ;;
   *)
-    fail "डोमेन ${URL} ${CODE} देता है, 200 नहीं" \
-         "404 का मतलब Ingress गलत सेवा की ओर इशारा करता है; 5xx का मतलब बैकएंड जवाब देने को तैयार नहीं"
+    fail "domain ${URL} responds ${CODE}, not 200" \
+         "404 means the Ingress points to the wrong service; 5xx means the backend is not ready to answer"
     ;;
 esac
 
-# --- टेनेंट पक्ष: मशीन स्वयं और उसका प्रकाशन ---------------
+# --- tenant side: the machine itself and its publication -------------------
 if [ "$TENANT_OK" -eq 0 ]; then
-  warn "टेनेंट-साइड जाँचें छोड़ी गईं: KUBECONFIG के ज़रिये टेनेंट तक नहीं पहुँचा जा सका" \
-       "टेनेंट एक्सेस दें: export KUBECONFIG=~/.kube/config"
+  warn "tenant-side checks skipped: tenant not reachable via KUBECONFIG" \
+       "provide tenant access: export KUBECONFIG=~/.kube/config"
 else
-  # हम «ऑब्जेक्ट मौजूद है या नहीं» नहीं, बल्कि Ready शर्त पूछते हैं: मशीन का ऑर्डर एक सेकंड में
-  # बन जाता है, पर गेस्ट तीन से पाँच मिनट में ऊपर आता है, और उतने समय तक मशीन मौजूद रहती है
-  # पर डायरेक्टरी अभी जवाब नहीं देती।
+  # We ask not "does the object exist", but the Ready condition: the machine order is created
+  # in a second, but the guest comes up in three to five minutes, and all that time the
+  # machine exists but the directory does not answer yet.
   if ! kubectl -n "$NS" get vminstance "$VM" >/dev/null 2>&1; then
-    fail "टेनेंट ${NS} में कोई वर्चुअल मशीन ${VM} नहीं है" \
-         "डैशबोर्ड में VM Disk और VM Instance बनाएँ या staff-directory-vm.yaml लागू करें"
+    fail "there is no virtual machine ${VM} in tenant ${NS}" \
+         "create a VM Disk and VM Instance in the dashboard or apply staff-directory-vm.yaml"
   else
     VM_READY="$(kubectl -n "$NS" get vminstance "$VM" \
       -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)"
     if [ "$VM_READY" = "True" ]; then
-      ok "वर्चुअल मशीन ${VM} चल रही है"
+      ok "virtual machine ${VM} is running"
     elif [ -n "$VM_READY" ]; then
-      fail "वर्चुअल मशीन ${VM} मौजूद है, पर तैयार नहीं (Ready=${VM_READY})" \
-           "डैशबोर्ड में मशीन कार्ड देखें; पहली बार चालू होने में 3-5 मिनट लगते हैं"
+      fail "virtual machine ${VM} exists, but is not ready (Ready=${VM_READY})" \
+           "look at the machine card in the dashboard; the first power-on takes 3-5 minutes"
     else
-      warn "वर्चुअल मशीन ${VM} मौजूद है, पर उसकी स्थिति पढ़ी नहीं जा सकी" \
-           "उसे डैशबोर्ड में देखें: वह चालू होनी चाहिए"
+      warn "virtual machine ${VM} exists, but its state could not be read" \
+           "look at it in the dashboard: it should be powered on"
     fi
-    evidence "टेनेंट की वर्चुअल मशीनें" "$(kubectl -n "$NS" get vminstance 2>/dev/null)"
+    evidence "Tenant virtual machines" "$(kubectl -n "$NS" get vminstance 2>/dev/null)"
   fi
 
-  # Ingress मेज़बान बनाता है, प्रतिभागी नहीं। अगर डोमेन पहले से 200 देता है — तो वह मौजूद है;
-  # हम इसे अलग से जाँचते हैं ताकि 503/404 पर तुरंत साफ़ हो कि प्रकाशन है भी या नहीं।
+  # The Ingress is created by the host, not the participant. If the domain already responds
+  # 200 — it is in place; we check it separately so that on 503/404 it is immediately clear
+  # whether there is any publication at all.
   if kubectl -n "$NS" get ingress spravochnik >/dev/null 2>&1; then
-    ok "Ingress spravochnik मौजूद है — डायरेक्टरी टेनेंट में प्रकाशित है"
-    evidence "टेनेंट का Ingress" "$(kubectl -n "$NS" get ingress spravochnik 2>/dev/null)"
+    ok "Ingress spravochnik is in place — the directory is published in the tenant"
+    evidence "Tenant Ingress" "$(kubectl -n "$NS" get ingress spravochnik 2>/dev/null)"
   else
-    warn "टेनेंट ${NS} में Ingress spravochnik नहीं मिला" \
-         "इसे मेज़बान बनाता है; अगर डोमेन पहले से 200 देता है तो चिंता की बात नहीं, वरना मेज़बान से संपर्क करें"
+    warn "Ingress spravochnik not found in tenant ${NS}" \
+         "it is created by the host; if the domain already responds 200 there is nothing to worry about, otherwise contact the host"
   fi
 fi
 

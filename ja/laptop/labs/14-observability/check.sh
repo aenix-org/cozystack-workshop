@@ -1,131 +1,135 @@
 #!/usr/bin/env bash
-# ラボ14のチェック: 可観測性が実際に機能していること。
+# Check for lab 14: observability actually works.
 #
-# 「参加者がグラフを見た」ことは検証できず、できるふりをするのは不誠実だ。
-# そこで、グラフが成り立つために欠かせないものを確認する:
-#   1) メトリクス収集エージェントがクラスタで動いていること、
-#   2) 収集したものを、どこか虚空ではなく自分のテナントへ送っていること、
-#   3) ログ収集も機能していること — これがなければラボの半分は無意味になる、
-#   4) グラフ上で見つけられる、ラボ3の負荷の痕跡がクラスタに残っていること。
+# "The participant looked at a graph" cannot be verified, and pretending it can is dishonest.
+# So we check the things without which a graph is impossible:
+#   1) the metrics-collection agent is running in the cluster,
+#   2) it sends what it collects to your tenant, and not into the void,
+#   3) log collection also works — without it half of the lab is pointless,
+#   4) there is a trace of load from lab 3 in the cluster that can be found in the graphs.
 
 LAB_NAME="14-observability"
-LAB_TITLE="ラボ14 · 可観測性: グラフの中から自分のスパイクを見つける"
+LAB_TITLE="Lab 14 · Observability: find your spike in the graphs"
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
 need_kubeconfig
 
 MON_NS=cozy-monitoring
 
-# --- 収集用 namespace -------------------------------------------------------
-# namespace の存在だけでは何も証明できない: プラットフォームは同じ場所に metrics-server も置き、
-# それは etcd を持つ任意のクラスタにインストールされ、アドオンには依存しない。ここで存在を確認するのは、
-# 「クラスタに到達できない」と「収集が無効」を区別するためだけだ。
+# --- collection namespace ---------------------------------------------------
+# The namespace alone proves nothing: the platform also places metrics-server there,
+# which is installed on any cluster with etcd and does not depend on the addon. We check
+# for its presence only to distinguish "cluster unavailable" from "collection disabled".
 if ! kubectl get ns "$MON_NS" >/dev/null 2>&1; then
-  fail "クラスタに namespace ${MON_NS} がありません — クラスタの応答が想定と異なります" \
-       "アドオンを有効化してください: ダッシュボード -> Kubernetes -> lab -> 編集 -> Addons -> Monitoring agents。注意: レコードはこの時点以降にのみ現れます"
+  fail "the cluster has no namespace ${MON_NS} — the cluster responded differently than expected" \
+       "enable the addon: dashboard -> Kubernetes -> lab -> edit -> Addons -> Monitoring agents. Note: records will appear only from this moment on"
   finish
   exit $?
 fi
 
-# --- メトリクスエージェント -------------------------------------------------
+# --- metrics agent ----------------------------------------------------------
 VMAGENT_RUNNING="$(kubectl get pods -n "$MON_NS" --no-headers 2>/dev/null \
   | awk '$1 ~ /^vmagent/ && $3=="Running"' | grep -c . )"
 VMAGENT_TOTAL="$(kubectl get pods -n "$MON_NS" --no-headers 2>/dev/null \
   | awk '$1 ~ /^vmagent/' | grep -c . )"
 
 if [ "$VMAGENT_RUNNING" -ge 1 ]; then
-  ok "メトリクス収集エージェントが動いています (vmagent ポッド: ${VMAGENT_RUNNING})"
+  ok "the metrics-collection agent is running (vmagent pods: ${VMAGENT_RUNNING})"
 elif [ "$VMAGENT_TOTAL" -ge 1 ]; then
-  fail "メトリクス収集エージェントは存在しますが動いていません (${VMAGENT_TOTAL} 個中 ${VMAGENT_RUNNING} 個が Running)" \
-       "原因を確認してください: kubectl -n ${MON_NS} describe pod -l app.kubernetes.io/name=vmagent | sed -n '/Events:/,\$p'"
+  fail "the metrics-collection agent exists but is not running (${VMAGENT_RUNNING} of ${VMAGENT_TOTAL} in Running)" \
+       "check the cause: kubectl -n ${MON_NS} describe pod -l app.kubernetes.io/name=vmagent | sed -n '/Events:/,\$p'"
 else
-  fail "${MON_NS} に vmagent ポッドが1つもありません — Monitoring agents アドオンが無効です" \
-       "有効化してください: ダッシュボード -> Kubernetes -> lab -> 編集 -> Addons -> Monitoring agents。レコードが蓄積され始めるのはこの時点以降で、過去は取り戻せません"
+  fail "there is not a single vmagent pod in ${MON_NS} — the Monitoring agents addon is disabled" \
+       "enable it: dashboard -> Kubernetes -> lab -> edit -> Addons -> Monitoring agents. Records will start accumulating only from this moment on; the past cannot be recovered"
 fi
-evidence "${MON_NS} の収集ポッド" "$(kubectl get pods -n "$MON_NS" 2>/dev/null)"
+evidence "Collection pods in ${MON_NS}" "$(kubectl get pods -n "$MON_NS" 2>/dev/null)"
 
-# --- 配信: エージェントは本当に送信しているのか、それともどこでもない場所へ書き込んでいるのか --------
+# --- delivery: is the agent really sending, or writing into the void? --------
+# A working agent that writes into the void looks exactly like a working one, so we
+# ask the agent itself how many successful (2XX) sends it made. Zero means the tenant
+# has no Monitoring app: vmagent has nowhere to write, there is no storage, and the
+# Grafana steps will not work.
 if [ "$VMAGENT_RUNNING" -ge 1 ]; then
   VMPOD="$(kubectl get pods -n "$MON_NS" --no-headers 2>/dev/null | awk '$1 ~ /^vmagent/ && $3=="Running"{print $1; exit}')"
   SENT="$(kubectl exec -n "$MON_NS" "$VMPOD" -c vmagent -- sh -c 'wget -qO- http://127.0.0.1:8429/metrics 2>/dev/null' 2>/dev/null \
     | awk '/^vmagent_remotewrite_requests_total.*status_code="2XX"/{s+=$NF} END{printf "%d", s+0}')"
   if [ "${SENT:-0}" -gt 0 ]; then
-    ok "メトリクスは実際にストレージへ届いています (成功した送信: ${SENT})"
+    ok "metrics are actually delivered to storage (successful sends: ${SENT})"
   else
-    fail "エージェントは稼働していますが、ストレージへメトリクスを 1 つも届けていません (成功した送信は 0)" \
-         "テナントに Monitoring アプリがありません — vmagent は書き込む先がなく、そのため履歴メトリクスも Grafana (ステップ 2-5) もありません。カタログ (Administration) から Monitoring をデプロイするか、講師に尋ねてください"
+    fail "the agent is running but delivered zero metrics to storage (0 successful sends)" \
+         "the tenant has no Monitoring app - vmagent has nowhere to write, so there are no historical metrics and no Grafana (steps 2-5). Deploy Monitoring from the catalog (Administration) or ask the instructor"
   fi
 fi
 
-# --- メトリクスは正確にどこへ送られるか -------------------------------------
-# 虚空へ書き込んでいる稼働中エージェントは、正常なものとまったく同じに見える。
+# --- where exactly the metrics go -------------------------------------------
+# A running agent that writes into the void looks exactly like a working one.
 RW_URL="$(kubectl get vmagent -n "$MON_NS" \
   -o jsonpath='{.items[0].spec.remoteWrite[0].url}' 2>/dev/null)"
 if [ -n "$RW_URL" ]; then
   case "$RW_URL" in
     *tenant-*)
       TARGET_NS="$(printf '%s' "$RW_URL" | sed -n 's|.*vminsert-[a-z]*\.\([^.]*\)\..*|\1|p')"
-      ok "メトリクスはテナントへ送られています${TARGET_NS:+ (${TARGET_NS})}"
+      ok "metrics are sent to the tenant${TARGET_NS:+ (${TARGET_NS})}"
       ;;
     *)
-      warn "メトリクスはテナント固有には見えないアドレスへ送られています" \
-           "ホストが共有ストレージを設定した場合はこれで正常なこともあります; アドレスは証跡にあります"
+      warn "metrics are sent to an address that does not look tenant-specific" \
+           "this may be fine if the host set up shared storage; the address is in the evidence"
       ;;
   esac
-  evidence "メトリクスの送信先" "$RW_URL"
+  evidence "Where the metrics are sent" "$RW_URL"
 else
-  warn "メトリクスの送信先アドレスを読み取れませんでした" \
-       "手動で確認してください: kubectl get vmagent -n ${MON_NS} -o yaml"
+  warn "could not read the metrics send address" \
+       "check by hand: kubectl get vmagent -n ${MON_NS} -o yaml"
 fi
 
-# --- ログ収集 --------------------------------------------------------------
+# --- log collection ---------------------------------------------------------
 FB_DESIRED="$(kubectl get ds -n "$MON_NS" --no-headers 2>/dev/null \
   | awk '$1 ~ /fluent-bit/ {print $2; exit}')"
 FB_READY="$(kubectl get ds -n "$MON_NS" --no-headers 2>/dev/null \
   | awk '$1 ~ /fluent-bit/ {print $4; exit}')"
 if [ -n "$FB_DESIRED" ] && [ "${FB_READY:-0}" = "$FB_DESIRED" ] && [ "${FB_READY:-0}" != "0" ]; then
-  ok "ログ収集がすべてのノードで動いています (${FB_READY}/${FB_DESIRED})"
+  ok "log collection is running on all nodes (${FB_READY}/${FB_DESIRED})"
 elif [ -n "$FB_DESIRED" ]; then
-  fail "ログ収集がすべてのノードでは動いていません (${FB_DESIRED} 個中 ${FB_READY:-0} 個)" \
-       "確認してください: kubectl -n ${MON_NS} get pods | grep fluent-bit — これがないとログ検索のステップは動きません"
+  fail "log collection is not running on all nodes (${FB_READY:-0} of ${FB_DESIRED})" \
+       "check: kubectl -n ${MON_NS} get pods | grep fluent-bit — without it the log-search step will not work"
 else
-  warn "ログコレクタ fluent-bit が見つかりませんでした" \
-       "Grafana の vlogs-generic ソースは空になります; ログ検索のステップは実行できません"
+  warn "the fluent-bit log collector was not found" \
+       "the vlogs-generic source in Grafana will be empty; the log-search step cannot be completed"
 fi
 
-# --- グラフで探すものがあるか ----------------------------------------------
-# メトリクスが完璧に収集されていても、負荷がなかったなら探すものは何もない。
+# --- is there anything to look for in the graphs ----------------------------
+# Metrics may be collected perfectly, but if there was no load, there is nothing to find.
 if kubectl get hpa rickroll >/dev/null 2>&1; then
   LAST_SCALE="$(kubectl get hpa rickroll -o jsonpath='{.status.lastScaleTime}' 2>/dev/null)"
   CUR="$(kubectl get hpa rickroll -o jsonpath='{.status.currentReplicas}' 2>/dev/null)"
   DES="$(kubectl get hpa rickroll -o jsonpath='{.status.desiredReplicas}' 2>/dev/null)"
   if [ -n "$LAST_SCALE" ]; then
-    ok "負荷の痕跡があります: オートスケーリングが作動しました (最後は ${LAST_SCALE})"
-    evidence "オートスケーリングの状態" "$(kubectl get hpa rickroll 2>/dev/null)
-最後の作動: ${LAST_SCALE}
-現在のレプリカ数: ${CUR:-?}, 要求数: ${DES:-?}"
+    ok "a load trace exists: autoscaling has triggered (last time ${LAST_SCALE})"
+    evidence "Autoscaling state" "$(kubectl get hpa rickroll 2>/dev/null)
+last trigger: ${LAST_SCALE}
+current replicas: ${CUR:-?}, desired: ${DES:-?}"
   else
-    warn "オートスケーリングは設定されていますが一度も作動していません" \
-         "レプリカ増加のステップは見つかりません; fortio ジェネレータでラボ3の負荷を再現してください"
+    warn "autoscaling is configured but has never triggered" \
+         "you will not find the replica-growth step; repeat the load from lab 3 with the fortio generator"
   fi
 else
-  warn "クラスタに rickroll という名前の HorizontalPodAutoscaler がありません" \
-       "このラボのグラフ関連ステップはラボ3に依存します; それがないと CPU スパイクだけは見つかりますが、段差は見つかりません"
+  warn "the cluster has no HorizontalPodAutoscaler named rickroll" \
+       "the graph steps in this lab rely on lab 3; without it you will find only the CPU spike, but not the step"
 fi
 
-# --- アプリケーション自体のメトリクス --------------------------------------
-# 間接的だが本質的: アプリケーションのポッドが生きていれば、その消費量はグラフに現れる。
+# --- the application metrics themselves -------------------------------------
+# Indirect, but material: if the application pods are alive, their consumption is in the graphs.
 APP_PODS="$(kubectl get pods -l app=rickroll --no-headers 2>/dev/null | grep -c . )"
 if [ "${APP_PODS:-0}" -ge 1 ]; then
-  ok "アプリケーションのポッドが揃っています (${APP_PODS} 個) — その消費量はグラフで見えます"
-  evidence "アプリケーションのポッド" "$(kubectl get pods -l app=rickroll -o wide 2>/dev/null)"
+  ok "the application pods are in place (${APP_PODS}) — their consumption is visible in the graphs"
+  evidence "Application pods" "$(kubectl get pods -l app=rickroll -o wide 2>/dev/null)"
 else
-  warn "クラスタに rickroll アプリケーションのポッドがありません" \
-       "ラボ3の時点の履歴メトリクスはそのまま保存されています; Grafana でその時間範囲を指定するだけです"
+  warn "there are no rickroll application pods in the cluster" \
+       "the historical metrics from the time of lab 3 are still preserved; just set that time range in Grafana"
 fi
 
-# --- Grafana はどこにあるか -------------------------------------------------
-# チェックではなく手助け: Grafana のアドレスは参加者が最も長く探すものだ。
+# --- where to find Grafana --------------------------------------------------
+# Not a check, but help: the Grafana address is what participants search for the longest.
 : "${COZY_KUBECONFIG:=$HOME/.kube/workshop}"
 if [ -n "${COZY_TENANT:-}" ] && [ -r "$COZY_KUBECONFIG" ]; then
   TNS="tenant-${COZY_TENANT}"
@@ -136,21 +140,21 @@ if [ -n "${COZY_TENANT:-}" ] && [ -r "$COZY_KUBECONFIG" ]; then
       -o jsonpath='{range .items[*]}{.spec.rules[0].host}{"\n"}{end}' 2>/dev/null \
       | grep '^grafana\.' | head -1)"
     if [ -n "$GRAF_HOST" ]; then
-      ok "あなたのメトリクス用の Grafana: https://${GRAF_HOST}"
+      ok "Grafana for your metrics: https://${GRAF_HOST}"
       evidence "Grafana" "https://${GRAF_HOST}
-テナント ${TNS} のメトリクスは namespace ${MON_TARGET} に保存されています"
+the metrics of tenant ${TNS} are stored in namespace ${MON_TARGET}"
     else
-      warn "あなたのテナントのモニタリングは ${MON_TARGET} にありますが、Grafana のアドレスを読み取れませんでした" \
-           "${MON_TARGET} があなたの namespace でない場合、Grafana は共有です: アドレスはホストに尋ねてください"
-      evidence "テナントのモニタリング" "モニタリング用 namespace: ${MON_TARGET}"
+      warn "your tenant's monitoring lives in ${MON_TARGET}, but the Grafana address could not be read" \
+           "if ${MON_TARGET} is not your namespace, then Grafana is shared: ask the host for the address"
+      evidence "Tenant monitoring" "monitoring namespace: ${MON_TARGET}"
     fi
   else
-    warn "テナント ${TNS} のメトリクスがどこへ行くのか特定できませんでした" \
-         "Grafana のアドレスはホストに尋ねるか、ダッシュボードで見つけてください: Monitoring アプリケーション -> Ingress"
+    warn "could not determine where the metrics of tenant ${TNS} go" \
+         "ask the host for the Grafana address or find it in the dashboard: Monitoring application -> Ingress"
   fi
 else
-  warn "Grafana のアドレスが特定されていません" \
-       "COZY_TENANT と COZY_KUBECONFIG を設定すれば、スクリプトが自動で見つけます; これはラボの合格には影響しません"
+  warn "the Grafana address is not determined" \
+       "set COZY_TENANT and COZY_KUBECONFIG, and the script will find it itself; this does not affect passing the lab"
 fi
 
 finish

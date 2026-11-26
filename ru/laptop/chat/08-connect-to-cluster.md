@@ -6,9 +6,9 @@
 
 **Ваши доступы:**
 ```
-дашборд: https://dashboard.workshop.aenix.io
-логин:   workshopXX      ← ваш номер, скажу лично
-пароль:  ...             ← скажу лично
+dashboard: https://dashboard.workshop.aenix.io
+login:     workshopXX      ← your number, I'll tell you in person
+password:  ...             ← I'll tell you in person
 ```
 
 1. Откройте дашборд по ссылке выше.
@@ -20,13 +20,13 @@
 **macOS и Linux**
 ```bash
 mkdir -p ~/.kube
-nano ~/.kube/workshop      # вставьте скопированное, сохраните
+nano ~/.kube/workshop      # paste what you copied, then save
 export KUBECONFIG=~/.kube/workshop
 ```
 
 **Windows** (PowerShell)
 ```powershell
-notepad $HOME\.kube\workshop   # вставьте, сохраните
+notepad $HOME\.kube\workshop   # paste, then save
 $env:KUBECONFIG = "$HOME\.kube\workshop"
 ```
 
@@ -50,13 +50,13 @@ kubeconfig, в поле `certificate-authority-data`, и в файле по ум
 Разбираемся по шагам, в PowerShell:
 ```powershell
 $env:KUBECONFIG
-# пусто — значит берётся файл по умолчанию, а не тот, что вам выдали
+# empty — means it's using the default file, not the one you were given
 
 Select-String -Path "$HOME\.kube\workshop" -Pattern "certificate-authority-data" -Quiet
-# False — файл сохранён неполностью, скачайте секрет из дашборда заново
+# False — the file was saved incompletely; download the secret from the dashboard again
 
 Get-Content "$HOME\.kube\workshop" -TotalCount 1
-# должно начинаться с apiVersion; квадратики или пустота — файл в UTF-16
+# should start with apiVersion; little squares or emptiness mean the file is in UTF-16
 ```
 
 Третий пункт — самая коварная ловушка Windows. Блокнот и перенаправление `>` сохраняют

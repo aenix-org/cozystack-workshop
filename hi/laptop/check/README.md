@@ -43,7 +43,7 @@ export KUBECONFIG=~/lab.kubeconfig
 जहाँ आपने इसे सेव किया:
 
 ```bash
-export KUBECONFIG=/mnt/c/Users/<आपका-नाम>/lab.kubeconfig
+export KUBECONFIG=/mnt/c/Users/<your-name>/lab.kubeconfig
 ```
 
 ⚠️ **अगर WSL इंस्टॉल नहीं हो सकता** — कॉर्पोरेट लैपटॉप पर यह आम स्थिति है — तब भी आप लैब्स
@@ -106,10 +106,10 @@ export COZY_TENANT=workshop07
 
 `check/lib.sh` — साझा फ़ंक्शन, हर स्क्रिप्ट की शुरुआत में सोर्स किए जाते हैं:
 
-- `ok "टेक्स्ट"` / `fail "टेक्स्ट" "संकेत"` / `warn "टेक्स्ट"` — नतीजा छापें
+- `ok "text"` / `fail "text" "hint"` / `warn "text"` — नतीजा छापें
 - `need_kubeconfig` — जाँचें कि `KUBECONFIG` सेट है और क्लस्टर जवाब देता है
 - `need_tenant` — जाँचें कि `COZY_TENANT` सेट है
-- `evidence "शीर्षक" "मान"` — आर्टिफ़ैक्ट में एक साक्ष्य जोड़ें
+- `evidence "heading" "value"` — आर्टिफ़ैक्ट में एक साक्ष्य जोड़ें
 - `finish` — नतीजा समेटें, रिपोर्ट लिखें, एग्ज़िट कोड लौटाएँ
 
 एग्ज़िट कोड: `0` — सब कुछ पास हो गया, `1` — विफलताएँ हैं। इस तरह स्क्रिप्ट को ऑटोमेशन में

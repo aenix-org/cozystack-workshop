@@ -9,7 +9,7 @@
 
 Забираємо скрипт з GitHub прямо на машину:
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/bastion/scripts/convert.sh
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/bastion/scripts/convert.sh
 ```
 
 Відкриваємо його:
@@ -18,13 +18,13 @@ nano convert.sh
 ```
 
 **Ось і згодилися три значення, які ви записали в блокнот на кроці 1.** На початку
-файлу є блок «ВСТАВТЕ СВОЇ ЗНАЧЕННЯ» — замініть у ньому заглушки на свої, лишивши
+файлу є блок «PASTE YOUR VALUES» — замініть у ньому заглушки на свої, лишивши
 лапки на місці:
 
 ```
-BUCKET="ім'я-вашого-бакета"
-ACCESS_KEY="ваш-accessKey"
-SECRET_KEY="ваш-secretKey"
+BUCKET="your-bucket-name"
+ACCESS_KEY="your-accessKey"
+SECRET_KEY="your-secretKey"
 ```
 
 Рядок `S3_ENDPOINT` і посилання на вихідний образ не чіпайте — вони вже правильні
@@ -33,7 +33,7 @@ SECRET_KEY="ваш-secretKey"
 Зберегти в nano: `Ctrl+O`, потім `Enter`, потім `Ctrl+X` для виходу. Перевірте, що
 заглушок не лишилося:
 ```bash
-grep ВСТАВЬТЕ convert.sh || echo "все заповнено, можна запускати"
+grep PASTE_ convert.sh || echo "all filled in, ready to run"
 ```
 
 Запускаємо — обов'язково через `sudo`, скрипту потрібні права root. І запускаємо **у `screen`**:
@@ -42,9 +42,9 @@ grep ВСТАВЬТЕ convert.sh || echo "все заповнено, можна 
 обірветься на середині. `screen` тримає процес, навіть коли зв'язок пропав:
 
 ```bash
-screen -S convert          # увійти в окрему сесію
-sudo bash convert.sh       # запустити всередині неї
-#  обірвався зв'язок? заходьте заново до цієї ж машини, потім:  screen -r convert
+screen -S convert          # start a separate session
+sudo bash convert.sh       # run it inside that session
+#  connection dropped? log back in to this same machine, then:  screen -r convert
 ```
 
 Що відбувається всередині: скрипт завантажує вихідний образ, запускає `virt-v2v`,
@@ -61,7 +61,7 @@ sudo bash convert.sh       # запустити всередині неї
 що починається зі слова `Share:`, посилання йде одразу за ним.
 
 **Що з ним робити:** скопіюйте його в той самий блокнот. На наступному кроці ви повернетесь на бастіон, відкриєте `manifests/03-app-vm.yaml` і вставите його в поле `url` — туди, де
-зараз стоїть заглушка `ВСТАВЬТЕ_PRESIGNED_URL`. Та сама, про яку я попереджав,
+зараз стоїть заглушка `PASTE_PRESIGNED_URL`. Та сама, про яку я попереджав,
 коли ми підставляли номери.
 
 Це тимчасове підписане посилання: сховище назовні не відкрите, а посилання ви зробили

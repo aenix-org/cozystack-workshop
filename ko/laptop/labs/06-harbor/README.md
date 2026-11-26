@@ -58,12 +58,12 @@
 않으면:
 
 ```bash
-# echo는 변수 값을 출력합니다: 지금 kubectl이 어떤 접근 파일을 쓰고 있는지 보여줍니다.
-# 비어 있으면 kubectl은 여러분이 생각하는 파일이 아니라 기본 파일 ~/.kube/config를 사용합니다.
+# echo prints the value of the variable: which access file kubectl is using right now.
+# Empty means kubectl will use the default file ~/.kube/config, not the one you think.
 echo $KUBECONFIG
 
-# get nodes = "클러스터의 노드를 보여줘". 여기서는 리트머스 시험지입니다:
-# 그 답으로 명령이 두 클러스터 중 어디로 갔는지 알 수 있습니다.
+# get nodes = "show the cluster's nodes". Here it's a litmus test:
+# the answer tells you which of the two clusters the command went to.
 kubectl get nodes
 ```
 
@@ -76,7 +76,7 @@ kubectl get nodes
 없습니다: 아래에서 `kubectl apply -f name.yaml`이라고 적힌 곳의 파일은 여기서 가져옵니다.
 
 ```bash
-# 이 lab의 모든 명령은 lab 폴더에서 실행합니다 — 그 폴더로 이동하세요
+# every command in this lab is run from the lab folder — change into it
 cd labs/06-harbor
 ```
 
@@ -130,7 +130,7 @@ Harbor는 이미지 레이어를 S3 호환 스토리지에 저장하고, 그것�
 
 | 키 | 무엇이 들어 있나 |
 |---|---|
-| `url` | 여러분 레지스트리의 주소, `https://harbor-....<테스트베드 도메인>` 형태 |
+| `url` | 여러분 레지스트리의 주소, `https://harbor-....<testbed domain>` 형태 |
 | `admin-password` | 관리자 비밀번호 |
 | `redis-password` | Harbor의 내부 비밀번호, 여러분에게는 필요 없음 |
 
@@ -146,12 +146,12 @@ Harbor는 이미지 레이어를 S3 호환 스토리지에 저장하고, 그것�
 둡니다:
 
 ```bash
-# get secret = "Secret 객체를 보여줘". secret 이름은 애플리케이션 유형의 접두사와
-# 그 이름으로 조합됩니다: harbor- + harbor.
-#   -n tenant-workshopXX  어느 namespace에서 찾을지 — 여러분의 테넌트
-#   -o jsonpath='...'     객체 전체를 출력하지 않고 필드 하나만 꺼냅니다
-#   base64 -d             디코딩: secret 안의 값은 base64로 저장됩니다
-#   ; echo                줄바꿈을 덧붙입니다, 그렇지 않으면 비밀번호가 프롬프트와 붙습니다
+# get secret = "show the Secret object". The secret's name is assembled from the prefix
+# for the application type and its name: harbor- + harbor.
+#   -n tenant-workshopXX  which namespace to look in — your tenant
+#   -o jsonpath='...'     pull a single field out of the object rather than printing the whole thing
+#   base64 -d             decode: values inside secrets are stored in base64
+#   ; echo                add a newline, otherwise the password runs into the prompt
 kubectl -n tenant-workshopXX get secret harbor-harbor-credentials \
   -o jsonpath='{.data.admin-password}' | base64 -d; echo
 ```
@@ -166,9 +166,9 @@ kubectl -n tenant-workshopXX get secret harbor-harbor-credentials \
 `docker pull`은 아무것도 묻지 않고 이 레지스트리로 갑니다.
 
 ```bash
-# login = "이 레지스트리의 자격 증명을 기억해줘".
-# 인자는 url 키에서 가져온 레지스트리 주소입니다; 여기서 harbor-harbor.workshop03.example.org는 예시입니다.
-# 명령은 사용자 이름(admin)과 비밀번호를 묻습니다; 비밀번호는 입력해도 화면에 표시되지 않습니다.
+# login = "remember the credentials for this registry".
+# The argument is the registry address from the url key; harbor-harbor.workshop03.example.org here is an example.
+# The command will ask for a username (admin) and a password; the password isn't shown as you type.
 docker login harbor-harbor.workshop03.example.org
 ```
 
@@ -233,8 +233,8 @@ Login Succeeded
 클러스터가 실행 시 그것들을 환경 변수에 넣어 줍니다:
 
 ```go
-Pod:  env("POD_NAME", "알 수 없음"),
-Node: env("NODE_NAME", "알 수 없음"),
+Pod:  env("POD_NAME", "unknown"),
+Node: env("NODE_NAME", "unknown"),
 ```
 
 그리고 매니페스트에는 거기에 무엇을 넣을지 적혀 있습니다:
@@ -309,13 +309,13 @@ USER 10001
 ```bash
 cd labs/06-harbor
 
-# build = "Dockerfile로 이미지를 빌드해줘".
-#   --platform linux/amd64  어느 프로세서용으로 빌드할지; 클러스터 노드는 x86이고,
-#                           노트북은 ARM일 수 있습니다 — 그러면 플래그 없이는 엉뚱한 것이 나옵니다
-#   -t <주소>/<프로젝트>/<이름>:<태그>  결과에 붙일 이름. 이름 앞부분의 레지스트리 주소가
-#                           나중에 docker push가 보낼 곳입니다
-#   app/                    마지막 인자 — Dockerfile과 소스가 있는 폴더;
-#                           그 내용 전체가 빌더에게 전달됩니다
+# build = "build the image from the Dockerfile".
+#   --platform linux/amd64  which processor to build for; the cluster nodes are on x86,
+#                           and the laptop may be on ARM — then without the flag you get the wrong thing
+#   -t <address>/<project>/<name>:<tag>  what to name the result. The registry address at the start of the name
+#                           is where docker push will later send it
+#   app/                    the last argument — the folder with the Dockerfile and sources;
+#                           its entire contents are handed to the builder
 docker build --platform linux/amd64 -t harbor-harbor.workshop03.example.org/passes/passes-api:v1 app/
 ```
 
@@ -339,8 +339,8 @@ Successfully tagged harbor-harbor.workshop03.example.org/passes/passes-api:v1
 레지스트리에 보냅니다; 레지스트리에 이미 있는 레이어는 다시 보내지 않습니다.
 
 ```bash
-# push = "이미지를 레지스트리로 보내줘". 어디로 보낼지는 docker가 이미지 이름에서 가져옵니다:
-# 이름의 첫 부분이 레지스트리 주소이고, docker login에서 받은 자격 증명과 함께 그리로 갑니다.
+# push = "send the image to the registry". Where to send it, docker takes from the image name:
+# the first part of the name is the registry address, and there it goes, with the credentials from docker login.
 docker push harbor-harbor.workshop03.example.org/passes/passes-api:v1
 ```
 
@@ -359,9 +359,9 @@ docker push harbor-harbor.workshop03.example.org/passes/passes-api:v1
 📍 **위치:** 노트북에서, `lab` 클러스터.
 
 ```bash
-# KUBECONFIG는 kubectl에게 어떤 접근 파일을 쓸지 알려줍니다. 여러분의 `lab` 클러스터로 전환합니다:
-# 이제부터 모든 kubectl 명령이 그리로 갑니다.
-# 터미널 창을 닫을 때까지 유효합니다.
+# KUBECONFIG tells kubectl which access file to use. We switch to your `lab` cluster:
+# from here on all kubectl commands go to it.
+# It stays in effect until the terminal window is closed.
 export KUBECONFIG=~/lab.kubeconfig
 ```
 
@@ -370,11 +370,11 @@ export KUBECONFIG=~/lab.kubeconfig
 않고 파일을 제자리에서 수정합니다. 자기 시스템에 맞는 줄을 고르세요:
 
 ```bash
-# sed -i = "파일을 제자리에서 수정"
-#   's|무엇을|무엇으로|g'  모든 일치를 치환; 구분자로 / 대신 |를 쓴 이유는
-#                     주소에 슬래시가 있어 그것을 이스케이프해야 하기 때문입니다
-#   macOS의 sed는 -i 뒤에 필수 인자를 요구합니다; 빈 따옴표는
-#   "백업 복사본을 만들지 않는다"는 뜻입니다. Linux에서는 그런 인자가 없어야 합니다.
+# sed -i = "edit the file in place"
+#   's|what|with what|g'  replace all occurrences; the separator | is used instead of / because
+#                     the address has slashes and they would have to be escaped
+#   The sed in macOS requires a mandatory argument after -i; the empty quotes
+#   mean "make no backup copy". On Linux there must be no such argument.
 
 # Linux
 sed -i    's|HARBOR-HOST|harbor-harbor.workshop03.example.org|g' passes-broken.yaml
@@ -385,13 +385,13 @@ sed -i '' 's|HARBOR-HOST|harbor-harbor.workshop03.example.org|g' passes-broken.y
 적용합니다:
 
 ```bash
-# apply = "파일에 기술된 상태로 클러스터를 맞춰줘"
+# apply = "bring the cluster to what's described in the file"
 kubectl apply -f passes-broken.yaml
 
-# get pods = "Pod를 보여줘".
-#   -l app=passes-api  전부가 아니라 이 레이블이 있는 것만
-#   -w                 종료하지 않고, 변화가 나타나는 대로 출력합니다;
-#                      관찰 중단 — Ctrl+C
+# get pods = "show the Pods".
+#   -l app=passes-api  only the ones with this label, not everything
+#   -w                 don't exit, print changes as they appear;
+#                      stop watching — Ctrl+C
 kubectl get pods -l app=passes-api -w
 ```
 
@@ -406,9 +406,9 @@ passes-api-6c9d4f7b8-2xk4n    0/1     ImagePullBackOff   0          22s
 `Ctrl+C`로 관찰을 멈추고 클러스터가 뭐라고 하는지 보세요:
 
 ```bash
-# describe = "객체에 대해 자세히 알려줘". 출력의 맨 끝에 이벤트 로그가 나옵니다:
-# 클러스터가 Pod로 무엇을 하려 했고 어떻게 끝났는지.
-# tail -12는 마지막 열두 줄을 남깁니다 — 이벤트가 바로 거기 있습니다.
+# describe = "tell me about the object in detail". At the very end of the output comes the event log:
+# what the cluster tried to do with the Pod and how it ended.
+# tail -12 keeps the last twelve lines — the events are right there.
 kubectl describe pod -l app=passes-api | tail -12
 ```
 
@@ -474,11 +474,11 @@ secret은 어떤 교체보다도 오래 살아남습니다.
 이미지를 내려받을 때 스스로 읽을 수 있는 종류의 secret을 만듭니다:
 
 ```bash
-# create secret docker-registry = "레지스트리 자격 증명이 담긴 secret을 만들어줘"
-#   harbor             클러스터 안의 secret 이름; 애플리케이션 매니페스트가 이것을 참조합니다
-#   --docker-server    이 자격 증명이 어느 레지스트리용인지 — 이미지 이름에 있는 것과 같은 주소
-#   --docker-username  누가 로그인하는지
-#   --docker-password  비밀번호; $, ! 또는 공백이 있으면 작은따옴표가 필요합니다
+# create secret docker-registry = "create a secret with registry credentials"
+#   harbor             the secret's name inside the cluster; the application manifest will refer to it
+#   --docker-server    which registry these credentials are for — the same address as in the image name
+#   --docker-username  who's logging in
+#   --docker-password  the password; single quotes are needed if it has a $, ! or space
 kubectl create secret docker-registry harbor \
   --docker-server=harbor-harbor.workshop03.example.org \
   --docker-username=admin \
@@ -489,20 +489,20 @@ kubectl create secret docker-registry harbor \
 환경에서는 중요합니다. 히스토리에 남기지 않는 방법:
 
 ```bash
-# read는 키보드로 입력한 것을 HARBOR_PASS 변수에 넣습니다:
-#   -s  입력한 것을 화면에 표시하지 않음
-#   -r  백슬래시를 특수 문자로 취급하지 않음
-# 이 줄 뒤로 화면에는 아무것도 나타나지 않습니다: 비밀번호를 붙여 넣고 Enter를 누르세요.
+# read puts what's typed at the keyboard into the HARBOR_PASS variable:
+#   -s  don't show what's typed on the screen
+#   -r  don't treat a backslash as a special character
+# Nothing will appear on the screen after this line: paste the password and press Enter.
 read -rs HARBOR_PASS
 
-# 여기서부터 비밀번호는 변수에서 치환되므로, 셸 히스토리에는 변수 이름만
-# 들어갑니다. 큰따옴표는 필수입니다: 없으면 공백이 값을 끊어 놓습니다.
+# From here the password is substituted from the variable, so only the variable name
+# goes into the shell history. The double quotes are mandatory: without them spaces would break the value.
 kubectl create secret docker-registry harbor \
   --docker-server=harbor-harbor.workshop03.example.org \
   --docker-username=admin \
   --docker-password="$HARBOR_PASS"
 
-# unset은 변수를 지워, 비밀번호가 이 창의 다음 명령들에 넘어가지 않게 합니다
+# unset erases the variable so the password doesn't reach the next commands in this window
 unset HARBOR_PASS
 ```
 
@@ -512,8 +512,8 @@ unset HARBOR_PASS
 어떤 종류의 secret이 나왔는지 클러스터에 물어봅시다:
 
 ```bash
-#   -o jsonpath='{.type}'  객체의 한 필드를 출력합니다 — secret의 유형
-#   {"\n"}                 줄바꿈을 추가합니다, 그렇지 않으면 출력이 프롬프트와 붙습니다
+#   -o jsonpath='{.type}'  print a single field of the object — the secret's type
+#   {"\n"}                 add a newline, otherwise the output runs into the prompt
 kubectl get secret harbor -o jsonpath='{.type}{"\n"}'
 ```
 
@@ -530,10 +530,10 @@ secret은 `kubelet` 자신이 이해합니다: 안에 `~/.docker/config.json`과
 데이터를 텍스트로 적는 방법이고, 누구나 디코딩할 수 있습니다):
 
 ```bash
-# .data.\.dockerconfigjson — secret 안의 키. 키 이름 자체가 점으로 시작하므로,
-# 그것을 이스케이프합니다: 그렇지 않으면 jsonpath가 그것을 경로 구분자로 여깁니다.
-# base64 -d는 값을 다시 텍스트로 디코딩합니다 — 여러분의 노트북에 있는
-# 파일 ~/.docker/config.json과 같은 형식이 보입니다.
+# .data.\.dockerconfigjson — the key inside the secret. The key name itself starts with a dot,
+# so it's escaped: otherwise jsonpath would take it for a path separator.
+# base64 -d decodes the value back into text — you'll see the same format
+# as in the file ~/.docker/config.json on your laptop.
 kubectl get secret harbor -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d
 ```
 
@@ -560,12 +560,12 @@ sed -i    's|HARBOR-HOST|harbor-harbor.workshop03.example.org|g' passes.yaml
 # macOS
 sed -i '' 's|HARBOR-HOST|harbor-harbor.workshop03.example.org|g' passes.yaml
 
-# delete -f = 파일에 기술된 바로 그 객체들을 클러스터에서 제거
+# delete -f = remove from the cluster exactly the objects described in the file
 kubectl delete -f passes-broken.yaml
 kubectl apply -f passes.yaml
 
-# rollout status는 새 복제본이 준비될 때까지 기다렸다가 스스로 끝납니다.
-# 거기에 이르지 못하면 오류를 반환하므로, 스크립트에 이런 줄을 넣기 편리합니다.
+# rollout status waits until the new replicas become ready, then finishes on its own.
+# If it doesn't get there, it returns an error, which is why such a line is handy in scripts.
 kubectl rollout status deployment/passes-api
 ```
 
@@ -592,19 +592,19 @@ deployment "passes-api" successfully rolled out
 건드리지 않는다는 점만 다릅니다.
 
 ```bash
-# port-forward svc/passes-api = 특정 Pod가 아니라 서비스로 향하는 터널
-#   8080:80 — 왼쪽 숫자는 여러분 노트북의 포트, 오른쪽은 클러스터의 서비스 포트
-# 창을 닫지 마세요: 터널은 명령이 실행되는 동안 살아 있습니다.
+# port-forward svc/passes-api = a tunnel to the service, not to a specific Pod
+#   8080:80 — the left number is the port on your laptop, the right one the service port in the cluster
+# Don't close the window: the tunnel lives as long as the command runs.
 kubectl port-forward svc/passes-api 8080:80
 ```
 
 다른 터미널 창에서:
 
 ```bash
-# curl — "주소로 가서 응답을 보여줘".
-#   -s     진행 표시기를 보여주지 않음
-#   ; echo 줄바꿈을 추가: 응답이 한 줄로 오는데, 없으면
-#          셸 프롬프트와 붙습니다
+# curl — "go to the address and show the answer".
+#   -s     don't show the progress indicator
+#   ; echo add a newline: the answer comes as a single line, and without it
+#          it runs into the shell prompt
 curl -s http://localhost:8080/; echo
 ```
 
@@ -626,11 +626,11 @@ curl -s http://localhost:8080/; echo
 응답의 `pod` 필드는 응답한 복제본의 이름입니다. 그것을 복제본 목록과 대조해 보세요:
 
 ```bash
-# 새 터미널 창은 KUBECONFIG 변수에 대해 아무것도 모릅니다 — 여기서도 설정하세요,
-# 그렇지 않으면 kubectl이 엉뚱한 클러스터로 갑니다
+# a new terminal window knows nothing about the KUBECONFIG variable — set it here too,
+# otherwise kubectl will go to the wrong cluster
 export KUBECONFIG=~/lab.kubeconfig
 
-# 같은 레이블 선택: 목록에 여러분이 응답에서 본 이름이 있어야 합니다
+# the same selection by label: the list should contain the name you saw in the answer
 kubectl get pods -l app=passes-api
 ```
 
@@ -643,9 +643,9 @@ kubectl get pods -l app=passes-api
 여덟 번의 요청:
 
 ```bash
-# run은 일회용 Pod를 띄우고, --rm은 그것을 뒤에서 정리합니다.
-# -- 뒤의 모든 것은 Pod 안에서 실행됩니다: 여덟 번 서비스를 내부 이름으로 호출하고
-# 응답한 복제본의 이름이 담긴 줄을 출력합니다.
+# run brings up a one-off Pod, --rm cleans it up afterwards.
+# Everything after -- runs inside the Pod: eight times we hit the service by its internal name
+# and print the line with the name of the replica that answered.
 kubectl run probe --rm -i --restart=Never --quiet --image=curlimages/curl:8.11.1 \
   -- sh -c 'for i in $(seq 1 8); do curl -s http://passes-api/ | grep -o "passes-api-[a-z0-9-]*"; done'
 ```
@@ -669,13 +669,13 @@ kubectl run probe --rm -i --restart=Never --quiet --image=curlimages/curl:8.11.1
 ```bash
 cd labs/06-harbor
 
-# 어느 클러스터에서 애플리케이션을 확인할지 — 여러분의 `lab`
+# which cluster to check the application in — your `lab`
 export KUBECONFIG=~/lab.kubeconfig
-# 여러분의 테넌트 번호: 이것으로 스크립트가 namespace 이름 tenant-workshop03을 조합합니다
+# your tenant number: from it the script assembles the namespace name tenant-workshop03
 export COZY_TENANT=workshop03
-# 관리 클러스터 접근이 어디 있는지 — 거기서 스크립트가 Harbor 자체를 봅니다.
-# 설정하지 않아도 됩니다: 그러면 스크립트가 ~/.kube/workshop을 찾고, 못 찾으면 — 관리
-# 클러스터에 대한 확인을 건너뛰고 그렇다고 말합니다.
+# where the access to the management cluster lives — there the script will look at Harbor itself.
+# You can leave it unset: then the script looks for ~/.kube/workshop, and not finding it — skips
+# the checks on the management cluster and says so.
 export COZY_KUBECONFIG=~/.kube/workshop
 
 ./check.sh
@@ -696,9 +696,9 @@ API로 응답하는지, 클러스터의 애플리케이션이 바로 여러분 �
 모든 랩을 마쳤을 때:
 
 ```bash
-# 파일에 기술된 객체들을 삭제합니다: Deployment도 Service도
+# delete the objects described in the file: both the Deployment and the Service
 kubectl delete -f passes.yaml
-# secret은 파일이 아니라 명령으로 만들었으므로 — 이름으로 삭제합니다
+# the secret was created by a command, not a file — delete it by name
 kubectl delete secret harbor
 ```
 

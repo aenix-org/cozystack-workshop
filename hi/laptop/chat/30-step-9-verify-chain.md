@@ -38,19 +38,19 @@ virtctl port-forward --namespace=tenant-workshopXX vmi/vm-instance-app-1 8080:80
 अगर port-forward फिर भी नहीं उठता, तो वही टनल मशीन के Pod के ज़रिए बनाया जा सकता है:
 ```bash
 kubectl get pod -n tenant-workshopXX -l vm.kubevirt.io/name=vm-instance-app-1
-kubectl port-forward -n tenant-workshopXX <आउटपुट-से-पॉड-का-नाम> 8080:8080
+kubectl port-forward -n tenant-workshopXX <pod-name-from-output> 8080:8080
 ```
 
 टर्मिनल की दूसरी विंडो में:
 ```bash
-# स्वास्थ्य
+# health
 curl -s http://localhost:8080/actuator/health
 
-# एक ऑर्डर बनाते हैं
+# create an order
 curl -s -X POST http://localhost:8080/api/orders \
   -H 'Content-Type: application/json' -d '{"item":"test"}'
 
-# देखते हैं कि वह रिकॉर्ड हो गया
+# see that it was recorded
 curl -s http://localhost:8080/api/orders
 ```
 

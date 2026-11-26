@@ -27,14 +27,14 @@ curl -s -o /dev/null -w '%{http_code}\n' localhost:8080/actuator/health
 прямо на бастіоні:
 
 ```bash
-# здоров'я
+# health
 curl -s https://app.workshopXX.workshop.aenix.io/actuator/health
 
-# створюємо замовлення
+# create an order
 curl -s -X POST https://app.workshopXX.workshop.aenix.io/api/orders \
   -H 'Content-Type: application/json' -d '{"item":"test"}'
 
-# дивимося, що воно записалося
+# see that it was recorded
 curl -s https://app.workshopXX.workshop.aenix.io/api/orders
 ```
 

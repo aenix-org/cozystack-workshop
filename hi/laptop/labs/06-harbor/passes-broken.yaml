@@ -1,32 +1,33 @@
 ---
-# लैब 6 · आपका अपना निजी इमेज रजिस्ट्री। यह फ़ाइल जानबूझकर अधूरी है।
+# Lab 6 · Your own private image registry. THIS FILE IS DELIBERATELY INCOMPLETE.
 #
-# यह काम नहीं करेगी, और यह जानबूझकर है: आपको विफलता अपनी आँखों से देखनी चाहिए और खुद
-# समझना चाहिए कि क्लस्टर के पास क्या कमी थी। यहाँ एक ही चीज़ की कमी है — वह चीज़ जो
-# क्लस्टर किसी बंद रजिस्ट्री को अपने बारे में बताता है जब वह इमेज लेने आता है। रजिस्ट्री
-# किसी को भी इमेज नहीं देती, और इस विवरण में ऐसा कुछ नहीं है जो क्लस्टर को उन पर अपना
-# हक़ साबित करने में मदद करे। ठीक कौन-सी पंक्ति इसे ठीक करती है — यह आप लैब के दौरान
-# समझेंगे; काम करने वाला संस्करण इसके बगल में passes.yaml में पड़ा है, और समझने से पहले
-# उसे खोलने का कोई मतलब नहीं है।
+# It won't work, and that's by design: you should see the failure with your own eyes and
+# figure out for yourself what the cluster was missing. What's missing here is one thing —
+# the thing the cluster calls itself to a closed registry when it comes for an image. The
+# registry doesn't hand out images to just anyone, and there's nothing in this manifest
+# that would help the cluster prove its right to them. Which exact line fixes this — you'll
+# work out over the course of the lab; the working version sits next to it, in passes.yaml,
+# and there's no point opening it before you've reasoned it through.
 #
-# यहाँ केवल Deployment है, कोई Service नहीं: सेवा को स्थायी नाम की अभी ज़रूरत नहीं है —
-# हम जवाब देने वाले पॉड तक वैसे भी नहीं पहुँचेंगे, क्योंकि इमेज डाउनलोड नहीं होती।
+# Here there's only a Deployment, no Service: a permanent name for the service isn't needed
+# yet — we won't reach a responding pod anyway, since the image doesn't download.
 #
-# आपके `lab` क्लस्टर पर, डिफ़ॉल्ट नेमस्पेस में लागू होता है:
+# Applied on your `lab` cluster, in the default namespace:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl apply -f passes-broken.yaml
 #     kubectl get pods -l app=passes-api -w
 #
-# ध्यान दें: HARBOR-HOST एक प्लेसहोल्डर है, काम करने वाला पता नहीं। अपने Harbor का पता डालें,
-# वरना आपको वह त्रुटि नहीं मिलेगी जिसके लिए फ़ाइल लिखी गई थी (प्लेसहोल्डर वाली दो पंक्तियाँ हैं):
+# ATTENTION: HARBOR-HOST is a placeholder, not a working address. Substitute the address of
+# your own Harbor, otherwise you'll get a different error than the one the file was written for
+# (there are two lines with the placeholder):
 #   sed -i    's|HARBOR-HOST|harbor.workshop03.example.org|g' passes-broken.yaml   # Linux
 #   sed -i '' 's|HARBOR-HOST|harbor.workshop03.example.org|g' passes-broken.yaml   # macOS
 #
-# नीचे दिए ऑब्जेक्ट में: apiVersion — विवरण स्कीमा का संस्करण, kind — हम क्या बना रहे हैं,
-# metadata.name — ऑब्जेक्ट का नाम। आगे इन्हें अलग से नहीं समझाया गया।
+# In the object below: apiVersion — the version of the description schema, kind — what we're
+# creating, metadata.name — the object's name. Not explained separately further down.
 #
-# Deployment «एक कंटेनर चलाओ» नहीं है, बल्कि «ऐसे कंटेनर की इतनी प्रतियाँ चलती रखो» है।
-# कोई प्रति गायब होगी — क्लस्टर बिना पूछे नई बना देगा।
+# A Deployment is not "run a container" but "keep so many copies of such-and-such a container
+# running". A copy disappears — the cluster creates a new one without asking.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -34,23 +35,23 @@ metadata:
   labels:
     app: passes-api
 spec:
-  # एक प्रति: विफलता को समझने के लिए एक ही काफ़ी है, और लॉग में तथा
-  # kubectl describe के आउटपुट में कम शोर होगा।
+  # One copy: to work through the failure one is enough, and the logs and the output of
+  # kubectl describe will have less noise.
   replicas: 1
-  # शर्त «मेरी प्रतियाँ app: passes-api लेबल वाले पॉड हैं»। नीचे पॉड टेम्पलेट में लेबल
-  # इससे मेल खाना चाहिए, वरना क्लस्टर मैनिफ़ेस्ट अस्वीकार कर देगा।
+  # The condition "my copies are pods with the label app: passes-api". The label in the pod
+  # template below must match this one, otherwise the cluster will reject the manifest.
   selector:
     matchLabels:
       app: passes-api
-  # वह टेम्पलेट जिससे प्रतियाँ छापी जाती हैं। अंदर की हर चीज़ एक पॉड का वर्णन करती है।
+  # The template copies are stamped from. Everything inside describes a single pod.
   template:
     metadata:
       labels:
         app: passes-api
     spec:
-      # पूरे पॉड पर सुरक्षा प्रतिबंध: root से न चलाना, अनप्रिविलेज्ड उपयोगकर्ता 10001 के
-      # तहत काम करना, सिस्टम कॉल के सेट को मानक प्रोफ़ाइल तक सीमित करना। इमेज इसी के
-      # लिए बनाई गई है (देखें app/Dockerfile, USER पंक्ति)।
+      # Security restrictions for the whole pod: don't run as root, work under the
+      # unprivileged user 10001, limit the set of system calls to the standard profile.
+      # The image is built for the same (see app/Dockerfile, the USER line).
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
@@ -58,26 +59,27 @@ spec:
           type: RuntimeDefault
       containers:
         - name: api
-          # कंटेनर स्तर पर अधिकार: अतिरिक्त विशेषाधिकार न लेना और कर्नेल की सभी विशेष
-          # क्षमताएँ छोड़ देना। एप्लिकेशन को एक नेटवर्क पोर्ट चाहिए, बाकी अनावश्यक है।
+          # Rights at the container level: don't gain extra privileges and drop all special
+          # kernel capabilities. The application needs one network port, the rest is excess.
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # इमेज नाम का पहला हिस्सा रजिस्ट्री का पता है। इसीलिए अपनी रजिस्ट्री पर जाने से
-          # मैनिफ़ेस्ट बदलते हैं: इमेज का नाम अलग हो जाता है। पता न हो, तो क्लस्टर इमेज
-          # के लिए Docker Hub जाता — यानी वहाँ, जहाँ सुरक्षा विभाग ने मना किया।
+          # The first part of the image name is the registry address. This is exactly why
+          # moving to your own registry changes the manifests: the image name becomes
+          # different. Without the address, the cluster would go for the image to Docker Hub —
+          # that is, to where the security team forbade.
           image: HARBOR-HOST/passes/passes-api:v1
-          # एप्लिकेशन का पोर्ट। नाम `http` आगे रेडीनेस प्रोब द्वारा उपयोग किया जाता है,
-          # इसलिए पोर्ट नंबर एक ही जगह सेट है, दो में नहीं।
+          # The application's port. The name `http` is used further down by the readiness
+          # probe, so the port number is set in one place, not two.
           ports:
             - containerPort: 8080
               name: http
-          # पर्यावरण चर, जिनसे एप्लिकेशन जानता है कि वह कौन है और कहाँ से आया है।
-          # ठीक इन्हीं को वह अपने जवाब में छापता है (देखें app/main.go, identity struct)।
-          # APP_VERSION और IMAGE_REGISTRY टेक्स्ट के रूप में सेट हैं — इन्हें हम खुद लिखते हैं;
-          # अगले तीन को क्लस्टर स्वयं प्रति शुरू होते समय भरता है, एप्लिकेशन के पास इन्हें
-          # जानने का कोई ज़रिया नहीं।
+          # Environment variables from which the application learns who it is and where it
+          # came from. Exactly these it prints in its response (see app/main.go, the identity
+          # struct). APP_VERSION and IMAGE_REGISTRY are set as text — those we write ourselves;
+          # the next three are filled in by the cluster itself when the copy starts, the
+          # application has no way to know them.
           env:
             - name: APP_VERSION
               value: "v1"
@@ -95,10 +97,10 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
-          # requests — प्रति के लिए क्या आरक्षित करना है: इन संख्याओं से शेड्यूलर नोड चुनता
-          # है। limits — छत: छत से ऊपर मेमोरी के लिए कंटेनर मार दिया जाता है, प्रोसेसर के
-          # लिए धीमा कर दिया जाता है। 16Mi इसलिए काफ़ी है क्योंकि एप्लिकेशन बिना निर्भरताओं
-          # वाला Go में है। 20m — प्रोसेसर कोर का बीस हज़ारवाँ हिस्सा।
+          # requests — what to reserve for a copy: by these numbers the scheduler picks a
+          # node. limits — the ceiling: for memory above the ceiling the container is killed,
+          # for CPU it's throttled. 16Mi is enough because the application is in Go with no
+          # dependencies. 20m is twenty thousandths of a CPU core.
           resources:
             requests:
               cpu: 20m
@@ -106,9 +108,9 @@ spec:
             limits:
               cpu: 300m
               memory: 64Mi
-          # रेडीनेस प्रोब: जब तक एप्लिकेशन /healthz पर जवाब नहीं देता, ट्रैफ़िक प्रति पर
-          # नहीं जाएगा। आज बात यहाँ तक नहीं पहुँचेगी — यह पहले से चल रही प्रक्रिया की जाँच
-          # करती है, और हमारे यहाँ पहले वाला चरण, इमेज डाउनलोड करना, अटक जाएगा।
+          # Readiness probe: until the application answers on /healthz, traffic won't go to
+          # the copy. Today it won't get that far — it checks an already-running process, and
+          # for us an earlier step, downloading the image, will get stuck.
           readinessProbe:
             httpGet:
               path: /healthz

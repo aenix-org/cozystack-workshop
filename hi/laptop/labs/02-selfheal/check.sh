@@ -1,36 +1,36 @@
 #!/usr/bin/env bash
-# लैब 2 की जाँच: स्व-उपचार (सेल्फ-हीलिंग)।
+# Check for lab 2: self-healing.
 #
-# हम यह नहीं जाँचते कि «कमांड टाइप की गईं», बल्कि लैब के बाद क्लस्टर की स्थिति: एप्लिकेशन फिर से
-# Service के ज़रिए अनुरोधों की सेवा करता है, अपनी कॉपी का नाम लौटाता है, और यह नाम
-# वास्तव में चल रहे पॉड का है। साथ ही हम इसके निशान ढूँढते हैं कि कॉपियाँ फिर से बनाई गई थीं।
+# We check not "the commands were typed", but the cluster state after the lab: the app again
+# serves requests through the Service, returns the name of its replica, and that name belongs
+# to a really running pod. Plus we look for traces that replicas were recreated.
 #
-# स्क्रिप्ट कुछ भी हटाती या बनाती नहीं, सिवाय एक बार के पॉड के जो क्लस्टर के अंदर से सेवा की
-# उपलब्धता जाँचता है — वह खुद को हटा देता है।
+# The script deletes and creates nothing, except a one-off pod to check
+# service availability from inside the cluster — it removes itself.
 
 LAB_NAME="02-selfheal"
-LAB_TITLE="लैब 2 · एक पॉड को मारें और देखें क्या होता है"
+LAB_TITLE="Lab 2 · Kill a pod and see what happens"
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
 need_kubeconfig
 
 APP=rickroll
 
-# kubectl से RFC3339 (हमेशा Z के साथ UTC) को unix सेकंड में। python3 के ज़रिए, क्योंकि
-# macOS पर BSD date और Linux पर GNU date तारीखों को अलग-अलग तरीके से पार्स करते हैं, और python हर जगह है,
-# जहाँ lib.sh काम करता है।
+# RFC3339 from kubectl (always UTC with Z) into unix seconds. Via python3, because
+# BSD date on macOS and GNU date on Linux parse dates differently, and python is everywhere
+# lib.sh works.
 _epoch() {
   python3 -c 'import sys,datetime as d;print(int(d.datetime.strptime(sys.argv[1],
 "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=d.timezone.utc).timestamp()))' "$1" 2>/dev/null
 }
 
-# --- एप्लिकेशन बिल्कुल मौजूद है ------------------------------------------------
+# --- the app exists at all -------------------------------------------------
 DEP_TS="$(kubectl get deployment "$APP" -o jsonpath='{.metadata.creationTimestamp}' 2>/dev/null)"
 
 if [ -z "$DEP_TS" ]; then
-  fail "एप्लिकेशन ${APP} क्लस्टर में नहीं है" \
-       "लैब के अंत में इसे वापस लाना था: kubectl apply -f ../01-deploy/rickroll.yaml"
-  evidence "namespace में क्या है" "$(kubectl get deployment,rs,pods 2>/dev/null)"
+  fail "app ${APP} is not in the cluster" \
+       "at the end of the lab it had to be restored: kubectl apply -f ../01-deploy/rickroll.yaml"
+  evidence "What is in the namespace" "$(kubectl get deployment,rs,pods 2>/dev/null)"
   finish
   exit $?
 fi
@@ -40,21 +40,21 @@ HAVE="$(kubectl get deployment "$APP" -o jsonpath='{.status.readyReplicas}' 2>/d
 [ -z "$HAVE" ] && HAVE=0
 
 if [ "${HAVE:-0}" -ge 1 ] && [ "$HAVE" = "$WANT" ]; then
-  ok "एप्लिकेशन ${APP} बहाल हो गया: ${WANT} में से ${HAVE} कॉपियाँ तैयार"
+  ok "app ${APP} restored: ready replicas ${HAVE} of ${WANT}"
 else
-  fail "माँगी गई ${WANT} में से ${HAVE} कॉपियाँ तैयार" \
-       "kubectl describe deployment ${APP} और kubectl get pods -l app=${APP} देखें"
+  fail "replicas ready ${HAVE} of the requested ${WANT}" \
+       "see kubectl describe deployment ${APP} and kubectl get pods -l app=${APP}"
 fi
-evidence "एप्लिकेशन की स्थिति" "$(kubectl get deployment,rs,pods -l app=${APP} 2>/dev/null)"
+evidence "App state" "$(kubectl get deployment,rs,pods -l app=${APP} 2>/dev/null)"
 
-# --- Deployment -> ReplicaSet -> Pod श्रृंखला -------------------------------
-# लैब का मतलब यह है कि कॉपी को ReplicaSet वापस लाता है, न कि «क्लस्टर सामान्य रूप से»।
-# अगर पॉड का मालिक ReplicaSet नहीं निकला, तो प्रतिभागी ने पॉड हाथ से उठाया,
-# और उसे स्व-उपचार नहीं दिखेगा।
-# हम पॉड्स को नाम से गिनते हैं, न कि मालिकों के अनूठे प्रकार इकट्ठा करते हैं: ownerReferences के बिना
-# पॉड के लिए jsonpath खाली स्ट्रिंग लौटाता है, `sort -u` उसे एक अदृश्य तत्व में समेट देता है,
-# और `*ReplicaSet*` तब तक मैच करता है जब तक कम से कम एक पॉड ReplicaSet द्वारा प्रबंधित है।
-# इसी वजह से हाथ से उठाया गया बाहरी पॉड जाँच में बिना पकड़े पास हो जाता था।
+# --- the Deployment -> ReplicaSet -> Pod chain -----------------------------
+# The point of the lab is that the replica is brought back by the ReplicaSet, not "the cluster in general".
+# If the pod's owner turns out not to be a ReplicaSet, the participant created the pod by hand,
+# and won't see self-healing.
+# We count pods by name, rather than collecting unique owner kinds: a pod without
+# ownerReferences makes jsonpath return an empty string, `sort -u` collapses it into an invisible
+# element, and `*ReplicaSet*` matches as long as at least one pod is managed by a ReplicaSet.
+# Because of that a foreign pod, created by hand, passed the check unnoticed.
 PODS_TOTAL="$(kubectl get pods -l app=${APP} --no-headers 2>/dev/null | grep -c . )"
 PODS_BY_RS="$(kubectl get pods -l app=${APP} \
   -o jsonpath='{range .items[?(@.metadata.ownerReferences[0].kind=="ReplicaSet")]}{.metadata.name}{"\n"}{end}' 2>/dev/null \
@@ -65,30 +65,30 @@ OWNER_KINDS="$(kubectl get pods -l app=${APP} \
 
 case "${PODS_TOTAL}:${PODS_BY_RS}" in
   0:*)
-    fail "app=${APP} लेबल वाला कोई भी पॉड नहीं है" \
-         "एप्लिकेशन वापस लाएँ: kubectl apply -f ../01-deploy/rickroll.yaml"
+    fail "there is no pod with the label app=${APP}" \
+         "restore the app: kubectl apply -f ../01-deploy/rickroll.yaml"
     ;;
   *:0)
-    fail "कोई भी ${APP} पॉड ReplicaSet द्वारा प्रबंधित नहीं है — स्व-उपचार नहीं होगा" \
-         "लगता है पॉड हाथ से उठाया गया (kubectl run)। उसे हटाएँ और ../01-deploy/rickroll.yaml लागू करें"
+    fail "no ${APP} pod is managed by a ReplicaSet — there will be no self-healing" \
+         "looks like the pod was created by hand (kubectl run). Delete it and apply ../01-deploy/rickroll.yaml"
     ;;
   *)
     if [ "$PODS_TOTAL" -ne "$PODS_BY_RS" ]; then
-      fail "app=${APP} लेबल बाहरी पॉड्स ने धारण किया है: ${PODS_TOTAL} में से ${PODS_BY_RS} ReplicaSet द्वारा प्रबंधित हैं" \
-           "बाकी बैलेंसिंग में आ जाएँगे और पराया जवाब देंगे — उन्हें ढूँढें: kubectl get pods -l app=${APP} -o wide"
-      evidence "पॉड्स के मालिक" \
+      fail "the label app=${APP} is worn by foreign pods: ${PODS_BY_RS} of ${PODS_TOTAL} are managed by a ReplicaSet" \
+           "the rest will end up in load balancing and serve a foreign response — find them: kubectl get pods -l app=${APP} -o wide"
+      evidence "Pod owners" \
         "$(kubectl get pods -l app=${APP} -o jsonpath='{range .items[*]}{.metadata.name}{" <- "}{.metadata.ownerReferences[0].kind}{"\n"}{end}' 2>/dev/null)"
     else
-    ok "कॉपियों को ReplicaSet प्रबंधित करता है — Deployment → ReplicaSet → Pod श्रृंखला बरकरार है"
-    evidence "कौन किसका मालिक" \
+    ok "replicas are managed by a ReplicaSet — the Deployment → ReplicaSet → Pod chain is intact"
+    evidence "Who owns whom" \
       "$(kubectl get pods -l app=${APP} -o jsonpath='{range .items[*]}{.metadata.name}{" <- "}{.metadata.ownerReferences[0].kind}{"/"}{.metadata.ownerReferences[0].name}{"\n"}{end}' 2>/dev/null)"
     fi
     ;;
 esac
 
-# --- कॉपियों के फिर से बनने के निशान ----------------------------------------
-# «पॉड को मारा गया» के सीधे सबूत क्लस्टर नहीं रखता। दो अप्रत्यक्ष हैं, और दोनों पर्याप्त हैं:
-# पॉड अपने Deployment से काफ़ी नया है, और ReplicaSet की घटनाओं में एक से ज़्यादा निर्माण हैं।
+# --- traces of replica recreation ------------------------------------------
+# The cluster keeps no direct evidence that "the pod was killed". There are two indirect ones, both sufficient:
+# the pod is noticeably younger than its Deployment, and in the ReplicaSet events there is more than one creation.
 POD_TS="$(kubectl get pods -l app=${APP} \
   -o jsonpath='{.items[0].metadata.creationTimestamp}' 2>/dev/null)"
 
@@ -98,75 +98,75 @@ POD_E="$(_epoch "$POD_TS")"
 if [ -n "$DEP_E" ] && [ -n "$POD_E" ]; then
   DELTA=$(( POD_E - DEP_E ))
   if [ "$DELTA" -ge 45 ]; then
-    ok "कॉपी एप्लिकेशन से ${DELTA} सेकंड नई है — मतलब पिछली हटाई गई और इसे बदले में बनाया गया"
+    ok "the replica is ${DELTA}s younger than the app — so the previous one was removed and this one created instead"
   else
-    warn "कॉपी एप्लिकेशन की लगभग समवयस्क है (अंतर ${DELTA} सेकंड)" \
-         "अगर आपने बिलकुल अंत में पूरा एप्लिकेशन बहाल किया — यह सामान्य है; वरना पॉड हटाने का चरण नहीं हुआ"
+    warn "the replica is almost the same age as the app (difference ${DELTA}s)" \
+         "if you restored the whole app at the very end — that's fine; otherwise the pod-deletion step wasn't done"
   fi
-  evidence "ऑब्जेक्ट्स की उम्र" "deployment बना: ${DEP_TS}
-pod बना:        ${POD_TS}
-अंतर:           ${DELTA} सेकंड"
+  evidence "Object ages" "deployment created: ${DEP_TS}
+pod created:        ${POD_TS}
+difference:         ${DELTA}s"
 else
-  warn "पॉड और एप्लिकेशन की उम्र की तुलना नहीं कर सके" \
-       "PATH में python3 चाहिए; लैब पास करने पर इसका असर नहीं पड़ता"
+  warn "couldn't compare the pod and app ages" \
+       "python3 is needed in PATH; this doesn't affect passing the lab"
 fi
 
-# घटनाएँ लगभग एक घंटा जीती हैं, इसलिए उनका न होना विफलता नहीं बल्कि टिप्पणी है।
+# Events live about an hour, so their absence is not a failure but a remark.
 CREATES="$(kubectl get events \
   --field-selector reason=SuccessfulCreate,involvedObject.kind=ReplicaSet \
   --no-headers 2>/dev/null | grep -c "$APP")"
 [ -z "$CREATES" ] && CREATES=0
 
 if [ "$CREATES" -ge 2 ]; then
-  ok "क्लस्टर की घटनाओं में ${CREATES} बार कॉपी बनी — स्व-उपचार वाकई हुआ"
-  evidence "कॉपी बनने की घटनाएँ" \
+  ok "cluster events show ${CREATES} replica creations — self-healing really did fire"
+  evidence "Replica creation events" \
     "$(kubectl get events --field-selector reason=SuccessfulCreate,involvedObject.kind=ReplicaSet 2>/dev/null | grep "$APP" | tail -10)"
 else
-  warn "क्लस्टर की घटनाओं में कॉपी बनना केवल ${CREATES} बार दिखता है" \
-       "घटनाएँ लगभग एक घंटा रखी जाती हैं और समाप्त हो सकती हैं"
+  warn "cluster events show replica creation only ${CREATES} time(s)" \
+       "events are kept about an hour and may have expired"
 fi
 
-# दोनों में से कोई भी संकेत अकेले ब्लॉक नहीं करता: घटनाएँ लगभग एक घंटा जीती हैं,
-# और उम्र उसी के लिए मेल खाती है जिसने लैब के अंत में जायज़ तौर पर पूरा एप्लिकेशन बहाल किया।
-# लेकिन अगर एक भी नहीं टिकता — कॉपी को हटाया ही नहीं गया, और लैब पूरी नहीं हुई। इस
-# जोड़ी के बिना स्क्रिप्ट लैब 1 के तुरंत बाद «लैब पास» छाप देती थी, बिना एक भी हटाने का इंतज़ार किए।
+# Neither of the two signs is blocking on its own: events live about an hour,
+# and the age matches for someone who legitimately restored the whole app at the end of the lab.
+# But if NEITHER holds — the replica wasn't deleted at all, and the lab isn't done. Without this
+# pairing the script printed "LAB PASSED" right after lab 1, without waiting for a single deletion.
 if [ "${DELTA:-0}" -lt 45 ] && [ "$CREATES" -lt 2 ]; then
-  fail "स्व-उपचार के कोई निशान नहीं मिले: कॉपी को हटाया नहीं गया" \
-       "कॉपी हटाएँ: kubectl delete pod -l app=${APP} — और एक घंटे के भीतर जाँच चलाएँ, जब तक घटनाएँ जीवित हैं"
+  fail "no traces of self-healing found: the replica wasn't deleted" \
+       "delete the replica: kubectl delete pod -l app=${APP} — and run the check within an hour, while events are alive"
 fi
 
-# --- सेवा वाकई सेवा देती है --------------------------------------------
-# मुख्य सारभूत जाँच: «ऑब्जेक्ट मौजूद है» नहीं, बल्कि «Service के ज़रिए एक पेज आता है
-# और उसमें जीवित कॉपी का नाम है»।
+# --- the service actually serves -------------------------------------------
+# The main substantive check: not "the object exists", but "through the Service a page arrives
+# and it contains the name of a live replica".
 BODY="$(in_cluster_curl "http://${APP}/")"
 
 if [ -z "$BODY" ]; then
-  fail "Service ${APP} ने क्लस्टर के अंदर से पेज नहीं लौटाया" \
-       "एंडपॉइंट्स जाँचें: kubectl get endpointslices -l kubernetes.io/service-name=${APP}"
+  fail "Service ${APP} did not return a page from inside the cluster" \
+       "check the endpoints: kubectl get endpointslices -l kubernetes.io/service-name=${APP}"
 elif printf '%s' "$BODY" | grep -q '__POD__'; then
-  fail "पेज दिया जा रहा है, लेकिन उसमें कॉपी का नाम नहीं भरा गया" \
-       "ConfigMap rickroll-conf खो गया: ../01-deploy/rickroll.yaml को पूरा लागू करें"
+  fail "the page is served, but the replica name wasn't substituted into it" \
+       "the ConfigMap rickroll-conf is lost: apply ../01-deploy/rickroll.yaml in full"
 else
   SERVED="$(printf '%s' "$BODY" | grep -o "${APP}-[a-z0-9]*-[a-z0-9]*" | head -1)"
   if [ -z "$SERVED" ]; then
-    fail "Service के जवाब में कॉपी का नाम नहीं है" \
-         "पेज हमारे एप्लिकेशन से नहीं आया — kubectl get svc ${APP} -o yaml जाँचें"
+    fail "the Service response has no replica name" \
+         "the page came not from our app — check kubectl get svc ${APP} -o yaml"
   elif kubectl get pod "$SERVED" >/dev/null 2>&1; then
-    ok "Service पेज देता है, उसे जीवित कॉपी ${SERVED} ने सेवा दी"
-    evidence "Service का जवाब (अंश)" \
-      "$(printf '%s' "$BODY" | grep -o "सेवा प्रदान करने वाला Pod<b>${APP}-[a-z0-9-]*</b>" | head -1)"
+    ok "the Service serves a page, it was served by the live replica ${SERVED}"
+    evidence "Service response (fragment)" \
+      "$(printf '%s' "$BODY" | grep -o "served by pod<b>${APP}-[a-z0-9-]*</b>" | head -1)"
   else
-    fail "पेज को कॉपी ${SERVED} ने दिया, लेकिन ऐसा पॉड क्लस्टर में अब नहीं है" \
-         "दस सेकंड इंतज़ार करें और जाँच फिर चलाएँ — शायद कॉपी अभी ही बदल रही थी"
+    fail "the page was served by replica ${SERVED}, but there is no such pod in the cluster anymore" \
+         "wait ten seconds or so and run the check again — the replica was probably changing right now"
   fi
 fi
 
-# --- अगली लैब के लिए तैयारी -------------------------------------------------
+# --- readiness for the next lab --------------------------------------------
 if [ "$WANT" = "1" ]; then
-  ok "कॉपियों की संख्या एक पर वापस आ गई — लैब 3 साफ़ शुरुआत से शुरू होगी"
+  ok "the replica count is back to one — lab 3 will start from a clean slate"
 else
-  warn "अभी माँगी गई कॉपियाँ: ${WANT}" \
-       "लैब 3 से पहले एक वापस लाएँ: kubectl scale deployment ${APP} --replicas=1"
+  warn "currently requested replicas: ${WANT}" \
+       "before lab 3 restore one: kubectl scale deployment ${APP} --replicas=1"
 fi
 
 finish

@@ -27,14 +27,14 @@ curl -s -o /dev/null -w '%{http_code}\n' localhost:8080/actuator/health
 bastion (साझा VM) पर ही `curl` से जाँच लें:
 
 ```bash
-# स्वास्थ्य
+# health
 curl -s https://app.workshopXX.workshop.aenix.io/actuator/health
 
-# एक ऑर्डर बनाते हैं
+# create an order
 curl -s -X POST https://app.workshopXX.workshop.aenix.io/api/orders \
   -H 'Content-Type: application/json' -d '{"item":"test"}'
 
-# देखते हैं कि वह रिकॉर्ड हो गया
+# see that it was recorded
 curl -s https://app.workshopXX.workshop.aenix.io/api/orders
 ```
 

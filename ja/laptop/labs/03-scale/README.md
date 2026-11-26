@@ -30,7 +30,7 @@
 ファイルはすでにすべて揃っています — リポジトリと一緒に受け取っています。作ったり打ち直したりするものは何もありません。以下で `kubectl apply -f name.yaml` を見かけたら、そのファイルはここにあります。
 
 ```bash
-# このラボのすべてのコマンドはこのフォルダーから実行します — さもないと、コマンド内のファイル名が見つかりません。
+# Every command in this lab is run from this folder — otherwise the file names in them won't be found.
 cd labs/03-scale
 ```
 
@@ -47,19 +47,19 @@ cd labs/03-scale
 このラボ全体は、レプリカ数が目に見えて増えることに拠っています。ですから 1 から始めなければなりません — さもないと増加を比べる相手がなくなります。今いくつのレプリカが動いているか見てみましょう。
 
 ```bash
-# KUBECONFIG はクラスターのアドレスとログイン情報が入ったファイルへのパスです。
-# この変数を設定するまで、kubectl はノートPC 自身の上でクラスターを探し、見つけられません。
+# KUBECONFIG is the path to the file with the cluster's address and login details.
+# Until the variable is set, kubectl looks for the cluster on the laptop itself and doesn't find it.
 export KUBECONFIG=~/lab.kubeconfig
 
-# READY 列は「ready / requested」と読みます。1/1 は 1 レプリカを要求し、稼働中という意味です。
+# The READY column reads as "ready / requested": 1/1 means one replica requested and running.
 kubectl get deployment rickroll
 ```
 
 `1/1` と出るはずです。それより多ければ 1 に戻してください。さもないと増加が見えにくくなります。
 
 ```bash
-# scale はアプリケーションのレコードのうち 1 つのフィールド — レプリカ数 — だけを変えます。
-# 余分なレプリカはクラスターが自分で数秒以内に退役させます。
+# scale changes exactly one field in the application's record — the replica count.
+# The cluster will retire the extra replicas on its own, within seconds.
 kubectl scale deployment rickroll --replicas=1
 ```
 
@@ -68,10 +68,11 @@ kubectl scale deployment rickroll --replicas=1
 オートスケーリングを設定する前に、それが何に対してパーセンテージを計算するのかを理解しておく必要があります。
 
 ```bash
-# クラスター内のオブジェクトには数百のフィールドがあり、表には出てきません。jsonpath はレスポンスから
-# ちょうど 1 か所だけを取り出します。パスは上から下へ読みます。spec.template はレプリカが作られる元の
-# テンプレート、containers[0] はその中の最初のコンテナ、resources はその CPU とメモリの
-# 要求と上限です。末尾の {"\n"} は改行で、レスポンスが次のコマンドプロンプトにくっつかないようにします。
+# An object in the cluster has hundreds of fields; the table doesn't show them. jsonpath extracts
+# exactly one spot from the response. Read the path top to bottom: spec.template is the template
+# from which replicas are created, containers[0] is the first container in it, resources is its
+# request and ceiling for CPU and memory. The tail {"\n"} is a newline, so the response
+# doesn't run into the next command prompt.
 kubectl get deployment rickroll \
   -o jsonpath='{.spec.template.spec.containers[0].resources}{"\n"}'
 ```
@@ -183,8 +184,8 @@ replicas needed = ceil( current replicas × current load ÷ target load )
 適用します。
 
 ```bash
-# apply = 「クラスターをファイルに書かれた状態にする」。HPA オブジェクトはすぐに現れますが、
-# 計算をすぐには始めません — それが次のステップでつまずくところです。
+# apply = "bring the cluster to what's described in the file." The HPA object will appear at once,
+# but it won't start computing right away — that's what we'll trip over in the next step.
 kubectl apply -f hpa.yaml
 ```
 
@@ -193,9 +194,9 @@ kubectl apply -f hpa.yaml
 何が得られたか見てみましょう。
 
 ```bash
-# hpa は horizontalpodautoscaler の略記です。kubectl はどちらの綴りも理解します。
-# TARGETS 列は「現在の負荷 / ターゲット」と読み、REPLICAS は今いくつの
-# レプリカが要求されているかです。
+# hpa is shorthand for horizontalpodautoscaler; kubectl understands both spellings.
+# The TARGETS column reads as "current load / target," REPLICAS is how many
+# replicas are requested right now.
 kubectl get hpa rickroll
 ```
 
@@ -222,7 +223,7 @@ rickroll   Deployment/rickroll   cpu: <unknown>/50%   1         6         1     
 時間が足りていないのです。1 分半から 2 分待って、もう一度見てください。
 
 ```bash
-# 上と同じコマンドです。同じ TARGETS 列を見ています。
+# The same command as above. We're looking at the same TARGETS column.
 kubectl get hpa rickroll
 ```
 
@@ -236,9 +237,9 @@ rickroll   Deployment/rickroll   cpu: 0%/50%     1         6         1          
 メトリクスが実際に流れているかは直接確認できます。
 
 ```bash
-# top = 「これらの Pod が今どれだけリソースを食っているか」。数値は
-# オートスケーリングに供給しているのと同じ metrics-server から来ます。top が答えるなら、
-# データ源は生きていて、あとは時間の問題です。
+# top = "how many resources these Pods are eating right now." The numbers come from
+# the same metrics-server that feeds autoscaling: if top answers, then the
+# data source is alive and it's only a matter of time.
 kubectl top pods -l app=rickroll
 ```
 
@@ -252,9 +253,9 @@ rickroll-6f4b9c8d57-p9wqt   1m           4Mi
 `metrics-server` はクラスターと一緒に自らインストールされます — 別途有効化する必要はありません。これは `cozy-monitoring` namespace に住んでいて、こう確認できます。
 
 ```bash
-# -n = どの namespace を見るか。namespace はクラスターの一区画で、
-# デフォルトでは kubectl は default を見るため、そこにはシステム Pod は見えません。
-# deploy は deployment の略記です。
+# -n = which namespace to look in. A namespace is a section of the cluster;
+# by default kubectl looks in default and doesn't see the system Pods there.
+# deploy is shorthand for deployment.
 kubectl -n cozy-monitoring get deploy metrics-server
 ```
 
@@ -263,8 +264,8 @@ kubectl -n cozy-monitoring get deploy metrics-server
 正確な原因は次で分かります。
 
 ```bash
-# describe = オブジェクトの完全なカード: 全フィールド、イベント、コンディション。
-# 表の列をいくつか印字するだけの get とは違います。
+# describe = the object's full card: all fields, events, and conditions,
+# unlike get, which prints a few table columns.
 kubectl describe hpa rickroll
 ```
 
@@ -340,12 +341,12 @@ Web インターフェイスのための安定したアドレスです。クラ�
 適用して待ちます。
 
 ```bash
-# ファイルの中には一度に 2 つのオブジェクトがあります。生成ツールを持つ Deployment と、その
-# Web インターフェイスのための安定したアドレスである Service です。
+# There are two objects at once in the file: the Deployment with the generator and a Service — a
+# stable address for its web interface.
 kubectl apply -f fortio.yaml
 
-# rollout status はターミナルを保持し、レプリカが準備できるまで進捗を印字します。
-# ここで待つのは意図的です。生成ツールが立ち上がるまでは、負荷を掛ける相手がないからです。
+# rollout status holds the terminal and prints progress until the replica is ready.
+# We wait here on purpose: until the generator is up, there's nothing to drive load with.
 kubectl rollout status deployment/fortio
 ```
 
@@ -356,10 +357,10 @@ kubectl rollout status deployment/fortio
 ```bash
 export KUBECONFIG=~/lab.kubeconfig
 
-# port-forward はあなたのノートPC からクラスターへのトンネルを走らせます。
-#   svc/fortio    接続先: fortio という名前の Service
-#   8081:8080     「自分側のポート : クラスター内のポート」と読みます — localhost:8081 への
-#                 リクエストがこの Service のポート 8080 へ渡ります
+# port-forward runs a tunnel from your laptop into the cluster.
+#   svc/fortio    what we connect to: the Service named fortio
+#   8081:8080     reads as "port on your side : port in the cluster" — a request
+#                 to localhost:8081 goes to port 8080 of this Service
 kubectl port-forward svc/fortio 8081:8080
 ```
 
@@ -378,16 +379,16 @@ kubectl port-forward svc/fortio 8081:8080
 ```bash
 export KUBECONFIG=~/lab.kubeconfig
 
-# rickroll のレプリカを観察します。新しい行 1 本 1 本が、そのうちの 1 つの状態変化です。
-# コマンドは終了しません。抜けるには Ctrl+C — これはレプリカ自体には何の影響もありません。
+# We watch rickroll's replicas: each new line is a state change of one of them.
+# The command doesn't finish; to exit, Ctrl+C — this has no effect on the replicas themselves.
 kubectl get pods -l app=rickroll -w
 ```
 
 3 つ目のウィンドウがあれば、そこにもこれを入れてください — そうすれば意思決定のプロセスそのものが見えます。
 
 ```bash
-# 同じ観察ですが、オートスケーリングの決定を対象にしたものです。TARGETS は負荷が
-# どう変わるかを、REPLICAS はそれに応じていくつのレプリカを要求したかを示します。
+# The same watching, but of the autoscaling decisions: TARGETS shows how the load
+# changes, REPLICAS shows how many replicas it requested in response.
 kubectl get hpa rickroll -w
 ```
 
@@ -409,13 +410,13 @@ kubectl get hpa rickroll -w
 ⚠️ **お使いの Fortio のバージョンでフィールド名が違う場合**（たとえば接続数が `Threads` と表示されている場合）、意味で判断してください。URL、リクエストレート、継続時間、並列度です。同じ負荷はブラウザを介さずコマンドで掛けることもできます。
 
 ```bash
-# exec はあなたのノートPC ではなく、すでに動いている Pod の中でコマンドを実行します。
-#   deploy/fortio   このアプリケーションの Pod の中で。どの Pod かは kubectl が自分で選びます
-#   --              この区切りより後はすべて Pod 向けのコマンドです
-#   -qps 1200       毎秒 1200 リクエスト
-#   -c 80           80 本の並列接続
-#   -t 90s          1 分半、負荷を保持する
-# 最後の引数がターゲット: 私たちのアプリケーションの Service 名です。
+# exec runs a command inside an already-running Pod, not on your laptop.
+#   deploy/fortio   in a Pod of this application; which Pod exactly — kubectl picks itself
+#   --              everything after this separator is the command for the Pod
+#   -qps 1200       twelve hundred requests per second
+#   -c 80           eighty parallel connections
+#   -t 90s          hold the load for a minute and a half
+# The last argument is the target: the Service name of our application.
 kubectl exec deploy/fortio -- fortio load -qps 1200 -c 80 -t 90s http://rickroll/
 ```
 
@@ -438,7 +439,7 @@ rickroll-6f4b9c8d57-t8zxc   1/1     Running             3s
 📍 **HPA を見てください** — 何を見て、何を決めたか:
 
 ```bash
-# TARGETS はターゲットに対する現在の平均負荷、REPLICAS はいくつのレプリカが要求されているかです。
+# TARGETS is the current average load against the target, REPLICAS is how many replicas are requested.
 kubectl get hpa rickroll
 ```
 
@@ -458,8 +459,8 @@ rickroll   Deployment/rickroll   cpu: 645%/50%   1         6         6          
 HPA の算術を自分で確かめてください。
 
 ```bash
-# 各レプリカ個別の消費量です。CPU(cores) はミリCPU で印字されます。
-# 100m はコアの 100 分の 1、1000m は丸ごと 1 コアです。
+# The consumption of each replica separately. CPU(cores) is printed in millicpu:
+# 100m is a hundredth of a core, 1000m is a whole core.
 kubectl top pods -l app=rickroll
 ```
 
@@ -496,8 +497,8 @@ rickroll-6f4b9c8d57-mn4kd   1/1     Terminating   4m
 ⚠️ **Windows ではスクリプトは PowerShell ではなく WSL から実行します** — インストール方法はラボ 0 の冒頭に書かれています。WSL がなくてもラボは完了できますが、レポートの成果物は残りません。
 
 ```bash
-# ./ は「システムの PATH のコマンド」ではなく「現在のフォルダーのファイル」を意味します。
-# このスクリプトはクラスター内の何も変えません。読み取ってレポートを印字するだけです。
+# ./ means "a file from the current folder," not a command from the system PATH.
+# The script changes nothing in the cluster: it only reads and prints a report.
 ./check.sh
 ```
 
@@ -506,15 +507,15 @@ rickroll-6f4b9c8d57-mn4kd   1/1     Terminating   4m
 **HPA を削除します。** ラボ 4 では負荷を掛けたまま新しいバージョンをロールアウトします。同時にレプリカ数を変える余分なメカニズムがあると、絵図が混乱するだけです。
 
 ```bash
-# delete -f = 「このファイルに書かれたものをクラスターから取り除く」。アプリケーションは残ります。
-# ファイルには HPA だけが書かれています。削除後、レプリカ数は現在の値で凍結します。
+# delete -f = "remove from the cluster what's described in this file." The application stays:
+# only the HPA is described in the file. After deletion the replica count freezes at the current value.
 kubectl delete -f hpa.yaml
 ```
 
 **Fortio は残しておきます** — ラボ 4 で負荷源として必要になります。ラボ 4 をやる予定がないなら、これも取り除いてください。
 
 ```bash
-# ファイルの両方のオブジェクトを取り除きます — 生成ツールの Deployment とその Service です。
+# Removes both objects from the file — the generator's Deployment and its Service.
 kubectl delete -f fortio.yaml
 ```
 

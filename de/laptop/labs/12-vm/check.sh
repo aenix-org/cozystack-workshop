@@ -1,125 +1,125 @@
 #!/usr/bin/env bash
-# Prüfung von Lab 12: Die migrierte VM ist über den Ingress und die Domain der
-# Plattform nach außen veröffentlicht — genauso wie die containerisierte Anwendung.
+# Lab 12 check: the migrated virtual machine is published to the outside through the
+# platform's ingress and domain — exactly like the containerized application.
 #
-# Wir prüfen nicht «Objekte angelegt», sondern dass die Sache tatsächlich funktioniert:
-#   1) der Domainname des Tenants liefert HTTP 200 und es ist die Verzeichnis-Seite,
-#   2) die virtuelle Maschine selbst läuft (Ready),
-#   3) der Ingress, der die Maschine veröffentlicht, ist vorhanden.
-# Der erste Punkt ist der wichtigste: er ist der Beweis, dass das Verzeichnis von außen sichtbar ist.
+# We check not "objects created", but that the thing actually works:
+#   1) the tenant's domain name returns HTTP 200 and it is the directory page,
+#   2) the virtual machine itself is running (Ready),
+#   3) the Ingress that publishes the machine is in place.
+# The first item is the main one: it is the proof that the directory is visible from outside.
 #
-# Läuft auf dem Laptop, aus dem Ordner dieses Labs. Braucht Tenant-Zugang und die Tenant-Nummer:
+# Runs on the laptop, from this lab's folder. Needs tenant access and the tenant number:
 #     export KUBECONFIG=~/.kube/workshop
 #     export COZY_TENANT=workshopXX
 #     cd labs/12-vm && ./check.sh
-# Die Domain-Prüfung funktioniert auch ohne Tenant-Zugang — curl genügt ihr. Ohne Tenant-
-# Zugang scheitert das Skript nicht: es überspringt die tenantseitigen Prüfungen und sagt das.
+# The domain check works even without tenant access — curl is enough for it. Without tenant
+# access the script does not fail: it will skip the tenant-side checks and say so.
 #
-# Das Skript ändert nichts — es liest nur und sendet HTTP-Anfragen. Führe es vor dem Aufräumen aus:
-# sobald die Maschine gelöscht ist, gibt es nichts mehr zu prüfen.
+# The script changes nothing — it only reads and sends HTTP requests. Run it before cleanup:
+# once the machine is deleted there will be nothing left to check.
 
-# Diese beiden Variablen werden von lib.sh aufgegriffen — sie gehen in den Kopf des Berichts und in den
-# Dateinamen report-<lab>-<datum>.md, den das Skript neben sich ablegt.
+# These two variables are picked up by lib.sh — they go into the report header and into the
+# file name report-<lab>-<date>.md, which the script places next to itself.
 LAB_NAME="12-vm"
-LAB_TITLE="Lab 12 · Eine virtuelle Maschine neben den Containern"
-# Gemeinsame Prüfbibliothek: ok / fail / warn / evidence / finish kommen von hier.
-# Der Pfad wird relativ zu dem Ort aufgelöst, an dem das Skript selbst liegt, daher funktioniert
-# der Start aus jedem Verzeichnis gleich.
+LAB_TITLE="Lab 12 · A virtual machine next to the containers"
+# Shared check library: ok / fail / warn / evidence / finish come from here.
+# The path is resolved relative to where the script itself lives, so running from any
+# directory works the same.
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
-# Die Tenant-Nummer ist erforderlich: aus ihr entstehen sowohl der Namespace-Name als auch der
-# Domainname, unter dem das Verzeichnis veröffentlicht ist. Ohne sie gibt es nichts zu prüfen.
+# The tenant number is required: it forms both the namespace name and the domain name at
+# which the directory is published. Without it there is nothing to check.
 need_tenant
 
-# Die Namen, die wir prüfen. VM ist der Name der BESTELLUNG für eine Maschine, also des VMInstance-
-# Objekts; danach wird `kubectl get vminstance` gefragt. Die tatsächlich laufende Instanz heißt
-# anders: die Plattform rollt die Bestellung mit dem Chart `vm-instance` aus, der Chart-Name wird
-# mit dem Release-Namen zusammengeklebt, und heraus kommt vm-instance-spravochnik.
+# The names we check. VM is the name of the ORDER for a machine, i.e. of the VMInstance
+# object; it is what `kubectl get vminstance` is asked about. The actual running instance is
+# named differently: the platform deploys the order with the `vm-instance` chart, the chart
+# name is glued to the release name, and you get vm-instance-spravochnik.
 VM=spravochnik
 NS="tenant-${COZY_TENANT}"
-# Die Domain, unter der der Moderator das Verzeichnis vorab über Ingress veröffentlicht hat. Dieselbe
-# Adresse, die du im Browser öffnest.
+# The domain on which the host published the directory in advance through Ingress. The same
+# address you open in the browser.
 HOST="spravochnik.${COZY_TENANT}.workshop.aenix.io"
 URL="http://${HOST}"
 
-# Tenant-Zugang ist nicht erforderlich: die Domain wird mit einem gewöhnlichen curl geprüft. Wenn
-# KUBECONFIG gesetzt ist und der Tenant antwortet — fügen wir Prüfungen des Maschinenzustands und des Ingress hinzu.
+# Tenant access is not required: the domain is checked with an ordinary curl. If KUBECONFIG
+# is set and the tenant responds — we add checks of the machine state and Ingress.
 TENANT_OK=0
 if [ -n "${KUBECONFIG:-}" ] && kubectl -n "$NS" get vminstance >/dev/null 2>&1; then
   TENANT_OK=1
 fi
 
-# --- die Hauptsache: das Verzeichnis ist von außen über die Domain sichtbar -------------
-# Wir nehmen den Antwortcode und den Body getrennt: der Code unterscheidet «hinter dem Ingress ist
-# noch niemand» (503) von «führt an die falsche Stelle» (404) und «gar keine Domain» (000),
-# und der Body bestätigt, dass genau das Verzeichnis antwortet, nicht irgendein zufälliger Platzhalter.
+# --- the main thing: the directory is visible from outside via the domain -------------
+# We take the response code and the body separately: the code distinguishes "no one behind
+# the ingress yet" (503) from "leads to the wrong place" (404) and "no domain at all" (000),
+# and the body confirms that it is exactly the directory answering, not some random stub.
 CODE="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$URL" 2>/dev/null)"
 BODY="$(curl -s --max-time 10 "$URL" 2>/dev/null)"
 
 case "$CODE" in
   200)
     case "$BODY" in
-      *"Mitarbeiterverzeichnis"*)
-        ok "Verzeichnis veröffentlicht: ${URL} antwortet mit 200 und liefert die Verzeichnis-Seite"
-        evidence "Antwort über die Domain" "Anfrage: ${URL}
-Antwortcode: ${CODE}
+      *"Staff directory"*)
+        ok "directory published: ${URL} responds 200 and serves the directory page"
+        evidence "Response over the domain" "request: ${URL}
+response code: ${CODE}
 $(printf '%s' "$BODY" | head -3)"
         ;;
       *)
-        fail "${URL} liefert 200, aber es ist nicht die Verzeichnis-Seite" \
-             "hinter der Domain antwortet etwas anderes; prüfe, dass genau das Verzeichnis auf Port 8080 innerhalb der Maschine lauscht"
+        fail "${URL} returns 200, but it is not the directory page" \
+             "something else answers behind the domain; check that the directory is exactly what listens on port 8080 inside the machine"
         ;;
     esac
     ;;
   503)
-    fail "Domain ${URL} antwortet mit 503 — hinter dem Ingress ist noch niemand, der antwortet" \
-         "die Maschine bootet noch oder der Verzeichnisdienst auf 8080 ist nicht hochgekommen; warte, bis die vminstance Ready ist, und schau in die Konsole der Maschine"
+    fail "domain ${URL} returns 503 — no one is behind the Ingress to answer yet" \
+         "the machine is still booting or the directory service on 8080 has not come up; wait for the vminstance to be Ready and look into the machine's console"
     ;;
   000)
-    fail "Domain ${URL} antwortet überhaupt nicht" \
-         "prüfe das Netzwerk; den Ingress mit diesem Host legt der Moderator an — wenn es gar keine Domain gibt, frag ihn"
+    fail "domain ${URL} does not respond at all" \
+         "check the network; the Ingress with this host is created by the host — if there is no domain at all, ask them"
     ;;
   *)
-    fail "Domain ${URL} antwortet mit ${CODE}, nicht mit 200" \
-         "404 bedeutet, dass der Ingress zum falschen Service führt; 5xx bedeutet, dass das Backend nicht bereit ist zu antworten"
+    fail "domain ${URL} responds ${CODE}, not 200" \
+         "404 means the Ingress leads to the wrong service; 5xx means the backend is not ready to answer"
     ;;
 esac
 
-# --- Tenant-Seite: die Maschine selbst und ihre Veröffentlichung --------------------------
+# --- tenant side: the machine itself and its publication --------------------------
 if [ "$TENANT_OK" -eq 0 ]; then
-  warn "tenantseitige Prüfungen übersprungen: der Tenant ist über KUBECONFIG nicht erreichbar" \
-       "gib Tenant-Zugang an: export KUBECONFIG=~/.kube/workshop"
+  warn "tenant-side checks skipped: the tenant is not reachable via KUBECONFIG" \
+       "provide tenant access: export KUBECONFIG=~/.kube/workshop"
 else
-  # Wir fragen nicht «existiert das Objekt», sondern nach der Ready-Bedingung: die Bestellung für eine
-  # Maschine wird in einer Sekunde angelegt, während der Gast drei bis fünf Minuten hochkommt, und die
-  # ganze Zeit existiert die Maschine, aber das Verzeichnis antwortet noch nicht.
+  # We ask not "does the object exist", but the Ready condition: the order for a machine is
+  # created in a second, while the guest comes up in three to five minutes, and all that
+  # time the machine exists but the directory does not answer yet.
   if ! kubectl -n "$NS" get vminstance "$VM" >/dev/null 2>&1; then
-    fail "im Tenant ${NS} gibt es keine virtuelle Maschine ${VM}" \
-         "lege eine VM Disk und eine VM Instance im Dashboard an oder wende staff-directory-vm.yaml an"
+    fail "there is no virtual machine ${VM} in tenant ${NS}" \
+         "create a VM Disk and a VM Instance in the dashboard or apply staff-directory-vm.yaml"
   else
     VM_READY="$(kubectl -n "$NS" get vminstance "$VM" \
       -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)"
     if [ "$VM_READY" = "True" ]; then
-      ok "virtuelle Maschine ${VM} läuft"
+      ok "virtual machine ${VM} is running"
     elif [ -n "$VM_READY" ]; then
-      fail "virtuelle Maschine ${VM} existiert, ist aber nicht bereit (Ready=${VM_READY})" \
-           "schau dir die Maschinenkarte im Dashboard an; der erste Start dauert 3-5 Minuten"
+      fail "virtual machine ${VM} exists, but is not ready (Ready=${VM_READY})" \
+           "look at the machine card in the dashboard; the first boot takes 3-5 minutes"
     else
-      warn "virtuelle Maschine ${VM} existiert, aber ihr Zustand konnte nicht gelesen werden" \
-           "schau sie dir mit eigenen Augen im Dashboard an: sie sollte eingeschaltet sein"
+      warn "virtual machine ${VM} exists, but its state could not be read" \
+           "look at it with your own eyes in the dashboard: it should be powered on"
     fi
-    evidence "Virtuelle Maschinen des Tenants" "$(kubectl -n "$NS" get vminstance 2>/dev/null)"
+    evidence "Tenant virtual machines" "$(kubectl -n "$NS" get vminstance 2>/dev/null)"
   fi
 
-  # Den Ingress legt der Moderator an, nicht der Teilnehmer. Wenn die Domain bereits mit 200 antwortet —
-  # ist er vorhanden; wir prüfen separat, damit bei 503/404 sofort klar ist, ob es überhaupt eine
-  # Veröffentlichung gibt.
+  # The Ingress is created by the host, not the participant. If the domain already answers
+  # 200 — it is in place; we check separately so that on 503/404 it is immediately clear
+  # whether there is any publication at all.
   if kubectl -n "$NS" get ingress spravochnik >/dev/null 2>&1; then
-    ok "Ingress spravochnik ist vorhanden — das Verzeichnis ist im Tenant veröffentlicht"
-    evidence "Ingress des Tenants" "$(kubectl -n "$NS" get ingress spravochnik 2>/dev/null)"
+    ok "Ingress spravochnik is in place — the directory is published in the tenant"
+    evidence "Tenant Ingress" "$(kubectl -n "$NS" get ingress spravochnik 2>/dev/null)"
   else
-    warn "Ingress spravochnik im Tenant ${NS} nicht gefunden" \
-         "ihn legt der Moderator an; wenn die Domain bereits mit 200 antwortet — kein Grund zur Sorge, andernfalls wende dich an den Moderator"
+    warn "Ingress spravochnik not found in tenant ${NS}" \
+         "it is created by the host; if the domain already answers 200 — nothing to worry about, otherwise ask the host"
   fi
 fi
 

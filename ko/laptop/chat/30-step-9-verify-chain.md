@@ -38,7 +38,7 @@ virtctl이 클라이언트와 클러스터의 버전 차이에 대해 불평한�
 포트 포워딩이 그래도 올라오지 않으면, 같은 터널을 머신의 Pod를 통해 만들 수 있습니다:
 ```bash
 kubectl get pod -n tenant-workshopXX -l vm.kubevirt.io/name=vm-instance-app-1
-kubectl port-forward -n tenant-workshopXX <출력에서-나온-Pod-이름> 8080:8080
+kubectl port-forward -n tenant-workshopXX <pod-name-from-output> 8080:8080
 ```
 
 다른 터미널 창에서:
@@ -46,11 +46,11 @@ kubectl port-forward -n tenant-workshopXX <출력에서-나온-Pod-이름> 8080:
 # health
 curl -s http://localhost:8080/actuator/health
 
-# 주문 생성
+# create an order
 curl -s -X POST http://localhost:8080/api/orders \
   -H 'Content-Type: application/json' -d '{"item":"test"}'
 
-# 기록되었는지 확인
+# see that it was recorded
 curl -s http://localhost:8080/api/orders
 ```
 

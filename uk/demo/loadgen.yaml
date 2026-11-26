@@ -1,6 +1,6 @@
-# Емуляція активності користувача в demo-середовищі (tenant-workshop00).
-# Малі обсяги + очищення старого. Інстанси не чіпаємо, лише дані всередині.
-# CronJob'и живуть у namespace тенанта (мережеві політики дають доступ до сервісів лише зсередини).
+# Emulating user activity in the demo environment (tenant-workshop00).
+# Small volumes + cleanup of old data. We don't touch the instances, only the data inside them.
+# The CronJobs live in the tenant namespace (network policies allow access to the services only from within).
 ---
 apiVersion: batch/v1
 kind: CronJob

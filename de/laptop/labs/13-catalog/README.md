@@ -35,12 +35,12 @@ selbst, gleich jetzt: Sie können den Cluster nach Ihren Berechtigungen fragen, 
 zu erstellen.
 
 ```bash
-# KUBECONFIG — die Variable, die kubectl liest, um Adresse des Clusters und Ihre Zugangsdaten zu finden.
-# Hier ist es der Tenant-Zugang, dieselbe Datei wie in jedem anderen Lab.
+# KUBECONFIG — the variable kubectl reads to find the cluster's address and your credentials.
+# Here it is the tenant access, the same file as in every other lab.
 export KUBECONFIG=~/.kube/workshop
-# auth can-i = "darf ich das?". Der Cluster antwortet mit ja oder nein und ändert nichts:
-#   create                   welche Aktion wir prüfen
-#   applicationdefinitions   auf welchem Objekttyp
+# auth can-i = "am I allowed to?". The cluster answers yes or no and changes nothing:
+#   create                   which action we are checking
+#   applicationdefinitions   on which type of object
 kubectl auth can-i create applicationdefinitions
 ```
 
@@ -98,13 +98,13 @@ geht um die Verpackung.
 
 ```
 chart/
-├── Chart.yaml            Name, Version, Beschreibung
-├── values.yaml           Parameter und Standardwerte
-├── values.schema.json    welche Werte als gültig gelten
+├── Chart.yaml            name, version, description
+├── values.yaml           parameters and default values
+├── values.schema.json    which values to consider valid
 └── templates/
-    ├── configmap.yaml    die Seite und die nginx-Konfiguration
-    ├── deployment.yaml   die Anwendung selbst
-    └── service.yaml      die Adresse
+    ├── configmap.yaml    the page and the nginx config
+    ├── deployment.yaml   the application itself
+    └── service.yaml      the address
 ```
 
 <details>
@@ -147,7 +147,7 @@ Generator von Cozystack (`cozyvalues-gen`) die `values.schema.json` und die Para
 im README des Charts. Eine einzige Quelle der Wahrheit: ändern Sie den Kommentar, generieren Sie das Schema neu, und
 das Formular im Dashboard ändert sich mit.
 
-Das Format ist streng: `## @param {Typ} name=Standardwert - Beschreibung.`
+Das Format ist streng: `## @param {type} name=default-value - Description.`
 
 Es gibt bewusst wenige Parameter. Jeder neue Parameter ist ein weiteres Feld im Formular, eine
 weitere Möglichkeit, die Anwendung falsch auszurollen, und ein weiterer Zweig, den Sie pflegen müssen. Ein
@@ -160,10 +160,10 @@ Das Schema wird von Helm geprüft, **bevor** irgendetwas in den Cluster wandert.
 schmuggeln Sie eine Zeichenkette in einen numerischen Parameter.
 
 ```bash
-# template = "baue die Manifeste aus dem Chart zusammen und gib sie aus", der Cluster wird dabei nicht angefasst:
-#   gp                    der Release-Name, unter dem der Chart sozusagen ausgerollt wird
-#   chart                 der Ordner mit dem Chart
-#   --set replicas=abc    einen einzelnen Parameter direkt auf der Kommandozeile überschreiben
+# template = "assemble the manifests from the chart and print them", the cluster is not touched:
+#   gp                    the release name the chart is notionally deployed under
+#   chart                 the folder with the chart
+#   --set replicas=abc    override a single parameter right on the command line
 helm template gp chart --set replicas=abc
 ```
 
@@ -237,9 +237,9 @@ falsche Einrückung, ein verloren gegangenes Pflichtfeld, ein Template, das sich
 
 ```bash
 cd labs/13-catalog
-# lint = "prüfe das Paket auf Formatfehler und Pflichtfelder"
-#   chart   Pfad zum Chart-Ordner; darin erwartet Helm Chart.yaml, values.yaml
-#           und den Ordner templates/
+# lint = "check the package for formatting errors and required fields"
+#   chart   path to the chart folder; inside it Helm expects Chart.yaml, values.yaml
+#           and the templates/ folder
 helm lint chart
 ```
 
@@ -262,8 +262,8 @@ verwandeln: Helm nimmt die Werte aus `values.yaml`, setzt sie in den Text ein un
 Ergebnis aus.
 
 ```bash
-# main — der Release-Name, also dieses konkreten Deployments des Charts. Er geht
-# in die Namen der erzeugten Objekte ein, damit zwei Installationen nebeneinander nicht kollidieren.
+# main — the release name, that is, of this specific deployment of the chart. It goes
+# into the names of the objects created, so two installations side by side will not clash.
 helm template main chart
 ```
 
@@ -274,10 +274,10 @@ Prüfen Sie, dass die Parameter wirklich in den Manifesten ankommen. Wir rendern
 und behalten nur die Zeile der Ausgabe, die sich ändern sollte.
 
 ```bash
-# --set replicas=5 überschreibt den Wert aus values.yaml für die Dauer eines Laufs.
-# | grep 'replicas:' — behalte aus der gesamten Ausgabe nur die Zeilen mit diesem Wort.
+# --set replicas=5 overrides the value from values.yaml for the duration of one run.
+# | grep 'replicas:' — from the whole output keep only the lines with this word.
 helm template main chart --set replicas=5 | grep 'replicas:'
-# dasselbe für den booleschen Parameter: external entscheidet, welcher Service-Typ im Manifest landet
+# the same for the boolean parameter: external decides which Service type ends up in the manifest
 helm template main chart --set external=true | grep 'type:'
 ```
 
@@ -333,11 +333,11 @@ Nachdem diese Datei angewendet wurde, erscheint ein neuer Objekttyp im Cluster. 
 Definition anwendet:
 
 ```bash
-# get = "zeig mir, was da ist". guestpasses ist genau der Name aus dem Feld plural unten:
-#   -n tenant-workshopXX   in welchem namespace nachzusehen ist; ersetzen Sie XX durch Ihre eigene Nummer
+# get = "show me what's there". guestpasses is that very name from the plural field below:
+#   -n tenant-workshopXX   which namespace to look in; replace XX with your own number
 kubectl get guestpasses -n tenant-workshopXX
-# describe = "zeig mir alles über ein Objekt": Parameter, Zustand, jüngste Events.
-# main ist hier der Name einer konkret bestellten Anwendung, nicht der Name des Typs.
+# describe = "show me everything about one object": parameters, state, recent events.
+# main here is the name of a specific ordered application, not the name of the type.
 kubectl describe guestpass main -n tenant-workshopXX
 ```
 
@@ -432,9 +432,9 @@ in Zeilen um, aber das Feld `icon` braucht eine einzige durchgehende Zeichenkett
 Zeilenumbrüche in einem separaten Schritt entfernt.
 
 ```bash
-# base64 = eine Binärdatei in eine Zeichenkette aus Buchstaben, Ziffern und den Zeichen + / = verwandeln
-#   -i icon.svg   was zu kodieren ist (die Flag-Schreibweise für macOS und BSD)
-# tr -d '\n' = jeden Zeilenumbruch aus der Ausgabe entfernen und sie zu einer zusammenkleben
+# base64 = turn a binary file into a string of letters, digits and the signs + / =
+#   -i icon.svg   what to encode (the flag spelling for macOS and BSD)
+# tr -d '\n' = drop every line break from the output, gluing it into one
 base64 -i icon.svg | tr -d '\n'
 ```
 
@@ -463,9 +463,9 @@ Rechte. Die Verweigerung kommt vom Cluster, nicht von `kubectl`, und der Text de
 genau, was gefehlt hat.
 
 ```bash
-# Tenant-Zugang — derselbe, mit dem Sie den ganzen Workshop über gearbeitet haben
+# tenant access — the same one you have worked with throughout the workshop
 export KUBECONFIG=~/.kube/workshop
-# apply = "bringe den Cluster in Einklang mit dem, was in der Datei steht"; -f — aus einer Datei lesen
+# apply = "bring the cluster into line with what's written in the file"; -f — read from a file
 kubectl apply -f applicationdefinition.yaml
 ```
 
@@ -513,10 +513,10 @@ Die Verweigerung könnte auch von einem Fehler in der Datei selbst kommen. Trenn
 fragen Sie zuerst nach den Berechtigungen, lassen Sie dann `kubectl` die ganze Datei parsen, ohne sie irgendwohin zu senden.
 
 ```bash
-# auth can-i = "darf ich das?". Die Antwort ist ja oder nein, und der Cluster wird nicht verändert.
+# auth can-i = "am I allowed to?". The answer is yes or no, and the cluster is not changed.
 kubectl auth can-i create applicationdefinitions
-# --dry-run=client = "parse die Datei und zeige, was herauskäme, aber geh nicht zum Cluster".
-# client bedeutet, dass die gesamte Prüfung auf dem Laptop läuft und der Cluster nie etwas davon erfährt.
+# --dry-run=client = "parse the file and show what would come out, but do not go to the cluster".
+# client means the whole check runs on the laptop and the cluster never even hears about it.
 kubectl apply -f applicationdefinition.yaml --dry-run=client
 ```
 
@@ -590,7 +590,7 @@ dekodiert – und, am wichtigsten, dass das Schema in der Definition mit dem Sch
 Chart übereinstimmt.
 
 ```bash
-# ./ vor dem Namen bedeutet "die Datei aus dem aktuellen Ordner", also aus labs/13-catalog
+# ./ before the name means "the file from the current folder", that is, from labs/13-catalog
 ./check.sh
 ```
 

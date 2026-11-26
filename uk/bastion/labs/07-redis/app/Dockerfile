@@ -1,59 +1,59 @@
-# Лаба 7 · рецепт складання образу сервісу «Перепустка», версія v2.
+# Lab 7 · build recipe for the "Passes" service image, version v2.
 #
-# Dockerfile — це список кроків, за якими з вихідників виходить образ: незмінний
-# знімок файлової системи разом із командою запуску. Найближчий знайомий вам аналог —
-# шаблон віртуальної машини, але збирається він не мишкою, а ось цим текстом, лежить
-# у реєстрі та версіонується тегом.
+# A Dockerfile is a list of steps that turn source code into an image: an immutable
+# snapshot of the filesystem together with the command to run. The closest familiar analog
+# is a virtual machine template, but it is built not with a mouse but with this text, lives
+# in a registry, and is versioned by a tag.
 #
-# Збирають його на віртуалці, не в кластері (див. крок про складання в README):
-#   docker build --platform linux/amd64 -t <ваш-harbor>/passes/passes-api:v2 app/
-#   docker push  <ваш-harbor>/passes/passes-api:v2
+# It is built on a VM, not in the cluster (see the build step in the README):
+#   docker build --platform linux/amd64 -t <your-harbor>/passes/passes-api:v2 app/
+#   docker push  <your-harbor>/passes/passes-api:v2
 #
-# --platform linux/amd64 обов'язковий на Mac з Apple Silicon: без нього образ збереться
-# під ARM, запушиться без жодної скарги й впаде в кластері з «exec format error».
+# --platform linux/amd64 is mandatory on a Mac with Apple Silicon: without it the image will
+# build for ARM, push without a single complaint, and crash in the cluster with "exec format error".
 #
-# Двохетапне складання.
+# Two-stage build.
 #
-# Перший етап — складальний: сюди потрібен весь компілятор Go, а це приблизно 350 МБ.
-# Другий етап — те, що поїде в кластер: туди потрапляє лише готовий бінарник.
-# Так підсумковий образ виходить близько 10 МБ замість 350, і всередині нього немає ні
-# компілятора, ні вихідників, ні пакетного менеджера — тобто нічим
-# скористатися тому, хто в контейнер усе ж таки потрапив.
+# The first stage is the build stage: here the whole Go compiler is needed, which is about 350 MB.
+# The second stage is what ships to the cluster: only the finished binary lands there.
+# This way the final image ends up around 10 MB instead of 350, and inside it there is neither
+# a compiler, nor sources, nor a package manager — that is, nothing to use
+# for whoever does manage to get into the container.
 
-# FROM — з якого готового образу починаємо. Тут беремо офіційний образ з компілятором
-# Go на базі Alpine. AS build дає цьому етапу ім'я, щоб на другому етапі забрати з нього
-# результат. Версія зафіксована (1.23), а не latest: інакше завтрашнє складання того самого
-# вихідника може дати інший бінарник.
+# FROM — which ready-made image we start from. Here we take the official image with the Go
+# compiler based on Alpine. AS build gives this stage a name so the second stage can grab the
+# result from it. The version is pinned (1.23), not latest: otherwise tomorrow's build of the same
+# source may produce a different binary.
 FROM golang:1.23-alpine AS build
-# WORKDIR — робоча папка всередині образу. Усі наступні команди виконуються в ній.
+# WORKDIR — the working folder inside the image. All following commands run in it.
 WORKDIR /src
-# COPY кладе файли з віртуалки всередину образу. Двома рядками, а не одним: go.mod змінюється
-# рідко, main.go — часто, а docker кешує кожен крок окремо. Торкнулися лише main.go —
-# крок із go.mod візьметься з кешу.
+# COPY places files from the VM inside the image. In two lines, not one: go.mod changes
+# rarely, main.go often, and docker caches each step separately. Touch only main.go —
+# the go.mod step will be taken from cache.
 COPY go.mod ./
 COPY main.go ./
-# RUN — виконати команду прямо під час складання; її результат залишається в образі.
-# CGO_ENABLED=0 — зібрати статично, без прив'язки до системних бібліотек.
-# Без цього бінарник вимагатиме glibc, якої в кінцевому образі не буде.
-# -trimpath прибирає з бінарника шляхи з вашої віртуалки, -ldflags="-s -w" викидає
-# відлагоджувальну інформацію — образ менший, а в лог не витікають імена ваших папок.
+# RUN — execute a command right during the build; its result stays in the image.
+# CGO_ENABLED=0 — build statically, without ties to system libraries.
+# Without this the binary would require glibc, which will not be in the final image.
+# -trimpath strips paths from your VM out of the binary, -ldflags="-s -w" throws out
+# debug information — the image is smaller, and your folder names do not leak into the log.
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/passes-api .
 
-# Другий FROM починає образ заново, з чистого аркуша. Усе, що було на етапі build,
-# на цьому місці викидається, і в підсумковий образ потрапить лише те, що ми явно
-# скопіюємо наступною командою COPY --from=build.
+# The second FROM starts the image over from a clean slate. Everything that was in the build stage
+# is discarded at this point, and only what we explicitly
+# copy with the next COPY --from=build command will land in the final image.
 FROM alpine:3.21
-# Застосунок працює не від root. У правильно налаштованому кластері Pod від root
-# не пустять зовсім, і це не причіпка, а стандартна вимога безпеки.
+# The application runs not as root. In a properly configured cluster a pod running as root
+# will not be allowed at all, and this is not nitpicking but a standard security requirement.
 RUN adduser -D -u 10001 app
-# Єдине, що переїжджає зі складального етапу, — один файл: готовий бінарник.
+# The only thing that moves over from the build stage is a single file: the finished binary.
 COPY --from=build /out/passes-api /usr/local/bin/passes-api
-# USER — від кого запускати процес. Вказано номер, а не ім'я: kubernetes перевіряє
-# в маніфесті саме номер (runAsNonRoot дивиться на uid), і вони повинні збігатися.
+# USER — as whom to run the process. A number is given, not a name: kubernetes checks
+# exactly the number in the manifest (runAsNonRoot looks at the uid), and they must match.
 USER 10001
-# EXPOSE — позначка «всередині слухають цей порт». Нічого не відкриває й не пробрасує,
-# це документація для того, хто писатиме маніфест.
+# EXPOSE — a note that "this port is listened on inside". It does not open or forward anything,
+# it is documentation for whoever will write the manifest.
 EXPOSE 8080
-# ENTRYPOINT — що запускається, коли контейнер стартує. Процес тут один і він
-# головний: закінчиться він — закінчиться контейнер, і кластер підніме нову копію.
+# ENTRYPOINT — what runs when the container starts. There is one process here and it is
+# the main one: when it ends the container ends, and the cluster brings up a new copy.
 ENTRYPOINT ["/usr/local/bin/passes-api"]

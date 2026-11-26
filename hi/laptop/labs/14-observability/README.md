@@ -76,7 +76,7 @@
 करने की ज़रूरत नहीं: नीचे जहाँ भी `kubectl apply -f name.yaml` लिखा है, फ़ाइल यहीं से ली जाती है।
 
 ```bash
-# इस लैब के फ़ोल्डर में जाएँ: नीचे के सभी सापेक्ष पथ यहीं से गिने जाते हैं
+# switch to this lab's folder: all the relative paths below are counted from here
 cd labs/14-observability
 ```
 
@@ -93,14 +93,14 @@ cd labs/14-observability
 ऐड-ऑन के ज़रिये देता है। जाँचें कि यह चालू है या नहीं:
 
 ```bash
-# KUBECONFIG — वह वेरिएबल जिसे kubectl पढ़कर जानता है कि क्लस्टर का पता क्या है और किस रूप
-# में लॉगिन करना है। आपने ~/lab.kubeconfig फ़ाइल तब सहेजी थी जब आपने `lab` क्लस्टर बनाया था।
-# हर नई टर्मिनल विंडो में इसे दोबारा सेट करना पड़ता है।
+# KUBECONFIG — the variable kubectl reads to learn the cluster's address and who to
+# log in as. You saved the file ~/lab.kubeconfig when you created the `lab` cluster.
+# It has to be set again in every new terminal window.
 export KUBECONFIG=~/lab.kubeconfig
 
-# get pods = "मुझे दिखाओ कौन-से pods मौजूद हैं"।
-#   -n cozy-monitoring   पूरे क्लस्टर में नहीं, बल्कि इसी namespace में देखो: ठीक यहीं
-#                        ऐड-ऑन अपने कलेक्टर रखता है।
+# get pods = "show me which pods exist".
+#   -n cozy-monitoring   look not across the whole cluster, but in this namespace: that's
+#                        exactly where the add-on puts its collectors.
 kubectl get pods -n cozy-monitoring
 ```
 
@@ -130,16 +130,16 @@ metrics-server-7d4b8c9f5-x2klm    1/1     Running   0          3d
 ऑटोस्केलिंग हटा दिया था, और लैब 4 की साफ़-सफ़ाई ने लोड जेनरेटर हटा दिया था, इसलिए आपको दोनों को वापस लाना होगा:
 
 ```bash
-export KUBECONFIG=~/lab.kubeconfig          # वही एक्सेस फ़ाइल जो ऊपर है
+export KUBECONFIG=~/lab.kubeconfig          # the same access file as above
 
-# apply = "क्लस्टर को उस स्थिति में लाओ जो फ़ाइल में वर्णित है"। दोनों फ़ाइलें पड़ोसी
-# लैब के फ़ोल्डर में हैं, इसलिए पथ `../` से शुरू होता है — इन्हें दोबारा टाइप करने की ज़रूरत नहीं।
-kubectl apply -f ../03-scale/hpa.yaml       # rickroll के लिए ऑटोस्केलिंग नियम
-kubectl apply -f ../03-scale/fortio.yaml    # लोड जेनरेटर
+# apply = "bring the cluster to what's described in the file". Both files live in the
+# neighboring lab's folder, so the path starts with `../` — no need to type them again.
+kubectl apply -f ../03-scale/hpa.yaml       # the autoscaling rule for rickroll
+kubectl apply -f ../03-scale/fortio.yaml    # the load generator
 
-# rollout status = "टर्मिनल को रोके रखो और बताओ जब रोलआउट पूरा हो जाए"।
-# deployment/fortio — ऑब्जेक्ट का प्रकार और उसका नाम। जनरेटर के ऊपर आते ही कमांड
-# `successfully rolled out` पंक्ति के साथ प्रॉम्प्ट लौटा देता है।
+# rollout status = "hold the terminal and tell me when the rollout is done".
+# deployment/fortio — the object type and its name. The command returns the prompt
+# with the line `successfully rolled out` once the generator comes up.
 kubectl rollout status deployment/fortio
 ```
 
@@ -149,11 +149,11 @@ kubectl rollout status deployment/fortio
 ऑटोस्केलिंग स्टेप नहीं दिखेगा:
 
 ```bash
-# port-forward = लैपटॉप से क्लस्टर के भीतर एक सुरंग खोदो। जब तक कमांड चलती है,
-# localhost:8081 पर की गई रिक्वेस्ट लोड जेनरेटर में पहुँचती है।
-#   svc/fortio    लक्ष्य: fortio नाम की सेवा (pod नहीं)
-#   8081:8080     बाईं ओर, आपके लैपटॉप पर का पोर्ट; दाईं ओर, सेवा के भीतर का पोर्ट
-# विंडो बंद न करें: सुरंग ठीक उतनी ही देर जीवित रहती है जितनी देर कमांड चलती है।
+# port-forward = dig a tunnel from the laptop into the cluster. While the command runs,
+# a request to localhost:8081 lands in the load generator.
+#   svc/fortio    the target: the service (not the pod) named fortio
+#   8081:8080     on the left, the port on your laptop; on the right, the port inside the service
+# Don't close the window: the tunnel lives exactly as long as the command runs.
 kubectl port-forward svc/fortio 8081:8080
 ```
 
@@ -184,11 +184,11 @@ kubectl port-forward svc/fortio 8081:8080
 वह पता देखने के लिए जहाँ कलेक्टर अपना डेटा भेजता है:
 
 ```bash
-# get vmagent = "मुझे कलेक्टर ऑब्जेक्ट दिखाओ"। सामान्य तालिका के बजाय हम उसके विवरण से एक
-# ही फ़ील्ड माँगते हैं — -o jsonpath सिंटैक्स किसी भी क्लस्टर ऑब्जेक्ट के साथ काम करता है:
-#   .items[0]                  मिला पहला (और यहाँ इकलौता) कलेक्टर
-#   .spec.remoteWrite[0].url   वह पता जहाँ वह मेट्रिक्स सौंपता है
-#   {"\n"}                     एक नई पंक्ति, वरना आउटपुट प्रॉम्प्ट से जा टकराता है
+# get vmagent = "show me the collector object". Instead of the usual table we ask for a single
+# field from its description — the -o jsonpath syntax works with any cluster object:
+#   .items[0]                  the first (and here only) collector found
+#   .spec.remoteWrite[0].url   the address it hands the metrics to
+#   {"\n"}                     a newline, otherwise the output runs into the prompt
 kubectl get vmagent -n cozy-monitoring \
   -o jsonpath='{.items[0].spec.remoteWrite[0].url}{"\n"}'
 ```
@@ -320,13 +320,13 @@ count by (pod) ( ... )
 </details>
 
 ```promql
-# count by (pod) — मैच हुई सीरीज़ को pod लेबल के आधार पर अलग करें और गिनें कि हर समूह में
-# कितनी सीरीज़ हैं। नंबर खुद मायने नहीं रखते: हमें जो चाहिए वह है परिणामी pod नामों की सूची।
+# count by (pod) — break the matched series out by the pod label and count how many series
+# are in each group. The numbers themselves don't matter: what we want is the list of pod names that results.
 count by (pod) (
-  # मेट्रिक का नाम — कंटेनर का CPU-समय काउंटर
+  # the metric name — the container CPU-time counter
   container_cpu_usage_seconds_total{
-    cluster="kubernetes-lab",   # आपका क्लस्टर: यहाँ रिलीज़ का नाम, न कि ऐप का नाम lab
-    namespace="default"         # lab क्लस्टर के भीतर वह namespace जहाँ rickroll डिप्लॉय है
+    cluster="kubernetes-lab",   # your cluster: the release name here, not the app name lab
+    namespace="default"         # the namespace inside the lab cluster where rickroll is deployed
   }
 )
 ```
@@ -388,14 +388,14 @@ sum by (pod) ( ... )
 </details>
 
 ```promql
-# rate(...[2m]) — प्रति सेकंड काउंटर की वृद्धि दर, 2-मिनट की खिड़की पर औसत।
-# CPU समय के लिए यह ऐसे पढ़ा जाता है "कितने cores खपत हो रहे थे":
-# 0.24 — एक core का चौबीस प्रतिशत, यानी 240m।
-sum by (pod) (     # pod के कंटेनरों का योग: प्रति pod एक पंक्ति, न कि प्रति कंटेनर
+# rate(...[2m]) — the counter's growth rate per second, averaged over a 2-minute window.
+# For CPU time it reads as "how many cores were being consumed":
+# 0.24 — twenty-four percent of one core, that is 240m.
+sum by (pod) (     # sum the pod's containers: one line per pod, not per container
   rate(container_cpu_usage_seconds_total{
     cluster="kubernetes-lab", namespace="default",
-    pod=~"rickroll-.*",  # =~ रेगुलर एक्सप्रेशन से तुलना: pod के नाम का पुछल्ला यादृच्छिक है
-    container!=""        # पूरे-pod वाली कुल सीरीज़ हटाएँ, वरना सब कुछ दोगुना हो जाता है
+    pod=~"rickroll-.*",  # =~ comparison by regular expression: the pod name's tail is random
+    container!=""        # drop the whole-pod total series, otherwise everything doubles
   }[2m])
 )
 ```
@@ -432,9 +432,9 @@ Pods तुरंत नहीं बनते।
 साथ में उपयोगी:
 
 ```promql
-# कुल कितनी rickroll कॉपियाँ बनाई गई हैं
+# how many rickroll copies have been created in total
 kube_deployment_status_replicas{cluster="kubernetes-lab", deployment="rickroll"}
-# उनमें से कितनी readiness जाँच पास कर चुकी हैं और पहले से ट्रैफ़िक ले रही हैं
+# how many of them have passed the readiness check and are already taking traffic
 kube_deployment_status_replicas_available{cluster="kubernetes-lab", deployment="rickroll"}
 ```
 
@@ -444,19 +444,19 @@ kube_deployment_status_replicas_available{cluster="kubernetes-lab", deployment="
 </details>
 
 ```promql
-# ..._status_current_replicas — अभी कितनी rickroll कॉपियाँ चल रही हैं।
-# नंबर एप्लिकेशन से नहीं बल्कि HPA ऑब्जेक्ट से आता है, जिसे kube-state-metrics पढ़ता है।
+# ..._status_current_replicas — how many rickroll copies are running right now.
+# The number comes not from the application but from the HPA object, read by kube-state-metrics.
 kube_horizontalpodautoscaler_status_current_replicas{
-  cluster="kubernetes-lab",             # सिर्फ़ आपका lab क्लस्टर
-  horizontalpodautoscaler="rickroll"    # लैब 3 वाले ऑटोस्केलिंग ऑब्जेक्ट का नाम
+  cluster="kubernetes-lab",             # only your lab cluster
+  horizontalpodautoscaler="rickroll"    # the name of the autoscaling object from lab 3
 }
 ```
 
 और साथ में, दूसरी क्वेरी के रूप में:
 
 ```promql
-# ..._status_desired_replicas — ऑटोस्केलिंग अभी कितनी कॉपियाँ रखना चाहता है,
-# लोड के आधार पर। current का desired से पीछे रहना ठीक pod बनने का समय है।
+# ..._status_desired_replicas — how many copies autoscaling wants to have now,
+# based on the load. current lagging behind desired is exactly the pod creation time.
 kube_horizontalpodautoscaler_status_desired_replicas{
   cluster="kubernetes-lab",
   horizontalpodautoscaler="rickroll"
@@ -483,7 +483,7 @@ kube_horizontalpodautoscaler_status_desired_replicas{
 हिस्से हैं: ऊपर, वास्तविक खपत; नीचे, request।
 
 ```promql
-# ऊपरी हिस्सा — pod की वास्तविक CPU खपत। ऊपर वाली ही क्वेरी।
+# The top part — the pod's actual CPU consumption. The same query as above.
 sum by (pod) (
   rate(container_cpu_usage_seconds_total{
     cluster="kubernetes-lab", namespace="default",
@@ -491,13 +491,13 @@ sum by (pod) (
   }[2m])
 )
 /
-# निचला हिस्सा — pod ने कितना माँगा। भाग का परिणाम request का अंश है: 1 का मतलब
-# "जितना माँगा ठीक उतना ही खपत कर रहा है", 0.5 — जितना माँगा उसका आधा।
+# The bottom part — how much the pod requested. The result of the division is the fraction of the request: 1 means
+# "consuming exactly as much as it requested", 0.5 — half of what was requested.
 sum by (pod) (
   kube_pod_container_resource_requests{
     cluster="kubernetes-lab", namespace="default",
     pod=~"rickroll-.*",
-    resource="cpu"     # मेट्रिक में memory सीरीज़ भी है — हम सिर्फ़ CPU रखते हैं
+    resource="cpu"     # the metric also has memory series — we keep only CPU
   }
 )
 ```
@@ -523,9 +523,9 @@ sum by (pod) (
 **क्लस्टर में सबसे ज़्यादा CPU कौन खपत करता है, top 10:**
 
 ```promql
-# topk(10, ...) — सिर्फ़ सबसे बड़े मानों वाली दस सीरीज़ रखें।
-# by (namespace, pod) से समूहीकरण जवाब में namespace जोड़ता है: आप देख सकते हैं यह किसका pod है।
-# [5m] खिड़की पिछले स्टेप्स से चौड़ी है: हमें स्पाइक का आकार नहीं, बल्कि औसत स्तर चाहिए।
+# topk(10, ...) — keep only the ten series with the largest values.
+# Grouping by (namespace, pod) adds the namespace to the answer: you can see whose pod it is.
+# The [5m] window is wider than in the previous steps: we want not the shape of the spike, but the average level.
 topk(10,
   sum by (namespace, pod) (
     rate(container_cpu_usage_seconds_total{cluster="kubernetes-lab", container!=""}[5m])
@@ -536,8 +536,8 @@ topk(10,
 **Pod के आधार पर मेमोरी (काउंटर नहीं, इसलिए कोई `rate` नहीं):**
 
 ```promql
-# container_memory_working_set_bytes — काउंटर नहीं बल्कि एक तात्क्षणिक मान: इस क्षण इतने bytes
-# घिरे हुए हैं। यहाँ rate() बकवास देगा — "bytes प्रति सेकंड"।
+# container_memory_working_set_bytes — not a counter but an instantaneous value: this many bytes
+# are occupied at this moment. rate() here would give nonsense — "bytes per second".
 sum by (pod) (
   container_memory_working_set_bytes{
     cluster="kubernetes-lab", namespace="default", container!=""
@@ -553,9 +553,9 @@ sum by (pod) (
 **कितना संसाधन आरक्षित है बनाम कितना वास्तव में इस्तेमाल होता है:**
 
 ```promql
-# sum without by — सब कुछ एक ही नंबर में जोड़ें: क्लस्टर के सभी pods के लिए कितना CPU
-# आरक्षित है। यह request है, खपत नहीं: जो आरक्षित है और बेकार पड़ा है वह भी
-# योग में जाता है।
+# sum without by — add everything into a single number: how much CPU is reserved for all
+# the cluster's pods. This is the request, not the consumption: what's reserved and sitting idle
+# goes into the sum too.
 sum(kube_pod_container_resource_requests{cluster="kubernetes-lab", resource="cpu"})
 ```
 
@@ -566,8 +566,8 @@ vSphere में reservations के बारे में होती है
 अगर आपने लैब 11 किया, तो इसी दौरान Android build पर भी नज़र डालें — यह साफ़ दिखता है:
 
 ```promql
-# वही rate, पर build pods पर एक फ़िल्टर। sum without by (pod) — पूरे build के लिए एक पंक्ति,
-# चाहे यह कितने भी pods ऊपर लाए।
+# The same rate, but a filter on the build pods. sum without by (pod) — one line for the whole build,
+# however many pods it brings up.
 sum(rate(container_cpu_usage_seconds_total{
   cluster="kubernetes-lab", pod=~"propusk-build-.*", container!=""
 }[2m]))
@@ -603,15 +603,15 @@ kubernetes_namespace_name:default AND kubernetes_pod_name:rickroll*
 📍 **कहाँ:** लैपटॉप पर, उसी टर्मिनल विंडो में जहाँ आपने `kubectl` के साथ काम किया।
 
 ```bash
-export KUBECONFIG=~/lab.kubeconfig          # lab क्लस्टर `lab` तक पहुँच
+export KUBECONFIG=~/lab.kubeconfig          # access to the lab cluster `lab`
 
-# नीचे के दो वेरिएबल स्क्रिप्ट को टेनेंट तक भी पहुँच देते हैं। इनके साथ यह अतिरिक्त रूप से
-# जाँचेगा कि मेट्रिक्स वहाँ पहुँचे, और आपके Grafana का पता छापेगा। इनके बिना
-# जाँच पास हो जाएगी, पर रिपोर्ट छोटी होगी।
-export COZY_TENANT=workshopXX               # XX के बजाय आपका नंबर
-export COZY_KUBECONFIG=~/.kube/workshop     # टेनेंट एक्सेस फ़ाइल
+# The two variables below give the script access to the tenant as well. With them it will
+# additionally check that the metrics made it there, and print the address of your Grafana. Without them
+# the check will pass, but the report will be shorter.
+export COZY_TENANT=workshopXX               # your number instead of XX
+export COZY_KUBECONFIG=~/.kube/workshop     # the tenant access file
 
-./check.sh                                  # ./ = "फ़ाइल को वर्तमान फ़ोल्डर से चलाओ"
+./check.sh                                  # ./ = "run the file from the current folder"
 ```
 
 ⚠️ **Windows पर स्क्रिप्ट WSL से चलाई जाती है**, न कि PowerShell से — इसे कैसे सेट करना है यह

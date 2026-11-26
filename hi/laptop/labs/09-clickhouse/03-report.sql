@@ -1,42 +1,42 @@
--- लैब 9 · वह रिपोर्ट जिसके लिए प्रबंधन आया: हर महीने कितने अतिथि,
--- एक विज़िट औसतन कितनी देर चलती है, किस घंटे में सबसे अधिक आते हैं और कौन-सी प्रवेश-चौकी
--- अधिक व्यस्त है।
+-- Lab 9 · the report management asked for: how many guests each month,
+-- how long a visit lasts on average, at what hour they arrive most often, and which entrance
+-- is busier.
 --
--- कहाँ चलता है: लैपटॉप पर, लैब क्लस्टर में, README की छोटी कमांड `ch`
--- से:
+-- Where it runs: on the laptop, in the lab cluster, with the short command `ch`
+-- from the README:
 --     cd labs/09-clickhouse && ch < 03-report.sql
--- इससे पहले 01-schema.sql और 02-generate.sql चलाए जा चुके होने चाहिए।
+-- Before this, 01-schema.sql and 02-generate.sql must have been run.
 --
--- परिणाम कैसे पढ़ें: डेटा में मौजूद हर महीने के लिए एक पंक्ति (वे
--- आठ हैं), महीने आरोही क्रम में, अतिथियों की संख्या महीने-दर-महीने बढ़ती हुई।
+-- How to read the result: one row per month present in the data (there are
+-- eight), months in ascending order, the guest count growing from month to month.
 --
--- क्यों दस लाख पंक्तियाँ मिलीसेकंड में गिन ली जाती हैं। ClickHouse हर कॉलम को
--- अलग फ़ाइल में रखता है। यह क्वेरी सात में से तीन कॉलम को छूती है — बाकी चार,
--- सबसे भारी guest_name सहित, डिस्क से पढ़े ही नहीं जाते। ऐसे डेटाबेस में जहाँ पंक्ति
--- डिस्क पर पूरी तरह पड़ी रहती है, तीन कॉलम पर गणना करने के लिए भी सभी दस लाख पंक्तियों को
--- उनके सारे फ़ील्ड के साथ उठाना पड़ता। यहीं से समय का अंतर आता है।
--- इसे संख्याओं में देखने के लिए: क्वेरी के अंत में FORMAT JSON पंक्ति जोड़ें — उत्तर में
--- खर्च हुए समय और पढ़ी गई मात्रा के साथ एक आँकड़ों का ब्लॉक दिखाई देगा।
+-- Why a million rows are counted in milliseconds. ClickHouse stores each column
+-- as a separate file. This query touches three columns out of seven — the other four,
+-- including the heaviest one, guest_name, are not read from disk at all. In a database where a row
+-- is stored on disk in full, you would have to pull all million rows with all their fields
+-- just to compute over three of them. Hence the difference in time.
+-- To see it in numbers: append the line FORMAT JSON to the end of the query — the response
+-- will include a statistics block with the time spent and the volume read.
 --
--- डेटा में आए हर महीने के लिए रिपोर्ट की एक पंक्ति।
+-- One report row per month that appeared in the data.
 SELECT
-    -- प्रवेश को किस महीने से जोड़ना है। toStartOfMonth सटीक समय को
-    -- महीने के पहले दिन में बदल देता है: एक ही मान, जिससे समूह भी बनाते हैं और क्रम भी,
-    -- «वर्ष प्लस महीना» जोड़ी के बजाय।
+    -- Which month to attribute the pass to. toStartOfMonth turns the exact time
+    -- into the first day of the month: a single value to both group and sort by,
+    -- instead of a "year plus month" pair.
     toStartOfMonth(created_at)          AS month,
-    -- समूह में कितनी पंक्तियाँ आईं — यही है «महीने में कितने अतिथि»।
+    -- How many rows fell into the group — this is "how many guests per month".
     count()                             AS guests,
-    -- विज़िट की औसत अवधि, पूर्ण मिनटों में पूर्णांकित।
+    -- Average visit duration, rounded to whole minutes.
     round(avg(duration_min))            AS avg_minutes,
-    -- आने का सबसे आम घंटा — वही व्यस्ततम घंटा। topK(1)(x) एक सबसे आम मान का
-    -- सरणी लौटाता है, और [1] उसे वहाँ से निकालता है (गिनती एक से)।
+    -- The most frequent arrival hour — the rush hour itself. topK(1)(x) returns an array
+    -- of the single most frequent value, and [1] pulls it out of there (counting from one).
     topK(1)(toHour(created_at))[1]      AS peak_hour,
-    -- इस महीने की सबसे व्यस्त प्रवेश-चौकी, उसी तरकीब से।
+    -- The busiest entrance of this month, by the same trick.
     topK(1)(entrance)[1]                AS busiest_entrance
--- ध्यान दें कि क्वेरी में क्या नहीं है: सबक्वेरी, अस्थायी तालिकाएँ और join।
--- सब कुछ डेटा पर एक ही पास में गिना जाता है।
+-- Note what the query does not have: subqueries, temporary tables, and joins.
+-- Everything is computed in a single pass over the data.
 FROM passes
--- एक महीने की सभी पंक्तियों को उत्तर की एक पंक्ति में समेट दें।
+-- Collapse all rows of one month into a single response row.
 GROUP BY month
--- महीनों को आरोही क्रम में दिखाएँ, ताकि वृद्धि ऊपर से नीचे पढ़ी जाए।
+-- Output the months in ascending order, so the growth reads top to bottom.
 ORDER BY month

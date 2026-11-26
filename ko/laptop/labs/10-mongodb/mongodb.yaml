@@ -1,53 +1,53 @@
-# 랩 10 · 다양한 종류의 출입증을 위한 MongoDB 데이터베이스 주문하기.
-# 원하는 것을 기술한 내용이며, 서비스는 플랫폼이 조립하고 구성합니다.
-# 대시보드에서 마우스로 주문하는 것과 동일한 것 — 다만 텍스트로 할 뿐입니다.
-# 랩 클러스터가 아니라 관리 클러스터의 테넌트에 적용됩니다:
+# Lab 10 · ordering a MongoDB database for passes of different kinds.
+# A description of what you want to get; the platform assembles and configures the service.
+# The same thing you would order with the mouse in the dashboard — only as text.
+# Applied NOT to the lab cluster, but to a tenant on the management cluster:
 #   kubectl --kubeconfig="$HOME/.kube/workshop" apply -f mongodb.yaml
 #
-# 적용하기 전에: tenant-workshopXX를 자신의 네임스페이스로,
-# ЗдесьВашПароль를 자신이 정한 비밀번호로 바꾸세요.
+# BEFORE APPLYING: replace tenant-workshopXX with your namespace,
+# and YourPasswordHere with a password you come up with.
 apiVersion: apps.cozystack.io/v1alpha1
 kind: MongoDB
 metadata:
   name: passes
   namespace: tenant-workshopXX
 spec:
-  # 사본 하나. MongoDB는 세 개짜리 레플리카 세트를 위해 설계되었습니다: 이들은 누가
-  # 프라이머리인지 투표하고, 하나를 잃어도 살아남습니다. 사본이 하나면 함께 투표할
-  # 상대가 없으므로 차트는 이를 위해 별도의 "안전하지 않은" 모드를 활성화합니다. 랩에는
-  # 적합하지만 프로덕션에는 적합하지 않습니다.
+  # A single copy. MongoDB is designed for a replica set of three: they vote on who
+  # is primary and survive the loss of one. With a single copy there is no one to vote
+  # with, and the chart enables a separate "unsafe" mode for this. Fine for a lab,
+  # not for production.
   replicas: 1
-  # 데이터용 디스크. 학습용 문서 네 개에는 1메가바이트로도 충분하지만, 볼륨은 나중에
-  # 확장하기보다 처음부터 넉넉하게 잡는 편이 더 쉽습니다.
+  # Disk for data. A megabyte would be enough for four learning documents, but it is
+  # easier to size the volume generously up front than to expand it later.
   size: 5Gi
-  # replicated — 클러스터의 다른 노드에 사본이 있는 볼륨: 노드가 빠져도
-  # 데이터는 남습니다.
+  # replicated — volumes that have a copy on another cluster node: a node drops out,
+  # the data remains.
   storageClass: replicated
-  # 데이터베이스 파드에 할당된 CPU와 메모리. 문서 네 개에는 차고 넘칩니다.
+  # CPU and memory allocated to the database pod. More than enough for four documents.
   resourcesPreset: s1.small
-  # MongoDB 브랜치. 운영 중인 데이터베이스에서 나중에 이를 바꾸는 것은 업그레이드 없이는 불가능합니다.
+  # MongoDB branch. Changing it after the fact on a live database is not possible without an upgrade.
   version: v8
-  # false — 데이터베이스는 클러스터 내부에서만 접근 가능하며, 외부로 포트가 노출되지 않습니다.
-  # 옆에서 함께 실행되는 작업 파드에서 접근하게 됩니다.
+  # false — the database is reachable only from inside the cluster, no port is exposed outward.
+  # You will access it from a working pod started alongside it.
   external: false
-  # 샤딩은 데이터를 여러 서버 세트에 걸쳐 분할합니다. 데이터가 단일 서버에 들어가지 않을 때
-  # 필요합니다; 출입증 네 개는 들어갑니다.
+  # Sharding splits data across several sets of servers. Needed when
+  # the data does not fit on a single server; four passes do fit.
   sharding: false
-  # 데이터베이스 사용자와 그 비밀번호. 자신의 비밀번호를 정하고 기억하세요: 작업 파드
-  # (MONGO_URI 연결 문자열)와 확인 스크립트(MONGO_PASSWORD 변수)에서 필요합니다.
-  # 계정은 서비스 데이터베이스 admin에 생성됩니다 —
-  # 그래서 연결 문자열에 authSource=admin이 필수입니다.
+  # The database user and its password. Come up with your own password and remember it: it is needed
+  # by the working pod (in the MONGO_URI connection string) and by the check script
+  # (the MONGO_PASSWORD variable). The account is created in the service database admin —
+  # that is why authSource=admin is mandatory in the connection string.
   users:
     passapp:
-      password: ЗдесьВашПароль
-  # passes 데이터베이스와 그 안의 권한: passapp 사용자에게 이 데이터베이스의 admin 역할이 부여되어,
-  # 읽기, 쓰기, 인덱스 생성, 컬렉션 설정 변경을 할 수 있습니다.
-  # 다른 데이터베이스에 대한 권한은 부여하지 않습니다.
+      password: YourPasswordHere
+  # The passes database and permissions in it: the passapp user is granted the admin role of this database,
+  # meaning it can read, write, build indexes and change collection settings.
+  # This does not grant rights to other databases.
   databases:
     passes:
       roles:
         admin:
           - passapp
-  # 오브젝트 스토리지로의 백업. 학습용 스탠드에서는 비활성화되어 있습니다.
+  # Backups to object storage. Disabled on the learning stand.
   backup:
     enabled: false

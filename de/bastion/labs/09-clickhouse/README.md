@@ -178,8 +178,8 @@ was Sie einschalten.
 Diese Datei wird **nicht auf den Lab-Cluster** angewendet, sondern auf den Tenant:
 
 ```bash
-# --kubeconfig benennt die Zugangsdatei explizit und überschreibt die Variable KUBECONFIG.
-# So geht die Bestellung an den Tenant auf dem Management-Cluster, nicht an den Lab-Cluster.
+# --kubeconfig names the access file explicitly and overrides the KUBECONFIG variable.
+# So the order goes to the tenant on the management cluster, not to the lab cluster.
 kubectl --kubeconfig ~/.kube/config apply -f clickhouse.yaml
 ```
 
@@ -225,22 +225,22 @@ Zerlegen wir den Namen in seine Teile:
 Bringen Sie den Arbeits-Pod hoch. Setzen Sie Ihre Tenant-Nummer und Ihr Passwort ein:
 
 ```bash
-# Alles ab hier passiert im Lab-Cluster, also stellen wir kubectl darauf um.
+# Everything from here happens in the lab cluster, so we switch kubectl to it.
 export KUBECONFIG=~/lab.kubeconfig
-# run erstellt einen einzelnen Pod aus dem angegebenen Image — eine kleine Wegwerfmaschine im Cluster.
-# Das Image bringt curl mit, und das genügt: ein separater ClickHouse-Client wird nicht gebraucht.
-#   --restart=Never  ihn nicht erneut hochbringen, wenn der Befehl darin endet
-#   --env=CH_URL     die Adresse der HTTP-Schnittstelle des Speichers; der abschließende Schrägstrich ist erforderlich
-#   --env=CH_AUTH    das Paar „Benutzer:Passwort" für gewöhnliche HTTP-Authentifizierung
-#   --command --     alles nach den zwei Bindestrichen ist der Befehl, den der Pod ausführt
-# sleep 86400 = „einen Tag lang nichts tun": der Pod wird nur als Arbeitsbereich gebraucht.
+# run creates a single Pod from the given image — a disposable little machine inside the cluster.
+# The image ships curl, and that's enough: a separate ClickHouse client won't be needed.
+#   --restart=Never  don't bring it up again when the command inside finishes
+#   --env=CH_URL     the address of the storage's HTTP interface; the trailing slash is required
+#   --env=CH_AUTH    the "user:password" pair for ordinary HTTP authentication
+#   --command --     everything after the two dashes is the command the Pod will run
+# sleep 86400 = "do nothing for a day": the Pod is needed only as a workspace.
 kubectl run ch-workbench \
   --image=curlimages/curl:8.11.1 \
   --restart=Never \
   --env=CH_URL="http://chendpoint-clickhouse-analytics.tenant-workshopXX.svc.cozy.local:8123/" \
   --env=CH_AUTH="analyst:YourPasswordHere" \
   --command -- sleep 86400
-# wait hält das Terminal an, bis der Pod startet, aber nicht länger als zwei Minuten.
+# wait holds the terminal until the Pod starts, but no longer than two minutes.
 kubectl wait --for=condition=Ready pod/ch-workbench --timeout=120s
 ```
 
@@ -286,9 +286,9 @@ eine Tabelle für Menschen. Es gibt mehr als dreißig Formate; unten brauchen wi
 </details>
 
 ```bash
-# Wir definieren ch — einen kurzen Namen für einen langen Befehl. Ab hier bedeutet „ch": sende
-# an ClickHouse das SQL, das auf der Standardeingabe ankommt, und zeige die Antwort als Tabelle.
-# Der Name lebt, bis Sie dieses Terminalfenster schließen; in einem neuen Fenster definieren Sie ihn erneut.
+# We define ch — a short name for a long command. From here "ch" means: send to
+# ClickHouse the SQL that arrives on standard input, and show the answer as a table.
+# The name lives until you close this terminal window; in a new window define it again.
 ch() {
   kubectl exec -i ch-workbench -- sh -c \
     'curl -sS -u "$CH_AUTH" --data-binary @- "$CH_URL?default_format=PrettyCompact"'
@@ -298,8 +298,8 @@ ch() {
 Prüfen wir die Verbindung:
 
 ```bash
-# echo gibt eine Zeichenkette aus, | reicht sie an die Eingabe von ch weiter. SELECT version() ist die
-# billigstmögliche Abfrage: der Server liest nichts von der Festplatte, er nennt nur seine Version.
+# echo prints a string, | passes it to ch's input. SELECT version() is the cheapest
+# query possible: the server reads nothing from disk, it just names its version.
 echo 'SELECT version()' | ch
 ```
 
@@ -314,8 +314,8 @@ Verbindung, aber das Passwort ist falsch: erstellen Sie den Pod mit dem richtige
 Windows-PowerShell-Nutzer, Ihre Version:
 
 ```powershell
-# $input — das, was durch die Pipeline links in die Funktion kam.
-# Das Backtick am Zeilenende setzt den Befehl in der nächsten Zeile fort.
+# $input — what came into the function through the pipeline on the left.
+# The backtick at the end of a line continues the command onto the next line.
 function ch {
   $input | kubectl exec -i ch-workbench -- sh -c `
     'curl -sS -u "$CH_AUTH" --data-binary @- "$CH_URL?default_format=PrettyCompact"'
@@ -335,19 +335,19 @@ anwenden — zwei Zeilen darin bestimmen, welche Abfragen später schnell ausfal
 <summary><b>Das Schema Zeile für Zeile durchgehen</b></summary>
 
 ```sql
--- IF NOT EXISTS — nicht meckern, wenn die Tabelle schon existiert. Die Datei kann zweimal angewendet werden.
+-- IF NOT EXISTS — don't complain if the table already exists. The file can be applied twice.
 CREATE TABLE IF NOT EXISTS passes
 (
-    pass_id      UInt64,                 -- die Pass-Nummer
-    created_at   DateTime,               -- wann die Person durch das Drehkreuz ging
-    guest_name   String,                 -- der Name des Gastes: jeder hat seinen eigenen
-    host_dept    LowCardinality(String), -- die Abteilung des Gastgebers: wenige Werte
-    entrance     LowCardinality(String), -- der Eingang: es gibt drei
-    pass_type    LowCardinality(String), -- einmalig, wöchentlich, Fahrzeug
-    duration_min UInt16                  -- wie viele Minuten der Gast drinnen blieb
+    pass_id      UInt64,                 -- the pass number
+    created_at   DateTime,               -- when the person went through the turnstile
+    guest_name   String,                 -- the guest's name: everyone's is their own
+    host_dept    LowCardinality(String), -- the host's department: few values
+    entrance     LowCardinality(String), -- the entrance: there are three
+    pass_type    LowCardinality(String), -- one-time, weekly, vehicle
+    duration_min UInt16                  -- how many minutes the guest stayed inside
 )
-ENGINE = MergeTree               -- wie speichern: Parts auf der Festplatte, Zusammenführen im Hintergrund
-ORDER BY (created_at, entrance)  -- in welcher Reihenfolge die Daten ablegen; zugleich der Index
+ENGINE = MergeTree               -- how to store: parts on disk, merging in the background
+ORDER BY (created_at, entrance)  -- what order to put the data in; also the index
 ```
 
 `UInt64`, `UInt16` — vorzeichenlose Ganzzahlen von 8 und 2 Byte. In ClickHouse wählen Sie die Größe
@@ -394,8 +394,8 @@ sie einzeln durchgeht. Und niemand wird nachträglich eine Million Blätter neu 
 **Wenden Sie es an.**
 
 ```bash
-# < liest die Datei und reicht sie an die Eingabe von ch weiter, sendet also den Inhalt der Datei
-# in einer einzigen Abfrage an ClickHouse. CREATE TABLE gibt eine leere Antwort zurück — das ist Erfolg.
+# < reads the file and feeds it to ch's input, that is, sends the file's contents
+# to ClickHouse in a single query. CREATE TABLE returns an empty answer — that is success.
 ch < 01-schema.sql
 ```
 
@@ -456,8 +456,8 @@ enthalten, wonach wir gleich suchen.
 ⚠️ Die Array-Indizierung in ClickHouse beginnt bei eins, nicht bei null. Daher das `1 + …`.
 
 ```sql
-    ['Nord', 'Nord', 'Nord',
-     'Süd', 'Süd', 'West'][1 + cityHash64(number, 'entrance') % 6] AS entrance
+    ['North', 'North', 'North',
+     'South', 'South', 'West'][1 + cityHash64(number, 'entrance') % 6] AS entrance
 ```
 
 Derselbe Trick für eine ungleichmäßige Verteilung: der Nordeingang erhält die Hälfte des Stroms, der
@@ -481,8 +481,8 @@ einem Skript, das eine Zeile nach der anderen einfügt.
 **Wenden Sie es an.**
 
 ```bash
-# Die Datei enthält ein einzelnes INSERT … SELECT: ClickHouse erfindet eine Million Zeilen selbst und schreibt sie,
-# ohne je den Server zu verlassen.
+# The file holds a single INSERT … SELECT: ClickHouse will invent a million rows itself and write them,
+# without ever leaving the server.
 ch < 02-generate.sql
 ```
 
@@ -492,7 +492,7 @@ zurückkehrt. Eine leere Antwort von `INSERT` ist Erfolg.
 Prüfen wir, was wir bekommen haben:
 
 ```bash
-# count() ohne Bedingungen beantwortet die Frage „wie viele Zeilen sind insgesamt in der Tabelle".
+# count() with no conditions answers the question "how many rows are in the table in total."
 echo 'SELECT count() FROM passes' | ch
 ```
 
@@ -511,16 +511,16 @@ wir sie ausführen.
 <summary><b>Den Bericht Zeile für Zeile durchgehen</b></summary>
 
 ```sql
--- Eine Berichtszeile für jeden Monat, der in den Daten vorkommt.
+-- One report row for each month that occurs in the data.
 SELECT
-    toStartOfMonth(created_at)          AS month,        -- welchem Monat es zugeordnet wird
-    count()                             AS guests,       -- wie viele Zutritte darin
-    round(avg(duration_min))            AS avg_minutes,  -- durchschnittliche Besuchsdauer
-    topK(1)(toHour(created_at))[1]      AS peak_hour,    -- die häufigste Ankunftsstunde
-    topK(1)(entrance)[1]                AS busiest_entrance  -- der häufigste Eingang
+    toStartOfMonth(created_at)          AS month,        -- which month to assign it to
+    count()                             AS guests,       -- how many entries in it
+    round(avg(duration_min))            AS avg_minutes,  -- average visit duration
+    topK(1)(toHour(created_at))[1]      AS peak_hour,    -- the most frequent hour of arrival
+    topK(1)(entrance)[1]                AS busiest_entrance  -- the most frequent entrance
 FROM passes
-GROUP BY month   -- alle Zeilen eines Monats in eine einzige Antwortzeile zusammenfassen
-ORDER BY month   -- die Monate in aufsteigender Reihenfolge ausgeben
+GROUP BY month   -- collapse all rows of one month into a single answer row
+ORDER BY month   -- output the months in ascending order
 ```
 
 `toStartOfMonth` verwandelt eine exakte Zeit in den ersten Tag des Monats. Ein klassischer Trick zum
@@ -541,8 +541,8 @@ oder Joins. Alles wird in einem einzigen Durchgang über die Daten berechnet.
 **Wenden Sie es an.**
 
 ```bash
-# Eine Gruppierung über die ganze Tabelle. Die Antwort hat so viele Zeilen, wie es Monate
-# gibt, die in den Daten vorkommen.
+# One grouping over the whole table. The answer will have as many rows as there are months
+# that occur in the data.
 ch < 03-report.sql
 ```
 
@@ -552,16 +552,16 @@ Nun das Wichtigste — **wie lange die Berechnung dauerte**. Das Format `JSON` a
 der Antwort einen Statistikblock hinzu:
 
 ```bash
-# <<'SQL' … SQL — eine Möglichkeit, mehrzeiligen Text an die Eingabe eines Befehls zu übergeben, ohne Datei.
-# Die Anführungszeichen um SQL bedeuten „lass den Inhalt in Ruhe": sonst würde die Shell versuchen,
-# die Zeichen innerhalb der Abfrage als ihre eigenen zu interpretieren.
+# <<'SQL' … SQL — a way to pass multi-line text to a command's input, without a file.
+# The quotes around SQL mean "leave the contents alone": otherwise the shell would try
+# to interpret the characters inside the query as its own.
 ch <<'SQL'
--- Derselbe Bericht, auf zwei Spalten gekürzt: Monat und Gästezahl.
+-- The same report, trimmed to two columns: month and guest count.
 SELECT toStartOfMonth(created_at) AS month, count() AS guests
 FROM passes
 GROUP BY month
 ORDER BY month
-FORMAT JSON  -- die Antwort nicht als Tabelle, sondern als JSON zurückgeben: es enthält einen Statistikblock
+FORMAT JSON  -- return the answer not as a table but as JSON: it contains a statistics block
 SQL
 ```
 
@@ -625,15 +625,15 @@ Das Wort „spaltenorientiert“ klingt abstrakt, bis Sie die Zahlen sehen.
 
 ```bash
 ch <<'SQL'
--- Wir fragen ClickHouse selbst, wie viel Platz jede Spalte der Tabelle belegt.
+-- We ask ClickHouse itself how much space each column of the table takes.
 SELECT
-    name,                                                    -- der Name der Spalte
-    formatReadableSize(data_compressed_bytes)   AS on_disk,  -- wie viel auf der Festplatte liegt
-    formatReadableSize(data_uncompressed_bytes) AS raw,      -- wie viel es ohne Kompression wäre
-    round(data_uncompressed_bytes / data_compressed_bytes, 1) AS ratio  -- wie oft es komprimiert wurde
-FROM system.columns   -- eine Systemtabelle: darin beschreibt ClickHouse sich selbst
-WHERE database = currentDatabase() AND table = 'passes'   -- nur unsere Tabelle
-ORDER BY data_compressed_bytes DESC   -- die schwersten Spalten oben
+    name,                                                    -- the column's name
+    formatReadableSize(data_compressed_bytes)   AS on_disk,  -- how much sits on disk
+    formatReadableSize(data_uncompressed_bytes) AS raw,      -- how much it would be without compression
+    round(data_uncompressed_bytes / data_compressed_bytes, 1) AS ratio  -- how many times it compressed
+FROM system.columns   -- a system table: in it ClickHouse describes itself
+WHERE database = currentDatabase() AND table = 'passes'   -- only our table
+ORDER BY data_compressed_bytes DESC   -- the heaviest columns on top
 SQL
 ```
 
@@ -687,8 +687,8 @@ Bestätigen wir, dass die Abfrage wirklich wenig liest. Wir zählen über eine e
 
 ```bash
 ch <<'SQL'
--- Wir zählen Besuche, die länger als hundert Minuten dauern. Die Abfrage nennt eine Spalte von sieben — sie
--- sollte also nur einen kleinen Teil der Tabelle lesen. Das prüfen wir anhand von bytes_read.
+-- We count visits longer than a hundred minutes. The query names one column out of seven — so
+-- it should read only a small part of the table. We'll check that by bytes_read.
 SELECT count() FROM passes WHERE duration_min > 100 FORMAT JSON
 SQL
 ```
@@ -698,8 +698,8 @@ Tabelle:
 
 ```bash
 ch <<'SQL'
--- Wir summieren das unkomprimierte Volumen aller Spalten. Das ist genau „wie viele Daten es insgesamt gibt" —
--- die Zahl, mit der bytes_read aus der vorigen Ausgabe verglichen werden soll.
+-- We sum the uncompressed volume of all columns. That's exactly "how much data there is in total" —
+-- the figure that bytes_read from the previous output should be compared against.
 SELECT formatReadableSize(sum(data_uncompressed_bytes)) AS total
 FROM system.columns
 WHERE database = currentDatabase() AND table = 'passes'
@@ -748,17 +748,17 @@ aber die Zeilen an ihrem Platz.
 ```bash
 ch <<'SQL'
 SELECT
-    hour,                                     -- die Stunde des Tages
-    guests,                                   -- wie viele Zutritte auf diese Stunde fielen
-    bar(guests, 0, max(guests) OVER (), 50) AS chart  -- ein Balken aus Pseudografik
+    hour,                                     -- the hour of the day
+    guests,                                   -- how many entries fell on this hour
+    bar(guests, 0, max(guests) OVER (), 50) AS chart  -- a bar of pseudo-graphics
 FROM
 (
-    -- Die innere Abfrage: eine gewöhnliche Gruppierung nach Stunde
+    -- The inner query: an ordinary grouping by hour
     SELECT toHour(created_at) AS hour, count() AS guests
     FROM passes
     GROUP BY hour
 )
-ORDER BY hour   -- Stunden aufsteigend, damit das Bild von oben nach unten zu lesen ist
+ORDER BY hour   -- hours ascending, so the picture reads top to bottom
 SQL
 ```
 
@@ -772,20 +772,20 @@ Abfrage auf:
 
 ```bash
 ch <<'SQL'
--- ClickHouse zeichnet jede ausgeführte Abfrage in der Systemtabelle system.query_log auf.
+-- ClickHouse records every executed query in the system table system.query_log.
 SELECT
-    event_time,                                       -- wann die Abfrage endete
-    query_duration_ms,                                -- wie viele Millisekunden sie dauerte
-    formatReadableQuantity(read_rows) AS rows_read,   -- wie viele Zeilen sie las
-    formatReadableSize(read_bytes)    AS bytes_read,  -- wie viele Byte sie dabei hochholte
-    -- Der Abfragetext: wir fassen die Zeilenumbrüche darin zusammen und nehmen die ersten 50 Zeichen,
-    -- sonst passt die Ausgabe nicht auf den Bildschirm
+    event_time,                                       -- when the query finished
+    query_duration_ms,                                -- how many milliseconds it took
+    formatReadableQuantity(read_rows) AS rows_read,   -- how many rows it read
+    formatReadableSize(read_bytes)    AS bytes_read,  -- how many bytes it pulled up in doing so
+    -- The query text: we collapse line breaks in it and take the first 50 characters,
+    -- otherwise the output won't fit on the screen
     substring(replaceRegexpAll(query, '\\s+', ' '), 1, 50) AS query
 FROM system.query_log
-WHERE type = 'QueryFinish'  -- nur die abgeschlossenen: für den Start gibt es einen separaten Eintrag
-  AND user = 'analyst'      -- nur Ihre, ohne die eigenen Dienstabfragen des Servers
-ORDER BY event_time DESC    -- die jüngsten oben
-LIMIT 10                    -- und zehn genügen
+WHERE type = 'QueryFinish'  -- only finished ones: there's a separate record for the start
+  AND user = 'analyst'      -- only yours, without the server's own service queries
+ORDER BY event_time DESC    -- the recent ones on top
+LIMIT 10                    -- and ten is enough
 SQL
 ```
 
@@ -807,7 +807,7 @@ Die Abfrage drängt sich auf:
 
 ```bash
 ch <<'SQL'
--- Wir suchen eine einzige Zeile nach Pass-Nummer. SELECT * bedeutet „alle Spalten zurückgeben".
+-- We look for a single row by pass number. SELECT * means "return all columns."
 SELECT * FROM passes WHERE pass_id = 424242 FORMAT JSON
 SQL
 ```
@@ -838,8 +838,8 @@ Nun dasselbe, aber richtig gemacht. Der Sicherheitsdienst kennt meist nicht nur 
 auch, **wann es passierte**:
 
 ```sql
--- Dieselbe Suche, aber mit einem Zeitrahmen. Die Bedingung auf created_at landet
--- im Sortierschlüssel, und ClickHouse verwirft alles außerhalb dieses Tages.
+-- The same search, but with a time frame. The condition on created_at lands
+-- in the sorting key, and ClickHouse discards everything outside that day.
 SELECT * FROM passes
 WHERE created_at >= '2026-03-01' AND created_at < '2026-03-02'
   AND pass_id = 424242
@@ -886,9 +886,9 @@ Zeilenaktualisierung, sondern eine Änderung an der Tabelle.**
 
 ```bash
 ch <<'SQL'
--- Wir ändern den Namen eines Gastes in einer Zeile. Der Befehl gibt die Kontrolle sofort zurück, aber die Arbeit
--- endet damit nicht: ClickHouse stellt sie in eine Warteschlange und führt sie im Hintergrund aus.
-ALTER TABLE passes UPDATE guest_name = 'Weber J.' WHERE pass_id = 424242
+-- We change a guest's name in one row. The command returns control immediately, but the work
+-- doesn't end there: ClickHouse will queue it and carry it out in the background.
+ALTER TABLE passes UPDATE guest_name = 'Whitfield J.' WHERE pass_id = 424242
 SQL
 ```
 
@@ -896,12 +896,12 @@ Sehen wir, was passiert:
 
 ```bash
 ch <<'SQL'
--- Die Warteschlange der aufgeschobenen Änderungen an der Tabelle — eine weitere ClickHouse-Systemtabelle.
+-- The queue of deferred changes to the table — another ClickHouse system table.
 SELECT
-    command,       -- was genau ihr aufgetragen wurde
-    is_done,       -- 1, wenn die Arbeit abgeschlossen ist
-    parts_to_do,   -- wie viele Parts noch neu zu schreiben sind
-    create_time    -- wann die Aufgabe in die Warteschlange gestellt wurde
+    command,       -- what exactly it's been told to do
+    is_done,       -- 1 if the work is finished
+    parts_to_do,   -- how many parts remain to be rewritten
+    create_time    -- when the task was put in the queue
 FROM system.mutations
 WHERE table = 'passes'
 ORDER BY create_time DESC
@@ -949,11 +949,11 @@ ihn.
 
 ```bash
 cd labs/09-clickhouse
-# Das Skript liest diese drei Umgebungsvariablen, Sie müssen sie also vor dem Ausführen setzen
-# und im selben Terminalfenster.
-export KUBECONFIG=~/lab.kubeconfig       # welchen Cluster prüfen
-export COZY_TENANT=workshop03            # Ihre Tenant-Nummer
-export CH_PASSWORD='ihr-analyst-passwort'  # das, das Sie beim Bestellen von ClickHouse gesetzt haben
+# The script reads these three environment variables, so you must set them before running it
+# and in the same terminal window.
+export KUBECONFIG=~/lab.kubeconfig       # which cluster to check
+export COZY_TENANT=workshop03            # your tenant number
+export CH_PASSWORD='your-analyst-password'  # the one you set when ordering ClickHouse
 ./check.sh
 ```
 
@@ -971,8 +971,8 @@ Das Passwort gelangt nicht in den Bericht.
 ## Aufräumen
 
 ```bash
-# Der Arbeits-Pod speichert nichts: die gesamte Arbeit geschah innerhalb von ClickHouse, und der Pod
-# reichte nur Abfragen weiter. Löschen Sie ihn ohne Bedauern.
+# The working Pod stores nothing: all the work happened inside ClickHouse, and the Pod only
+# passed queries along. Delete it without regret.
 kubectl delete pod ch-workbench
 ```
 

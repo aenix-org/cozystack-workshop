@@ -28,7 +28,7 @@ bastion 자체에서는 이 스크립트들을 실행하지 않습니다 — 매
 **변환 머신**에는 네트워크가 있으므로 파일을 스스로 내려받습니다. 저장소는
 공개되어 있어 키가 필요 없습니다:
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/bastion/scripts/convert.sh
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/bastion/scripts/convert.sh
 ```
 
 **여러분의 app-VM에는 처음엔 네트워크가 아예 없습니다** — 바로 그 고장 난 상태를 우리가
@@ -41,5 +41,5 @@ curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-work
 ⚠️ **매니페스트의 테넌트 번호는 이미 채워져 있습니다** — bastion을 준비하는 동안
 `tenant-workshopXX` 자리표시자가 여러분의 번호로 교체되었습니다. 손으로 입력할 것은 없습니다.
 여러분이 직접 채우는 것은 오직 `convert.sh`의 `bucketName`, `accessKey`, `secretKey`
-(이 파일은 변환기 안으로 새로 내려받히며 `ВСТАВЬТЕ_...` 자리표시자가 들어 있습니다), 그리고
+(이 파일은 변환기 안으로 새로 내려받히며 `PASTE_...` 자리표시자가 들어 있습니다), 그리고
 네 번째 단계에서 `manifests/03-app-vm.yaml`에 넣는 presigned 링크뿐입니다.

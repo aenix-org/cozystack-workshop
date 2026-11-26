@@ -1,174 +1,175 @@
 #!/usr/bin/env bash
-# Перевірка лаби 1: застосунок розгорнуто і він працює по суті.
+# Check for lab 1: the application is deployed and genuinely working.
 #
-# «По суті» тут означає: сторінка справді віддається по HTTP, у ній підставлено
-# ім'я Pod, і це ім'я збігається з ім'ям реально запущеної копії. Перевіряти
-# існування об'єкта Deployment немає сенсу — він може існувати і не працювати.
+# "Genuinely" here means: the page is actually served over HTTP, a pod name is
+# substituted into it, and that name matches the name of a copy that is really
+# running. Checking that a Deployment object exists is pointless — it can exist
+# and not work.
 #
-# Запускається на ноутбуці, з папки цієї лаби, за доступом до навчального кластера `lab`
-# (не до тенанта на кластері керування):
+# Runs on the laptop, from this lab's folder, against access to the training
+# cluster `lab` (not to a tenant on the management cluster):
 #     export KUBECONFIG=~/lab.kubeconfig
 #     cd labs/01-deploy && ./check.sh
-# Змінна COZY_TENANT тут не потрібна: вся лаба йде всередині кластера `lab`.
+# The COZY_TENANT variable is not needed here: the whole lab runs inside the `lab` cluster.
 #
-# Скрипт нічого не змінює в кластері — лише читає і надсилає HTTP-запити.
-# Запускати його до прибирання: після видалення застосунку перевіряти буде нічого.
+# The script changes nothing in the cluster — it only reads and sends HTTP requests.
+# Run it before cleanup: after the application is deleted there is nothing to check.
 
-# Ці дві змінні підхоплює lib.sh — вони потрапляють у заголовок звіту і в ім'я
-# файлу report-<лаба>-<дата>.md, який скрипт кладе поруч із собою.
+# These two variables are picked up by lib.sh — they go into the report header and into the
+# file name report-<lab>-<date>.md that the script writes next to itself.
 LAB_NAME="01-deploy"
-LAB_TITLE="Лаба 1 · Перший застосунок"
-# Спільна бібліотека перевірок: звідси приходять ok / fail / warn / evidence / finish,
-# запит сторінки зсередини кластера і запис звіту. Шлях рахується від місця, де
-# лежить сам скрипт, тому запуск з будь-якого каталогу працює однаково.
+LAB_TITLE="Lab 1 · Your first application"
+# Shared check library: ok / fail / warn / evidence / finish come from here,
+# along with the in-cluster page request and report writing. The path is computed from where
+# the script itself lives, so running from any directory works the same.
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
-# Зупиняємося одразу, якщо KUBECONFIG не задано. Без нього kubectl шукає кластер
-# на самому ноутбуці, не знаходить і валить усі перевірки поспіль однією й тією ж помилкою,
-# з якої справжню причину не видно.
+# Stop immediately if KUBECONFIG is not set. Without it kubectl looks for a cluster
+# on the laptop itself, fails to find one, and knocks over every check in a row with the same
+# error, which hides the real cause.
 need_kubeconfig
 
-# --- об'єкт застосунку ------------------------------------------------------
-# Перший рубіж: застосунок узагалі заведено і хоча б одна копія дійшла до готовності.
-# Дивимося на .status.readyReplicas, а не на факт існування Deployment: об'єкт
-# створюється миттєво і завжди успішно, готовність же означає, що копія піднялася,
-# пройшла перевірку готовності і здатна відповідати.
+# --- application object ------------------------------------------------------
+# First line: the application exists at all and at least one copy has reached readiness.
+# We look at .status.readyReplicas, not at the fact that the Deployment exists: the object
+# is created instantly and always succeeds, whereas readiness means a copy came up,
+# passed its readiness check, and is able to respond.
 if kubectl get deployment rickroll >/dev/null 2>&1; then
   DESIRED="$(kubectl get deployment rickroll -o jsonpath='{.spec.replicas}' 2>/dev/null)"
   READY="$(kubectl get deployment rickroll -o jsonpath='{.status.readyReplicas}' 2>/dev/null)"
   READY="${READY:-0}"
   DESIRED="${DESIRED:-0}"
   if [ "$DESIRED" -eq 0 ]; then
-    # Окремий випадок: об'єкт є, але в нього запитано нуль копій. Повідомлення
-    # «жодна копія не готова (потрібно 0)» звучало б безглуздям.
-    fail "застосунок зупинено — запитано 0 копій" \
-         "поверніть копію: kubectl scale deployment rickroll --replicas=1"
+    # Special case: the object exists but has zero copies requested. A message
+    # "no copy is ready (0 needed)" would sound like nonsense.
+    fail "application stopped — 0 copies requested" \
+         "bring a copy back: kubectl scale deployment rickroll --replicas=1"
   elif [ "$READY" -ge 1 ]; then
-    ok "застосунок розгорнуто, готових копій ${READY} з ${DESIRED}"
-    # Застрягла викатка не роняє сервіс: стара копія продовжує працювати, і
-    # readyReplicas залишається одиницею. Без цієї перевірки учасник іде із зеленою
-    # галочкою і деплойментом, який назавжди застряг в ErrImagePull.
-    # Дивимося на самі копії, а не тільки на ProgressDeadlineExceeded: дедлайн
-    # спрацьовує через десять хвилин, а скрипт запускають одразу. Стара копія при
-    # цьому працює, readyReplicas залишається одиницею, і без цієї перевірки учасник
-    # іде із зеленою галочкою і деплойментом, що застряг в ImagePullBackOff.
+    ok "application deployed, ready copies ${READY} of ${DESIRED}"
+    # A stuck rollout does not take the service down: the old copy keeps working, and
+    # readyReplicas stays at one. Without this check the participant leaves with a green
+    # tick and a deployment stuck forever in ErrImagePull.
+    # We look at the copies themselves, not only at ProgressDeadlineExceeded: the deadline
+    # fires after ten minutes, but the script is run right away. The old copy keeps
+    # working meanwhile, readyReplicas stays at one, and without this check the participant
+    # leaves with a green tick and a deployment stuck in ImagePullBackOff.
     STUCK="$(kubectl get pods -l app=rickroll \
       -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.status.containerStatuses[0].state.waiting.reason}{"\n"}{end}' 2>/dev/null \
       | awk '$2=="ImagePullBackOff" || $2=="ErrImagePull" || $2=="CrashLoopBackOff" || $2=="CreateContainerConfigError" {print $1" ("$2")"}')"
     PROG_REASON="$(kubectl get deployment rickroll \
       -o jsonpath='{.status.conditions[?(@.type=="Progressing")].reason}' 2>/dev/null)"
     if [ -n "$STUCK" ] || [ "$PROG_REASON" = "ProgressDeadlineExceeded" ]; then
-      fail "викатка застрягла: нова копія не піднімається, працює тільки стара" \
-           "дивіться kubectl get pods -l app=rickroll — зазвичай образ не завантажився; повернути робочий стан: kubectl apply -f rickroll.yaml"
-      evidence "Копії, які не стартують" "${STUCK:-причина у статусі Deployment: $PROG_REASON}"
+      fail "rollout is stuck: the new copy does not come up, only the old one works" \
+           "check kubectl get pods -l app=rickroll — usually the image did not pull; restore a working state: kubectl apply -f rickroll.yaml"
+      evidence "Copies that do not start" "${STUCK:-reason is in the Deployment status: $PROG_REASON}"
     fi
   else
-    fail "застосунок створено, але жодна копія не готова (потрібно ${DESIRED})" \
-         "дивіться kubectl get pods -l app=rickroll і kubectl describe deployment rickroll"
-    evidence "Стан Pod" "$(kubectl get pods -l app=rickroll -o wide 2>/dev/null)"
+    fail "application created, but no copy is ready (${DESIRED} needed)" \
+         "check kubectl get pods -l app=rickroll and kubectl describe deployment rickroll"
+    evidence "Pod state" "$(kubectl get pods -l app=rickroll -o wide 2>/dev/null)"
   fi
 else
-  fail "не знайдено Deployment з ім'ям rickroll" \
-       "застосуйте маніфест: kubectl apply -f rickroll.yaml"
+  fail "no Deployment named rickroll found" \
+       "apply the manifest: kubectl apply -f rickroll.yaml"
 fi
 
-# --- налаштування і сторінка ---------------------------------------------------
-# Обидва ConfigMap створюються тим самим файлом, що й застосунок, тому зникнути вони можуть
-# тільки разом із ним або від ручного видалення. Перевіряємо їх окремо, щоб при
-# поломці сторінки учасник одразу бачив, чого саме бракує: без rickroll-conf
-# nginx не підставить ім'я Pod, а без rickroll-page-v1 не буде з чим порівнювати
-# другу версію в лабі 4 і нікуди відкочуватися.
+# --- settings and page ------------------------------------------------------
+# Both ConfigMaps are created by the same file as the application, so they can only go missing
+# together with it or from a manual deletion. We check them separately so that when the page
+# breaks the participant immediately sees exactly what is missing: without rickroll-conf
+# nginx will not substitute the pod name, and without rickroll-page-v1 there is nothing to
+# compare the second version against in lab 4 and nothing to roll back to.
 for cm in rickroll-conf rickroll-page-v1; do
   if kubectl get configmap "$cm" >/dev/null 2>&1; then
-    ok "налаштування на місці: ConfigMap ${cm}"
+    ok "settings in place: ConfigMap ${cm}"
   else
-    fail "не знайдено ConfigMap ${cm}" \
-         "він створюється тим самим файлом: kubectl apply -f rickroll.yaml"
+    fail "ConfigMap ${cm} not found" \
+         "it is created by the same file: kubectl apply -f rickroll.yaml"
   fi
 done
 
-# --- постійна адреса -------------------------------------------------------
+# --- stable address ---------------------------------------------------------
 if kubectl get service rickroll >/dev/null 2>&1; then
-  # Service без ендпоінтів — типова і непомітна поломка: об'єкт є,
-  # а мітки на Pod не збіглися з селектором, і за адресою порожньо.
+  # A Service with no endpoints is a typical and unnoticeable breakage: the object exists,
+  # but the pod labels did not match the selector, and there is nothing behind the address.
   EPS="$(kubectl get endpoints rickroll -o jsonpath='{.subsets[*].addresses[*].ip}' 2>/dev/null)"
   EPS_N="$(printf '%s' "$EPS" | wc -w | tr -d ' ')"
   if [ "${EPS_N:-0}" -ge 1 ]; then
-    ok "постійна адреса працює, за нею копій: ${EPS_N}"
-    evidence "Адреси за сервісом" "$EPS"
+    ok "stable address works, copies behind it: ${EPS_N}"
+    evidence "Addresses behind the service" "$EPS"
   else
-    fail "Service rickroll є, але за ним немає жодної копії" \
-         "зазвичай причина в тому, що мітки Pod не збіглися з selector сервісу — звірте app: rickroll"
+    fail "Service rickroll exists, but there is not a single copy behind it" \
+         "usually the cause is that the pod labels did not match the service selector — check app: rickroll"
   fi
 else
-  fail "не знайдено Service з ім'ям rickroll" \
-       "він створюється тим самим файлом: kubectl apply -f rickroll.yaml"
+  fail "no Service named rickroll found" \
+       "it is created by the same file: kubectl apply -f rickroll.yaml"
 fi
 
-# --- головне: сторінка реально віддається -------------------------------------
-# Заради цієї перевірки все й затівалося. Усі попередні кажуть лише про те, що об'єкти
-# в кластері описані правильно; ця — що користувач отримує сторінку. Запит іде
-# ЗСЕРЕДИНИ кластера, одноразовим Pod: ззовні адреси rickroll не існує, і
-# port-forward тут був би перевіркою вашого ноутбука, а не кластера.
-# Запитуємо декілька разів: за кількох копій за сервісом одиночна вибірка
-# може не зачепити підмінену, і перевірка зеленіє на чужому контенті.
+# --- the main thing: the page is actually served ----------------------------
+# This is what the whole thing was for. All the previous checks only say that the objects
+# in the cluster are described correctly; this one says the user gets a page. The request goes
+# FROM INSIDE the cluster, from a one-off pod: from outside the rickroll address does not exist, and
+# port-forward here would be a check of your laptop, not of the cluster.
+# We request several times: with several copies behind the service a single sample
+# may miss the substituted one, and the check goes green on someone else's content.
 BODY="$(in_cluster_curl_many 'http://rickroll/' 8)"
-# Маркер має траплятися РІВНО РАЗ на сторінку, інакше лічильник відповідей бреше:
-# «Never Gonna Give You Up» стоїть і в <title>, і в <h1>, і давало подвоєння.
-ANSWERS="$(printf '%s' "$BODY" | grep -c 'вас обслужив Pod')"
+# The marker must appear EXACTLY ONCE per page, otherwise the response counter lies:
+# "Never Gonna Give You Up" is in both <title> and <h1>, and that caused a doubling.
+ANSWERS="$(printf '%s' "$BODY" | grep -c 'served by pod')"
 TOTAL_LINES="$(printf '%s' "$BODY" | grep -c '<title>')"
 if [ "${ANSWERS:-0}" -ge 1 ] && [ "${ANSWERS:-0}" -eq "${TOTAL_LINES:-0}" ]; then
-  ok "застосунок відповідає по HTTP і віддає свою сторінку (перевірено ${ANSWERS} запитів)"
+  ok "application responds over HTTP and serves its own page (${ANSWERS} requests verified)"
 elif [ "${ANSWERS:-0}" -ge 1 ]; then
-  fail "за сервісом відповідає не тільки ваш застосунок: своя сторінка прийшла ${ANSWERS} разів із ${TOTAL_LINES}" \
-       "хтось іще носить мітку app=rickroll — дивіться kubectl get pods -l app=rickroll і видаліть зайве"
+  fail "not only your application answers behind the service: your own page arrived ${ANSWERS} times out of ${TOTAL_LINES}" \
+       "someone else carries the label app=rickroll — check kubectl get pods -l app=rickroll and remove the extras"
 else
-  fail "застосунок не віддав очікувану сторінку" \
-       "перевірте вручну: kubectl port-forward svc/rickroll 8080:80, потім відкрийте http://localhost:8080"
-  evidence "Що повернулося замість сторінки" "$(printf '%s' "$BODY" | head -20)"
+  fail "application did not serve the expected page" \
+       "check manually: kubectl port-forward svc/rickroll 8080:80, then open http://localhost:8080"
+  evidence "What came back instead of the page" "$(printf '%s' "$BODY" | head -20)"
 fi
 
-# --- підстановка імені Pod -------------------------------------------------
-# Заради цього лаба й зроблена: ім'я у сторінці має збігатися з реальним Pod.
+# --- pod name substitution --------------------------------------------------
+# This is what the lab was made for: the name in the page must match the real pod.
 SERVED_BY="$(printf '%s' "$BODY" | grep -o '<b>[^<]*</b>' | head -1 | sed 's/<[^>]*>//g')"
-# Беремо Pod, якими керує ReplicaSet застосунку, а НЕ все, що носить мітку
-# app=rickroll. Інакше сторонній Pod із такою міткою потрапляє в список «справжніх»
-# і сам себе підтверджує — перевірено, самозванець так проходив перевірку.
+# We take the pods managed by the application's ReplicaSet, and NOT everything that carries the
+# label app=rickroll. Otherwise a foreign pod with that label gets into the list of "real" ones
+# and confirms itself — verified, an impostor passed the check that way.
 REAL_PODS="$(kubectl get pods -l app=rickroll \
   -o jsonpath='{range .items[?(@.metadata.ownerReferences[0].kind=="ReplicaSet")]}{.metadata.name}{"\n"}{end}' 2>/dev/null)"
 STRAY="$(kubectl get pods -l app=rickroll \
   -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.metadata.ownerReferences[0].kind}{"\n"}{end}' 2>/dev/null \
   | awk '$2!="ReplicaSet" {print $1}')"
 if [ -n "$STRAY" ]; then
-  fail "мітку app=rickroll носять сторонні Pod — вони потраплять у балансування" \
-       "видаліть зайве: $(printf '%s' "$STRAY" | tr '\n' ' ')"
-  evidence "Сторонні Pod під міткою застосунку" "$STRAY"
+  fail "foreign pods carry the label app=rickroll — they will get into load balancing" \
+       "remove the extras: $(printf '%s' "$STRAY" | tr '\n' ' ')"
+  evidence "Foreign pods under the application label" "$STRAY"
 fi
 
 if [ -z "$SERVED_BY" ]; then
-  fail "у сторінці немає імені Pod" \
-       "перевірте, що підставився ConfigMap rickroll-conf — у ньому рядок sub_filter '__POD__' '\$hostname'"
+  fail "no pod name in the page" \
+       "check that the ConfigMap rickroll-conf was substituted — it has the line sub_filter '__POD__' '\$hostname'"
 elif [ "$SERVED_BY" = "__POD__" ]; then
-  fail "ім'я Pod не підставилося — у сторінці залишилася заглушка __POD__" \
-       "nginx не застосував sub_filter: перевірте, що том із налаштуваннями змонтовано в /etc/nginx/conf.d"
+  fail "pod name was not substituted — the placeholder __POD__ is left in the page" \
+       "nginx did not apply sub_filter: check that the settings volume is mounted at /etc/nginx/conf.d"
 elif printf '%s' "$REAL_PODS" | grep -qx "$SERVED_BY"; then
-  ok "ім'я Pod підставляється і збігається з реально запущеною копією: ${SERVED_BY}"
-  evidence "Хто обслужив запит" "$SERVED_BY"
-  evidence "Запущені копії" "$REAL_PODS"
+  ok "pod name is substituted and matches a really running copy: ${SERVED_BY}"
+  evidence "Who served the request" "$SERVED_BY"
+  evidence "Running copies" "$REAL_PODS"
 else
-  fail "сторінка називає Pod «${SERVED_BY}», але такого Pod в кластері немає" \
-       "можливо, копія перестворилася між запитом і перевіркою — запустіть скрипт ще раз"
+  fail "the page names pod «${SERVED_BY}», but there is no such pod in the cluster" \
+       "the copy may have been recreated between the request and the check — run the script again"
 fi
 
-# --- перевірка готовності налаштована ------------------------------------------
-# Без неї в лабі про викатку версій буде простій, і учасник вирішить, що ми збрехали.
+# --- readiness check configured ---------------------------------------------
+# Without it the version-rollout lab will have downtime, and the participant will decide we lied.
 PROBE_PATH="$(kubectl get deployment rickroll \
   -o jsonpath='{.spec.template.spec.containers[0].readinessProbe.httpGet.path}' 2>/dev/null)"
 if [ -n "$PROBE_PATH" ]; then
-  ok "перевірка готовності налаштована (${PROBE_PATH}) — оновлення пройде без простою"
+  ok "readiness check configured (${PROBE_PATH}) — the update will go without downtime"
 else
-  warn "у застосунку немає перевірки готовності" \
-       "лаба 4 про оновлення без простою на такому застосунку дасть помилки — поверніть readinessProbe із rickroll.yaml"
+  warn "the application has no readiness check" \
+       "lab 4 on zero-downtime updates will produce errors on such an application — restore readinessProbe from rickroll.yaml"
 fi
 
 finish

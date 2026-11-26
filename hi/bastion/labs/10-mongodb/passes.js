@@ -1,94 +1,95 @@
-// लैब 10 · passes कलेक्शन में चार अलग-अलग रूपों के चार पास।
+// Lab 10 · four passes of four different shapes in the passes collection.
 //
-// यह कोई कॉन्फ़िग फ़ाइल नहीं, बल्कि mongosh के लिए एक प्रोग्राम है — MongoDB शेल, जो
-// JavaScript समझता है। यह VM पर, लैब क्लस्टर में, README के छोटे कमांड `mo` से
-// चलता है (यह वर्किंग पॉड के अंदर mongosh को शुरू करता है):
+// This is not a config file but a program for mongosh — the MongoDB shell, which
+// understands JavaScript. It runs on the VM, in the lab cluster, via the short
+// command `mo` from the README (it launches mongosh inside the working pod):
 //     cd labs/10-mongodb && mo < passes.js
-// जवाब में आपको लाइन «संग्रह में दस्तावेज़: 4» दिखेगी।
+// In response you will see the line «documents in collection: 4».
 //
-// फ़ाइल को दो बार चलाइए — दस्तावेज़ आठ हो जाएंगे: insertMany केवल जोड़ता है।
+// Run the file twice and there will be eight documents: insertMany only appends.
 
-// db — वह डेटाबेस जिससे आप जुड़े हैं; passes — उसमें एक कलेक्शन (टेबल का सबसे निकटतम
-// समकक्ष); insertMany का मतलब «इन दस्तावेज़ों को जोड़ो»। किसी भी टेबल को पहले से बनाने
-// की ज़रूरत नहीं और फ़ील्ड वर्णन करने की कोई जगह नहीं: कलेक्शन पहली इंसर्ट के क्षण में
-// प्रकट होता है, और डिफ़ॉल्ट रूप से डेटाबेस की इस बारे में कोई राय नहीं कि किसी दस्तावेज़
-// में कौन-से फ़ील्ड हो सकते हैं।
-// इसीलिए नीचे के चार दस्तावेज़ों में फ़ील्ड के अलग-अलग सेट हैं और फिर भी वे साथ-साथ,
-// एक ही कलेक्शन में पड़े हैं। दस्तावेज़ मॉडल इसी के लिए मौजूद है: न खाली कॉलम,
-// न चार पास प्रकारों के लिए चार टेबल, न उन्हें जोड़ने वाली पाँचवीं।
+// db is the database you are connected to; passes is a collection in it (the closest
+// analog of a table); insertMany means «add these documents». No table needs to be
+// created in advance and there is nowhere to describe fields: the collection appears
+// at the moment of the first insert, and by default the database has no opinion about
+// which fields a document may have.
+// That is why the four documents below have different sets of fields yet lie side by
+// side, in one collection. This is exactly what the document model exists for: no empty
+// columns, no four tables for four pass types, no fifth one to link them.
 db.passes.insertMany([
   {
-    // एकल पास — सबसे छोटा रूप: छह फ़ील्ड, सभी सरल मान।
-    // सामान्य टेबल में यह एक सामान्य पंक्ति होती।
-    // ISODate(...) कोई स्ट्रिंग नहीं, बल्कि ठीक एक तारीख है। MongoDB दस्तावेज़ों को द्विआधारी
-    // BSON फ़ॉर्मैट में संग्रहित करता है, जहाँ मान का एक प्रकार होता है: तारीख, पूर्णांक, दशमलव, बूलियन।
-    // तारीख से तुलना और छँटाई की जा सकती है, स्ट्रिंग «2026-09-01» से केवल तभी अगर
-    // रिकॉर्डिंग फ़ॉर्मैट के साथ किस्मत अच्छी रही।
-    type: "एकल-उपयोग",
-    guest: "राजेश कुमार शर्मा",
+    // A single-entry pass — the shortest shape: six fields, all simple values.
+    // In an ordinary table this would be an ordinary row.
+    // ISODate(...) is not a string but exactly a date. MongoDB stores documents in the
+    // binary BSON format, where a value has a type: date, integer, float, boolean.
+    // By date you can compare and sort; by the string «2026-09-01» only if you got
+    // lucky with the recording format.
+    type: "single-use",
+    guest: "James P. Whitfield",
     host: "petrov@corp.example",
-    entrance: "उत्तरी",
+    entrance: "North",
     valid_on: ISODate("2026-09-01T09:00:00Z"),
-    purpose: "नौकरी साक्षात्कार"
+    purpose: "job interview"
   },
   {
-    // साप्ताहिक पास। valid_on के बजाय जोड़ी valid_from और valid_to, एक ही प्रवेश के बजाय
-    // सीधे फ़ील्ड में प्रवेशों की सूची entrances। टेबल में ऐसी सूची के लिए या तो एक अलग
-    // «पास — प्रवेश» टेबल की ज़रूरत होती, या कॉमा से अलग की गई स्ट्रिंग की,
-    // जिसमें फिर ढंग से खोजा नहीं जा सकता।
-    // एक फ़ील्ड badge_returned प्रकट हुआ है, जो एकल पास में बिल्कुल नहीं है:
-    // न NULL और न खाली, बल्कि उस दस्तावेज़ में सचमुच ऐसा कोई फ़ील्ड ही नहीं। ये अलग
-    // बातें हैं, और इन्हें अलग-अलग तरीके से खोजा जाता है।
-    type: "साप्ताहिक",
-    guest: "अनीता देवी वर्मा",
+    // A weekly pass. Instead of valid_on there is a pair valid_from and valid_to,
+    // instead of a single entrance a list of entrances right in the field. In a table
+    // such a list would need either a separate «pass — entrance» table, or a
+    // comma-separated string that you then cannot search properly.
+    // A badge_returned field has appeared, which the single-entry pass does not have at
+    // all: not NULL and not empty, but literally no such field in that document. These
+    // are different things, and they are searched for differently.
+    type: "weekly",
+    guest: "Emma L. Prescott",
     host: "petrov@corp.example",
-    entrances: ["उत्तरी", "दक्षिणी"],
+    entrances: ["North", "South"],
     valid_from: ISODate("2026-09-01T00:00:00Z"),
     valid_to: ISODate("2026-09-07T23:59:59Z"),
-    purpose: "बाहरी ऑडिट",
+    purpose: "external audit",
     badge_returned: false
   },
   {
-    // वाहन पास। जो कुछ भी कार से संबंधित है, वह एक ही फ़ील्ड
-    // car के अंदर पड़ा है। यह JSON वाली स्ट्रिंग नहीं, बल्कि एक पूर्ण नेस्टेड संरचना है:
-    // car.plate से खोजा जा सकता है और उस पर इंडेक्स बनाया जा सकता है।
-    type: "वाहन",
-    guest: "विक्रम सिंह गुप्ता",
+    // A vehicle pass. Everything related to the car lies inside a single field
+    // car. This is not a string with JSON inside but a full-fledged nested structure:
+    // by car.plate you can search and build an index on it.
+    type: "vehicle",
+    guest: "Victor S. Marsh",
     host: "logistics@corp.example",
-    entrance: "पश्चिमी",
+    entrance: "West",
     valid_on: ISODate("2026-09-02T07:30:00Z"),
     car: {
-      plate: "MH-12-AB-1174",
-      model: "Force Traveller",
+      plate: "AB-1174-CD",
+      model: "Ford Transit",
       trailer: false,
       weight_kg: 3500
     },
     parking: "P2"
   },
   {
-    // समूह पास। यहाँ वस्तुओं की सूची है: हर सदस्य के अपने फ़ील्ड हैं,
-    // सूची की लंबाई मनमानी है।
-    // और सबसे मुख्य बात — इस दस्तावेज़ में guest फ़ील्ड बिल्कुल नहीं है: अतिथि के बजाय
-    // एक संगठन और एक संपर्क व्यक्ति। रूप दूसरों से एक फ़ील्ड से नहीं, बल्कि सार में
-    // भिन्न है। आगे लैब में इसकी गूँज होगी: दस्तावेज़ों की जाँच का नियम सबसे
-    // guest की माँग नहीं कर पाएगा, वरना एक वैध समूह पास पास नहीं होगा।
-    type: "समूह",
-    organization: "नगर उच्च विद्यालय सं. 1",
-    contact: "सुनीता रानी अग्रवाल",
+    // A group pass. Here there is a list of objects: each member has its own fields,
+    // the length of the list is arbitrary.
+    // And most importantly — this document has no guest field at all: instead of a
+    // guest, an organization and a contact person. The shape differs from the others
+    // not by one field but in essence. This will echo further in the lab: the document
+    // validation rule will not be able to require guest from everyone, otherwise a
+    // legitimate group pass would not pass.
+    type: "group",
+    organization: "City High School No. 1",
+    contact: "Olivia W. Grant",
     host: "hr@corp.example",
-    entrance: "उत्तरी",
+    entrance: "North",
     valid_on: ISODate("2026-09-03T10:00:00Z"),
-    escort: "अनिल कुमार मिश्रा",
+    escort: "Alan A. Foster",
     members: [
-      { name: "प्रदीप यादव", age: 16 },
-      { name: "मीना जोशी", age: 15 },
-      { name: "ईशान नायर", age: 17 }
+      { name: "Peter Hale", age: 16 },
+      { name: "Mary Fenwick", age: 15 },
+      { name: "Isaac Hart", age: 17 }
     ]
   }
 ]);
 
-// countDocuments({}) — शर्त से मेल खाने वाले दस्तावेज़ गिनना; खाली शर्त का
-// मतलब «सभी»। प्रिंट इसलिए ज़रूरी है ताकि फ़ाइल का एक दृश्य परिणाम हो: insertMany स्वयं
-// जारी किए गए पहचानकर्ताओं की सूची से जवाब देता है, और उसमें यह देखना आसानी से छूट जाता है कि
-// कितने दस्तावेज़ वास्तव में जमा हुए।
-print("संग्रह में दस्तावेज़: " + db.passes.countDocuments({}));
+// countDocuments({}) counts documents matching a condition; an empty condition means
+// «all». The print is needed so the file has a visible result: insertMany itself
+// responds with a list of issued identifiers, and in it it is easy to miss how many
+// documents actually landed.
+print("documents in collection: " + db.passes.countDocuments({}));

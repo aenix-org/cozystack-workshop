@@ -27,14 +27,14 @@ curl -s -o /dev/null -w '%{http_code}\n' localhost:8080/actuator/health
 そのまま `curl` で確認しても構いません。
 
 ```bash
-# ヘルスチェック
+# health
 curl -s https://app.workshopXX.workshop.aenix.io/actuator/health
 
-# 注文を作成する
+# create an order
 curl -s -X POST https://app.workshopXX.workshop.aenix.io/api/orders \
   -H 'Content-Type: application/json' -d '{"item":"test"}'
 
-# 記録されたことを確認する
+# see that it was recorded
 curl -s https://app.workshopXX.workshop.aenix.io/api/orders
 ```
 

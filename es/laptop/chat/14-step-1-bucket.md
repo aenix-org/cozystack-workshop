@@ -31,12 +31,12 @@ El bucket está cerrado y, para poner algo en él, necesitas sus propias claves 
 
 El cuarto, `endpoint`, no hace falta que lo anotes: es el mismo para todos y ya está escrito en el script.
 
-**A dónde van.** En el paso 3 abrirás el archivo `convert.sh` en la máquina conversora, y dentro de él un bloque «PEGA TUS VALORES» de tres líneas:
+**A dónde van.** En el paso 3 abrirás el archivo `convert.sh` en la máquina conversora, y dentro de él un bloque «PASTE YOUR VALUES» de tres líneas:
 
 ```
-BUCKET="ВСТАВЬТЕ_bucketName"
-ACCESS_KEY="ВСТАВЬТЕ_accessKey"
-SECRET_KEY="ВСТАВЬТЕ_secretKey"
+BUCKET="PASTE_bucketName"
+ACCESS_KEY="PASTE_accessKey"
+SECRET_KEY="PASTE_secretKey"
 ```
 
 Esos son exactamente los tres valores que pegarás ahí, cada uno entre sus propias comillas. No los necesitarás en ningún otro lado: el propio script subirá la imagen terminada a tu bucket y creará él mismo un enlace hacia ella.

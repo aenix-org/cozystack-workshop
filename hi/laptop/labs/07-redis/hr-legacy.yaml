@@ -1,20 +1,20 @@
 ---
-# लैब 7 · लेगेसी कर्मचारी निर्देशिका के लिए एक स्टब।
-# असल जीवन में यह किसी और का सिस्टम है जिसे दोबारा लिखने की अनुमति आपको नहीं मिलेगी: यह 800 ms में जवाब देता है,
-# और आपको किसी तरह इसके साथ रहना है। यहाँ उसी व्यवहार वाला एक स्टब है, ताकि मापने के लिए कुछ हो।
+# Lab 7 · a stub for the legacy employee directory.
+# In real life this is someone else's system that you won't be allowed to rewrite: it responds in 800 ms,
+# and you have to live with that somehow. Here is a stub with the same behavior, so there is something to measure.
 #
-# कहाँ लागू होता है: आपका `lab` क्लस्टर (export KUBECONFIG=~/lab.kubeconfig), Cozystack का
-# प्रबंधन क्लस्टर नहीं। कमांड: kubectl apply -f hr-legacy.yaml
+# Where it applies: your `lab` cluster (export KUBECONFIG=~/lab.kubeconfig), not the Cozystack
+# management cluster. Command: kubectl apply -f hr-legacy.yaml
 #
-# HARBOR-HOST एक प्लेसहोल्डर है, पता नहीं। अपने खुद के Harbor का पता डालें, वरना क्लस्टर
-# किसी अस्तित्वहीन होस्ट से इमेज खींचने की कोशिश करेगा:
+# HARBOR-HOST is a placeholder, not an address. Substitute the address of your own Harbor, otherwise the cluster
+# will try to pull the image from a nonexistent host:
 #   sed -i    's|HARBOR-HOST|harbor.workshop03.example.org|g' *.yaml   # Linux
 #   sed -i '' 's|HARBOR-HOST|harbor.workshop03.example.org|g' *.yaml   # macOS
 #
-# फ़ाइल में `---` पंक्ति से अलग किए गए दो ऑब्जेक्ट हैं: एक Deployment (क्या चलता है और कितनी
-# प्रतियों में) और एक Service (उन प्रतियों तक पहुँचने के लिए एक स्थायी नाम)। प्रत्येक ऑब्जेक्ट के लिए
-# apiVersion और kind बताते हैं कि यह किस तरह का ऑब्जेक्ट है, और metadata.name इसका नाम है;
-# आगे नीचे इन तीन फ़ील्ड्स पर टिप्पणी नहीं की गई है।
+# The file has two objects separated by a `---` line: a Deployment (what runs and in how many
+# copies) and a Service (a permanent name used to reach those copies). For each object
+# apiVersion and kind say what kind of object it is, and metadata.name is what it's called;
+# further down these three fields are not commented.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -22,72 +22,72 @@ metadata:
   labels:
     app: hr-legacy
 spec:
-  # कितनी प्रतियाँ चालू रखनी हैं। यदि कोई प्रति गायब हो जाती है, तो क्लस्टर बिना पूछे एक नई
-  # बना देगा। निर्देशिका के लिए एक ही काफ़ी है: यह लोड के लिए नहीं, बल्कि मापन के लिए यहाँ है।
+  # How many copies to keep running. If a copy disappears, the cluster will create a new one without
+  # asking. One is enough for the directory: it's here not for load, but for measurement.
   replicas: 1
-  # इस लेबल से Deployment क्लस्टर के बाकी सभी पॉड्स के बीच अपने पॉड्स को पहचानता है।
-  # selector में लेबल और नीचे template में लेबल का मेल होना ज़रूरी है, वरना ऑब्जेक्ट
-  # वही नहीं ढूँढ पाएगा जो उसने खुद बनाया था।
+  # By this label the Deployment recognizes its pods among all the others in the cluster.
+  # The label in selector and the label in template below must match, otherwise the object
+  # won't find what it created itself.
   selector:
     matchLabels:
       app: hr-legacy
-  # template पॉड का टेम्पलेट है। नीचे जो कुछ है वह एक प्रति का वर्णन करता है: इसे किससे बनाना है,
-  # किन विशेषाधिकारों के साथ चलाना है, और कैसे पता करें कि यह अनुरोध स्वीकार करने के लिए तैयार है।
+  # template is the pod template. Everything below describes one copy: what to build it from,
+  # with which privileges to run it, and how to tell that it's ready to accept requests.
   template:
     metadata:
       labels:
         app: hr-legacy
     spec:
-      # पॉड-स्तर की सुरक्षा आवश्यकताएँ। प्रोसेस root के रूप में नहीं चलता (uid 10001),
-      # seccomp प्रोफ़ाइल उन सिस्टम कॉल्स को काट देती है जिनकी एप्लिकेशन को ज़रूरत नहीं।
-      # नीतियाँ सक्षम वाले क्लस्टर में, इन फ़ील्ड्स के बिना पॉड बिल्कुल शुरू नहीं होगा।
+      # Pod-level security requirements. The process runs not as root (uid 10001),
+      # the seccomp profile cuts off system calls the application doesn't need.
+      # In a cluster with policies enabled, a pod without these fields won't start at all.
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
         seccompProfile:
           type: RuntimeDefault
-      # Harbor लॉगिन और पासवर्ड से बंद है, और क्लस्टर को खुद को पहचानवाने के लिए कुछ चाहिए।
-      # `harbor` सीक्रेट आपने रजिस्ट्री लैब में सेट किया था। इस संदर्भ के बिना इमेज नहीं खींची जाएगी,
-      # और पॉड ImagePullBackOff स्थिति में रह जाएगा।
+      # Harbor is closed off by a login and password, and the cluster needs something to identify itself with. The
+      # `harbor` secret you set up in the registry lab. Without this reference the image won't be pulled,
+      # and the pod will stay in the ImagePullBackOff state.
       imagePullSecrets:
         - name: harbor
       containers:
         - name: hr
-          # पॉड स्तर जैसा ही, पर किसी विशिष्ट कंटेनर के लिए: हम विशेषाधिकार वृद्धि पर रोक
-          # लगाते हैं और सभी कर्नेल क्षमताएँ हटा देते हैं। Go एप्लिकेशन को
-          # इनमें से किसी की भी ज़रूरत नहीं।
+          # The same as at the pod level, but for a specific container: we forbid
+          # privilege escalation and drop all kernel capabilities. The Go application
+          # needs none of them.
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # इमेज निर्देशिका और खुद "गेस्ट पास" सेवा के लिए एक ही है।
-          # असल में कौन-सी प्रोसेस शुरू होगी, यह नीचे दिए MODE वेरिएबल से तय होता है।
+          # The image is the same for the directory and for the "Guest Pass" service itself.
+          # Which process actually starts is decided by the MODE variable below.
           image: HARBOR-HOST/passes/passes-api:v2
-          # पोर्ट का सिर्फ़ नंबर नहीं, एक नाम भी है: नीचे readiness प्रोब और Service
-          # नाम का संदर्भ देते हैं। नंबर बदलेगा तो एक ही जगह संपादन करना होगा।
+          # The port has a name, not just a number: the readiness probe and the Service below
+          # reference the name. If the number changes, you'll edit it in one place.
           ports:
             - containerPort: 8080
               name: http
-          # इस एप्लिकेशन को कॉन्फ़िगर करने का एकमात्र तरीका पर्यावरण चर हैं।
-          # व्यवहार बदलने के लिए इमेज दोबारा बनाने की ज़रूरत नहीं।
+          # Environment variables are the only way to configure this application.
+          # There's no need to rebuild the image to change behavior.
           env:
-            # MODE=hr — इंस्टेंस HR सिस्टम होने का नाटक करता है: इंतज़ार करता है और जवाब देता है।
+            # MODE=hr — the instance pretends to be an HR system: it waits and responds.
             - name: MODE
               value: "hr"
-            # ठीक वही देरी जो असली निर्देशिका दिखाती है।
-            # इसे बदलकर आप बदलते हैं कि "हालात कितने बुरे हैं" — बाद में 2s आज़माएँ।
+            # Exactly the delay that the real directory shows.
+            # By changing it, you change "how bad things are" — try 2s afterwards.
             - name: HR_DELAY
               value: "800ms"
-            # पॉड अपना नाम पहले से नहीं जानता — क्लस्टर इसे बनते समय सौंपता है।
-            # fieldRef इस नाम को शुरुआत में वेरिएबल में डाल देता है, और यह
-            # सेवा के जवाब में पहुँचता है: दिखता है कि किस प्रति ने उत्तर दिया।
+            # A pod doesn't know its own name in advance — the cluster assigns it on creation.
+            # fieldRef substitutes this name into the variable at startup, and it
+            # ends up in the service's response: you can see which copy answered.
             - name: POD_NAME
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
-          # requests — नोड चुनते समय कंटेनर के लिए कितने संसाधन आरक्षित किए जाते हैं,
-          # limits — वह सीमा जिसे पार करने की अनुमति नहीं। vSphere में reservation
-          # और limit जैसा, पर प्रति कंटेनर सेट होता है, प्रति वर्चुअल मशीन नहीं।
+          # requests — how many resources are reserved for the container when choosing a node,
+          # limits — the ceiling it won't be allowed to exceed. Similar to reservation
+          # and limit in vSphere, but set per container, not per virtual machine.
           resources:
             requests:
               cpu: 50m
@@ -95,9 +95,9 @@ spec:
             limits:
               cpu: "1"
               memory: 64Mi
-          # Readiness प्रोब। जब तक /healthz जवाब नहीं देता, Service इस प्रति में एक भी अनुरोध
-          # नहीं भेजेगा। प्रोब के बिना ट्रैफ़िक ऐसी प्रोसेस में जाएगा जो अभी शुरू नहीं हुई,
-          # और आपको बेवजह त्रुटियाँ दिखेंगी — जबकि "सब कुछ रोल आउट हो गया"।
+          # Readiness probe. Until /healthz responds, the Service won't send a single request
+          # to this copy. Without the probe, traffic would go to a process that hasn't started yet,
+          # and you'd see errors out of nowhere — even though "everything rolled out".
           readinessProbe:
             httpGet:
               path: /healthz
@@ -105,19 +105,19 @@ spec:
             initialDelaySeconds: 2
             periodSeconds: 5
 ---
-# Service — पॉड्स के एक समूह के लिए स्थायी नाम और स्थायी पता। पॉड्स दोबारा बनते हैं
-# और हर बार नया IP पाते हैं, पर hr-legacy नाम वही रहता है। लोड बैलेंसर के VIP जैसा,
-# पर चार पंक्तियों में सेट होता है और क्लस्टर के भीतर रहता है।
+# Service — a permanent name and permanent address for a set of pods. Pods get recreated
+# and each time receive a new IP, but the name hr-legacy stays the same. Similar to a load
+# balancer VIP, but set up in four lines and living inside the cluster.
 apiVersion: v1
 kind: Service
 metadata:
   name: hr-legacy
 spec:
-  # इस लेबल से Service जीवित प्रतियों की सूची जुटाता है। ऊपर पॉड्स जैसा ही लेबल:
-  # यदि मेल नहीं खाया — Service अस्तित्व में रहेगा और कहीं नहीं ले जाएगा।
+  # By this label the Service gathers the list of live copies. The same label as on the pods above:
+  # if it doesn't match, the Service will exist and lead nowhere.
   selector:
     app: hr-legacy
   ports:
-    # अनुरोध पोर्ट 80 पर आते हैं, पॉड के भीतर यह http नाम वाले पोर्ट (8080) पर जाता है।
+    # Requests come in on port 80, inside the pod this goes to the port named http (8080).
     - port: 80
       targetPort: http

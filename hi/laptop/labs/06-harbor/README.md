@@ -57,12 +57,12 @@ VM के लिए अनुरोध, इंस्टॉलेशन, सर�
 में चली गई।** कमांड के हर ब्लॉक से पहले लिखा है कि वह किस क्लस्टर के लिए है। अगर संदेह हो:
 
 ```bash
-# echo चर का मान छापता है: kubectl अभी किस एक्सेस फ़ाइल का उपयोग कर रहा है।
-# खाली — मतलब kubectl डिफ़ॉल्ट फ़ाइल ~/.kube/config लेगा, वह नहीं जो आप सोचते हैं।
+# echo prints the value of the variable: which access file kubectl is using right now.
+# Empty means kubectl will use the default file ~/.kube/config, not the one you think.
 echo $KUBECONFIG
 
-# get nodes = "क्लस्टर के नोड दिखाओ"। यहाँ यह लिटमस टेस्ट है:
-# जवाब से पता चलता है कि कमांड दो में से किस क्लस्टर में गई।
+# get nodes = "show the cluster's nodes". Here it's a litmus test:
+# the answer tells you which of the two clusters the command went to.
 kubectl get nodes
 ```
 
@@ -76,7 +76,7 @@ kubectl get nodes
 से ली जाती है।
 
 ```bash
-# इस लैब की हर कमांड लैब फ़ोल्डर से चलती है — उसमें जाएँ
+# every command in this lab is run from the lab folder — change into it
 cd labs/06-harbor
 ```
 
@@ -130,7 +130,7 @@ Harbor इमेज की लेयरें S3-संगत स्टोरे
 
 | कुंजी | उसमें क्या है |
 |---|---|
-| `url` | आपकी रजिस्ट्री का पता, इस तरह का `https://harbor-....<परीक्षण मंच डोमेन>` |
+| `url` | आपकी रजिस्ट्री का पता, इस तरह का `https://harbor-....<testbed domain>` |
 | `admin-password` | व्यवस्थापक का पासवर्ड |
 | `redis-password` | Harbor का आंतरिक पासवर्ड, जो आपको नहीं चाहिए |
 
@@ -145,12 +145,12 @@ Harbor इमेज की लेयरें S3-संगत स्टोरे
 एप्लिकेशन के लिए प्लेटफ़ॉर्म एक अलग नियम बना देता है जो ठीक उसी के क्रेडेंशियल की अनुमति देता है:
 
 ```bash
-# get secret = "Secret ऑब्जेक्ट दिखाओ"। सीक्रेट का नाम एप्लिकेशन प्रकार के
-# प्रीफ़िक्स और उसके नाम से जुड़ता है: harbor- + harbor.
-#   -n tenant-workshopXX  किस namespace में देखना है — आपके टेनेंट में
-#   -o jsonpath='...'     पूरे ऑब्जेक्ट को छापने के बजाय उसमें से एक फ़ील्ड निकालो
-#   base64 -d             डिकोड करो: सीक्रेट के अंदर मान base64 में रखे होते हैं
-#   ; echo                एक नई लाइन जोड़ो, वरना पासवर्ड प्रॉम्प्ट से चिपक जाएगा
+# get secret = "show the Secret object". The secret's name is assembled from the prefix
+# for the application type and its name: harbor- + harbor.
+#   -n tenant-workshopXX  which namespace to look in — your tenant
+#   -o jsonpath='...'     pull a single field out of the object rather than printing the whole thing
+#   base64 -d             decode: values inside secrets are stored in base64
+#   ; echo                add a newline, otherwise the password runs into the prompt
 kubectl -n tenant-workshopXX get secret harbor-harbor-credentials \
   -o jsonpath='{.data.admin-password}' | base64 -d; echo
 ```
@@ -166,9 +166,9 @@ kubectl -n tenant-workshopXX get secret harbor-harbor-credentials \
 कुछ पूछे इसी रजिस्ट्री में जाते हैं।
 
 ```bash
-# login = "इस रजिस्ट्री के क्रेडेंशियल याद रखो"।
-# आर्ग्युमेंट — url कुंजी से रजिस्ट्री का पता; यहाँ harbor-harbor.workshop03.example.org एक उदाहरण है।
-# कमांड यूज़रनेम (admin) और पासवर्ड पूछेगी; टाइप करते समय पासवर्ड नहीं दिखता।
+# login = "remember the credentials for this registry".
+# The argument is the registry address from the url key; harbor-harbor.workshop03.example.org here is an example.
+# The command will ask for a username (admin) and a password; the password isn't shown as you type.
 docker login harbor-harbor.workshop03.example.org
 ```
 
@@ -232,8 +232,8 @@ Login Succeeded
 क्लस्टर लॉन्च पर, एनवायरनमेंट वेरिएबल में डालता है:
 
 ```go
-Pod:  env("POD_NAME", "अज्ञात"),
-Node: env("NODE_NAME", "अज्ञात"),
+Pod:  env("POD_NAME", "unknown"),
+Node: env("NODE_NAME", "unknown"),
 ```
 
 और मैनिफ़ेस्ट में लिखा है कि वहाँ क्या डालना है:
@@ -308,13 +308,13 @@ USER 10001
 ```bash
 cd labs/06-harbor
 
-# build = "Dockerfile से इमेज बनाओ"।
-#   --platform linux/amd64  किस प्रोसेसर के लिए बनाना है; क्लस्टर के नोड x86 पर हैं,
-#                           और लैपटॉप ARM पर हो सकता है — तब फ़्लैग के बिना गलत चीज़ बनेगी
-#   -t <पता>/<प्रोजेक्ट>/<नाम>:<टैग>  नतीजे को क्या नाम देना है। नाम की शुरुआत में रजिस्ट्री का पता
-#                           वह जगह है जहाँ docker push बाद में उसे भेजेगा
-#   app/                    आख़िरी आर्ग्युमेंट — Dockerfile और सोर्स वाला फ़ोल्डर;
-#                           उसकी पूरी सामग्री बिल्डर को सौंप दी जाती है
+# build = "build the image from the Dockerfile".
+#   --platform linux/amd64  which processor to build for; the cluster nodes are on x86,
+#                           and the laptop may be on ARM — then without the flag you get the wrong thing
+#   -t <address>/<project>/<name>:<tag>  what to name the result. The registry address at the start of the name
+#                           is where docker push will later send it
+#   app/                    the last argument — the folder with the Dockerfile and sources;
+#                           its entire contents are handed to the builder
 docker build --platform linux/amd64 -t harbor-harbor.workshop03.example.org/passes/passes-api:v1 app/
 ```
 
@@ -338,8 +338,8 @@ Successfully tagged harbor-harbor.workshop03.example.org/passes/passes-api:v1
 भेजता है; जो लेयरें रजिस्ट्री में पहले से हैं वे दोबारा नहीं भेजी जातीं।
 
 ```bash
-# push = "इमेज को रजिस्ट्री में भेजो"। कहाँ भेजना है, यह docker इमेज के नाम से लेता है:
-# नाम का पहला हिस्सा रजिस्ट्री का पता है, और वहीं वह docker login के क्रेडेंशियल के साथ जाता है।
+# push = "send the image to the registry". Where to send it, docker takes from the image name:
+# the first part of the name is the registry address, and there it goes, with the credentials from docker login.
 docker push harbor-harbor.workshop03.example.org/passes/passes-api:v1
 ```
 
@@ -357,9 +357,9 @@ docker push harbor-harbor.workshop03.example.org/passes/passes-api:v1
 📍 **कहाँ:** लैपटॉप पर, `lab` क्लस्टर।
 
 ```bash
-# KUBECONFIG kubectl को बताता है कि किस एक्सेस फ़ाइल का उपयोग करना है। हम आपके `lab`
-# क्लस्टर पर स्विच करते हैं: यहाँ से आगे सभी kubectl कमांड उसी में जाती हैं।
-# यह टर्मिनल विंडो बंद होने तक प्रभावी रहता है।
+# KUBECONFIG tells kubectl which access file to use. We switch to your `lab` cluster:
+# from here on all kubectl commands go to it.
+# It stays in effect until the terminal window is closed.
 export KUBECONFIG=~/lab.kubeconfig
 ```
 
@@ -368,11 +368,11 @@ export KUBECONFIG=~/lab.kubeconfig
 या दिखाए, संपादित करता है। अपने सिस्टम वाली पंक्ति लें:
 
 ```bash
-# sed -i = "फ़ाइल को उसी जगह संपादित करो"
-#   's|क्या|किससे|g'  सभी घटनाएँ बदलो; विभाजक | का उपयोग / के बजाय इसलिए किया गया क्योंकि
-#                     पते में स्लैश हैं और उन्हें एस्केप करना पड़ता
-#   macOS वाला sed -i के बाद एक अनिवार्य आर्ग्युमेंट माँगता है; खाली उद्धरण चिह्नों
-#   का मतलब "कोई बैकअप प्रति न बनाओ"। Linux पर ऐसा कोई आर्ग्युमेंट नहीं होना चाहिए।
+# sed -i = "edit the file in place"
+#   's|what|with what|g'  replace all occurrences; the separator | is used instead of / because
+#                     the address has slashes and they would have to be escaped
+#   The sed in macOS requires a mandatory argument after -i; the empty quotes
+#   mean "make no backup copy". On Linux there must be no such argument.
 
 # Linux
 sed -i    's|HARBOR-HOST|harbor-harbor.workshop03.example.org|g' passes-broken.yaml
@@ -383,13 +383,13 @@ sed -i '' 's|HARBOR-HOST|harbor-harbor.workshop03.example.org|g' passes-broken.y
 इसे लागू करें:
 
 ```bash
-# apply = "क्लस्टर को वैसा बनाओ जैसा फ़ाइल में वर्णित है"
+# apply = "bring the cluster to what's described in the file"
 kubectl apply -f passes-broken.yaml
 
-# get pods = "Pods दिखाओ"।
-#   -l app=passes-api  केवल वे जिनके पास यह लेबल है, सब कुछ नहीं
-#   -w                 बाहर मत निकलो, बदलाव जैसे-जैसे आएँ वैसे-वैसे छापो;
-#                      देखना रोकना — Ctrl+C
+# get pods = "show the Pods".
+#   -l app=passes-api  only the ones with this label, not everything
+#   -w                 don't exit, print changes as they appear;
+#                      stop watching — Ctrl+C
 kubectl get pods -l app=passes-api -w
 ```
 
@@ -404,9 +404,9 @@ passes-api-6c9d4f7b8-2xk4n    0/1     ImagePullBackOff   0          22s
 `Ctrl+C` से देखना रोकें और देखें क्लस्टर क्या कहता है:
 
 ```bash
-# describe = "ऑब्जेक्ट के बारे में विस्तार से बताओ"। आउटपुट के बिल्कुल अंत में इवेंट लॉग आता है:
-# क्लस्टर ने Pod के साथ क्या करने की कोशिश की और वह कैसे ख़त्म हुआ।
-# tail -12 आख़िरी बारह पंक्तियाँ रखता है — इवेंट ठीक वहीं हैं।
+# describe = "tell me about the object in detail". At the very end of the output comes the event log:
+# what the cluster tried to do with the Pod and how it ended.
+# tail -12 keeps the last twelve lines — the events are right there.
 kubectl describe pod -l app=passes-api | tail -12
 ```
 
@@ -471,11 +471,11 @@ Pod के स्टेटस पर नहीं, बल्कि `kubectl desc
 प्रकार का सीक्रेट बनाता है जिसे `kubelet` इमेज डाउनलोड करते समय खुद पढ़ सकता है:
 
 ```bash
-# create secret docker-registry = "रजिस्ट्री के क्रेडेंशियल वाला एक सीक्रेट बनाओ"
-#   harbor             क्लस्टर के भीतर सीक्रेट का नाम; एप्लिकेशन मैनिफ़ेस्ट इसका संदर्भ देगा
-#   --docker-server    ये क्रेडेंशियल किस रजिस्ट्री के लिए हैं — वही पता जो इमेज के नाम में है
-#   --docker-username  कौन लॉग इन कर रहा है
-#   --docker-password  पासवर्ड; एकल उद्धरण चिह्न ज़रूरी हैं अगर उसमें $, ! या स्पेस हो
+# create secret docker-registry = "create a secret with registry credentials"
+#   harbor             the secret's name inside the cluster; the application manifest will refer to it
+#   --docker-server    which registry these credentials are for — the same address as in the image name
+#   --docker-username  who's logging in
+#   --docker-password  the password; single quotes are needed if it has a $, ! or space
 kubectl create secret docker-registry harbor \
   --docker-server=harbor-harbor.workshop03.example.org \
   --docker-username=admin \
@@ -486,20 +486,20 @@ kubectl create secret docker-registry harbor \
 पड़ता, काम के माहौल में पड़ता है। हिस्ट्री के बिना एक तरीका:
 
 ```bash
-# read कीबोर्ड से टाइप किया हुआ HARBOR_PASS चर में डालता है:
-#   -s  टाइप किया हुआ स्क्रीन पर मत दिखाओ
-#   -r  बैकस्लैश को विशेष वर्ण मत समझो
-# इस पंक्ति के बाद स्क्रीन पर कुछ नहीं दिखेगा: पासवर्ड पेस्ट करें और Enter दबाएँ।
+# read puts what's typed at the keyboard into the HARBOR_PASS variable:
+#   -s  don't show what's typed on the screen
+#   -r  don't treat a backslash as a special character
+# Nothing will appear on the screen after this line: paste the password and press Enter.
 read -rs HARBOR_PASS
 
-# यहाँ से पासवर्ड चर से डाला जाता है, इसलिए शेल हिस्ट्री में केवल चर का नाम
-# जाता है। दोहरे उद्धरण चिह्न अनिवार्य हैं: उनके बिना स्पेस मान को तोड़ देंगे।
+# From here the password is substituted from the variable, so only the variable name
+# goes into the shell history. The double quotes are mandatory: without them spaces would break the value.
 kubectl create secret docker-registry harbor \
   --docker-server=harbor-harbor.workshop03.example.org \
   --docker-username=admin \
   --docker-password="$HARBOR_PASS"
 
-# unset चर मिटा देता है ताकि पासवर्ड इस विंडो की अगली कमांड तक न पहुँचे
+# unset erases the variable so the password doesn't reach the next commands in this window
 unset HARBOR_PASS
 ```
 
@@ -509,8 +509,8 @@ unset HARBOR_PASS
 आइए क्लस्टर से पूछें कि किस तरह का सीक्रेट निकला:
 
 ```bash
-#   -o jsonpath='{.type}'  ऑब्जेक्ट का एक फ़ील्ड छापो — सीक्रेट का टाइप
-#   {"\n"}                 एक नई लाइन जोड़ो, वरना आउटपुट प्रॉम्प्ट से चिपक जाएगा
+#   -o jsonpath='{.type}'  print a single field of the object — the secret's type
+#   {"\n"}                 add a newline, otherwise the output runs into the prompt
 kubectl get secret harbor -o jsonpath='{.type}{"\n"}'
 ```
 
@@ -527,10 +527,10 @@ kubernetes.io/dockerconfigjson
 टेक्स्ट के रूप में लिखने का एक तरीका है, और कोई भी उसे डिकोड कर सकता है):
 
 ```bash
-# .data.\.dockerconfigjson — सीक्रेट के अंदर की कुंजी। कुंजी का नाम खुद एक बिंदु से शुरू होता है,
-# इसलिए उसे एस्केप किया गया है: वरना jsonpath उसे पथ विभाजक समझ लेता।
-# base64 -d मान को वापस टेक्स्ट में डिकोड करता है — आपको वही प्रारूप दिखेगा
-# जो आपके लैपटॉप पर फ़ाइल ~/.docker/config.json में है।
+# .data.\.dockerconfigjson — the key inside the secret. The key name itself starts with a dot,
+# so it's escaped: otherwise jsonpath would take it for a path separator.
+# base64 -d decodes the value back into text — you'll see the same format
+# as in the file ~/.docker/config.json on your laptop.
 kubectl get secret harbor -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d
 ```
 
@@ -556,12 +556,12 @@ sed -i    's|HARBOR-HOST|harbor-harbor.workshop03.example.org|g' passes.yaml
 # macOS
 sed -i '' 's|HARBOR-HOST|harbor-harbor.workshop03.example.org|g' passes.yaml
 
-# delete -f = क्लस्टर से ठीक वही ऑब्जेक्ट हटाओ जो फ़ाइल में वर्णित हैं
+# delete -f = remove from the cluster exactly the objects described in the file
 kubectl delete -f passes-broken.yaml
 kubectl apply -f passes.yaml
 
-# rollout status तब तक इंतज़ार करता है जब तक नई प्रतिकृतियाँ तैयार न हो जाएँ, फिर खुद ख़त्म होता है।
-# अगर वह वहाँ न पहुँचे, तो एक त्रुटि लौटाता है, इसीलिए ऐसी पंक्ति स्क्रिप्ट में सुविधाजनक होती है।
+# rollout status waits until the new replicas become ready, then finishes on its own.
+# If it doesn't get there, it returns an error, which is why such a line is handy in scripts.
 kubectl rollout status deployment/passes-api
 ```
 
@@ -587,19 +587,19 @@ deployment "passes-api" successfully rolled out
 में जाता है। सबसे करीबी समरूप एक NAT गेटवे पर एक अस्थायी पोर्ट फ़ॉरवर्ड है, बस नेटवर्क को छुए बिना।
 
 ```bash
-# port-forward svc/passes-api = किसी ख़ास Pod तक नहीं, सेवा तक एक सुरंग
-#   8080:80 — बायाँ नंबर आपके लैपटॉप पर पोर्ट है, दायाँ क्लस्टर में सेवा का पोर्ट
-# विंडो बंद न करें: सुरंग तब तक जीती है जब तक कमांड चलती है।
+# port-forward svc/passes-api = a tunnel to the service, not to a specific Pod
+#   8080:80 — the left number is the port on your laptop, the right one the service port in the cluster
+# Don't close the window: the tunnel lives as long as the command runs.
 kubectl port-forward svc/passes-api 8080:80
 ```
 
 एक अलग टर्मिनल विंडो में:
 
 ```bash
-# curl — "पते पर जाओ और जवाब दिखाओ"।
-#   -s     प्रगति संकेतक मत दिखाओ
-#   ; echo एक नई लाइन जोड़ो: जवाब एक ही पंक्ति में आता है, और उसके बिना
-#          वह शेल प्रॉम्प्ट से चिपक जाता है
+# curl — "go to the address and show the answer".
+#   -s     don't show the progress indicator
+#   ; echo add a newline: the answer comes as a single line, and without it
+#          it runs into the shell prompt
 curl -s http://localhost:8080/; echo
 ```
 
@@ -621,11 +621,11 @@ curl -s http://localhost:8080/; echo
 जवाब में `pod` फ़ील्ड उस प्रतिकृति का नाम है जिसने जवाब दिया। इसे प्रतिकृतियों की सूची से मिलाएँ:
 
 ```bash
-# एक नई टर्मिनल विंडो KUBECONFIG चर के बारे में कुछ नहीं जानती — इसे यहाँ भी सेट करें,
-# वरना kubectl गलत क्लस्टर में जाएगा
+# a new terminal window knows nothing about the KUBECONFIG variable — set it here too,
+# otherwise kubectl will go to the wrong cluster
 export KUBECONFIG=~/lab.kubeconfig
 
-# वही लेबल के अनुसार चयन: सूची में वह नाम होना चाहिए जो आपने जवाब में देखा था
+# the same selection by label: the list should contain the name you saw in the answer
 kubectl get pods -l app=passes-api
 ```
 
@@ -637,9 +637,9 @@ kubectl get pods -l app=passes-api
 बैलेंसिंग को सचमुच ऐसे जाँचा जा सकता है — क्लस्टर के भीतर जीने वाले एक अस्थायी Pod से आठ अनुरोध:
 
 ```bash
-# run एक बार का Pod खड़ा करता है, --rm उसे बाद में साफ़ कर देता है।
-# -- के बाद जो कुछ है वह Pod के भीतर चलता है: आठ बार हम सेवा को उसके आंतरिक नाम से बुलाते हैं
-# और जवाब देने वाली प्रतिकृति के नाम वाली पंक्ति छापते हैं।
+# run brings up a one-off Pod, --rm cleans it up afterwards.
+# Everything after -- runs inside the Pod: eight times we hit the service by its internal name
+# and print the line with the name of the replica that answered.
 kubectl run probe --rm -i --restart=Never --quiet --image=curlimages/curl:8.11.1 \
   -- sh -c 'for i in $(seq 1 8); do curl -s http://passes-api/ | grep -o "passes-api-[a-z0-9-]*"; done'
 ```
@@ -662,13 +662,13 @@ kubectl run probe --rm -i --restart=Never --quiet --image=curlimages/curl:8.11.1
 ```bash
 cd labs/06-harbor
 
-# एप्लिकेशन को किस क्लस्टर में जाँचना है — आपके `lab` में
+# which cluster to check the application in — your `lab`
 export KUBECONFIG=~/lab.kubeconfig
-# आपका टेनेंट नंबर: इससे स्क्रिप्ट namespace का नाम tenant-workshop03 बनाती है
+# your tenant number: from it the script assembles the namespace name tenant-workshop03
 export COZY_TENANT=workshop03
-# प्रबंधन क्लस्टर तक एक्सेस कहाँ रहता है — वहाँ स्क्रिप्ट खुद Harbor को देखेगी।
-# इसे न सेट करना भी ठीक है: तब स्क्रिप्ट ~/.kube/workshop ढूँढती है, और न मिलने पर — प्रबंधन
-# क्लस्टर की जाँचें छोड़ देती है और ऐसा बता देती है।
+# where the access to the management cluster lives — there the script will look at Harbor itself.
+# You can leave it unset: then the script looks for ~/.kube/workshop, and not finding it — skips
+# the checks on the management cluster and says so.
 export COZY_KUBECONFIG=~/.kube/workshop
 
 ./check.sh
@@ -689,9 +689,9 @@ export COZY_KUBECONFIG=~/.kube/workshop
 जब आप सभी लैब पूरी कर लें:
 
 ```bash
-# फ़ाइल में वर्णित ऑब्जेक्ट हटाओ: Deployment और Service दोनों
+# delete the objects described in the file: both the Deployment and the Service
 kubectl delete -f passes.yaml
-# सीक्रेट एक कमांड से बना था, फ़ाइल से नहीं — उसे नाम से हटाओ
+# the secret was created by a command, not a file — delete it by name
 kubectl delete secret harbor
 ```
 

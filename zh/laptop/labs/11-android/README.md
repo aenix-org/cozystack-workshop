@@ -82,14 +82,14 @@ bucket 是一个**托管服务**——一个现成的目录项：你说明你需
 **同一个 bucket 用文本表示**，如果你更喜欢这样的话。注意：这里的 `namespace`（集群内部的一道隔断；你的租户就是一个单独的 namespace）是租户的，而且你需要的是访问租户的文件，不是 `lab` 集群的那个。
 
 ```bash
-# KUBECONFIG——kubectl 用哪个访问文件。这里用租户的：bucket
-# 是在管理集群上订购的，不是在 lab 集群里
+# KUBECONFIG — which access file kubectl uses. Here it's the tenant's: the bucket
+# is ordered on the management cluster, not in the lab cluster
 export KUBECONFIG=~/.kube/workshop
 
-# apply =「把集群变成文件里描述的样子」。这条命令本身并不创建
-# 存储——它把订单交给平台。
-#   -f bucket.yaml   要应用哪个文件。在这之前，先把文件里的
-#                    tenant-workshopXX 替换成你自己的 namespace，否则订单会跑到别处去
+# apply = "bring the cluster to what's described in the file." The command doesn't create
+# the storage itself — it hands the order to the platform.
+#   -f bucket.yaml   which file to apply. Before this, replace
+#                    tenant-workshopXX in it with your namespace, or the order goes elsewhere
 kubectl apply -f bucket.yaml
 ```
 
@@ -146,15 +146,15 @@ bucket 需要几秒钟来完成置备。等到它在控制台里显示为就绪�
 同样这四个值也可以通过命令行拿到——平台会给你对每个你创建过的应用的凭据授予访问权限。下面这条命令取出四个值里的一个，`accessKey`；其余的取法一样，只需换一下字段名。
 
 ```bash
-# 我们用跟上一步相同的租户访问权限：secret 就在租户里。
-# get secret =「显示那个装着密码和密钥的对象」。secret 里面的值是
-# base64 编码的——这不是加密，只是把二进制数据写成文本的一种方式。
-#   -n tenant-workshopXX   在哪个 namespace 里找
-#   -o jsonpath='...'      不返回整个对象，只返回它里面的一个字段：
-#                          .data.accessKey —— data 区段里面的 accessKey 字段
-#   base64 -d              把它解码回可读的形式（d = decode）
-#   ; echo                 加一个换行：没有它的话，这个值会跟
-#                          下一个终端提示符黏在一起
+# We work with the same tenant access as in the previous step: the secret lives in the tenant.
+# get secret = "show the object with passwords and keys." The values inside the secret are
+# base64-encoded — this isn't encryption, just a way of writing binary data as text.
+#   -n tenant-workshopXX   which namespace to look in
+#   -o jsonpath='...'      return not the whole object, but a single field from it:
+#                          .data.accessKey — the accessKey field inside the data section
+#   base64 -d              decode it back into readable form (d = decode)
+#   ; echo                 add a line break: without it the value would run into
+#                          the next terminal prompt
 kubectl -n tenant-workshopXX get secret bucket-builds-ci-credentials \
   -o jsonpath='{.data.accessKey}' | base64 -d; echo
 ```
@@ -170,20 +170,20 @@ kubectl -n tenant-workshopXX get secret bucket-builds-ci-credentials \
 我们要在 `lab` 集群里用上一步的那四个值攒出我们自己的一个 secret。别改字段名：构建脚本会去找名字正好是这些的变量。
 
 ```bash
-# 从这里到实验结束，我们都用 lab 集群，不用租户
+# From here to the end of the lab we work with the lab cluster, not the tenant
 export KUBECONFIG=~/lab.kubeconfig
 
-# create secret generic =「用我接下来列出的这些值创建一个 secret」。
-# generic 意思是「一组任意的名字-值对」，而不是某个现成的类型，
-# 比如给镜像仓库密码或 TLS 证书用的那种。
-#   bucket-creds        secret 的名字。Job 会按这个名字引用它
-#   --from-literal=name='value'   一对。把 ВСТАВЬТЕ_... 替换成
-#                       控制台里 bucket 卡片上的那些值
+# create secret generic = "create a secret from the values I'm about to list."
+# generic means "an arbitrary set of name-value pairs," not a ready-made type
+# for an image-registry password or a TLS certificate.
+#   bucket-creds        the secret's name. The Job will reference it by this name
+#   --from-literal=name='value'   one pair. In place of PASTE_..., substitute
+#                       the values from the bucket's card in the dashboard
 kubectl create secret generic bucket-creds \
-  --from-literal=endpoint='ВСТАВЬТЕ_endpoint' \
-  --from-literal=bucketName='ВСТАВЬТЕ_bucketName' \
-  --from-literal=accessKey='ВСТАВЬТЕ_accessKey' \
-  --from-literal=secretKey='ВСТАВЬТЕ_secretKey'
+  --from-literal=endpoint='PASTE_endpoint' \
+  --from-literal=bucketName='PASTE_bucketName' \
+  --from-literal=accessKey='PASTE_accessKey' \
+  --from-literal=secretKey='PASTE_secretKey'
 ```
 
 **你应该看到：**
@@ -202,7 +202,7 @@ secret/bucket-creds created
 
 源代码放在那里也是出于同样的原因：构建需要文件，而为了六个文本文件去搭一块网络磁盘毫无意义。
 
-这个应用只做一件事：它显示一行字«申请访客通行证»。这就够了，因为这个实验讲的不是 Android，而是它在哪里被构建出来。
+这个应用只做一件事：它显示一行字«Request a guest pass»。这就够了，因为这个实验讲的不是 Android，而是它在哪里被构建出来。
 
 **APK** 就是最后产出的东西。它是一个归档文件，里面装着编译好的应用、图片、文本，以及该启动哪个界面的描述；手机安装的正是它。就它扮演的角色而言，它跟 Windows 上的 `.msi` 是一回事：一个交给用户的单一文件。
 
@@ -276,7 +276,7 @@ class MainActivity : Activity() {
 我们把源代码放进集群。目前还什么都没运行：这些只是构建在下一步会需要的文件。
 
 ```bash
-# 创建一个里面装着六个文件的 ConfigMap。要检查它是否就位：
+# Creates a ConfigMap with six files inside. To check it's in place:
 # kubectl get configmap propusk-src
 kubectl apply -f propusk-src.yaml
 ```
@@ -309,29 +309,29 @@ kubectl apply -f propusk-src.yaml
 有三行值得细看。
 
 ```bash
-# yes —— 一条无休止地打印「y」的命令：这样一批「接受
-# 许可协议吗？[y/n]」的问题就无需人参与地被应答了。
-#   >/dev/null 2>&1   把正常输出和错误输出都丢掉：这里不需要
-#   || true           「即使命令返回了错误，也当它没事」
+# yes — a command that prints "y" endlessly: this way a batch of "accept the
+# license? [y/n]" questions gets answered without a human.
+#   >/dev/null 2>&1   discard both normal output and error output: it's not needed here
+#   || true           "even if the command returned an error, treat it as fine"
 yes | sdkmanager --sdk_root="$ANDROID_SDK_ROOT" --licenses >/dev/null 2>&1 || true
 ```
 
 这里的 `|| true` 不是偷工减料，而是必需的：当 `sdkmanager` 关闭它的输入时，`yes` 会收到一个 SIGPIPE，于是它返回一个非零码。在 `set -o pipefail` 下，这会无缘无故地让构建失败。如果许可协议真的没被接受，紧接着的下一条命令就会拒绝安装 SDK，所以我们并没有把错误藏起来。
 
 ```bash
-# alias set =「把存储地址和密钥记在一个短名字 builds 底下」，这样
-# 后面每一条复制命令里就不用把它们重复一遍了。
-#   "https://${endpoint}"   地址：https:// 前缀我们自己加，secret 里没有它
-#   ${accessKey} ${secretKey}   S3 说法里的登录名和密码，它们来自 secret
-#   >/dev/null              把输出压掉
+# alias set = "remember the storage address and keys under the short name builds," so
+# we don't repeat them in every copy command that follows.
+#   "https://${endpoint}"   the address: we add the https:// prefix ourselves, it's not in the secret
+#   ${accessKey} ${secretKey}   the login and password in S3 terms, they come from the secret
+#   >/dev/null              suppress the output
 mc alias set builds "https://${endpoint}" "${accessKey}" "${secretKey}" >/dev/null
 ```
 
 输出是刻意压掉的，脚本里没有 `set -x` 也是同样的原因：Job 的日志任何有集群访问权限的人都看得到，而密钥绝不能落到那里。
 
 ```bash
-# echo 往任务的日志里打印一行。它不做任何实际工作——它是一个标记，
-# 表明前一条复制命令跑到了尽头
+# echo prints a line to the task's log. It does no work — it's a marker
+# that the previous copy command ran to completion
 echo "APK-UPLOADED ${bucketName}/propusk/propusk-${STAMP}.apk"
 ```
 
@@ -410,14 +410,14 @@ secret 的四个密钥全都变成名字相同的环境变量。另一种做法�
 我们应用这个 job，然后立刻看看它创建出来的那个 Pod。
 
 ```bash
-# 从文件里创建两个对象：一个装着脚本的 ConfigMap，以及 Job 本身。
-# 从这一刻起，集群就有义务给这个构建找一个节点并把它启动起来
+# Creates two objects from the file: a ConfigMap with the script and the Job itself.
+# From this moment the cluster is obliged to find a node for the build and start it
 kubectl apply -f android-build.yaml
 
-# get pods =「显示 Pod」。任务的 Pod 没有自己的名字——Job 自己给它
-# 编一个，在它自己的名字后面接上一段随机尾巴。所以我们不按名字找，而按标签找：
-#   -l job-name=propusk-build   挑出 job-name 标签等于该 job 名字的那些 Pod。
-#                               这个标签是 Job 自己贴到它的 Pod 上的
+# get pods = "show the Pods." The task's Pod has no name of its own — the Job invents it
+# itself, appending a random tail to its own name. So we search not by name but by label:
+#   -l job-name=propusk-build   select Pods with the job-name label equal to the job's name.
+#                               The Job attaches this label to its Pods itself
 kubectl get pods -l job-name=propusk-build
 ```
 
@@ -431,10 +431,10 @@ propusk-build-x7k2p    0/1     Pending   0          40s
 `Pending` 不是「正在启动」。它意味着「没启动，也不会启动」。集群会把原因写进 Pod 的事件里——那是它的一份日志：谁试图对它做了什么。
 
 ```bash
-# describe =「把关于这个对象所知道的一切都显示出来」：配置、状态、事件。
-# 输出很长，所以我们只留下它的末尾部分：
-#   sed -n '/Events:/,$p'   从出现「Events:」的那一行开始，
-#                           一直打印到输出的末尾（$ —— 末尾）
+# describe = "show everything known about the object": settings, state, events.
+# The output is long, so we keep only its tail:
+#   sed -n '/Events:/,$p'   print lines from the one where "Events:" appears,
+#                           through the end of the output ($ — end)
 kubectl describe pod -l job-name=propusk-build | sed -n '/Events:/,$p'
 ```
 
@@ -483,18 +483,19 @@ Warning  FailedScheduling  0/1 nodes are available: 1 Insufficient cpu, 1 Insuff
 等新节点。`lab` 集群没有图形化控制台，所以我们用命令来盯着：
 
 ```bash
-# get nodes =「显示集群的节点」——就是那些跑着 Pod 的虚拟机。
-#   -w   watch，「别退出；每次有变化就追加一行」。旧节点
-#        会从列表里掉出去，新节点会出现并到达 STATUS=Ready。
-#        要退出这个监视——Ctrl+C，它对集群没有任何影响
+# get nodes = "show the cluster's nodes" — those very virtual machines on which
+# the Pods run.
+#   -w   watch, "don't exit; append lines on every change." The old node
+#        will drop from the list, a new one will appear and reach STATUS=Ready.
+#        To leave the watch — Ctrl+C, which has no effect on the cluster
 kubectl get nodes -w
 ```
 
 一旦节点变成 `Ready`，那个卡住的构建 Pod 就会自己动起来——调度器一直在复查 `Pending` 的 Pod，不用去请求它。我们检查一下它是否动了：
 
 ```bash
-# 跟改节点之前同样的查询。现在 STATUS 那一列应该显示
-# ContainerCreating，再过一两分钟变成 Running
+# The same query as before the node edit. Now the STATUS column should show
+# ContainerCreating, and in a minute or two Running
 kubectl get pods -l job-name=propusk-build
 ```
 
@@ -505,10 +506,10 @@ kubectl get pods -l job-name=propusk-build
 我们要在构建的日志里盯着它——也就是脚本在容器内部打印到屏幕上的那些内容。
 
 ```bash
-# logs =「显示任务打印了什么」。
-#   -f                  follow：别退出，而是随着新行出现追加上去。
-#                       退出——Ctrl+C，构建照样继续
-#   job/propusk-build   你可以指向 Job 本身，而不是 Pod：kubectl 会自己找到它的 Pod
+# logs = "show what the task printed."
+#   -f                  follow: don't exit, but append lines as they appear.
+#                       Exit — Ctrl+C, the build keeps going regardless
+#   job/propusk-build   you can point at the Job itself, not the Pod: kubectl will find its Pod on its own
 kubectl logs -f job/propusk-build
 ```
 
@@ -516,24 +517,24 @@ kubectl logs -f job/propusk-build
 
 | 日志标记 | 大约在什么时候 |
 |---|---|
-| `== 1/5 正在安装 Android 命令行工具 ==` | 立刻 |
-| `== 2/5 正在接受许可协议并下载 SDK（最耗时的一步） ==` | +1–2 分钟，而且卡得最久 |
-| `== 3/5 正在构建 APK ==` | 从开始起 +5–15 分钟 |
+| `== 1/5 installing Android command-line tools ==` | 立刻 |
+| `== 2/5 accepting licenses and downloading the SDK (the longest step) ==` | +1–2 分钟，而且卡得最久 |
+| `== 3/5 building the APK ==` | 从开始起 +5–15 分钟 |
 | `BUILD SUCCESSFUL in ...` | 从开始起 +10–25 分钟 |
 | `APK-UPLOADED bucket-.../propusk/propusk-...apk` | 紧接在它之后 |
 
 ⚠️ **在 `2/5` 标记处沉默二十分钟是正常的，不是卡死。** `sdkmanager` 在非交互模式下不显示下载进度：它一声不吭，然后打印一个 `done`。你可以在另一个终端窗口里确认进程还活着——看看这个 Pod 是不是在吃 CPU 和内存：
 
 ```bash
-# top =「它此刻消耗多少」。不是 requests 那个声明，而是就在这一秒的
-# 实际用量。非零的 CPU 意味着内部正在干活
+# top = "how much it's consuming right now." Not the requests claim, but actual usage
+# this very second. Non-zero CPU means work is happening inside
 kubectl top pod -l job-name=propusk-build
 ```
 
 当 Pod 以代码 0 退出时（返回码为零是被广泛接受的「运行时没出错」），这个 Job 就被认为完成了：
 
 ```bash
-# 我们看的不是 Pod，而是 job 本身：它有一些 Pod 没有的列
+# We look not at the Pod but at the job itself: it has columns the Pod doesn't
 kubectl get job propusk-build
 ```
 
@@ -577,8 +578,8 @@ propusk/propusk-latest.apk
 📍 **位置：** 在笔记本电脑上，在你之前用 `kubectl` 干活的那个终端窗口里。
 
 ```bash
-# 这个脚本用跟你一样的访问文件去连 lab 集群。bucket 的凭据
-# 它从 bucket-creds secret 里取——你不用另外输入任何东西
+# The script reaches the lab cluster with the same access file as you. The bucket
+# credentials it takes from the bucket-creds secret — you don't need to enter anything separately
 export KUBECONFIG=~/lab.kubeconfig
 ./check.sh
 ```
@@ -594,11 +595,11 @@ Job 结束之后什么都不消耗：Pod 终止了，它的那些核和 GB 早�
 不需要马上删掉它，日志还会有用。等你做完了：
 
 ```bash
-# delete -f =「把这个文件里描述的东西从集群里移除」。Job 连同
-# 它的日志会一起消失，所以这条命令在时间上排最后，不是最前
+# delete -f = "remove from the cluster what's described in this file." Along with the Job
+# its logs will disappear too, so this command comes last in time, not first
 kubectl delete -f android-build.yaml
 kubectl delete -f propusk-src.yaml
-# 我们单独删掉这个 secret：它没有对应的文件，你是用命令创建它的
+# We delete the secret separately: there's no file for it, you created it with a command
 kubectl delete secret bucket-creds
 ```
 

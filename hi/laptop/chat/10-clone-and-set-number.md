@@ -64,4 +64,4 @@ Get-ChildItem -Recurse manifests,scripts -File | ForEach-Object {
 grep -rn tenant-workshopXX manifests scripts || echo "clean, you can continue"
 ```
 
-एक जगह ऐसी है जिसे कमांड नहीं छुएगी: `manifests/03-app-vm.yaml` में पंक्ति `url: "ВСТАВЬТЕ_PRESIGNED_URL"`। यह URL आपको बाद में मिलेगा, जब आप इमेज कन्वर्ट करेंगे। फ़िलहाल बस इतना जान लीजिए कि वह वहाँ आपका इंतज़ार कर रहा है।
+एक जगह ऐसी है जिसे कमांड नहीं छुएगी: `manifests/03-app-vm.yaml` में पंक्ति `url: "PASTE_PRESIGNED_URL"`। यह URL आपको बाद में मिलेगा, जब आप इमेज कन्वर्ट करेंगे। फ़िलहाल बस इतना जान लीजिए कि वह वहाँ आपका इंतज़ार कर रहा है।

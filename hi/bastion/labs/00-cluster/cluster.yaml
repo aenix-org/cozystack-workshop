@@ -1,9 +1,9 @@
-# लैब 1-14 के लिए प्रशिक्षण Kubernetes क्लस्टर।
-# लागू करने से पहले, tenant-workshopXX को अपने namespace से बदलें।
+# Training Kubernetes cluster for labs 1-14.
+# Before applying, replace tenant-workshopXX with your own namespace.
 #
-# प्रबंधन (MANAGEMENT) क्लस्टर पर लागू किया जाता है — उसी एक्सेस के साथ जो टेनेंट के
-# साथ जारी किया गया था। इस क्लस्टर का अपना kubeconfig अभी मौजूद नहीं है: यह
-# क्लस्टर के ऊपर आने के बाद ही प्रकट होगा।
+# Applied on the MANAGEMENT cluster — using the access that was issued together
+# with the tenant. The kubeconfig of this cluster itself does not exist yet: it will
+# appear only after the cluster comes up.
 #
 #   kubectl apply -f cluster.yaml
 #
@@ -16,18 +16,18 @@ spec:
   version: v1.35
   storageClass: replicated
   controlPlane:
-    # कंट्रोल प्लेन की एक ही प्रति: एक प्रशिक्षण स्टैंड, संसाधन बचाना
-    # दोष-सहिष्णुता से अधिक मायने रखता है।
+    # A single copy of the control plane: a training stand, saving resources
+    # matters more than fault tolerance.
     replicas: 1
   addons:
     monitoringAgents:
-      # तुरंत सक्षम करें। मेट्रिक्स संग्रह को पूर्वव्यापी रूप से सक्षम नहीं किया जा सकता: चेकबॉक्स सेट
-      # होने से पहले जो कुछ भी हुआ वह खो जाता है। लैब 14 इस डेटा पर निर्भर करती है।
+      # Enable right away. Metrics collection cannot be enabled retroactively: everything
+      # that happened before the checkbox was set is lost. Lab 14 relies on this data.
       enabled: true
   nodeGroups:
     md0:
-      # यदि प्रतियों में जगह की कमी होने लगे तो समूह स्वयं नोड्स जोड़ सकता है।
-      # स्केलिंग लैब में इतनी दूर तक नहीं जाएगा: वहाँ प्रतियाँ बढ़ती हैं, नोड्स नहीं।
+      # The group can add nodes on its own if the copies start running out of space.
+      # In the scaling lab it won't get that far: there the copies grow, not the nodes.
       minReplicas: 1
       maxReplicas: 3
       instanceType: u1.medium

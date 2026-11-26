@@ -1,16 +1,16 @@
--- orders-Schema für managed Postgres (Tabelle + History-Seed).
+-- orders schema for managed Postgres (table + history seed).
 --
--- Die Rolle `orders` und die DB `orders` werden vom Postgres-Chart (Postgres CR) erstellt,
--- daher gibt es hier KEIN CREATE USER / CREATE DATABASE — nur die Tabelle und etwas History.
+-- The `orders` role and `orders` DB are created by the Postgres chart (Postgres CR),
+-- so there is NO CREATE USER / CREATE DATABASE here — only the table and a bit of history.
 --
--- WICHTIG (PG 15+): Die Rolle orders kann ohne Grant keine Tabellen im Schema public
--- erstellen. Zuerst einmalig als Superuser (Secret postgres-db-superuser):
+-- IMPORTANT (PG 15+): the orders role cannot create tables in the public schema without
+-- a grant. First, once, as superuser (secret postgres-db-superuser):
 --     GRANT CREATE,USAGE ON SCHEMA public TO orders;
--- und erst danach diese Datei als Rolle orders anwenden. Ohne die Tabelle antwortet die
--- Anwendung mit 500 auf POST /api/orders (health bleibt dabei 200 — es prüft nur die
--- Verbindung zu PG, nicht das Vorhandensein der Tabelle).
+-- and only then apply this file as the orders role. Without the table the application
+-- returns 500 on POST /api/orders (health stays 200 — it only checks the
+-- connection to PG, not the presence of the table).
 --
--- Ausführung (vom app-VM oder einer beliebigen Maschine mit Zugriff auf managed PG):
+-- Run (from the app-VM or any machine with access to managed PG):
 --     PGPASSWORD='<orders-pw>' psql -h postgres-db-rw -U orders -d orders -f orders-schema.sql
 
 CREATE TABLE IF NOT EXISTS orders (
@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS orders (
     processed_at TIMESTAMPTZ
 );
 
--- etwas History, damit die Liste auf dem Projektor nicht leer aussieht
+-- a bit of history so the list does not look empty on the projector
 INSERT INTO orders (item, status, created_by, processed_by, created_at, processed_at)
 SELECT '12x rack rails', 'PROCESSED', 'app-1', 'kafka',
        now() - interval '3 days', now() - interval '3 days' + interval '2 seconds'

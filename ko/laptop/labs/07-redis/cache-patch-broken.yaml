@@ -1,21 +1,21 @@
 ---
-# 랩 7 · 이 패치는 의도적으로 불완전합니다. "캐시를 켠 것 같은데 빨라지지는 않았다"는
-# 상황이 어떤 모습인지 여러분이 직접 보도록 하기 위한 것입니다. 정상 동작 버전은 cache-patch.yaml에 있습니다.
+# Lab 7 · THIS PATCH IS INTENTIONALLY INCOMPLETE. It exists so that you can see what
+# "we sort of turned the cache on, but it didn't get any faster" looks like. The working version is in cache-patch.yaml.
 #
-# 여러분의 `lab` 클러스터에 적용합니다 (export KUBECONFIG=~/lab.kubeconfig):
+# Applied in your `lab` cluster (export KUBECONFIG=~/lab.kubeconfig):
 #   kubectl patch deployment passes-api --patch-file cache-patch-broken.yaml
 #
-# 정답을 미리 훔쳐볼 필요는 없습니다. 적용한 뒤 요청을 몇 번 보내고 애플리케이션 로그를
-# 확인하세요: kubectl logs -l app=passes-api. 애플리케이션이 무엇이 잘못됐는지 알려줍니다.
-# 핵심은 그 메시지를 읽고 이 파일에 무엇이 빠졌는지 파악하는 것입니다.
+# No need to peek at the answer. Apply it, make a couple of requests, and look at the
+# application logs: kubectl logs -l app=passes-api. The application tells you what's wrong with it
+# — the point is to read the message and figure out what this file is missing.
 #
-# REDIS-ADDR 대신 여러분의 Redis 주소를 넣으세요 (주소 찾기 단계 참고).
-# 플레이스홀더를 그대로 두면 안 됩니다: 그러면 이 모든 것을 준비한 목적과는 다른 오류가 나옵니다.
+# Substitute your own Redis address in place of REDIS-ADDR (see the step about finding the address).
+# You must not leave the placeholder: then you'll get a different error, not the one this whole thing was set up for.
 spec:
   template:
     spec:
       containers:
-        # 컨테이너 이름은 클러스터가 수정할 위치를 찾는 주소입니다.
+        # The container name is the address by which the cluster finds the place to patch.
         - name: api
           env:
             - name: REDIS_ADDR

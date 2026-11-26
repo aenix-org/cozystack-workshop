@@ -76,7 +76,7 @@ CPU 스파이크와, 오토스케일링이 복제본을 추가하며 생긴 계�
 아래에서 `kubectl apply -f name.yaml`이라고 나오는 곳마다, 그 파일은 여기서 가져옵니다.
 
 ```bash
-# 이 lab의 폴더로 전환합니다: 아래의 모든 상대 경로는 여기서부터 셉니다
+# switch to this lab's folder: all the relative paths below are counted from here
 cd labs/14-observability
 ```
 
@@ -93,13 +93,14 @@ cd labs/14-observability
 이 애드온이 켜져 있는지 확인합니다:
 
 ```bash
-# KUBECONFIG — kubectl이 클러스터의 주소와 누구로 로그인할지를 읽어 오는 변수입니다. `lab` 클러스터를
-# 만들 때 ~/lab.kubeconfig 파일을 저장해 두었습니다. 새 터미널 창을 열 때마다 다시 설정해야 합니다.
+# KUBECONFIG — the variable kubectl reads to learn the cluster's address and who to
+# log in as. You saved the file ~/lab.kubeconfig when you created the `lab` cluster.
+# It has to be set again in every new terminal window.
 export KUBECONFIG=~/lab.kubeconfig
 
-# get pods = "어떤 pod들이 있는지 보여 줘".
-#   -n cozy-monitoring   전체 클러스터가 아니라 이 namespace 안만 봅니다: 바로 여기에
-#                        애드온이 수집기를 넣습니다.
+# get pods = "show me which pods exist".
+#   -n cozy-monitoring   look not across the whole cluster, but in this namespace: that's
+#                        exactly where the add-on puts its collectors.
 kubectl get pods -n cozy-monitoring
 ```
 
@@ -128,16 +129,16 @@ metrics-server-7d4b8c9f5-x2klm    1/1     Running   0          3d
 정리 과정에서 부하 생성기가 제거되었으니, 둘 다 되살려야 한다는 점을 유념하세요:
 
 ```bash
-export KUBECONFIG=~/lab.kubeconfig          # 위와 같은 접근 파일
+export KUBECONFIG=~/lab.kubeconfig          # the same access file as above
 
-# apply = "클러스터를 파일에 기술된 상태로 만들어라". 두 파일 모두 이웃 lab의 폴더에 있으므로
-# 경로가 `../`로 시작합니다 — 다시 타이핑할 필요가 없습니다.
-kubectl apply -f ../03-scale/hpa.yaml       # rickroll의 오토스케일링 규칙
-kubectl apply -f ../03-scale/fortio.yaml    # 부하 생성기
+# apply = "bring the cluster to what's described in the file". Both files live in the
+# neighboring lab's folder, so the path starts with `../` — no need to type them again.
+kubectl apply -f ../03-scale/hpa.yaml       # the autoscaling rule for rickroll
+kubectl apply -f ../03-scale/fortio.yaml    # the load generator
 
-# rollout status = "터미널을 붙잡고 있다가 롤아웃이 끝나면 알려 줘".
-# deployment/fortio — 객체 유형과 그 이름. 생성기가 올라오면 명령이 `successfully rolled out`
-# 줄과 함께 프롬프트를 돌려줍니다.
+# rollout status = "hold the terminal and tell me when the rollout is done".
+# deployment/fortio — the object type and its name. The command returns the prompt
+# with the line `successfully rolled out` once the generator comes up.
 kubectl rollout status deployment/fortio
 ```
 
@@ -147,11 +148,11 @@ kubectl rollout status deployment/fortio
 나타나지 않습니다:
 
 ```bash
-# port-forward = 노트북에서 클러스터 안으로 터널을 뚫습니다. 명령이 실행되는 동안,
-# localhost:8081로 보낸 요청이 부하 생성기에 도달합니다.
-#   svc/fortio    대상: fortio라는 이름의 service(pod가 아님)
-#   8081:8080     왼쪽은 당신의 노트북 위의 포트, 오른쪽은 service 내부의 포트
-# 창을 닫지 마세요: 터널은 명령이 실행되는 딱 그동안만 살아 있습니다.
+# port-forward = dig a tunnel from the laptop into the cluster. While the command runs,
+# a request to localhost:8081 lands in the load generator.
+#   svc/fortio    the target: the service (not the pod) named fortio
+#   8081:8080     on the left, the port on your laptop; on the right, the port inside the service
+# Don't close the window: the tunnel lives exactly as long as the command runs.
 kubectl port-forward svc/fortio 8081:8080
 ```
 
@@ -182,11 +183,11 @@ lab 0의 파라미터 표에 별도의 항목으로 있습니다.
 수집기가 데이터를 보내는 주소를 보려면:
 
 ```bash
-# get vmagent = "수집기 객체를 보여 줘". 익숙한 표 대신 그 기술(description)에서 필드 하나만
-# 요청합니다 — -o jsonpath 문법은 어떤 클러스터 객체에도 통합니다:
-#   .items[0]                  찾은 첫 번째(그리고 여기서는 유일한) 수집기
-#   .spec.remoteWrite[0].url   메트릭을 넘겨 주는 주소
-#   {"\n"}                     줄바꿈, 없으면 출력이 프롬프트에 붙어 버립니다
+# get vmagent = "show me the collector object". Instead of the usual table we ask for a single
+# field from its description — the -o jsonpath syntax works with any cluster object:
+#   .items[0]                  the first (and here only) collector found
+#   .spec.remoteWrite[0].url   the address it hands the metrics to
+#   {"\n"}                     a newline, otherwise the output runs into the prompt
 kubectl get vmagent -n cozy-monitoring \
   -o jsonpath='{.items[0].spec.remoteWrite[0].url}{"\n"}'
 ```
@@ -312,13 +313,13 @@ count by (pod) ( ... )
 </details>
 
 ```promql
-# count by (pod) — 매칭된 시계열을 pod 레이블로 쪼개고 각 그룹에 시계열이 몇 개인지 셉니다.
-# 숫자 자체는 중요하지 않습니다: 우리가 원하는 것은 그 결과로 나오는 pod 이름들의 목록입니다.
+# count by (pod) — break the matched series out by the pod label and count how many series
+# are in each group. The numbers themselves don't matter: what we want is the list of pod names that results.
 count by (pod) (
-  # 메트릭 이름 — 컨테이너 CPU 시간 카운터
+  # the metric name — the container CPU-time counter
   container_cpu_usage_seconds_total{
-    cluster="kubernetes-lab",   # 당신의 클러스터: 여기는 릴리스 이름이지 앱 이름 lab이 아닙니다
-    namespace="default"         # rickroll이 배포된, lab 클러스터 내부의 namespace
+    cluster="kubernetes-lab",   # your cluster: the release name here, not the app name lab
+    namespace="default"         # the namespace inside the lab cluster where rickroll is deployed
   }
 )
 ```
@@ -376,14 +377,14 @@ sum by (pod) ( ... )
 </details>
 
 ```promql
-# rate(...[2m]) — 카운터의 초당 증가율을 2분 창으로 평균 낸 것.
-# CPU 시간에 대해서는 "코어가 몇 개나 소비되고 있었는가"로 읽힙니다:
-# 0.24 — 코어 한 개의 24%, 즉 240m.
-sum by (pod) (     # pod의 컨테이너들을 합칩니다: 컨테이너당이 아니라 pod당 한 줄
+# rate(...[2m]) — the counter's growth rate per second, averaged over a 2-minute window.
+# For CPU time it reads as "how many cores were being consumed":
+# 0.24 — twenty-four percent of one core, that is 240m.
+sum by (pod) (     # sum the pod's containers: one line per pod, not per container
   rate(container_cpu_usage_seconds_total{
     cluster="kubernetes-lab", namespace="default",
-    pod=~"rickroll-.*",  # =~ 정규식에 의한 비교: pod 이름의 꼬리는 무작위입니다
-    container!=""        # pod 전체 합계 시계열을 버립니다, 안 그러면 모든 게 두 배가 됩니다
+    pod=~"rickroll-.*",  # =~ comparison by regular expression: the pod name's tail is random
+    container!=""        # drop the whole-pod total series, otherwise everything doubles
   }[2m])
 )
 ```
@@ -419,9 +420,9 @@ lab 11에서 마주쳤던 상황입니다.
 함께 보면 유용한 것:
 
 ```promql
-# rickroll 복제본이 총 몇 개 생성되었는지
+# how many rickroll copies have been created in total
 kube_deployment_status_replicas{cluster="kubernetes-lab", deployment="rickroll"}
-# 그중 몇 개가 readiness 체크를 통과해 이미 트래픽을 받고 있는지
+# how many of them have passed the readiness check and are already taking traffic
 kube_deployment_status_replicas_available{cluster="kubernetes-lab", deployment="rickroll"}
 ```
 
@@ -431,19 +432,19 @@ kube_deployment_status_replicas_available{cluster="kubernetes-lab", deployment="
 </details>
 
 ```promql
-# ..._status_current_replicas — 지금 이 순간 rickroll 복제본이 몇 개 실행 중인지.
-# 이 숫자는 애플리케이션이 아니라 kube-state-metrics가 읽은 HPA 객체에서 옵니다.
+# ..._status_current_replicas — how many rickroll copies are running right now.
+# The number comes not from the application but from the HPA object, read by kube-state-metrics.
 kube_horizontalpodautoscaler_status_current_replicas{
-  cluster="kubernetes-lab",             # 당신의 lab 클러스터만
-  horizontalpodautoscaler="rickroll"    # lab 3의 오토스케일링 객체 이름
+  cluster="kubernetes-lab",             # only your lab cluster
+  horizontalpodautoscaler="rickroll"    # the name of the autoscaling object from lab 3
 }
 ```
 
 그리고 그 옆에, 두 번째 쿼리로:
 
 ```promql
-# ..._status_desired_replicas — 오토스케일링이 부하를 근거로 지금 갖고자 하는 복제본 수.
-# current가 desired에 뒤처지는 것이 바로 pod 생성에 걸리는 시간입니다.
+# ..._status_desired_replicas — how many copies autoscaling wants to have now,
+# based on the load. current lagging behind desired is exactly the pod creation time.
 kube_horizontalpodautoscaler_status_desired_replicas{
   cluster="kubernetes-lab",
   horizontalpodautoscaler="rickroll"
@@ -468,7 +469,7 @@ CPU가 오르고, 그다음 오토스케일링이 그것을 알아채고 반응�
 실제 소비, 아래에는 request입니다.
 
 ```promql
-# 위쪽 부분 — pod의 실제 CPU 소비. 위와 같은 쿼리입니다.
+# The top part — the pod's actual CPU consumption. The same query as above.
 sum by (pod) (
   rate(container_cpu_usage_seconds_total{
     cluster="kubernetes-lab", namespace="default",
@@ -476,13 +477,13 @@ sum by (pod) (
   }[2m])
 )
 /
-# 아래 부분 — pod가 얼마나 요청했는지. 나눗셈의 결과는 request 대비 비율입니다: 1은
-# "요청한 만큼 정확히 소비 중"을, 0.5는 요청한 것의 절반을 뜻합니다.
+# The bottom part — how much the pod requested. The result of the division is the fraction of the request: 1 means
+# "consuming exactly as much as it requested", 0.5 — half of what was requested.
 sum by (pod) (
   kube_pod_container_resource_requests{
     cluster="kubernetes-lab", namespace="default",
     pod=~"rickroll-.*",
-    resource="cpu"     # 이 메트릭에는 memory 시계열도 있습니다 — CPU만 남깁니다
+    resource="cpu"     # the metric also has memory series — we keep only CPU
   }
 )
 ```
@@ -505,9 +506,9 @@ lab 3의 `hpa.yaml`에는 `averageUtilization: 50`이 있고, `rickroll.yaml`에
 **클러스터에서 누가 CPU를 가장 많이 소비하는가, 상위 10:**
 
 ```promql
-# topk(10, ...) — 값이 가장 큰 시계열 열 개만 남깁니다.
-# by (namespace, pod)로 묶으면 답에 namespace가 더해집니다: 누구의 pod인지 볼 수 있습니다.
-# [5m] 창은 앞 단계들보다 넓습니다: 스파이크의 모양이 아니라 평균 수준을 원하기 때문입니다.
+# topk(10, ...) — keep only the ten series with the largest values.
+# Grouping by (namespace, pod) adds the namespace to the answer: you can see whose pod it is.
+# The [5m] window is wider than in the previous steps: we want not the shape of the spike, but the average level.
 topk(10,
   sum by (namespace, pod) (
     rate(container_cpu_usage_seconds_total{cluster="kubernetes-lab", container!=""}[5m])
@@ -518,8 +519,8 @@ topk(10,
 **Pod별 메모리(카운터가 아니므로 `rate` 없음):**
 
 ```promql
-# container_memory_working_set_bytes — 카운터가 아니라 순간값입니다: 이 순간에 이만큼의
-# 바이트가 점유되어 있다. 여기서 rate()는 "초당 바이트"라는 말도 안 되는 값을 줍니다.
+# container_memory_working_set_bytes — not a counter but an instantaneous value: this many bytes
+# are occupied at this moment. rate() here would give nonsense — "bytes per second".
 sum by (pod) (
   container_memory_working_set_bytes{
     cluster="kubernetes-lab", namespace="default", container!=""
@@ -535,8 +536,9 @@ sum by (pod) (
 **리소스가 얼마나 예약되어 있는가 대 실제로 얼마나 쓰이는가:**
 
 ```promql
-# sum without by — 모든 것을 하나의 숫자로 합칩니다: 클러스터의 모든 pod에 CPU가 얼마나
-# 예약되어 있는가. 이것은 소비가 아니라 request입니다: 예약되어 놀고 있는 것도 합계에 들어갑니다.
+# sum without by — add everything into a single number: how much CPU is reserved for all
+# the cluster's pods. This is the request, not the consumption: what's reserved and sitting idle
+# goes into the sum too.
 sum(kube_pod_container_resource_requests{cluster="kubernetes-lab", resource="cpu"})
 ```
 
@@ -547,8 +549,8 @@ sum(kube_pod_container_resource_requests{cluster="kubernetes-lab", resource="cpu
 lab 11을 했다면, 하는 김에 Android 빌드도 한번 보세요 — 뚜렷하게 보입니다:
 
 ```promql
-# 같은 rate이지만 build pod에 필터를 겁니다. sum without by (pod) — 빌드가 pod를 몇 개
-# 올리든 빌드 전체에 한 줄.
+# The same rate, but a filter on the build pods. sum without by (pod) — one line for the whole build,
+# however many pods it brings up.
 sum(rate(container_cpu_usage_seconds_total{
   cluster="kubernetes-lab", pod=~"propusk-build-.*", container!=""
 }[2m]))
@@ -583,14 +585,15 @@ kubernetes_namespace_name:default AND kubernetes_pod_name:rickroll*
 📍 **위치:** 노트북에서, `kubectl`로 작업하던 그 동일한 터미널 창에서.
 
 ```bash
-export KUBECONFIG=~/lab.kubeconfig          # lab 클러스터 `lab`에 대한 접근
+export KUBECONFIG=~/lab.kubeconfig          # access to the lab cluster `lab`
 
-# 아래 두 변수는 스크립트에 테넌트 접근까지 부여합니다. 이것이 있으면 메트릭이 거기 도달했는지
-# 추가로 확인하고, 당신의 Grafana 주소를 출력합니다. 없으면 확인은 통과하지만 보고가 짧아집니다.
-export COZY_TENANT=workshopXX               # XX 대신 당신의 번호
-export COZY_KUBECONFIG=~/.kube/workshop     # 테넌트 접근 파일
+# The two variables below give the script access to the tenant as well. With them it will
+# additionally check that the metrics made it there, and print the address of your Grafana. Without them
+# the check will pass, but the report will be shorter.
+export COZY_TENANT=workshopXX               # your number instead of XX
+export COZY_KUBECONFIG=~/.kube/workshop     # the tenant access file
 
-./check.sh                                  # ./ = "현재 폴더에서 파일을 실행하라"
+./check.sh                                  # ./ = "run the file from the current folder"
 ```
 
 ⚠️ **Windows에서는 스크립트를 PowerShell이 아니라 WSL에서 실행합니다** — 설정 방법은 lab 0

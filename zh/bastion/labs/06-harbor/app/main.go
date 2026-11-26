@@ -1,36 +1,36 @@
-// 实验 6 · 你自己的私有镜像仓库。「通行证」服务，教学版本。
+// Lab 6 · Your own private image registry. The "Pass" service, training version.
 //
-// 这个程序做什么。它启动一个 Web 服务器，并在两个路径上作出响应。
-// /healthz 路径返回一个简短的「ok」：集群据此得知某个副本存活
-// 且已准备好接收流量。/ 路径返回一个 JSON 格式的小型响应（形如
-//「字段: 值」的文本），列出是哪个副本、在哪个节点上处理了这个
-// 请求。仅此而已：没有数据库，没有磁盘，没有状态。这是有意为之——在这个实验里
-// 重要的不是代码，而是它进入集群所走的路径：
-// 源码 -> 镜像 -> 你的仓库 -> 集群。
+// WHAT THIS PROGRAM DOES. It starts a web server and answers on two paths.
+// The /healthz path returns a short "ok": from it the cluster learns that a replica is alive
+// and ready to receive traffic. The / path returns a small response in JSON format (text
+// of the form "field: value"), listing which replica and on which node served the
+// request. Nothing else: no database, no disk, no state. That is intentional — in this lab
+// what matters is not the code, but the path it takes into the cluster:
+// source -> image -> your registry -> cluster.
 //
-// 你不需要会读这个 Go 文件，只要理解这里发生了什么就够了；
-// 下面的注释是按照你第一次见到 Go 的假设来写的。
+// You do not need to be able to read this Go file; it is enough to understand what happens here;
+// the comments below are written on the assumption that you are seeing Go for the first time.
 //
-// 没有外部依赖：只用到标准库，它随编译器一起
-// 附带而来。因此构建过程不会为了库而访问互联网，
-// 你可以在出网被封闭的地方构建镜像——而这
-// 恰恰就是整个实验的起点所在。
+// There are no external dependencies: only the standard library is used, which
+// ships together with the compiler. So the build does not go to the internet for
+// libraries, and you can build the image where outbound access is closed — which
+// is exactly where the whole lab begins.
 //
-// 它不是直接构建的，而是通过相邻的 Dockerfile，用命令
+// It is built not directly, but through the neighboring Dockerfile, with the command
 // docker build --platform linux/amd64 -t HARBOR-HOST/passes/passes-api:v1 app/
 //
-// package main —— Go 用这种方式标记一个可以运行的程序（与库
-// 相对）。运行时的入口点是文件最底部的 main 函数。
+// package main — this is how Go marks a program that can be run (as opposed
+// to a library). The entry point when it runs is the main function at the very bottom of the file.
 package main
 
-// 我们从标准库中取用的东西：
-//   encoding/json —— 以 JSON 格式组装响应
-//   log           —— 写日志消息；在容器里它们进入标准输出，
-//                   kubectl logs 从那里取走它们。容器内部没有日志文件，
-//                   也不需要创建——这对容器来说是正常的
-//   net/http      —— Web 服务器本身
-//   os            —— 读取环境变量
-//   time          —— 响应里的时间戳以及服务器超时
+// What we take from the standard library:
+//   encoding/json — assemble the response in JSON format
+//   log           — write messages; in a container they go to standard output,
+//                   from where kubectl logs picks them up. There are no log files inside,
+//                   and there is no need to create them — this is normal for containers
+//   net/http      — the web server itself
+//   os            — read environment variables
+//   time          — timestamp in the response and the server timeout
 import (
 	"encoding/json"
 	"log"
@@ -39,12 +39,12 @@ import (
 	"time"
 )
 
-// 响应的形态：应用向外报告的关于自身的一组字段。它们几乎都是
-// 应用从集群那里获知的：我们不计算也不猜测它们，而是集群
-// 自己把它们放进环境变量（见 passes.yaml，env 块和 downward API）。
+// The shape of the response: the set of fields the application reports about itself. Almost all of them
+// are what the application learns from the cluster: we do not compute or guess them, the cluster
+// itself puts them into environment variables (see passes.yaml, the env block and the downward API).
 //
-// 右侧反引号中的文本是最终 JSON 里的字段名。没有它，字段就会以
-// Namespace 而不是 namespace 的形式进入响应；check.sh 里的检查查找的是小写的「pod」。
+// The text in backticks on the right is the field name in the finished JSON. Without it the field would go
+// into the response as Namespace rather than namespace; the check in check.sh looks for the lowercase "pod".
 type identity struct {
 	Service   string `json:"service"`
 	Version   string `json:"version"`
@@ -55,9 +55,9 @@ type identity struct {
 	Time      string `json:"time"`
 }
 
-// 读取一个环境变量，如果它缺失或为空——就返回一个备用
-// 值。之所以需要它，是为了让程序也能在集群之外运行，不需要任何一项
-// 配置：它不会崩溃，而会老实地在响应里写上「未知」。
+// Read an environment variable, and if it is missing or empty — return a fallback
+// value. It is needed so the program can be run outside the cluster too, without a single
+// setting: it will not crash, but will honestly write "unknown" in the response.
 func env(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
@@ -65,64 +65,64 @@ func env(key, fallback string) string {
 	return fallback
 }
 
-// 入口点：程序的工作从这个函数开始。
+// Entry point: the program's work begins with this function.
 func main() {
-	// 监听哪个端口。端口可以用 PORT 变量覆盖而无需重新构建
-	// 镜像，但默认是 8080 —— 与 passes.yaml（containerPort）
-	// 以及 Dockerfile（EXPOSE）里是同一个数字。一旦不一致——Service 就会敲一扇关着的门。
+	// Which port to listen on. The port can be overridden with the PORT variable without rebuilding
+	// the image, but by default it is 8080 — the same number as in passes.yaml (containerPort)
+	// and in the Dockerfile (EXPOSE). If they diverge — the Service will knock on a closed door.
 	port := env("PORT", "8080")
 
-	// 路由表：哪个路径由哪个处理器来处理。
+	// The routing table: which path is served by which handler.
 	mux := http.NewServeMux()
 
-	// 就绪检查。集群往这里敲门，在得到响应之前
-	// 不会把流量发到该副本上。它总是快速作答，什么都不检查：
-	// 应用没有什么可检查的，它既没有数据库也没有磁盘。
+	// Readiness check. The cluster knocks here and does not send traffic to the replica
+	// until it gets a response. It always answers quickly, checking nothing:
+	// the application has nothing to check, it has neither a database nor a disk.
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		_, _ = w.Write([]byte("ok\n"))
 	})
 
-	// 主响应。我们组装那些字段，并把它们作为一个 JSON 返回。这些值是在
-	// 每次请求时读取的，因此服务的第二个副本会用它自己的 pod 名字来作答——
-	// 在实验里正是通过这个名字看出确实有两个副本。
+	// The main response. We assemble those very fields and return them as one JSON. The values are read
+	// on each request, so the second replica of the service will answer with its own pod name —
+	// by that name the lab shows that there really are two replicas.
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		body := identity{
 			Service:   "passes-api",
 			Version:   env("APP_VERSION", "v1"),
-			Pod:       env("POD_NAME", "未知"),
-			Node:      env("NODE_NAME", "未知"),
-			Namespace: env("POD_NAMESPACE", "未知"),
-			Registry:  env("IMAGE_REGISTRY", "未设置"),
+			Pod:       env("POD_NAME", "unknown"),
+			Node:      env("NODE_NAME", "unknown"),
+			Namespace: env("POD_NAMESPACE", "unknown"),
+			Registry:  env("IMAGE_REGISTRY", "not set"),
 			Time:      time.Now().UTC().Format(time.RFC3339),
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		enc := json.NewEncoder(w)
 		enc.SetIndent("", "  ")
-		// SetEscapeHTML(false)，否则西里尔字母以及像 < 这样的字符会变成 \uXXXX
-		// 使得响应在终端里变得不可读。
+		// SetEscapeHTML(false), otherwise Cyrillic and characters like < would go into \uXXXX
+		// and the response would become unreadable in the terminal.
 		enc.SetEscapeHTML(false)
 		if err := enc.Encode(body); err != nil {
-			log.Printf("无法返回响应: %v", err)
+			log.Printf("failed to write response: %v", err)
 		}
 	})
 
-	// 服务器设置。ReadHeaderTimeout —— 在断开连接之前
-	// 等待请求头多久。这五秒不是为了速度：没有这个超时，
-	// 打开后被丢弃的连接会不断堆积，直到吃光容器的内存，
-	// 而内存受清单里的 limit 限制。
+	// Server settings. ReadHeaderTimeout — how long to wait for request headers before
+	// dropping the connection. The five seconds are not for speed: without this timeout
+	// open and abandoned connections pile up until they eat the container's memory,
+	// and memory is capped by the limit from the manifest.
 	srv := &http.Server{
 		Addr:              ":" + port,
 		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
-	// 你在 kubectl logs 里看到的第一样东西。这一行是为了把「应用
-	// 没有启动」和「启动了，但不作答」区分开——这是不同的诊断。
-	log.Printf("passes-api %s 正在监听端口 %s, pod %s",
-		env("APP_VERSION", "v1"), port, env("POD_NAME", "未知"))
-	// 我们启动服务器并一直运行，直到被停止。如果端口被占用或服务器
-	// 崩溃——我们写下原因并以错误退出。集群会看到结束了的进程
-	// 并重新拉起一个副本；不需要在程序内部去修复重启。
+	// The first thing you will see in kubectl logs. The line is needed to tell "the application
+	// did not start" from "started, but does not answer" — these are different diagnoses.
+	log.Printf("passes-api %s listening on port %s, pod %s",
+		env("APP_VERSION", "v1"), port, env("POD_NAME", "unknown"))
+	// We start the server and run until we are stopped. If the port is busy or the server
+	// crashed — we write the reason and exit with an error. The cluster will see the finished process
+	// and bring up a replica anew; there is no need to fix the restart inside the program.
 	log.Fatal(srv.ListenAndServe())
 }

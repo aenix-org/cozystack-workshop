@@ -1,42 +1,42 @@
-# Lab 13. Standardwerte für den Chart „Ausweise".
+# Lab 13. Default values for the "Passes" chart.
 #
-# Das sind die Antworten auf die Fragen, die der Chart beim Ausrollen stellt: wie viele Kopien,
-# welcher Text auf der Seite steht, ob eine Adresse von außen nötig ist. Sie sind hier für den Fall
-# „nichts wurde ausgewählt" festgehalten. Wer die Anwendung bestellt, überschreibt sie: im Dashboard
-# über Formularfelder, im Terminal mit dem Schlüssel `--set replicas=5` oder einer eigenen Datei `helm install ... -f my.yaml`.
-# Das Bearbeiten dieser Datei ändert die Standardwerte für künftige Bestellungen, nicht für bereits ausgerollte.
+# These are the answers to the questions the chart asks at deployment time: how many replicas,
+# what text goes on the page, whether an external address is needed. They are recorded here for the
+# "nothing was selected" case. Whoever orders the application overrides them: in the dashboard with
+# form fields, in the terminal with the `--set replicas=5` flag or their own file `helm install ... -f my.yaml`.
+# Editing this file changes the defaults for future orders, not for already deployed ones.
 #
-# Wie die Werte von hier zum Bestellformular im Dashboard werden:
-#   Typ          — welches Feld angezeigt wird: {int} eine Zahl, {bool} ein Schalter,
-#                {string} ein Texteingabefeld, {struct} eine verschachtelte Gruppe von Feldern;
-#   Beschreibung — die Feldbeschriftung und der Hinweis darunter;
-#   =Wert        — was bereits im Feld steht, wenn das Formular geöffnet wird;
-#   Pflichtangabe — wird durch die Liste required im Schema festgelegt. Hier gibt es keine: jeder
-#                Parameter hat einen Standardwert, daher kann jedes Feld übersprungen werden.
-# Deshalb werden die Beschreibungen auf Englisch geschrieben: sie werden nicht nur vom Chart-Autor gelesen, sondern von jedem,
-# der die Anwendung im Dashboard bestellt.
+# How values from here turn into the order form in the dashboard:
+#   type       — which field to show: {int} a number, {bool} a toggle,
+#                {string} a text input, {struct} a nested group of fields;
+#   Description — the field label and the hint beneath it;
+#   =value     — what is already in the field when the form is opened;
+#   requiredness — set by the required list in the schema. There is none here: every
+#                parameter has a default value, so any field can be skipped.
+# That is why descriptions are written in English: they are read not only by the chart author, but by anyone
+# who orders the application in the dashboard.
 
-## Kommentare wie `## @param` sind keine Verzierung. Anhand von ihnen sammelt der Cozystack-Generator
-## (cozyvalues-gen) die values.schema.json und die Parametertabelle in der README.
-## Format: ## @param {Typ} Name=Standardwert - Beschreibung.
+## Comments like `## @param` are not decoration. The Cozystack generator
+## (cozyvalues-gen) uses them to assemble values.schema.json and the parameter table in the README.
+## Format: ## @param {type} name=default-value - Description.
 
-# Wie viele Kopien der Anwendung laufen sollen. Eine Kopie bedeutet Ausfallzeit, während
-# ein Knoten neu startet; zwei überleben den Verlust einer der beiden.
+# How many application replicas to keep running. One replica means downtime while
+# a node restarts; two survive the loss of either one.
 ## @param {int} replicas=2 - Number of application replicas.
 replicas: 2
 
-# Text auf der Hauptseite. Als Parameter herausgezogen, weil jede Tochtergesellschaft ihren eigenen hat,
-# und niemand nur dafür ein separates Image baut.
+# Text on the main page. Exposed as a parameter because each subsidiary has its own,
+# and no one will build a separate image just for that.
 ## @param {string} greeting=Order a pass for your guest - Text shown on the main page.
 greeting: "Order a pass for your guest"
 
-# Ob die Anwendung eine Adresse außerhalb des Clusters braucht. Konvention des Cozystack-Katalogs:
-# ein Feld namens external bedeutet bei allen Anwendungen dasselbe — externen Zugriff.
+# Whether the application needs an address outside the cluster. Cozystack catalog convention:
+# a field named external means the same thing for all applications — external access.
 ## @param {bool} external=false - Enable external access from outside the cluster.
 external: false
 
-# Größe einer einzelnen Kopie. Als separate Gruppe von Feldern herausgezogen, damit es im Bestellformular
-# wie ein einziger Block „Ressourcen" aussieht und nicht wie zwei unverbundene Felder.
+# Size of a single replica. Exposed as a separate group of fields so that in the order form it
+# looks like one "resources" block rather than two unrelated fields.
 ## @typedef {struct} Resources - CPU and memory for each replica.
 ## @field {quantity} cpu - CPU available to each replica.
 ## @field {quantity} memory - Memory (RAM) available to each replica.

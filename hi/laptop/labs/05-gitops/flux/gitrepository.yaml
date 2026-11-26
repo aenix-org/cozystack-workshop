@@ -1,39 +1,39 @@
 ---
-# लैब 5 · Git में इन्फ्रास्ट्रक्चर। स्रोत: Flux वांछित स्थिति कहाँ से लेता है।
+# Lab 5 · Infrastructure in Git. The source: where Flux gets the desired state from.
 #
-# आपके `lab` क्लस्टर पर बगल वाली kustomization.yaml के साथ लागू होता है:
+# Applied on your `lab` cluster together with the neighboring kustomization.yaml:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl apply -f flux/
 #
-# ध्यान दें: लागू करने से पहले url को अपने रिपॉज़िटरी के पते से बदलें: पंक्ति में
-# ЗАМЕНИТЕ-МЕНЯ एक प्लेसहोल्डर है, इसके साथ Flux एक अस्तित्वहीन पते पर जाएगा और त्रुटि
-# के साथ रुक जाएगा। ब्रांच भी जाँच लें: GitHub नए रिपॉज़िटरी main ब्रांच के साथ बनाता है।
+# ATTENTION: REPLACE the url with the address of YOUR repository before applying: the
+# REPLACE-ME string is a stub, with it Flux will go to a nonexistent address and stall
+# with an error. Check the branch too: GitHub creates new repositories with the main branch.
 #
-# हर ऑब्जेक्ट में: apiVersion — वर्णन स्कीमा का संस्करण, kind — हम क्या बना रहे हैं,
-# metadata.name — वह नाम जिससे आगे ऑब्जेक्ट का संदर्भ दिया जाता है। नीचे दोहराया नहीं गया।
+# In each object: apiVersion — the version of the description schema, kind — what we create,
+# metadata.name — the name by which the object is referenced further on. Not repeated below.
 #
-# इस ऑब्जेक्ट का एकमात्र काम क्लस्टर में रिपॉज़िटरी की ताज़ा प्रति रखना है।
-# यह कुछ लागू नहीं करता: केवल डाउनलोड करता है। बगल वाला Kustomization लागू करता है,
-# और वह यहाँ `passes` नाम से संदर्भ देता है, इसलिए नाम को अकेले बदला नहीं जा सकता।
+# The only task of this object is to keep a fresh copy of the repository in the cluster.
+# It applies nothing: it only downloads. The neighboring Kustomization applies things,
+# and it references here by the name `passes`, so the name cannot be changed on its own.
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: GitRepository
 metadata:
   name: passes
-  # flux-system — वह नेमस्पेस जिसे flux install कमांड ने बनाया; इसी में खुद
-  # Flux की सेवाएँ रहती हैं। कॉन्फ़िगरेशन ऑब्जेक्ट भी वहीं रखें, वरना सेवाएँ उन्हें नहीं देखेंगी।
+  # flux-system — the namespace that the flux install command set up; the Flux services
+  # themselves live in it. Configuration objects go there too, otherwise the services won't see them.
   namespace: flux-system
 spec:
-  # नई स्थिति के लिए Git में कितनी बार जाना है। एक मिनट — लैब के लिए;
-  # प्रोडक्शन में आमतौर पर 1–5 मिनट, और तुरंत प्रतिक्रिया GitHub के वेबहुक से की जाती है।
+  # How often to go to Git for the new state. One minute — for the lab;
+  # in production usually 1–5 minutes, and an instant reaction is done with a webhook from GitHub.
   interval: 1m
-  # रिपॉज़िटरी का पता। यह सार्वजनिक है, इसलिए यहाँ न लॉगिन है न कोई कुंजी —
-  # यह शिक्षण स्टैंड का सरलीकरण है। प्रोडक्शन में रिपॉज़िटरी निजी होता है, और उसके पास
-  # deploy-कुंजी वाले सीक्रेट का संदर्भ आता है (secretRef फ़ील्ड)।
-  url: https://github.com/ЗАМЕНИТЕ-МЕНЯ/passes-gitops
-  # किस ब्रांच को सत्य का स्रोत माना जाए। क्लस्टर में वही जाएगा जो main में मर्ज हुआ है;
-  # जो अन्य ब्रांचों में है वह नहीं जाएगा। यहीं से रिव्यू आता है: बदलाव पहले
-  # अपनी ब्रांच में रहता है, जहाँ उसे देखा जा सकता है, और केवल main में मर्ज होने पर ही
-  # वह प्रभावी बनता है। यदि रिपॉज़िटरी पुरानी master ब्रांच के साथ बना है —
-  # यहाँ ठीक करें, वरना Flux को पढ़ने के लिए कुछ नहीं मिलेगा।
+  # The repository address. It's public, so there's neither a login nor a key here —
+  # this is a simplification of the training stand. In production the repository is private, and next to it
+  # appears a reference to a secret with a deploy key (the secretRef field).
+  url: https://github.com/REPLACE-ME/passes-gitops
+  # Which branch to consider the source of truth. What is merged into main goes to the cluster;
+  # what lies in other branches does not go. This is where review comes from: a change
+  # first lives in its own branch, where it can be looked at, and only a merge into main
+  # makes it effective. If the repository was created with the old master branch —
+  # fix it here, otherwise Flux won't find what to read.
   ref:
     branch: main

@@ -16,14 +16,14 @@ password: Orders2019!
 连着三条命令，每条都有各自的一个理由：
 
 ```bash
-# 1. 接入 PGDG 仓库——PostgreSQL 软件包的来源。
+# 1. Wire up the PGDG repository — the source of PostgreSQL packages.
 yum install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm
 
-# 2. libzstd 库，没有它客户端装不上。CentOS 7 的仓库里没有它，
-#    所以我们从 EPEL 归档里取。
+# 2. The libzstd library, without which the client won't install. It's not in the CentOS 7
+#    repositories, so we take it from the EPEL archive.
 yum install -y https://archives.fedoraproject.org/pub/archive/epel/7/x86_64/Packages/l/libzstd-1.5.5-1.el7.x86_64.rpm
 
-# 3. 客户端本身——只从仍然可用的 pgdg15 仓库取。
+# 3. The client itself — only from the live pgdg15 repository.
 yum install -y --disablerepo='pgdg*' --enablerepo=pgdg15 postgresql15
 ```
 
@@ -52,7 +52,7 @@ psql --version
 **取回 schema 文件**——这台机器已经有网络了：
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/laptop/scripts/orders-schema.sql
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/laptop/scripts/orders-schema.sql
 ```
 
 **应用它。** 我们把这条命令逐段拆开，好让你不至于盲敲：

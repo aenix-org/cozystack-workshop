@@ -84,9 +84,9 @@ VMware 시스템 관리자입니다. Kubernetes를 처음 접하거나 거의 �
 
 ```markdown
 <details>
-<summary><b>매니페스트를 한 줄씩 훑어보기</b></summary>
+<summary><b>Walking through the manifest line by line</b></summary>
 
-...한 줄씩, 산문으로...
+...line by line, in prose...
 
 </details>
 ```
@@ -112,9 +112,9 @@ VMware 시스템 관리자입니다. Kubernetes를 처음 접하거나 거의 �
 멈춤은 항상 블록 인용 콜아웃이며, ⚠️는 붙이지 않습니다(그 표시는 함정용으로 남겨 둡니다):
 
 ```markdown
-> **더 읽기 전에 멈추고 생각해 보십시오.**
+> **Stop and think before you read on.**
 >
-> 질문 하나. 두 번째 질문이 있다면, 그것도.
+> A question. A second question, if there is one.
 ```
 
 스포일러의 제목은 항상 `답과, 이 오류보다 더 넓은 교훈`입니다.

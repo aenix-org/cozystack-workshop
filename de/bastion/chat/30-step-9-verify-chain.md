@@ -27,14 +27,14 @@ und sobald die Anwendung innerhalb der Maschine auf `8080` lauscht, wird der Sho
 im Browser auf Ihrem Laptop — oder prüfen Sie mit `curl` direkt auf dem Bastion:
 
 ```bash
-# Gesundheit
+# health
 curl -s https://app.workshopXX.workshop.aenix.io/actuator/health
 
-# eine Bestellung anlegen
+# create an order
 curl -s -X POST https://app.workshopXX.workshop.aenix.io/api/orders \
   -H 'Content-Type: application/json' -d '{"item":"test"}'
 
-# prüfen, dass sie gespeichert wurde
+# see that it was recorded
 curl -s https://app.workshopXX.workshop.aenix.io/api/orders
 ```
 

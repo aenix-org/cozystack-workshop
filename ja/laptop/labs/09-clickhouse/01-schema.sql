@@ -1,58 +1,59 @@
--- ラボ9 · 入退場ログのテーブル: 改札の1回の通過ごとに1行。
+-- Lab 9 · the pass log table: one row per turnstile swipe.
 --
--- どこで実行するか: ノートPC上、ラボクラスタ内で、README にある短い `ch` コマンドで実行する。
--- このコマンドは通常の POST リクエストのボディとして SQL を ClickHouse に送る:
+-- Where it runs: on the laptop, in the lab cluster, via the short `ch` command
+-- from the README — it sends the SQL to ClickHouse in the body of an ordinary POST request:
 --     cd labs/09-clickhouse && ch < 01-schema.sql
--- CREATE TABLE の応答は空 — これが成功の証。
+-- CREATE TABLE returns an empty response — that is what success looks like.
 --
--- ここには CREATE DATABASE も CREATE USER もない: データベースとユーザーは注文時に
--- サービス自身が用意した(ダッシュボード、または同じフォルダの clickhouse.yaml ファイル)。
+-- There is no CREATE DATABASE or CREATE USER here: the database and user were set up by the
+-- service itself at order time (the dashboard or the clickhouse.yaml file in this same folder).
 
--- IF NOT EXISTS — テーブルが既に存在していても文句を言わない。ファイルは2回適用してよい。
+-- IF NOT EXISTS — do not complain if the table already exists. The file can be applied twice.
 CREATE TABLE IF NOT EXISTS passes
 (
-    -- 通行証の番号。UInt64 と UInt16 — それぞれ8バイトと2バイトの符号なし整数。
-    -- ClickHouse では型のサイズを意図的に選ぶ: 10億行では列の余分な1バイトが
-    -- ディスク上の余分な1ギガバイトに化ける。
+    -- Pass number. UInt64 and UInt16 — unsigned integers of 8 and 2 bytes.
+    -- Type size in ClickHouse is chosen deliberately: on a billion rows every extra
+    -- byte in a column turns into an extra gigabyte on disk.
     pass_id      UInt64,
-    -- 人が改札を通過した時刻。レポート全体はこの列を軸に組み立てられる。
+    -- When the person passed the turnstile. The entire report is built around this column.
     created_at   DateTime,
-    -- ゲストの名前。ほぼ全ての行が固有なので、素の String。
+    -- Guest name. Almost every row has its own, so a plain String.
     guest_name   String,
-    -- 下の3列は LowCardinality(String): 異なる値が少ない文字列
-    -- (部署は5つ、入口は3つ、通行証の種類は4つ)。ClickHouse はこうした列に
-    -- 辞書を持たせ、100万回繰り返される単語ではなく番号をディスクに書く。
-    -- 目安: 異なる値が数千までなら LowCardinality、それより多ければ
-    -- 素の String。guest_name をこう包むのは包まないより悪い:
-    -- 100万個のユニークな名前の辞書はデータそのものより大きくなる。
+    -- The three columns below are LowCardinality(String): a string that has few distinct
+    -- values (there are five departments, three entrances, four pass types). ClickHouse
+    -- keeps a dictionary for such a column and writes numbers to disk, not the words
+    -- repeated a million times.
+    -- Rule: up to a few thousand distinct values — LowCardinality, more than that —
+    -- a plain String. Wrapping guest_name this way would be worse than not wrapping it:
+    -- a dictionary of a million unique names would be larger than the data itself.
     host_dept    LowCardinality(String),
     entrance     LowCardinality(String),
     pass_type    LowCardinality(String),
-    -- ゲストが中に滞在した分数。2バイトあれば十分すぎる。
+    -- How many minutes the guest spent inside. Two bytes are more than enough.
     duration_min UInt16
 )
--- テーブルのエンジン — ClickHouse がデータをディスクにどう保存するか。馴染みのある
--- データベースにはこうした選択肢はないが、ここにはあり、テーブル作成時に決める。
--- MergeTree: 挿入のたびにディスクに新しいパートを置き、パートはバックグラウンドで
--- より大きなものへとマージされる。だから実践的な目安は — 多くの行をまとめて挿入すること。
--- 1行ずつ100万回挿入すれば100万個のパートが生まれ、サーバーを倒してしまう。
+-- The table engine — how ClickHouse stores data on disk. Familiar databases have no
+-- such choice; here it exists and is made when the table is created.
+-- MergeTree: each insert puts a new part on disk, and parts are merged in the background
+-- into bigger ones. Hence the practical rule — insert in batches of many rows.
+-- A million single-row inserts would create a million parts and bring the server down.
 ENGINE = MergeTree
--- ファイル中で最も重要な行であり、テーブルにデータが入る前に選ぶ。
--- ORDER BY は行がディスク上で物理的に並ぶ順序を決め、それ自体が
--- 唯一の本当のインデックスとして働く: ClickHouse は数千行ごとにマークを保存し、
--- それを頼りにファイルのどのパートを全く読まずに済むかを判断する。
+-- The most important line in the file, and it is chosen before any data reaches the table.
+-- ORDER BY sets the order in which rows physically lie on disk, and it also serves as
+-- the only real index: ClickHouse stores marks every few thousand rows and uses them to
+-- figure out which parts of the file can be skipped entirely.
 --
--- 帰結:「3月の通過は何件あったか」はファイルの1区間を読むだけになり、
---「番号424242の通行証を探す」は pass_id 列全体を読むことになる。
--- pass_id がソートキーに入っていないからだ。これは欠陥ではなく設計。
+-- Consequence: "how many passes were there in March" turns into reading a single stretch
+-- of the file, while "find the pass with number 424242" turns into reading the whole
+-- pass_id column, because pass_id is not in the sort key. This is not a shortcoming but by design.
 --
--- 馴染みのある世界から: 紙のアーカイブと同じ判断 — 通行証を日付順、あるいは
--- 姓順に並べる。日付順に並べれば3月の綴りは即座に取り出せるが、特定の
--- 山田 は総当たりで探すことになる。そして100万枚の紙を後から
--- 並べ直す者などいない。
+-- From the familiar world: the same decision as in a paper archive — sort the passes
+-- by date or by surname. Sorted by date, the March folder is pulled instantly, while a
+-- particular Smith is found by scanning. And nobody is going to re-sort a million
+-- sheets of paper after the fact.
 --
--- ファイルに PARTITION BY はなく、それは意図的。パーティションはパートの別々の集合
--- (通常は月ごと)で、1つのコマンドで捨てられる。これは「2年分だけ保持し、それ以上は
--- 持たない」という規則に便利。8か月の学習データではパーティションは益もなく
--- 余分なパートを増やすだけで、余分な読み取りを削るのはここではソートキーが担う。
+-- There is no PARTITION BY in the file, deliberately. A partition is a separate set of parts
+-- (usually per month) that can be dropped with a single command; this is handy for the rule
+-- "keep two years and no more". On eight months of training data partitions would add
+-- extra parts for no benefit, and cutting out unnecessary reads is what the sort key does here.
 ORDER BY (created_at, entrance)

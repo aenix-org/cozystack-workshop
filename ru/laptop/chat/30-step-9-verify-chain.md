@@ -27,7 +27,7 @@ virtctl port-forward --namespace=tenant-workshopXX vmi/vm-instance-app-1 8080:80
 
 ⚠️ **Здесь `vmi/` обязателен, а в `virtctl console` — наоборот, мешает.** Это не
 опечатка и не наша прихоть: у двух команд разный синтаксис цели. `port-forward` требует
-`тип/имя` и без префикса отвечает `target must contain type and name separated by '/'`.
+`type/name` и без префикса отвечает `target must contain type and name separated by '/'`.
 `console` ждёт просто имя и с префиксом отвечает `forbidden`, потому что принимает
 слово `vmi` за имя машины.
 
@@ -37,19 +37,19 @@ virtctl port-forward --namespace=tenant-workshopXX vmi/vm-instance-app-1 8080:80
 Если проброс всё равно не поднимается, тот же туннель делается через под машины:
 ```bash
 kubectl get pod -n tenant-workshopXX -l vm.kubevirt.io/name=vm-instance-app-1
-kubectl port-forward -n tenant-workshopXX <имя-пода-из-вывода> 8080:8080
+kubectl port-forward -n tenant-workshopXX <pod-name-from-output> 8080:8080
 ```
 
 В другом окне терминала:
 ```bash
-# здоровье
+# health
 curl -s http://localhost:8080/actuator/health
 
-# создаём заказ
+# create an order
 curl -s -X POST http://localhost:8080/api/orders \
   -H 'Content-Type: application/json' -d '{"item":"test"}'
 
-# смотрим, что он записался
+# see that it was recorded
 curl -s http://localhost:8080/api/orders
 ```
 

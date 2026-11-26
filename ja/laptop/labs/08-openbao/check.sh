@@ -1,50 +1,50 @@
 #!/usr/bin/env bash
-# ラボ8のチェック: パスワードはマニフェストから OpenBao へ移され、ルールに従って存在する。
+# Check for lab 8: the password is moved out of the manifest into OpenBao and lives by the rules.
 #
-# 「オブジェクトが作成された」ではなく、本質を確認する: 保管庫が開封され、シークレットが
-# トークンで読み取れ、バージョンが2つ以上あり(つまりローテーションが実際に行われた)、監査が
-# 有効で、適用済みのアプリケーション・マニフェストに平文パスワードが無いこと。
+# We check not "the object was created", but the substance: the vault is unsealed, the secret
+# is readable by token, there is more than one version (so rotation actually happened), audit
+# is enabled, and the applied application manifest has no plaintext passwords.
 #
-# シークレットは一切レポートに載らない。値はどこにも出力されない。
+# No secret makes it into the report. Values are never printed anywhere.
 #
-# スクリプトは curl 入りの使い捨てポッドを立ち上げるので、実行には約1分かかる。
+# The script spins up one-shot pods with curl, so it runs for about a minute.
 
-# LAB_NAME と LAB_TITLE はレポートのヘッダーに入る。以下では共通のチェック・ライブラリを
-# 読み込む: そこから ok / warn / fail / evidence / finish と、クラスター内で使い捨てポッドを
-# 実行する関数を取り込む。need_kubeconfig と need_tenant は、アクセスやテナント番号が
-# 指定されていない場合にスクリプトを早めに止める: さもないと全部が一度に失敗し、
-# レポートから原因を突き止められなくなる。
+# LAB_NAME and LAB_TITLE go into the report header. Below, the shared check library is
+# sourced: it provides ok / warn / fail / evidence / finish and the functions that run
+# one-shot pods inside the cluster. need_kubeconfig and need_tenant stop the script early
+# if access or the tenant number is not set: otherwise everything would fail at once and
+# the report would not reveal the cause.
 LAB_NAME="08-openbao"
-LAB_TITLE="ラボ8 · シークレットをマニフェストに置かない"
+LAB_TITLE="Lab 8 · Secrets not in the manifest"
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
 need_kubeconfig
 need_tenant
 
-# --- どこを見るか ---------------------------------------------------------
-# 参加者は COZY_TENANT を `workshop07` と指定するが、namespace は
-# `tenant-workshop07` という名前になる。両方の書き方を受け付ける: ここは間違えやすく、
-# エラーメッセージも分かりにくくなる(「サービスが応答しない」)。
+# --- where to look ---------------------------------------------------------
+# The participant sets COZY_TENANT as `workshop07`, but the namespace is called
+# `tenant-workshop07`. We accept both spellings: it is easy to get wrong here, and the
+# error message would be unclear ("the service is not responding").
 NS="$COZY_TENANT"
 case "$NS" in
   tenant-*) ;;
   *) NS="tenant-$NS" ;;
 esac
 
-# 何をどこで探すか。BAO_APP はテナント内の OpenBao アプリケーションの名前で、
-# それは保管庫の内部アドレスの一部になる: アプリケーションに別の名前を付けたなら、
-# チェックを BAO_APP=名前 ./check.sh として実行する。SECRET_PATH は保管庫内のパスで、
-# ラボはそこにデータベースのパスワードを置く。
+# What we look for and where. BAO_APP is the name of the OpenBao application in the tenant,
+# and it is part of the vault's internal address: if you named the application differently,
+# run the check as BAO_APP=name ./check.sh. SECRET_PATH is the path inside the vault where
+# the lab stores the database password.
 BAO_APP="${BAO_APP:-secrets}"
 BAO_URL="http://openbao-${BAO_APP}.${NS}.svc.cozy.local:8200"
 APP_DEPLOY="${APP_DEPLOY:-secrets-demo}"
 SECRET_PATH="${SECRET_PATH:-passes/db}"
 
-evidence "保管庫のアドレス" "$BAO_URL"
+evidence "Vault address" "$BAO_URL"
 
-# 標準入力の JSON から、キーの連なりで値を取り出す。
-# パスが無いか JSON でない場合は 1 を返す — こうして呼び出し側は
-# 「そのキーが無い」と「空の値」を区別できる。
+# Extract a value by a chain of keys from JSON on standard input.
+# Returns 1 if the path does not exist or it is not JSON, so the caller can tell
+# "no such key" from "empty value".
 jget() {
   python3 -c '
 import sys, json
@@ -62,13 +62,13 @@ print("" if d is None else d)
 }
 
 
-# OpenBao へのリクエスト。トークンは一時的な Secret から環境変数として渡し、
-# 引数のヘッダーとしては渡さない: ポッドの引数は `get pods` 権限のある誰にでも見え、
-# etcd に保存され、監査ログに流れる。ここでは保管庫の root トークン — このラボ全体が
-# その対策として書かれている、まさにその漏洩だ。
+# A request to OpenBao. We pass the token via an environment variable from a temporary
+# Secret, NOT as a header in the arguments: pod arguments are visible to anyone with
+# `get pods`, they sit in etcd and end up in the audit log. Here it is the vault's root
+# token - exactly the leak this whole lab is written against.
 #
-# 定義は最初の呼び出しより前に置く: これが else ブランチの中にあったとき、
-# 一番最初のチェックが存在しない関数を呼び、ラボは決して合格できなかった。
+# The definition sits BEFORE the first call: when it lived inside the else branch, the very
+# first check called a nonexistent function and the lab could never be passed.
 bao_get() {
   in_cluster_with_secrets "curlimages/curl:8.11.1" \
     "BAO_TOKEN=${BAO_TOKEN:-}
@@ -77,57 +77,57 @@ BAO_PATH=$1" \
     sh -c 'curl -s --max-time 15 -H "X-Vault-Token: $BAO_TOKEN" "$BAO_URL$BAO_PATH"'
 }
 
-# --- 1. 保管庫が応答する -------------------------------------------------
-# 最初のリクエストが二つの問いに一度に答える: アプリケーションは立ち上がったか、そして
-# テナント番号は正しいか。封印状態を尋ねる — これは OpenBao がトークン無しで応答する
-# 唯一のエンドポイントだ。この後に応答が空なら「接続なし」を意味し、内容に関する
-# すべてのチェックは意味を失う。
+# --- 1. the vault responds -------------------------------------------------
+# The very first request answers two questions at once: did the application come up, and is
+# the tenant number correct. We ask for the seal status - this is the only endpoint OpenBao
+# serves without a token. An empty response afterwards means "no connection", and all the
+# content checks lose their meaning.
 SEAL="$(bao_get "/v1/sys/seal-status")"
 
 if [ -z "$SEAL" ]; then
-  fail "OpenBao が ${BAO_URL} で応答しない" \
-       "COZY_TENANT のテナント番号とアプリケーション名を確認してください(デフォルトは 'secrets'; 違う場合は BAO_APP=名前 ./check.sh); ダッシュボードでアプリケーションが準備完了状態である必要があります"
+  fail "OpenBao is not responding at ${BAO_URL}" \
+       "check the tenant number in COZY_TENANT and the application name (default 'secrets'; otherwise BAO_APP=name ./check.sh); in the dashboard the application must be in a ready state"
 else
-  ok "OpenBao がテナントの内部アドレスで応答している"
+  ok "OpenBao responds at the tenant's internal address"
 fi
 
-# --- 2. 初期化済み ----------------------------------------------------
-# 初期化は一度きりの操作で、そこで保管庫はマスターキーと最初のトークンを自分で作る。
-# それが行われるまで中には何も無い: シークレットも、それを置く場所も無い。
+# --- 2. initialized --------------------------------------------------------
+# Initialization is a one-time operation in which the vault creates its master key and its
+# first token. Until it is done, there is nothing inside: no secrets, and no place for them.
 INITED="$(printf '%s' "$SEAL" | jget initialized)"
 if [ "$INITED" = "True" ]; then
-  ok "保管庫は初期化されている"
+  ok "the vault is initialized"
 elif [ -n "$SEAL" ]; then
-  fail "保管庫が初期化されていない" \
-       "実行してください: kubectl exec bao-workbench -- bao operator init -key-shares=1 -key-threshold=1 そして出力を保存してください"
+  fail "the vault is not initialized" \
+       "run: kubectl exec bao-workbench -- bao operator init -key-shares=1 -key-threshold=1 and save the output"
 fi
 
-# --- 3. 開封済み --------------------------------------------------------
-# 封印された保管庫はポッド再起動後の通常の状態だ: データはディスク上にあるが、
-# unseal キーを入力するまでそれを読む手段が無い。だからこそオブジェクトの存在ではなく
-# 振る舞いを確認せよという要求になる: 「アプリケーションは準備完了」と「シークレットが提供される」は
-# 二つの別の主張であり、後者は前者から導かれない。
+# --- 3. unsealed -----------------------------------------------------------
+# A sealed vault is the normal state after a pod restart: the data is on disk, but there is
+# nothing to read it with until the unseal key is entered. Hence the requirement to check
+# behavior, not the presence of an object: "the application is ready" and "secrets are served"
+# are two different statements, and the second does not follow from the first.
 SEALED="$(printf '%s' "$SEAL" | jget sealed)"
 if [ "$SEALED" = "False" ]; then
-  ok "保管庫は開封されリクエストに応じている"
-  evidence "保管庫の状態" "$SEAL"
+  ok "the vault is unsealed and serving requests"
+  evidence "Vault state" "$SEAL"
 elif [ -n "$SEAL" ]; then
-  fail "保管庫が封印されている — どのリクエストにも 503 の拒否で応答する" \
-       "実行してください: kubectl exec bao-workbench -- bao operator unseal <あなたの unseal キー>"
-  evidence "保管庫の状態" "$SEAL"
+  fail "the vault is sealed - it answers every request with a 503 refusal" \
+       "run: kubectl exec bao-workbench -- bao operator unseal <your-unseal-key>"
+  evidence "Vault state" "$SEAL"
 fi
 
-# --- 4. シークレットが所定の場所にあり読み取れる -----------------------------------------
-# 次にトークンが必要だ。それが無いと確認するものが無いが、黙って飛ばすわけにもいかない:
-# 読み手には何が足りないのかが見えなければならない。
+# --- 4. the secret is in place and readable --------------------------------
+# Next we need a token. Without it there is nothing to check, but we must not silently skip:
+# the reader must see what is missing.
 if [ -z "$SEAL" ]; then
-  # 接続なし — 内容の確認は無意味。同じ原因を持つ4つの失敗でレポートを埋めないように
-  # 黙っておく。原因は上で既に名指ししてある。
-  warn "保管庫の内容は未確認: OpenBao への接続がない" \
-       "接続を解決してから、スクリプトを再度実行してください"
+  # No connection - checking the content is pointless. We stay silent so as not to flood
+  # the report with four failures that all share the same cause named above.
+  warn "vault content was not checked: there is no connection to OpenBao" \
+       "sort out the connection, then run the script again"
 elif [ -z "${BAO_TOKEN:-}" ]; then
-  fail "BAO_TOKEN 変数が未設定のため、保管庫の内容は未確認" \
-       "export BAO_TOKEN='保管庫を初めて開封したときに表示された root トークン' を設定し、スクリプトを再度実行してください"
+  fail "the BAO_TOKEN variable is not set, so the vault content was not checked" \
+       "export BAO_TOKEN='root token printed when the vault was first unsealed' and run the script again"
 else
 
   DATA="$(bao_get "/v1/secret/data/${SECRET_PATH}")"
@@ -135,61 +135,61 @@ else
   DATA_VERSION="$(printf '%s' "$DATA" | jget data metadata version)"
 
   if [ -n "$PASS_PRESENT" ]; then
-    ok "シークレット secret/${SECRET_PATH} はトークンで読み取れ、password フィールドは空でない"
-    # レポートには値ではなくバージョン番号を入れる。
-    evidence "シークレット" "パス: secret/${SECRET_PATH}
-password フィールド: あり(値は非表示)
-現在のバージョン: ${DATA_VERSION:-不明}"
+    ok "the secret secret/${SECRET_PATH} is readable by token, the password field is not empty"
+    # We put the version number into the report, not the value.
+    evidence "Secret" "path: secret/${SECRET_PATH}
+password field: present (value hidden)
+current version: ${DATA_VERSION:-unknown}"
   else
-    fail "secret/${SECRET_PATH} のパスに password フィールドが無い" \
-         "そこに置いてください: kubectl exec bao-workbench -- bao kv put secret/${SECRET_PATH} password=... ; エンジンがまだ有効でなければ — bao secrets enable -path=secret kv-v2"
+    fail "there is no password field at secret/${SECRET_PATH}" \
+         "put it there: kubectl exec bao-workbench -- bao kv put secret/${SECRET_PATH} password=... ; if the engine is not enabled yet - bao secrets enable -path=secret kv-v2"
   fi
 
-  # --- 5. ローテーションが実際に行われた --------------------------------------
-  # シークレットのバージョンが一つだけなら、置いて忘れたということだ。ローテーションこそ
-  # 保管庫を用意する理由そのもの: マニフェスト中を探し回るのではなく、一箇所でパスワードを
-  # 変える。約束ではなくバージョンを数える: その数は保管庫が自分で記録している。
+  # --- 5. rotation actually happened --------------------------------------
+  # A single version of the secret means it was put there and forgotten. Rotation is the
+  # very reason a vault is set up: change the password in one place instead of hunting for it
+  # across manifests. We count not promises, but versions: the vault keeps the count itself.
   META="$(bao_get "/v1/secret/metadata/${SECRET_PATH}")"
   CUR_VER="$(printf '%s' "$META" | jget data current_version)"
   case "$CUR_VER" in
     ''|*[!0-9]*) CUR_VER=0 ;;
   esac
   if [ "$CUR_VER" -ge 2 ]; then
-    ok "シークレットは変更された: バージョン ${CUR_VER}、つまりローテーションは言葉だけでなく実際に行われた"
-    evidence "シークレットのバージョン履歴" "$(printf '%s' "$META" | jget data versions)"
+    ok "the secret was changed: ${CUR_VER} versions, so rotation happened not just in words"
+    evidence "Secret version history" "$(printf '%s' "$META" | jget data versions)"
   else
-    fail "シークレットのバージョンが一つだけ — ローテーションが行われていない" \
-         "パスワードを変えてください: kubectl exec bao-workbench -- bao kv put secret/${SECRET_PATH} password=<新しい値> そしてアプリケーションを再起動してください"
+    fail "the secret has only one version - rotation was not done" \
+         "change the password: kubectl exec bao-workbench -- bao kv put secret/${SECRET_PATH} password=<new> and restart the application"
   fi
 
-  # --- 6. ポリシーは狭く、「何でもあり」ではない ---------------------------------
-  # ポリシーはまさに「トークンを手に入れた者に何ができるか」への答えだ。だから
-  # その存在の事実ではなく内容を見る: 保管庫全体ではなく特定のパスに対して与えられているか、
-  # そして読み取り専用か。
+  # --- 6. the policy is narrow, not "anything goes" ------------------------
+  # The policy is exactly the answer to "what could someone do who obtained the token". So we
+  # look not at the fact of its existence, but at its content: is it granted on a specific
+  # path instead of the whole vault, and read-only.
   POL="$(bao_get "/v1/sys/policies/acl/passes-read")"
   POL_BODY="$(printf '%s' "$POL" | jget data policy)"
   if [ -n "$POL_BODY" ]; then
-    ok "ポリシー passes-read が存在する"
-    evidence "ポリシー passes-read" "$POL_BODY"
+    ok "the passes-read policy exists"
+    evidence "Policy passes-read" "$POL_BODY"
     if printf '%s' "$POL_BODY" | grep -q 'secret/data/'"${SECRET_PATH}"; then
-      ok "ポリシーは保管庫全体ではなく特定のパスに対して与えられている"
+      ok "the policy is granted on a specific path, not on the whole vault"
     else
-      warn "ポリシーはあるが、その中にパス secret/data/${SECRET_PATH} が見当たらない" \
-           "ポリシーに data プレフィックスが指定されているか確認してください: secret/data/${SECRET_PATH}"
+      warn "the policy exists, but the path secret/data/${SECRET_PATH} is not visible in it" \
+           "check that the policy specifies the data prefix: secret/data/${SECRET_PATH}"
     fi
     if printf '%s' "$POL_BODY" | grep -Eq '"(create|update|delete|sudo)"'; then
-      warn "ポリシーが読み取り以外も許可している" \
-           "アプリケーションには read で十分; 余分な権限は削除すべきです"
+      warn "the policy allows more than reading" \
+           "the application only needs read; the extra permissions should be removed"
     fi
   else
-    fail "ポリシー passes-read が見つからない" \
-         "作成してください: kubectl exec -i bao-workbench -- bao policy write passes-read - < あなたのポリシーファイル(ポリシーの解説は README にあります)"
+    fail "the passes-read policy was not found" \
+         "create it: kubectl exec -i bao-workbench -- bao policy write passes-read - < your policy file (policy walkthrough is in the README)"
   fi
 
-  # --- 7. 監査が有効 ----------------------------------------------------
-  # 監査ログが無ければ「誰がいつこのシークレットを読んだか」に答える手段が無い — そしてそれは
-  # インシデント後に最初に尋ねられる問いだ。接続された監査デバイスを数える: 少なくとも
-  # 一つは無ければならない。
+  # --- 7. audit is enabled -------------------------------------------------
+  # Without an audit log there is nothing to answer "who read this secret and when" with - and
+  # that is the first question asked after an incident. We count the attached audit devices:
+  # there must be at least one.
   AUD="$(bao_get "/v1/sys/audit")"
   AUD_COUNT="$(printf '%s' "$AUD" | python3 -c '
 import sys, json
@@ -204,36 +204,37 @@ print(len([k for k in data if isinstance(data.get(k), dict)]))
     ''|*[!0-9]*) AUD_COUNT=0 ;;
   esac
   if [ "$AUD_COUNT" -ge 1 ]; then
-    ok "監査ログが有効(デバイス数: ${AUD_COUNT})"
-    evidence "監査デバイス" "$AUD"
+    ok "the audit log is enabled (devices: ${AUD_COUNT})"
+    evidence "Audit devices" "$AUD"
   else
-    fail "監査ログが有効でない — 誰がシークレットを読んだかに答える手段が無くなる" \
-         "有効にしてください: kubectl exec bao-workbench -- bao audit enable file file_path=stdout"
+    fail "the audit log is not enabled - there will be nothing to answer who read the secret with" \
+         "enable it: kubectl exec bao-workbench -- bao audit enable file file_path=stdout"
   fi
 fi
 
-# --- 8. ラボ・クラスター内のアプリケーション ---------------------------------
-# ここまでは管理クラスター上の保管庫を確認してきた。次はあなたの lab クラスターで、
-# そこにアプリケーション自体が存在する。ここで重要なのは Deployment が作成された事実ではなく、
-# 準備完了レプリカの有無だ: パスワードを取得できなかった init コンテナはポッドを立ち上げさせず、
-# まさにその状態を「すべて良好」と区別しなければならない。
+# --- 8. the application in the lab cluster ---------------------------------
+# Up to now we checked the vault on the management cluster. Next comes your lab cluster,
+# where the application itself lives. What matters here is not the fact that the Deployment
+# was created, but the presence of ready replicas: an init container that failed to fetch the
+# password will not let the pod come up, and that is exactly the state to tell apart from
+# "all good".
 if ! kubectl get deploy "$APP_DEPLOY" >/dev/null 2>&1; then
-  fail "ラボ・クラスターにアプリケーション ${APP_DEPLOY} が無い" \
-       "適用してください: kubectl apply -f secrets-demo.yaml(自分のテナント番号を差し込むのを忘れずに)"
+  fail "there is no application ${APP_DEPLOY} in the lab cluster" \
+       "apply it: kubectl apply -f secrets-demo.yaml (do not forget to substitute your tenant number)"
 else
   READY="$(kubectl get deploy "$APP_DEPLOY" -o jsonpath='{.status.readyReplicas}' 2>/dev/null)"
   case "$READY" in
     ''|*[!0-9]*) READY=0 ;;
   esac
   if [ "$READY" -ge 1 ]; then
-    ok "アプリケーション ${APP_DEPLOY} が稼働中(準備完了レプリカ: ${READY})"
+    ok "the application ${APP_DEPLOY} is running (ready replicas: ${READY})"
   else
-    fail "アプリケーション ${APP_DEPLOY} はあるが、準備完了のレプリカが一つも無い" \
-         "kubectl describe deploy/${APP_DEPLOY} と kubectl logs deploy/${APP_DEPLOY} -c fetch-secret を見てください — たいてい init コンテナが保管庫に到達できなかったか、トークンで拒否されています"
+    fail "the application ${APP_DEPLOY} exists, but no replica is ready" \
+         "look at kubectl describe deploy/${APP_DEPLOY} and kubectl logs deploy/${APP_DEPLOY} -c fetch-secret - usually the init container could not reach the vault or was denied by token"
   fi
 
-  # --- 9. マニフェストに平文パスワードが無い -------------------------
-  # ディスク上のファイルではなく適用済みのオブジェクトを見る: 何が適用されたか分からない。
+  # --- 9. no plaintext passwords in the manifest ---------------------------
+  # We look at the applied object, not the file on disk: anything could have been applied.
   LEAKS="$(kubectl get deploy "$APP_DEPLOY" -o json 2>/dev/null | python3 -c '
 import sys, json, re
 try:
@@ -246,50 +247,50 @@ found = []
 for c in list(spec.get("initContainers", [])) + list(spec.get("containers", [])):
     for e in c.get("env", []):
         if "value" in e and suspicious.search(e.get("name", "")):
-            found.append("%s / env %s は参照ではなく値で設定されている" % (c.get("name"), e.get("name")))
+            found.append("%s / env %s is set by value, not by reference" % (c.get("name"), e.get("name")))
 print("\n".join(found))
 ' 2>/dev/null)"
 
   if [ -z "$LEAKS" ]; then
-    ok "アプリケーションのマニフェストに、値で設定されたパスワード変数は無い"
+    ok "the application manifest has no variables with a password set by value"
   else
-    fail "アプリケーションのマニフェストに機微な値が平文のまま残っている" \
-         "取り除いてください: 値は保管庫から来るべきで、マニフェストには参照だけを置きます。secrets-demo.yaml を参照"
-    evidence "マニフェストで見つかったもの" "$LEAKS"
+    fail "the application manifest still has sensitive values in plaintext" \
+         "remove them: the value must come from the vault, and the manifest should hold only a reference. See secrets-demo.yaml"
+    evidence "What was found in the manifest" "$LEAKS"
   fi
 
-  # --- 10. アプリケーションが実際にシークレットを受け取った ------------------------
-  # 最後の証拠はオブジェクトの記述ではなくログから取る。マニフェストは完璧でも、
-  # パスワードがポッドに届かないことはある。二つのことを同時に見る:
-  # init コンテナが保管庫へ行ったと報告し、アプリケーションがフィンガープリントを出力する —
-  # つまり、受け取ったパスワードで実際に動いているということだ。
+  # --- 10. the application actually received the secret --------------------
+  # The final proof we take from the logs, not from the object description. The manifest can
+  # be flawless while the password never arrives in the pod. We look at two things at once:
+  # the init container reported it went to the vault, and the application prints a fingerprint -
+  # meaning it really works with the password it received.
   INIT_LOG="$(kubectl logs "deploy/${APP_DEPLOY}" -c fetch-secret --tail=5 2>/dev/null)"
   if printf '%s' "$INIT_LOG" | grep -qi 'openbao'; then
-    ok "init コンテナが保管庫からシークレットを取得した"
-    evidence "init コンテナのログ" "$INIT_LOG"
+    ok "the init container fetched the secret from the vault"
+    evidence "Init container log" "$INIT_LOG"
   else
-    fail "init コンテナが保管庫からシークレットを取得した形跡が見えない" \
-         "kubectl logs deploy/${APP_DEPLOY} -c fetch-secret を確認してください; そのコンテナが無ければ — 古いマニフェストが適用されています"
+    fail "there is no sign that the init container fetched the secret from the vault" \
+         "check kubectl logs deploy/${APP_DEPLOY} -c fetch-secret; if there is no such container - an old manifest was applied"
   fi
 
   APP_LOG="$(kubectl logs "deploy/${APP_DEPLOY}" -c app --tail=3 2>/dev/null)"
   if printf '%s' "$APP_LOG" | grep -q 'sha256:'; then
-    ok "アプリケーションは受け取ったパスワードで動いている(ログには値ではなくフィンガープリントが書かれる)"
-    evidence "アプリケーションのログ" "$APP_LOG"
+    ok "the application works with the password it received (the log holds a fingerprint, not the value)"
+    evidence "Application log" "$APP_LOG"
   else
-    fail "アプリケーションのログにパスワードのフィンガープリントが無い" \
-         "kubectl logs deploy/${APP_DEPLOY} -c app を確認してください — コンテナが起動できなかった可能性があります"
+    fail "there is no password fingerprint in the application log" \
+         "check kubectl logs deploy/${APP_DEPLOY} -c app - the container may have failed to start"
   fi
 fi
 
-# --- 11. 素朴なシークレットが取り除かれている ----------------------------------------
-# 「削除済み」と数えるのはラボを実際に行った場合だけだ: まっさらなクラスターにはシークレットが
-# もともと存在せず、行われていない後片付けで参加者を褒めてしまうことになる。
+# --- 11. the naive secret is removed ---------------------------------------
+# We count "removed" only if the lab was actually done: on a clean cluster the secret never
+# existed, and the report would praise the participant for a cleanup that never happened.
 if kubectl get secret passes-db >/dev/null 2>&1; then
-  warn "クラスターに素朴な段階のシークレット passes-db が残っている" \
-       "それはもう不要で、古いパスワードを含んでいる: kubectl delete secret passes-db"
+  warn "the secret passes-db from the naive stage is still in the cluster" \
+       "it is no longer needed and holds the old password: kubectl delete secret passes-db"
 elif kubectl get deployment secrets-demo >/dev/null 2>&1; then
-  ok "素朴なシークレット passes-db は削除済み"
+  ok "the naive secret passes-db is removed"
 fi
 
 finish

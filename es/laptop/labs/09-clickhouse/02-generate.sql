@@ -1,74 +1,74 @@
--- Lab 9 · generador de datos: un millón de registros de torniquete, inventados por el propio ClickHouse.
+-- Lab 9 · data generator: a million turnstile entries, invented by ClickHouse itself.
 --
--- Dónde se ejecuta: en el portátil, en el clúster de laboratorio, con el breve comando `ch`
--- del README:
+-- Where it runs: on the laptop, in the lab cluster, with the short command `ch`
+-- from the README:
 --     cd labs/09-clickhouse && ch < 02-generate.sql
--- Antes de esto, la tabla ya debe estar creada — 01-schema.sql.
+-- Before this, the table must already be created — 01-schema.sql.
 --
--- Cuánto esperar: un millón de filas se calcula y se escribe en unos segundos,
--- por completo dentro del servidor. Los datos no viajan por la red ni pasan por tu portátil.
--- La respuesta del INSERT está vacía — eso significa éxito. Para comprobar: echo 'SELECT count() FROM passes' | ch
+-- How long to wait: a million rows are computed and written in a few seconds,
+-- entirely inside the server. The data does not travel over the network and does not pass through your laptop.
+-- The INSERT reply is empty — that means success. To check: echo 'SELECT count() FROM passes' | ch
 --
--- Ejecuta el archivo dos veces y habrá dos millones de filas: INSERT solo añade y
--- no reemplaza nada. Para empezar de nuevo: TRUNCATE TABLE passes, y luego ejecuta este archivo otra vez.
+-- Run the file twice and there will be two million rows: INSERT only appends and
+-- replaces nothing. To start over: TRUNCATE TABLE passes, then run this file again.
 --
--- A continuación hay un único comando INSERT ... SELECT: las filas no vienen de fuera, se calculan
--- mediante la consulta que sigue.
+-- Below is a single INSERT ... SELECT command: the rows do not come from outside, they are computed
+-- by the query that follows.
 INSERT INTO passes
 SELECT
-    -- Número de pase. number es único dentro del generador — así que pass_id
-    -- también es único.
+    -- Pass number. number is unique within the generator — so pass_id
+    -- is unique too.
     number AS pass_id,
-    -- La hora de entrada se ensambla a partir de tres partes: día, hora y minuto. Cada parte es
-    -- su propio número pseudoaleatorio, obtenido como cityHash64(number, 'sal').
-    -- cityHash64 es una función hash rápida: para la misma entrada siempre da
-    -- el mismo resultado, por lo que los datos son reproducibles, mientras que una 'sal' distinta
-    -- ('day', 'hour', 'minute', ...) convierte un único number en tantos
-    -- valores aleatorios mutuamente independientes como quieras.
+    -- The entry time is assembled from three parts: day, hour, and minute. Each part is
+    -- its own pseudo-random number, obtained as cityHash64(number, 'salt').
+    -- cityHash64 is a fast hash function: for the same input it always gives
+    -- the same result, so the data is reproducible, while a different 'salt'
+    -- ('day', 'hour', 'minute', ...) turns a single number into as many
+    -- mutually independent random values as you like.
     addMinutes(
         addHours(
             addDays(
-                -- El punto de referencia es el 1 de enero. El resto módulo 57600 da un número hasta 57599,
-                -- su raíz cuadrada es un día de 0 a 239, es decir, ocho meses.
-                -- La raíz cuadrada aquí no es por estética: agrupa las entradas
-                -- hacia el final del período. Con el tiempo hay más invitados — como
-                -- en la vida real, y es precisamente este crecimiento lo que la dirección quiere ver en el informe.
+                -- The reference point is January 1st. The remainder modulo 57600 gives a number up to 57599,
+                -- its square root is a day from 0 to 239, that is, eight months.
+                -- The square root here is not for looks: it clusters entries
+                -- toward the end of the period. Over time there are more guests — as
+                -- in real life, and it is exactly this growth that management wants to see in the report.
                 toDateTime('2026-01-01 00:00:00'),
                 toUInt16(sqrt(cityHash64(number, 'day') % 57600))
             ),
-            -- La hora de llegada no se toma de forma uniforme "de 8 a 18", sino de un array donde
-            -- las horas se repiten con distinta frecuencia: 10 aparece tres veces, 15 tres veces,
-            -- 8 una vez. El resultado son dos picos pronunciados, antes del almuerzo y después;
-            -- el informe debe encontrarlos. Es bueno que los datos de prueba contengan aquello que
-            -- pretendemos buscar en ellos.
-            -- La indexación de arrays en ClickHouse empieza en uno, de ahí 1 + …
+            -- The arrival hour is taken not uniformly "from 8 to 18", but from an array where
+            -- hours repeat with different frequency: 10 appears three times, 15 three times,
+            -- 8 once. The result is two pronounced peaks, before lunch and after;
+            -- the report should find them. It is good when the test data contains what
+            -- we intend to look for in it.
+            -- Array indexing in ClickHouse starts at one, hence 1 + …
             [8, 9, 9, 10, 10, 10, 11, 11, 12,
              13, 14, 14, 15, 15, 15, 16, 17, 18][1 + cityHash64(number, 'hour') % 18]
         ),
-        -- Los minutos dentro de la hora son otro valor independiente más del mismo number.
+        -- The minutes within the hour are yet another independent value from the same number.
         cityHash64(number, 'minute') % 60
     ) AS created_at,
-    -- El nombre del invitado es único para cada fila: un millón de valores distintos en una sola columna.
-    -- Un poco más adelante en la lab quedará claro que en disco esta es la columna más pesada.
-    concat('Invitado n.º ', toString(number)) AS guest_name,
-    -- El departamento del empleado anfitrión: cinco valores, distribuidos por igual.
-    ['Ventas', 'Ingeniería', 'Contabilidad',
-     'Recursos Humanos', 'Logística'][1 + cityHash64(number, 'dept') % 5] AS host_dept,
-    -- La entrada. El mismo truco, pero la distribución es desigual: "Norte" toma
-    -- tres celdas de seis y recibe la mitad del flujo, "Sur" un tercio, "Oeste"
-    -- el resto. Los datos uniformes parecen inverosímiles en un informe y no muestran
-    -- nada.
-    ['Norte', 'Norte', 'Norte',
-     'Sur', 'Sur', 'Oeste'][1 + cityHash64(number, 'entrance') % 6] AS entrance,
-    -- Tipo de pase: seis celdas de diez van al de un solo uso, dos a cada semanal,
-    -- una a cada uno de vehículo y grupo — así es como se ve en la entrada.
-    ['puntual', 'puntual', 'puntual', 'puntual', 'puntual', 'puntual',
-     'semanal', 'semanal',
-     'vehicular', 'grupal'][1 + cityHash64(number, 'type') % 10] AS pass_type,
-    -- Duración de la visita de 30 a 329 minutos. toUInt16 es necesario porque la columna
-    -- está declarada como UInt16, mientras que el resultado de la aritmética es más ancho y no se estrechará por sí solo.
+    -- The guest name is unique to each row: a million different values in a single column.
+    -- A bit further into the lab it will be clear that on disk this is the heaviest column.
+    concat('Guest No. ', toString(number)) AS guest_name,
+    -- The host employee's department: five values, distributed equally.
+    ['Sales', 'Engineering', 'Accounting',
+     'HR', 'Logistics'][1 + cityHash64(number, 'dept') % 5] AS host_dept,
+    -- The entrance. The same trick, but the distribution is uneven: "North" takes
+    -- three cells out of six and gets half the flow, "South" a third, "West"
+    -- the rest. Uniform data looks implausible in a report and shows
+    -- nothing.
+    ['North', 'North', 'North',
+     'South', 'South', 'West'][1 + cityHash64(number, 'entrance') % 6] AS entrance,
+    -- Pass type: six cells out of ten go to single-use, two each to weekly,
+    -- one each to vehicle and group — that is how it looks at the entrance.
+    ['single-use', 'single-use', 'single-use', 'single-use', 'single-use', 'single-use',
+     'weekly', 'weekly',
+     'vehicle', 'group'][1 + cityHash64(number, 'type') % 10] AS pass_type,
+    -- Visit duration from 30 to 329 minutes. toUInt16 is needed because the column
+    -- is declared as UInt16, while the result of the arithmetic is wider and will not narrow itself.
     toUInt16(30 + cityHash64(number, 'duration') % 300) AS duration_min
--- numbers(1000000) es una tabla generadora incorporada: un millón de filas con una única
--- columna number que contiene valores de 0 a 999999. No está en disco, se calcula
--- sobre la marcha. Si necesitas más o menos datos, solo cambia este número.
+-- numbers(1000000) is a built-in generator table: a million rows with a single
+-- column number holding values from 0 to 999999. It is not on disk, it is computed
+-- on the fly. If you need more or less data, only this number changes.
 FROM numbers(1000000)

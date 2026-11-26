@@ -63,7 +63,7 @@ Deployment, кластер будет запускать её снова и сн
 ## Что лежит в папке лабы
 
 Все файлы уже у вас — вы забрали их вместе с репозиторием. Создавать и печатать заново
-ничего не нужно: там, где ниже написано `kubectl apply -f имя.yaml`, файл берётся отсюда.
+ничего не нужно: там, где ниже написано `kubectl apply -f name.yaml`, файл берётся отсюда.
 
 ```bash
 cd labs/11-android
@@ -106,14 +106,14 @@ cd labs/11-android
 нужен тенантный, а не от кластера `lab`.
 
 ```bash
-# KUBECONFIG — каким файлом доступа пользуется kubectl. Здесь тенантный: бакет
-# заказывается на управляющем кластере, а не в кластере lab
+# KUBECONFIG — which access file kubectl uses. Here it's the tenant's: the bucket
+# is ordered on the management cluster, not in the lab cluster
 export KUBECONFIG=~/.kube/workshop
 
-# apply = «приведи кластер к тому, что описано в файле». Команда не создаёт хранилище
-# сама — она передаёт заказ платформе.
-#   -f bucket.yaml   какой файл применить. Перед этим замените в нём
-#                    tenant-workshopXX на свой namespace, иначе заказ уедет не туда
+# apply = "bring the cluster to what's described in the file." The command doesn't create
+# the storage itself — it hands the order to the platform.
+#   -f bucket.yaml   which file to apply. Before this, replace
+#                    tenant-workshopXX in it with your namespace, or the order goes elsewhere
 kubectl apply -f bucket.yaml
 ```
 
@@ -179,15 +179,15 @@ Cozystack. Настоящее имя бакета в хранилище плат
 остальные берутся так же, меняется только имя поля.
 
 ```bash
-# Работаем тем же тенантным доступом, что и на прошлом шаге: секрет лежит в тенанте.
-# get secret = «покажи объект с паролями и ключами». Значения внутри секрета лежат
-# в кодировке base64 — это не шифрование, а способ записи двоичных данных текстом.
-#   -n tenant-workshopXX   в каком namespace искать
-#   -o jsonpath='...'      отдать не всю карточку объекта, а одно поле из неё:
-#                          .data.accessKey — ключ accessKey внутри раздела data
-#   base64 -d              раскодировать обратно в читаемый вид (d = decode)
-#   ; echo                 добавить перевод строки: без него значение слипнется
-#                          со следующим приглашением терминала
+# We work with the same tenant access as in the previous step: the secret lives in the tenant.
+# get secret = "show the object with passwords and keys." The values inside the secret are
+# base64-encoded — this isn't encryption, just a way of writing binary data as text.
+#   -n tenant-workshopXX   which namespace to look in
+#   -o jsonpath='...'      return not the whole object, but a single field from it:
+#                          .data.accessKey — the accessKey field inside the data section
+#   base64 -d              decode it back into readable form (d = decode)
+#   ; echo                 add a line break: without it the value would run into
+#                          the next terminal prompt
 kubectl -n tenant-workshopXX get secret bucket-builds-ci-credentials \
   -o jsonpath='{.data.accessKey}' | base64 -d; echo
 ```
@@ -207,20 +207,20 @@ kubectl -n tenant-workshopXX get secret bucket-builds-ci-credentials \
 Имена полей менять нельзя: скрипт сборки ищет переменные ровно с этими именами.
 
 ```bash
-# Здесь и до конца лабы работаем с кластером lab, а не с тенантом
+# From here to the end of the lab we work with the lab cluster, not the tenant
 export KUBECONFIG=~/lab.kubeconfig
 
-# create secret generic = «создай секрет из значений, которые я перечислю».
-# generic означает «произвольный набор пар имя-значение», а не готовый тип
-# для пароля к реестру образов или для TLS-сертификата.
-#   bucket-creds        имя секрета. По нему на него сошлётся Job
-#   --from-literal=имя='значение'   одна пара. Вместо ВСТАВЬТЕ_... подставьте
-#                       значения из карточки бакета в дашборде
+# create secret generic = "create a secret from the values I'm about to list."
+# generic means "an arbitrary set of name-value pairs," not a ready-made type
+# for an image-registry password or a TLS certificate.
+#   bucket-creds        the secret's name. The Job will reference it by this name
+#   --from-literal=name='value'   one pair. In place of PASTE_..., substitute
+#                       the values from the bucket's card in the dashboard
 kubectl create secret generic bucket-creds \
-  --from-literal=endpoint='ВСТАВЬТЕ_endpoint' \
-  --from-literal=bucketName='ВСТАВЬТЕ_bucketName' \
-  --from-literal=accessKey='ВСТАВЬТЕ_accessKey' \
-  --from-literal=secretKey='ВСТАВЬТЕ_secretKey'
+  --from-literal=endpoint='PASTE_endpoint' \
+  --from-literal=bucketName='PASTE_bucketName' \
+  --from-literal=accessKey='PASTE_accessKey' \
+  --from-literal=secretKey='PASTE_secretKey'
 ```
 
 **Что вы должны увидеть:**
@@ -250,7 +250,7 @@ secret/bucket-creds created
 Исходники лежат там же по той же причине: сборке нужны файлы, а заводить ради шести
 текстовых файлов сетевой диск незачем.
 
-Приложение делает одно: показывает строчку «Заказать пропуск для гостя». Этого достаточно,
+Приложение делает одно: показывает строчку «Request a guest pass». Этого достаточно,
 потому что лаба не про Android, а про то, где он собирается.
 
 **APK** — то, что получится на выходе. Это архив, внутри которого лежит скомпилированное
@@ -342,7 +342,7 @@ class MainActivity : Activity() {
 понадобятся сборке на следующем шаге.
 
 ```bash
-# Создаёт ConfigMap с шестью файлами внутри. Проверить, что он на месте:
+# Creates a ConfigMap with six files inside. To check it's in place:
 # kubectl get configmap propusk-src
 kubectl apply -f propusk-src.yaml
 ```
@@ -379,10 +379,10 @@ Deployment: сорок строк shell внутри поля `command` нево
 Три строчки заслуживают отдельного взгляда.
 
 ```bash
-# yes — команда, которая бесконечно печатает «y»: так пачка вопросов «принимаете
-# лицензию? [y/n]» отвечается без человека.
-#   >/dev/null 2>&1   выбросить и обычный вывод, и вывод ошибок: он тут не нужен
-#   || true           «даже если команда вернула ошибку, считай, что всё хорошо»
+# yes — a command that prints "y" endlessly: this way a batch of "accept the
+# license? [y/n]" questions gets answered without a human.
+#   >/dev/null 2>&1   discard both normal output and error output: it's not needed here
+#   || true           "even if the command returned an error, treat it as fine"
 yes | sdkmanager --sdk_root="$ANDROID_SDK_ROOT" --licenses >/dev/null 2>&1 || true
 ```
 
@@ -392,11 +392,11 @@ yes | sdkmanager --sdk_root="$ANDROID_SDK_ROOT" --licenses >/dev/null 2>&1 || tr
 ставить SDK, так что ошибку мы не спрячем.
 
 ```bash
-# alias set = «запомни адрес хранилища и ключи под коротким именем builds», чтобы
-# дальше не повторять их в каждой команде копирования.
-#   "https://${endpoint}"   адрес: приставку https:// дописываем сами, в секрете её нет
-#   ${accessKey} ${secretKey}   логин и пароль на языке S3, приезжают из секрета
-#   >/dev/null              погасить вывод
+# alias set = "remember the storage address and keys under the short name builds," so
+# we don't repeat them in every copy command that follows.
+#   "https://${endpoint}"   the address: we add the https:// prefix ourselves, it's not in the secret
+#   ${accessKey} ${secretKey}   the login and password in S3 terms, they come from the secret
+#   >/dev/null              suppress the output
 mc alias set builds "https://${endpoint}" "${accessKey}" "${secretKey}" >/dev/null
 ```
 
@@ -404,8 +404,8 @@ mc alias set builds "https://${endpoint}" "${accessKey}" "${secretKey}" >/dev/nu
 каждый, у кого есть доступ к кластеру, и ключи туда попадать не должны.
 
 ```bash
-# echo печатает строку в лог задачи. Никакой работы она не делает — это отметка
-# о том, что предыдущая команда копирования дошла до конца
+# echo prints a line to the task's log. It does no work — it's a marker
+# that the previous copy command ran to completion
 echo "APK-UPLOADED ${bucketName}/propusk/propusk-${STAMP}.apk"
 ```
 
@@ -508,14 +508,14 @@ nginx, и поставил бы её на узел, где она не поме�
 Применяем задание и сразу смотрим на под, который оно создало.
 
 ```bash
-# Создаёт из файла два объекта: ConfigMap со скриптом и сам Job.
-# С этого момента кластер обязан найти узел под сборку и запустить её
+# Creates two objects from the file: a ConfigMap with the script and the Job itself.
+# From this moment the cluster is obliged to find a node for the build and start it
 kubectl apply -f android-build.yaml
 
-# get pods = «покажи поды». Своего имени у пода задачи нет — Job придумывает его
-# сам, дописывая к своему имени случайный хвост. Поэтому ищем не по имени, а по метке:
-#   -l job-name=propusk-build   отобрать поды с меткой job-name, равной имени задания.
-#                               Метку Job вешает на свои поды сам
+# get pods = "show the Pods." The task's Pod has no name of its own — the Job invents it
+# itself, appending a random tail to its own name. So we search not by name but by label:
+#   -l job-name=propusk-build   select Pods with the job-name label equal to the job's name.
+#                               The Job attaches this label to its Pods itself
 kubectl get pods -l job-name=propusk-build
 ```
 
@@ -530,10 +530,10 @@ propusk-build-x7k2p    0/1     Pending   0          40s
 пишет в события пода — это его журнал: кто и что с ним пытался сделать.
 
 ```bash
-# describe = «покажи всё, что известно про объект»: настройки, состояние, события.
-# Вывод длинный, поэтому оставляем от него только конец:
-#   sed -n '/Events:/,$p'   напечатать строки от той, где встретилось «Events:»,
-#                           и до конца вывода ($ — конец)
+# describe = "show everything known about the object": settings, state, events.
+# The output is long, so we keep only its tail:
+#   sed -n '/Events:/,$p'   print lines from the one where "Events:" appears,
+#                           through the end of the output ($ — end)
 kubectl describe pod -l job-name=propusk-build | sed -n '/Events:/,$p'
 ```
 
@@ -601,11 +601,11 @@ memory 4Gi` и `cpu 1`. Ровно столько на узле и есть, н�
 Дождитесь нового узла. Графической консоли у кластера `lab` нет, смотрим командой:
 
 ```bash
-# get nodes = «покажи узлы кластера» — те самые виртуальные машины, на которых
-# работают поды.
-#   -w   watch, «не выходи и дописывай строки при каждом изменении». Старый узел
-#        уйдёт из списка, новый появится и дойдёт до STATUS=Ready.
-#        Выйти из слежения — Ctrl+C, на кластер это никак не влияет
+# get nodes = "show the cluster's nodes" — those very virtual machines on which
+# the Pods run.
+#   -w   watch, "don't exit; append lines on every change." The old node
+#        will drop from the list, a new one will appear and reach STATUS=Ready.
+#        To leave the watch — Ctrl+C, which has no effect on the cluster
 kubectl get nodes -w
 ```
 
@@ -613,8 +613,8 @@ kubectl get nodes -w
 `Pending`-поды постоянно, просить его не нужно. Проверяем, что тронулся:
 
 ```bash
-# Тот же запрос, что и до правки узла. Теперь в колонке STATUS ожидается
-# ContainerCreating, а через минуту-две Running
+# The same query as before the node edit. Now the STATUS column should show
+# ContainerCreating, and in a minute or two Running
 kubectl get pods -l job-name=propusk-build
 ```
 
@@ -626,10 +626,10 @@ kubectl get pods -l job-name=propusk-build
 внутри контейнера.
 
 ```bash
-# logs = «покажи, что напечатала задача».
-#   -f                  follow: не выходить, а дописывать строки по мере появления.
-#                       Выйти — Ctrl+C, сборка при этом продолжится
-#   job/propusk-build   можно указать сам Job, а не под: kubectl найдёт его под сам
+# logs = "show what the task printed."
+#   -f                  follow: don't exit, but append lines as they appear.
+#                       Exit — Ctrl+C, the build keeps going regardless
+#   job/propusk-build   you can point at the Job itself, not the Pod: kubectl will find its Pod on its own
 kubectl logs -f job/propusk-build
 ```
 
@@ -637,9 +637,9 @@ kubectl logs -f job/propusk-build
 
 | Отметка в логе | Когда примерно |
 |---|---|
-| `== 1/5 ставлю Android command-line tools ==` | сразу |
-| `== 2/5 принимаю лицензии и качаю SDK (самый долгий шаг) ==` | +1–2 минуты, и висит дольше всего |
-| `== 3/5 собираю APK ==` | +5–15 минут от старта |
+| `== 1/5 installing Android command-line tools ==` | сразу |
+| `== 2/5 accepting licenses and downloading the SDK (the longest step) ==` | +1–2 минуты, и висит дольше всего |
+| `== 3/5 building the APK ==` | +5–15 минут от старта |
 | `BUILD SUCCESSFUL in ...` | +10–25 минут от старта |
 | `APK-UPLOADED bucket-.../propusk/propusk-...apk` | сразу за ним |
 
@@ -649,8 +649,8 @@ kubectl logs -f job/propusk-build
 под процессор и память:
 
 ```bash
-# top = «сколько сейчас потребляет». Не заявка requests, а фактический расход
-# прямо в эту секунду. Ненулевой процессор означает, что внутри идёт работа
+# top = "how much it's consuming right now." Not the requests claim, but actual usage
+# this very second. Non-zero CPU means work is happening inside
 kubectl top pod -l job-name=propusk-build
 ```
 
@@ -658,7 +658,7 @@ Job считается выполненным, когда под заверши�
 общепринятое «отработал без ошибок»):
 
 ```bash
-# Смотрим не на под, а на само задание: у него есть колонки, которых у пода нет
+# We look not at the Pod but at the job itself: it has columns the Pod doesn't
 kubectl get job propusk-build
 ```
 
@@ -710,8 +710,8 @@ propusk/propusk-latest.apk
 📍 **Где:** на ноутбуке, в том же окне терминала, где вы работали с `kubectl`.
 
 ```bash
-# Скрипт ходит в кластер lab тем же файлом доступа, что и вы. Реквизиты бакета
-# он берёт из секрета bucket-creds — отдельно вводить ничего не нужно
+# The script reaches the lab cluster with the same access file as you. The bucket
+# credentials it takes from the bucket-creds secret — you don't need to enter anything separately
 export KUBECONFIG=~/lab.kubeconfig
 ./check.sh
 ```
@@ -732,11 +732,11 @@ Job после завершения ничего не потребляет: по
 Удалять его сразу не нужно, логи ещё пригодятся. Когда закончите:
 
 ```bash
-# delete -f = «убери из кластера то, что описано в этом файле». Вместе с Job
-# исчезнут и его логи, поэтому команда идёт последней по времени, а не первой
+# delete -f = "remove from the cluster what's described in this file." Along with the Job
+# its logs will disappear too, so this command comes last in time, not first
 kubectl delete -f android-build.yaml
 kubectl delete -f propusk-src.yaml
-# Секрет удаляем отдельно: файла с ним нет, вы создавали его командой
+# We delete the secret separately: there's no file for it, you created it with a command
 kubectl delete secret bucket-creds
 ```
 

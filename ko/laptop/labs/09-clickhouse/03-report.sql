@@ -1,42 +1,42 @@
--- 실습 9 · 경영진이 요청한 보고서: 매월 방문객이 몇 명인지,
--- 방문이 평균 얼마나 지속되는지, 몇 시에 가장 자주 오는지, 어느 출입구가
--- 더 붐비는지.
+-- Lab 9 · the report management asked for: how many guests each month,
+-- how long a visit lasts on average, at what hour they arrive most often, and which entrance
+-- is busier.
 --
--- 실행 위치: 노트북에서, 실습 클러스터에서, README에 있는 짧은 명령
--- `ch`로:
+-- Where it runs: on the laptop, in the lab cluster, with the short command `ch`
+-- from the README:
 --     cd labs/09-clickhouse && ch < 03-report.sql
--- 그 전에 01-schema.sql과 02-generate.sql이 먼저 실행되어 있어야 합니다.
+-- Before this, 01-schema.sql and 02-generate.sql must have been run.
 --
--- 결과 읽는 법: 데이터에 나타난 각 월마다 한 행씩(총 여덟 개),
--- 월은 오름차순으로, 방문객 수는 달을 거듭할수록 증가합니다.
+-- How to read the result: one row per month present in the data (there are
+-- eight), months in ascending order, the guest count growing from month to month.
 --
--- 백만 행이 왜 밀리초 만에 집계되는가. ClickHouse는 각 컬럼을
--- 별도의 파일로 저장합니다. 이 쿼리는 일곱 컬럼 중 세 개만 건드립니다 — 나머지 네 개는,
--- 가장 무거운 guest_name을 포함해, 디스크에서 전혀 읽지 않습니다. 행이 디스크에
--- 통째로 저장되는 데이터베이스에서는, 그중 세 개만 집계하려 해도 모든 필드를 담은
--- 백만 행 전부를 끌어올려야 합니다. 시간 차이가 여기서 생깁니다.
--- 숫자로 확인하는 법: 쿼리 끝에 FORMAT JSON 줄을 추가하세요 — 응답에
--- 소요 시간과 읽은 용량이 담긴 통계 블록이 나타납니다.
+-- Why a million rows are counted in milliseconds. ClickHouse stores each column
+-- as a separate file. This query touches three columns out of seven — the other four,
+-- including the heaviest one, guest_name, are not read from disk at all. In a database where a row
+-- is stored on disk in full, you would have to pull all million rows with all their fields
+-- just to compute over three of them. Hence the difference in time.
+-- To see it in numbers: append the line FORMAT JSON to the end of the query — the response
+-- will include a statistics block with the time spent and the volume read.
 --
--- 데이터에 나타난 각 월마다 보고서 한 행.
+-- One report row per month that appeared in the data.
 SELECT
-    -- 이 통과를 어느 월에 귀속시킬지. toStartOfMonth는 정확한 시각을
-    -- 그 달의 1일로 바꿉니다: 「연도 더하기 월」 쌍 대신,
-    -- 그룹화와 정렬을 모두 할 수 있는 하나의 값.
+    -- Which month to attribute the pass to. toStartOfMonth turns the exact time
+    -- into the first day of the month: a single value to both group and sort by,
+    -- instead of a "year plus month" pair.
     toStartOfMonth(created_at)          AS month,
-    -- 그룹에 몇 행이 들어왔는지 — 이것이 곧 「월별 방문객 수」.
+    -- How many rows fell into the group — this is "how many guests per month".
     count()                             AS guests,
-    -- 평균 방문 시간, 분 단위 정수로 반올림.
+    -- Average visit duration, rounded to whole minutes.
     round(avg(duration_min))            AS avg_minutes,
-    -- 가장 빈번한 도착 시간 — 바로 그 피크 시간. topK(1)(x)는 가장 빈번한
-    -- 값 하나로 이루어진 배열을 반환하고, [1]이 거기서 그 값을 꺼냅니다(1부터 셈).
+    -- The most frequent arrival hour — the rush hour itself. topK(1)(x) returns an array
+    -- of the single most frequent value, and [1] pulls it out of there (counting from one).
     topK(1)(toHour(created_at))[1]      AS peak_hour,
-    -- 이번 달 가장 붐빈 출입구, 같은 기법으로.
+    -- The busiest entrance of this month, by the same trick.
     topK(1)(entrance)[1]                AS busiest_entrance
--- 이 쿼리에 없는 것을 눈여겨보세요: 서브쿼리, 임시 테이블, join.
--- 모든 것이 데이터를 한 번 훑으며 계산됩니다.
+-- Note what the query does not have: subqueries, temporary tables, and joins.
+-- Everything is computed in a single pass over the data.
 FROM passes
--- 한 달의 모든 행을 응답 한 행으로 접습니다.
+-- Collapse all rows of one month into a single response row.
 GROUP BY month
--- 성장세가 위에서 아래로 읽히도록 월을 오름차순으로 출력합니다.
+-- Output the months in ascending order, so the growth reads top to bottom.
 ORDER BY month

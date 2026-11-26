@@ -1,174 +1,174 @@
 #!/usr/bin/env bash
-# लैब 1 की जाँच: एप्लिकेशन तैनात है और वास्तव में काम कर रहा है।
+# Check for lab 1: the application is deployed and genuinely working.
 #
-# यहाँ «वास्तव में» का अर्थ है: पेज सचमुच HTTP पर परोसा जाता है, उसमें पॉड का
-# नाम प्रतिस्थापित है, और वह नाम किसी सचमुच चल रही प्रतिलिपि के नाम से मेल खाता है।
-# Deployment ऑब्जेक्ट के अस्तित्व की जाँच बेकार है — वह मौजूद रह सकता है और काम न करे।
+# "Genuinely" here means: the page is actually served over HTTP, it has the pod
+# name substituted into it, and that name matches the name of a really running replica.
+# Checking that a Deployment object exists is pointless — it can exist and not work.
 #
-# यह वर्चुअल मशीन पर, इसी लैब के फ़ोल्डर से, प्रशिक्षण क्लस्टर `lab` तक पहुँच के साथ चलता है
-# (प्रबंधन क्लस्टर पर टेनेंट तक नहीं):
+# Runs on the VM, from this lab's folder, using access to the training cluster `lab`
+# (not to the tenant on the management cluster):
 #     export KUBECONFIG=~/lab.kubeconfig
 #     cd labs/01-deploy && ./check.sh
-# COZY_TENANT चर की यहाँ ज़रूरत नहीं: पूरी लैब `lab` क्लस्टर के भीतर चलती है।
+# The COZY_TENANT variable is not needed here: the whole lab runs inside the `lab` cluster.
 #
-# स्क्रिप्ट क्लस्टर में कुछ नहीं बदलती — केवल पढ़ती है और HTTP अनुरोध भेजती है।
-# इसे सफ़ाई से पहले चलाएँ: एप्लिकेशन हटाने के बाद जाँचने को कुछ नहीं बचेगा।
+# The script changes nothing in the cluster — it only reads and sends HTTP requests.
+# Run it before cleanup: after deleting the application there will be nothing to check.
 
-# इन दो चरों को lib.sh उठाता है — ये रिपोर्ट के शीर्षक में और उस फ़ाइल के नाम
-# report-<लैब>-<तारीख>.md में जाते हैं, जिसे स्क्रिप्ट अपने बगल में रखती है।
+# These two variables are picked up by lib.sh — they go into the report header and into the
+# file name report-<lab>-<date>.md that the script writes next to itself.
 LAB_NAME="01-deploy"
-LAB_TITLE="लैब 1 · पहला एप्लिकेशन"
-# साझा जाँच लाइब्रेरी: यहाँ से आते हैं ok / fail / warn / evidence / finish,
-# क्लस्टर के भीतर से पेज अनुरोध और रिपोर्ट लिखना। पथ की गणना उस स्थान से होती है जहाँ
-# स्क्रिप्ट स्वयं रहती है, इसलिए किसी भी निर्देशिका से चलाना एक जैसा काम करता है।
+LAB_TITLE="Lab 1 · First application"
+# The shared checks library: from here come ok / fail / warn / evidence / finish,
+# the in-cluster page request and writing the report. The path is computed from where
+# the script itself lives, so running from any directory works the same.
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
-# अगर KUBECONFIG सेट नहीं है तो तुरंत रुक जाएँ। इसके बिना kubectl क्लस्टर को
-# वर्चुअल मशीन पर ही ढूँढता है, नहीं पाता, और एक के बाद एक हर जाँच को उसी त्रुटि से
-# गिरा देता है, जिससे असली कारण नहीं दिखता।
+# Stop immediately if KUBECONFIG is not set. Without it kubectl looks for a cluster
+# on the VM itself, doesn't find one, and fails every check in a row with the same error
+# that hides the real cause.
 need_kubeconfig
 
-# --- एप्लिकेशन ऑब्जेक्ट ------------------------------------------------------
-# पहली रक्षा-पंक्ति: एप्लिकेशन सचमुच स्थापित है और कम से कम एक प्रतिलिपि तैयारी तक पहुँची।
-# हम .status.readyReplicas देखते हैं, न कि Deployment के मात्र अस्तित्व को: ऑब्जेक्ट
-# तत्काल और हमेशा सफलतापूर्वक बनता है, जबकि तैयारी का अर्थ है कि प्रतिलिपि उठी,
-# अपनी रेडीनेस जाँच पास की और जवाब देने में सक्षम है।
+# --- application object -----------------------------------------------------
+# First line of defense: the application is actually set up and at least one replica reached readiness.
+# We look at .status.readyReplicas, not at the mere existence of the Deployment: the object
+# is created instantly and always successfully, whereas readiness means a replica came up,
+# passed its readiness probe and is able to respond.
 if kubectl get deployment rickroll >/dev/null 2>&1; then
   DESIRED="$(kubectl get deployment rickroll -o jsonpath='{.spec.replicas}' 2>/dev/null)"
   READY="$(kubectl get deployment rickroll -o jsonpath='{.status.readyReplicas}' 2>/dev/null)"
   READY="${READY:-0}"
   DESIRED="${DESIRED:-0}"
   if [ "$DESIRED" -eq 0 ]; then
-    # विशेष स्थिति: ऑब्जेक्ट मौजूद है, पर उसके लिए शून्य प्रतिलिपियाँ माँगी गई हैं। संदेश
-    # «कोई प्रतिलिपि तैयार नहीं (0 चाहिए)» निरर्थक लगता।
-    fail "एप्लिकेशन रुका हुआ है — 0 प्रतिलिपियाँ माँगी गईं" \
-         "प्रतिलिपि वापस लाएँ: kubectl scale deployment rickroll --replicas=1"
+    # Special case: the object exists but zero replicas are requested for it. The message
+    # "no replica is ready (0 needed)" would sound like nonsense.
+    fail "application stopped — 0 replicas requested" \
+         "bring a replica back: kubectl scale deployment rickroll --replicas=1"
   elif [ "$READY" -ge 1 ]; then
-    ok "एप्लिकेशन तैनात है, ${DESIRED} में से ${READY} प्रतिलिपियाँ तैयार"
-    # अटकी हुई रोलआउट सेवा को नहीं गिराती: पुरानी प्रतिलिपि काम करती रहती है, और
-    # readyReplicas एक पर बना रहता है। इस जाँच के बिना प्रतिभागी हरे निशान और ऐसे
-    # डिप्लॉयमेंट के साथ चला जाता है जो सदा के लिए ErrImagePull में अटका रहता है।
-    # हम प्रतिलिपियों को स्वयं देखते हैं, केवल ProgressDeadlineExceeded को नहीं: समयसीमा
-    # दस मिनट बाद सक्रिय होती है, जबकि स्क्रिप्ट तुरंत चलाई जाती है। इस बीच पुरानी प्रतिलिपि
-    # काम करती रहती है, readyReplicas एक पर बना रहता है, और इस जाँच के बिना प्रतिभागी हरे
-    # निशान और ImagePullBackOff में अटके डिप्लॉयमेंट के साथ चला जाता है।
+    ok "application deployed, ${READY} of ${DESIRED} replicas ready"
+    # A stuck rollout doesn't take the service down: the old replica keeps working, and
+    # readyReplicas stays at one. Without this check the participant leaves with a green
+    # check mark and a deployment that is forever stuck in ErrImagePull.
+    # We look at the replicas themselves, not only at ProgressDeadlineExceeded: the deadline
+    # fires after ten minutes, while the script is run right away. The old replica keeps
+    # working meanwhile, readyReplicas stays at one, and without this check the participant
+    # leaves with a green check mark and a deployment stuck in ImagePullBackOff.
     STUCK="$(kubectl get pods -l app=rickroll \
       -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.status.containerStatuses[0].state.waiting.reason}{"\n"}{end}' 2>/dev/null \
       | awk '$2=="ImagePullBackOff" || $2=="ErrImagePull" || $2=="CrashLoopBackOff" || $2=="CreateContainerConfigError" {print $1" ("$2")"}')"
     PROG_REASON="$(kubectl get deployment rickroll \
       -o jsonpath='{.status.conditions[?(@.type=="Progressing")].reason}' 2>/dev/null)"
     if [ -n "$STUCK" ] || [ "$PROG_REASON" = "ProgressDeadlineExceeded" ]; then
-      fail "रोलआउट अटक गया: नई प्रतिलिपि नहीं उठ रही, केवल पुरानी काम कर रही है" \
-           "देखें kubectl get pods -l app=rickroll — आमतौर पर इमेज डाउनलोड नहीं हुई; कार्यशील स्थिति बहाल करें: kubectl apply -f rickroll.yaml"
-      evidence "जो प्रतिलिपियाँ शुरू नहीं होतीं" "${STUCK:-कारण Deployment की स्थिति में: $PROG_REASON}"
+      fail "rollout is stuck: the new replica won't come up, only the old one is working" \
+           "look at kubectl get pods -l app=rickroll — usually the image didn't pull; restore a working state: kubectl apply -f rickroll.yaml"
+      evidence "Replicas that won't start" "${STUCK:-cause in Deployment status: $PROG_REASON}"
     fi
   else
-    fail "एप्लिकेशन बना, पर कोई प्रतिलिपि तैयार नहीं (${DESIRED} चाहिए)" \
-         "देखें kubectl get pods -l app=rickroll और kubectl describe deployment rickroll"
-    evidence "पॉड की स्थिति" "$(kubectl get pods -l app=rickroll -o wide 2>/dev/null)"
+    fail "application created, but no replica is ready (${DESIRED} needed)" \
+         "look at kubectl get pods -l app=rickroll and kubectl describe deployment rickroll"
+    evidence "Pod state" "$(kubectl get pods -l app=rickroll -o wide 2>/dev/null)"
   fi
 else
-  fail "rickroll नाम का कोई Deployment नहीं मिला" \
-       "मैनिफ़ेस्ट लागू करें: kubectl apply -f rickroll.yaml"
+  fail "no Deployment named rickroll found" \
+       "apply the manifest: kubectl apply -f rickroll.yaml"
 fi
 
-# --- सेटिंग्स और पेज ---------------------------------------------------------
-# दोनों ConfigMap उसी फ़ाइल से बनते हैं जिससे एप्लिकेशन, इसलिए वे केवल उसी के साथ या
-# हाथ से हटाने पर ही गायब हो सकते हैं। हम इन्हें अलग से जाँचते हैं ताकि पेज टूटने पर
-# प्रतिभागी को तुरंत दिखे कि वास्तव में क्या कमी है: rickroll-conf के बिना nginx पॉड का
-# नाम प्रतिस्थापित नहीं करेगा, और rickroll-page-v1 के बिना लैब 4 में दूसरे संस्करण से
-# तुलना करने को कुछ नहीं होगा और वापस लौटने के लिए कहीं नहीं होगा।
+# --- settings and page ------------------------------------------------------
+# Both ConfigMaps are created by the same file as the application, so they can only
+# disappear together with it or from manual deletion. We check them separately so that when
+# the page breaks the participant immediately sees exactly what is missing: without rickroll-conf
+# nginx won't substitute the pod name, and without rickroll-page-v1 there is nothing to compare
+# the second version against in lab 4 and nowhere to roll back to.
 for cm in rickroll-conf rickroll-page-v1; do
   if kubectl get configmap "$cm" >/dev/null 2>&1; then
-    ok "सेटिंग्स मौजूद हैं: ConfigMap ${cm}"
+    ok "settings in place: ConfigMap ${cm}"
   else
-    fail "ConfigMap ${cm} नहीं मिला" \
-         "यह उसी फ़ाइल से बनता है: kubectl apply -f rickroll.yaml"
+    fail "ConfigMap ${cm} not found" \
+         "it's created by the same file: kubectl apply -f rickroll.yaml"
   fi
 done
 
-# --- स्थायी पता -------------------------------------------------------------
+# --- stable address ---------------------------------------------------------
 if kubectl get service rickroll >/dev/null 2>&1; then
-  # बिना एंडपॉइंट वाला Service एक आम और अनदेखी खराबी है: ऑब्जेक्ट मौजूद है,
-  # पर पॉड पर लगे लेबल सिलेक्टर से मेल नहीं खाए, और पते के पीछे खाली है।
+  # A Service without endpoints is a typical and unnoticed breakage: the object exists,
+  # but the labels on the pods didn't match the selector, and behind the address it's empty.
   EPS="$(kubectl get endpoints rickroll -o jsonpath='{.subsets[*].addresses[*].ip}' 2>/dev/null)"
   EPS_N="$(printf '%s' "$EPS" | wc -w | tr -d ' ')"
   if [ "${EPS_N:-0}" -ge 1 ]; then
-    ok "स्थायी पता काम कर रहा है, उसके पीछे प्रतिलिपियाँ: ${EPS_N}"
-    evidence "सेवा के पीछे के पते" "$EPS"
+    ok "stable address works, replicas behind it: ${EPS_N}"
+    evidence "Addresses behind the service" "$EPS"
   else
-    fail "Service rickroll मौजूद है, पर उसके पीछे एक भी प्रतिलिपि नहीं" \
-         "आमतौर पर कारण यह है कि पॉड के लेबल सेवा के selector से मेल नहीं खाए — app: rickroll मिलाएँ"
+    fail "Service rickroll exists, but there is no replica behind it" \
+         "usually the cause is that the pod labels didn't match the service selector — check app: rickroll"
   fi
 else
-  fail "rickroll नाम का कोई Service नहीं मिला" \
-       "यह उसी फ़ाइल से बनता है: kubectl apply -f rickroll.yaml"
+  fail "no Service named rickroll found" \
+       "it's created by the same file: kubectl apply -f rickroll.yaml"
 fi
 
-# --- मुख्य बात: पेज सचमुच परोसा जाता है --------------------------------------
-# यही जाँच जिसके लिए सब कुछ किया गया। पिछली सभी जाँचें केवल यह बताती हैं कि क्लस्टर में
-# ऑब्जेक्ट सही ढंग से वर्णित हैं; यह जाँच बताती है कि उपयोगकर्ता को पेज मिलता है। अनुरोध
-# क्लस्टर के भीतर से, एक बार के पॉड से जाता है: बाहर से rickroll का पता मौजूद नहीं है, और
-# यहाँ port-forward आपकी वर्चुअल मशीन की जाँच होती, क्लस्टर की नहीं।
-# हम कई बार अनुरोध करते हैं: सेवा के पीछे कई प्रतिलिपियाँ होने पर एक बार का नमूना
-# प्रतिस्थापित प्रतिलिपि को छू नहीं पाता, और जाँच किसी और की सामग्री पर हरी हो जाती है।
+# --- the main thing: the page is actually served ----------------------------
+# This is the check everything was set up for. All the previous ones only say that the objects
+# in the cluster are described correctly; this one — that the user gets the page. The request goes
+# FROM INSIDE the cluster, with a one-off pod: from outside the rickroll address doesn't exist, and
+# port-forward here would test your VM, not the cluster.
+# We request several times: with several replicas behind the service a single sample
+# may miss the substituted one, and the check goes green on someone else's content.
 BODY="$(in_cluster_curl_many 'http://rickroll/' 8)"
-# मार्कर पेज पर ठीक एक बार आना चाहिए, वरना जवाबों का काउंटर झूठ बोलता है:
-# «Never Gonna Give You Up» <title> में भी है और <h1> में भी, और इससे दुगुनापन आ रहा था।
-ANSWERS="$(printf '%s' "$BODY" | grep -c 'सेवा प्रदान करने वाला Pod')"
+# The marker must appear EXACTLY ONCE per page, otherwise the response counter lies:
+# "Never Gonna Give You Up" is in both <title> and <h1>, and gave a doubling.
+ANSWERS="$(printf '%s' "$BODY" | grep -c 'served by pod')"
 TOTAL_LINES="$(printf '%s' "$BODY" | grep -c '<title>')"
 if [ "${ANSWERS:-0}" -ge 1 ] && [ "${ANSWERS:-0}" -eq "${TOTAL_LINES:-0}" ]; then
-  ok "एप्लिकेशन HTTP पर जवाब देता है और अपना पेज परोसता है (${ANSWERS} अनुरोध जाँचे गए)"
+  ok "application responds over HTTP and serves its page (${ANSWERS} requests checked)"
 elif [ "${ANSWERS:-0}" -ge 1 ]; then
-  fail "सेवा के पीछे केवल आपका एप्लिकेशन जवाब नहीं देता: आपका पेज ${TOTAL_LINES} में से ${ANSWERS} बार आया" \
-       "कोई और भी app=rickroll लेबल पहने है — देखें kubectl get pods -l app=rickroll और अतिरिक्त हटाएँ"
+  fail "not only your application responds behind the service: your page came back ${ANSWERS} times out of ${TOTAL_LINES}" \
+       "someone else carries the label app=rickroll — look at kubectl get pods -l app=rickroll and remove the extras"
 else
-  fail "एप्लिकेशन ने अपेक्षित पेज नहीं परोसा" \
-       "हाथ से जाँचें: kubectl port-forward svc/rickroll 8080:80, फिर http://localhost:8080 खोलें"
-  evidence "पेज के बदले क्या लौटा" "$(printf '%s' "$BODY" | head -20)"
+  fail "the application did not serve the expected page" \
+       "check manually: kubectl port-forward svc/rickroll 8080:80, then open http://localhost:8080"
+  evidence "What came back instead of the page" "$(printf '%s' "$BODY" | head -20)"
 fi
 
-# --- पॉड नाम प्रतिस्थापन -----------------------------------------------------
-# लैब इसी के लिए बनी है: पेज में नाम असली पॉड से मेल खाना चाहिए।
+# --- pod name substitution --------------------------------------------------
+# This is what the lab was made for: the name in the page must match the real pod.
 SERVED_BY="$(printf '%s' "$BODY" | grep -o '<b>[^<]*</b>' | head -1 | sed 's/<[^>]*>//g')"
-# हम एप्लिकेशन के ReplicaSet द्वारा प्रबंधित पॉड लेते हैं, न कि हर वह चीज़ जो
-# app=rickroll लेबल पहने है। वरना ऐसे लेबल वाला कोई बाहरी पॉड «असली» की सूची में
-# आ जाता है और खुद को पुष्ट करता है — जाँचा गया, एक धोखेबाज़ इस तरह जाँच पास कर गया।
+# We take the pods managed by the application's ReplicaSet, and NOT everything that carries the
+# label app=rickroll. Otherwise a foreign pod with such a label ends up in the list of "real" ones
+# and confirms itself — verified, an impostor passed the check that way.
 REAL_PODS="$(kubectl get pods -l app=rickroll \
   -o jsonpath='{range .items[?(@.metadata.ownerReferences[0].kind=="ReplicaSet")]}{.metadata.name}{"\n"}{end}' 2>/dev/null)"
 STRAY="$(kubectl get pods -l app=rickroll \
   -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.metadata.ownerReferences[0].kind}{"\n"}{end}' 2>/dev/null \
   | awk '$2!="ReplicaSet" {print $1}')"
 if [ -n "$STRAY" ]; then
-  fail "app=rickroll लेबल बाहरी पॉड पहने हैं — वे लोड बैलेंसिंग में शामिल हो जाएँगे" \
-       "अतिरिक्त हटाएँ: $(printf '%s' "$STRAY" | tr '\n' ' ')"
-  evidence "एप्लिकेशन के लेबल के नीचे बाहरी पॉड" "$STRAY"
+  fail "foreign pods carry the label app=rickroll — they will be included in load balancing" \
+       "remove the extras: $(printf '%s' "$STRAY" | tr '\n' ' ')"
+  evidence "Foreign pods under the application's label" "$STRAY"
 fi
 
 if [ -z "$SERVED_BY" ]; then
-  fail "पेज में पॉड का नाम नहीं है" \
-       "जाँचें कि ConfigMap rickroll-conf प्रतिस्थापित हुआ — उसमें पंक्ति sub_filter '__POD__' '\$hostname' है"
+  fail "the page has no pod name" \
+       "check that the ConfigMap rickroll-conf was substituted — it has the line sub_filter '__POD__' '\$hostname'"
 elif [ "$SERVED_BY" = "__POD__" ]; then
-  fail "पॉड का नाम प्रतिस्थापित नहीं हुआ — पेज में प्लेसहोल्डर __POD__ रह गया" \
-       "nginx ने sub_filter लागू नहीं किया: जाँचें कि सेटिंग्स वाला वॉल्यूम /etc/nginx/conf.d पर माउंट है"
+  fail "the pod name wasn't substituted — the placeholder __POD__ is left in the page" \
+       "nginx didn't apply sub_filter: check that the settings volume is mounted at /etc/nginx/conf.d"
 elif printf '%s' "$REAL_PODS" | grep -qx "$SERVED_BY"; then
-  ok "पॉड का नाम प्रतिस्थापित होता है और सचमुच चल रही प्रतिलिपि से मेल खाता है: ${SERVED_BY}"
-  evidence "किसने अनुरोध परोसा" "$SERVED_BY"
-  evidence "चल रही प्रतिलिपियाँ" "$REAL_PODS"
+  ok "the pod name is substituted and matches a really running replica: ${SERVED_BY}"
+  evidence "Who served the request" "$SERVED_BY"
+  evidence "Running replicas" "$REAL_PODS"
 else
-  fail "पेज पॉड को «${SERVED_BY}» कहता है, पर क्लस्टर में ऐसा कोई पॉड नहीं है" \
-       "संभव है प्रतिलिपि अनुरोध और जाँच के बीच फिर से बनी हो — स्क्रिप्ट दोबारा चलाएँ"
+  fail "the page names the pod \"${SERVED_BY}\", but there is no such pod in the cluster" \
+       "the replica may have been recreated between the request and the check — run the script again"
 fi
 
-# --- रेडीनेस जाँच कॉन्फ़िगर है -----------------------------------------------
-# इसके बिना संस्करण रोलआउट वाली लैब में डाउनटाइम होगा, और प्रतिभागी सोचेगा कि हमने झूठ बोला।
+# --- readiness probe is configured ------------------------------------------
+# Without it the lab about version rollout will have downtime, and the participant will decide we lied.
 PROBE_PATH="$(kubectl get deployment rickroll \
   -o jsonpath='{.spec.template.spec.containers[0].readinessProbe.httpGet.path}' 2>/dev/null)"
 if [ -n "$PROBE_PATH" ]; then
-  ok "रेडीनेस जाँच कॉन्फ़िगर है (${PROBE_PATH}) — अपडेट बिना डाउनटाइम के होगा"
+  ok "readiness probe is configured (${PROBE_PATH}) — the update will proceed without downtime"
 else
-  warn "एप्लिकेशन में कोई रेडीनेस जाँच नहीं है" \
-       "ऐसे एप्लिकेशन पर बिना-डाउनटाइम अपडेट वाली लैब 4 त्रुटियाँ देगी — rickroll.yaml से readinessProbe बहाल करें"
+  warn "the application has no readiness probe" \
+       "lab 4 about zero-downtime updates will produce errors on such an application — restore readinessProbe from rickroll.yaml"
 fi
 
 finish

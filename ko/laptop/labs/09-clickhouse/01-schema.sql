@@ -1,58 +1,59 @@
--- 랩 9 · 출입 로그 테이블: 개찰구를 통과할 때마다 한 행씩 기록한다.
+-- Lab 9 · the pass log table: one row per turnstile swipe.
 --
--- 어디서 실행되나: 노트북에서, 랩 클러스터를 대상으로, README에 있는 짧은 `ch` 명령으로 실행된다 —
--- 이 명령은 일반적인 POST 요청의 본문에 담아 SQL을 ClickHouse로 보낸다:
+-- Where it runs: on the laptop, in the lab cluster, via the short `ch` command
+-- from the README — it sends the SQL to ClickHouse in the body of an ordinary POST request:
 --     cd labs/09-clickhouse && ch < 01-schema.sql
--- CREATE TABLE은 빈 응답을 돌려준다 — 그것이 바로 성공의 모습이다.
+-- CREATE TABLE returns an empty response — that is what success looks like.
 --
--- 여기에는 CREATE DATABASE도 CREATE USER도 없다: 데이터베이스와 사용자는 주문 시점에
--- 서비스 자체가 만들어 두었다(대시보드 또는 이 폴더에 있는 clickhouse.yaml 파일).
+-- There is no CREATE DATABASE or CREATE USER here: the database and user were set up by the
+-- service itself at order time (the dashboard or the clickhouse.yaml file in this same folder).
 
--- IF NOT EXISTS — 테이블이 이미 있어도 불평하지 말라는 뜻. 이 파일은 두 번 적용해도 된다.
+-- IF NOT EXISTS — do not complain if the table already exists. The file can be applied twice.
 CREATE TABLE IF NOT EXISTS passes
 (
-    -- 출입증 번호. UInt64와 UInt16 — 각각 8바이트와 2바이트의 부호 없는 정수.
-    -- ClickHouse에서 타입 크기는 의도적으로 고른다: 10억 행이면 컬럼의 여분 바이트 하나가
-    -- 디스크에서 여분의 기가바이트 하나로 바뀐다.
+    -- Pass number. UInt64 and UInt16 — unsigned integers of 8 and 2 bytes.
+    -- Type size in ClickHouse is chosen deliberately: on a billion rows every extra
+    -- byte in a column turns into an extra gigabyte on disk.
     pass_id      UInt64,
-    -- 사람이 개찰구를 통과한 시각. 전체 보고서가 이 컬럼을 중심으로 만들어진다.
+    -- When the person passed the turnstile. The entire report is built around this column.
     created_at   DateTime,
-    -- 방문객 이름. 거의 모든 행이 저마다 다르므로 일반 String을 쓴다.
+    -- Guest name. Almost every row has its own, so a plain String.
     guest_name   String,
-    -- 아래 세 컬럼은 LowCardinality(String)이다: 서로 다른 값이 적은 문자열
-    -- (부서는 다섯, 출입구는 셋, 출입증 종류는 넷). ClickHouse는 이런 컬럼에 대해
-    -- 사전을 유지하고, 백만 번 반복되는 단어 대신 번호를 디스크에 쓴다.
-    -- 규칙: 서로 다른 값이 수천 개까지면 — LowCardinality, 그보다 많으면 —
-    -- 일반 String. guest_name을 이렇게 감싸면 안 감싸느니만 못하다:
-    -- 백만 개의 고유한 이름으로 이루어진 사전은 데이터 자체보다 더 커진다.
+    -- The three columns below are LowCardinality(String): a string that has few distinct
+    -- values (there are five departments, three entrances, four pass types). ClickHouse
+    -- keeps a dictionary for such a column and writes numbers to disk, not the words
+    -- repeated a million times.
+    -- Rule: up to a few thousand distinct values — LowCardinality, more than that —
+    -- a plain String. Wrapping guest_name this way would be worse than not wrapping it:
+    -- a dictionary of a million unique names would be larger than the data itself.
     host_dept    LowCardinality(String),
     entrance     LowCardinality(String),
     pass_type    LowCardinality(String),
-    -- 방문객이 안에 머문 분 수. 2바이트면 넉넉하고도 남는다.
+    -- How many minutes the guest spent inside. Two bytes are more than enough.
     duration_min UInt16
 )
--- 테이블 엔진 — ClickHouse가 데이터를 디스크에 저장하는 방식. 익숙한 데이터베이스에는
--- 이런 선택이 없지만, 여기서는 존재하며 테이블을 만들 때 결정한다.
--- MergeTree: 매 삽입마다 새 파트를 디스크에 놓고, 파트들은 백그라운드에서 더 큰 것으로
--- 병합된다. 여기서 실용적인 규칙이 나온다 — 여러 행을 묶어 배치로 삽입하라.
--- 한 행씩 백만 번 삽입하면 백만 개의 파트가 생기고 서버를 주저앉힌다.
+-- The table engine — how ClickHouse stores data on disk. Familiar databases have no
+-- such choice; here it exists and is made when the table is created.
+-- MergeTree: each insert puts a new part on disk, and parts are merged in the background
+-- into bigger ones. Hence the practical rule — insert in batches of many rows.
+-- A million single-row inserts would create a million parts and bring the server down.
 ENGINE = MergeTree
--- 파일에서 가장 중요한 줄이며, 테이블에 데이터가 들어오기 전에 선택한다.
--- ORDER BY는 행이 디스크에 물리적으로 놓이는 순서를 정하고, 동시에 유일한 진짜 인덱스로도
--- 작동한다: ClickHouse는 몇천 행마다 마크를 저장해 두고, 그것을 보고 파일의 어느 부분을
--- 아예 읽지 않아도 되는지 파악한다.
+-- The most important line in the file, and it is chosen before any data reaches the table.
+-- ORDER BY sets the order in which rows physically lie on disk, and it also serves as
+-- the only real index: ClickHouse stores marks every few thousand rows and uses them to
+-- figure out which parts of the file can be skipped entirely.
 --
--- 그 결과: 「3월에 통과가 몇 번 있었나」는 파일의 한 구간을 읽는 일로 바뀌지만,
--- 「번호 424242인 출입증을 찾아라」는 pass_id 컬럼 전체를 읽는 일로 바뀐다.
--- pass_id가 정렬 키에 없기 때문이다. 이것은 결함이 아니라 설계다.
+-- Consequence: "how many passes were there in March" turns into reading a single stretch
+-- of the file, while "find the pass with number 424242" turns into reading the whole
+-- pass_id column, because pass_id is not in the sort key. This is not a shortcoming but by design.
 --
--- 익숙한 세계에서 보면: 종이 문서고에서와 똑같은 결정이다 — 출입증을 날짜순으로 놓을지
--- 성(姓)순으로 놓을지. 날짜순으로 놓으면 3월 묶음은 즉시 꺼낼 수 있지만, 특정
--- 김 씨는 하나씩 훑어서 찾는다. 그리고 백만 장의 종이를 나중에 다시 정렬할
--- 사람은 아무도 없다.
+-- From the familiar world: the same decision as in a paper archive — sort the passes
+-- by date or by surname. Sorted by date, the March folder is pulled instantly, while a
+-- particular Smith is found by scanning. And nobody is going to re-sort a million
+-- sheets of paper after the fact.
 --
--- 파일에 PARTITION BY가 없는 것은 의도적이다. 파티션은 별도의 파트 집합(보통 월별)으로,
--- 명령 하나로 버릴 수 있다; 「2년치만 보관하고 그 이상은 안 된다」 같은 규칙에 편리하다.
--- 8개월치 학습 데이터에서는 파티션이 이득 없이 여분의 파트만 늘릴 뿐이고, 불필요한 읽기를
--- 잘라내는 일은 여기서 정렬 키가 해낸다.
+-- There is no PARTITION BY in the file, deliberately. A partition is a separate set of parts
+-- (usually per month) that can be dropped with a single command; this is handy for the rule
+-- "keep two years and no more". On eight months of training data partitions would add
+-- extra parts for no benefit, and cutting out unnecessary reads is what the sort key does here.
 ORDER BY (created_at, entrance)

@@ -32,10 +32,10 @@
 ## Что лежит в папке лабы
 
 Все файлы уже у вас — вы забрали их вместе с репозиторием. Создавать и печатать заново
-ничего не нужно: там, где ниже написано `kubectl apply -f имя.yaml`, файл берётся отсюда.
+ничего не нужно: там, где ниже написано `kubectl apply -f name.yaml`, файл берётся отсюда.
 
 ```bash
-# путь отсчитывается от корня репозитория, который вы забрали в лабе 0
+# the path is relative to the root of the repository you pulled in lab 0
 cd labs/01-deploy
 ```
 
@@ -65,10 +65,10 @@ cd labs/01-deploy
 Подключаемся:
 
 ```bash
-# KUBECONFIG — переменная, из которой kubectl узнаёт, какой файл доступа брать.
-# Здесь это доступ к кластеру lab, а не к тенанту: файлы разные, кластеры разные.
+# KUBECONFIG — the variable kubectl reads to learn which access file to use.
+# Here that's access to the lab cluster, not to the tenant: different files, different clusters.
 export KUBECONFIG=~/lab.kubeconfig
-# get nodes = «покажи узлы». Ответ подтверждает, что kubectl обращается туда, куда надо.
+# get nodes = "show the nodes". The answer confirms kubectl is talking to the right place.
 kubectl get nodes
 ```
 
@@ -83,14 +83,14 @@ kubectl get nodes
 Перейдите в папку этой лабы — репозиторий вы забрали в лабе 0:
 
 ```bash
-# путь отсчитывается от папки, в которую вы клонировали репозиторий
+# the path is relative to the folder you cloned the repository into
 cd labs/01-deploy
 ```
 
 Если репозитория ещё нет:
 
 ```bash
-# clone = скачать репозиторий целиком; рядом появится папка с тем же именем
+# clone = download the whole repository; a folder with the same name will appear next to you
 git clone https://github.com/aenix-org/cozystack-migration-workshop.git
 cd labs/01-deploy
 ```
@@ -139,7 +139,7 @@ metadata:
   name: rickroll-page-v1
 data:
   index.html: |
-    ...<div class="pod">вас обслужил под<b>__POD__</b></div>...
+    ...<div class="pod">served by pod<b>__POD__</b></div>...
 ```
 
 Тот самый `__POD__`, который подменит nginx. Имя `-v1` не случайно: в лабе про выкатку версий
@@ -256,9 +256,9 @@ spec:
 Теперь применяем:
 
 ```bash
-# apply = «приведи кластер к тому, что описано в файле». Все четыре объекта создаются
-# одной командой, порядок внутри файла кластер разберёт сам.
-#   -f   взять описание из файла
+# apply = "bring the cluster to what's described in the file". All four objects are created
+# with a single command; the cluster works out the order within the file on its own.
+#   -f   take the description from a file
 kubectl apply -f rickroll.yaml
 ```
 
@@ -274,8 +274,8 @@ service/rickroll created
 Дождитесь, пока копия запустится:
 
 ```bash
-# rollout status ждёт, пока Deployment доведёт дело до конца: нужное число копий
-# запущено и готово принимать запросы. Команда завершится сама, когда это случится.
+# rollout status waits until the Deployment sees the job through: the required number of copies
+# is running and ready to accept requests. The command finishes on its own when that happens.
 kubectl rollout status deployment/rickroll
 ```
 
@@ -291,8 +291,8 @@ kubectl rollout status deployment/rickroll
 теперь то, что мы применили:
 
 ```bash
-# get deployment rickroll = показать один объект по типу и имени.
-#   -o yaml   вывести его целиком в том же виде, в каком его можно написать руками
+# get deployment rickroll = show a single object by type and name.
+#   -o yaml   print it in full, in the same form you could write it by hand
 kubectl get deployment rickroll -o yaml
 ```
 
@@ -327,10 +327,10 @@ spec:
 ниже прокинет туннель с вашего ноутбука внутрь.
 
 ```bash
-# port-forward = туннель с ноутбука внутрь кластера, живёт, пока команда работает.
-#   svc/rickroll   вести туннель к Service с именем rickroll, а тот уже направит
-#                  запрос на живую копию приложения
-#   8080:80        левое число — порт на ноутбуке, правое — порт Service в кластере
+# port-forward = a tunnel from the laptop into the cluster, alive as long as the command runs.
+#   svc/rickroll   run the tunnel to the Service named rickroll, which in turn routes
+#                  the request to a live copy of the application
+#   8080:80        the left number is the port on the laptop, the right is the Service port in the cluster
 kubectl port-forward svc/rickroll 8080:80
 ```
 
@@ -349,9 +349,9 @@ export KUBECONFIG=~/lab.kubeconfig
 ```
 
 ```bash
-# get pods = «покажи запущенные копии».
-#   -l app=rickroll   показать не все поды, а только с меткой app=rickroll —
-#                     той самой, по которой их находит Service
+# get pods = "show the running copies".
+#   -l app=rickroll   show not all Pods, but only those with the label app=rickroll —
+#                     the very one the Service uses to find them
 kubectl get pods -l app=rickroll
 ```
 
@@ -364,8 +364,8 @@ kubectl get pods -l app=rickroll
 📍 **Где:** на ноутбуке, в том же окне терминала, где вы работали с `kubectl`.
 
 ```bash
-# запускать из папки лабы: файлы скрипт ищет рядом с собой.
-# ./ перед именем означает «запусти файл вот отсюда», а не ищи его в системных папках
+# run it from the lab folder: the script looks for its files next to itself.
+# the ./ before the name means "run the file from right here", not look for it in system folders
 ./check.sh
 ```
 

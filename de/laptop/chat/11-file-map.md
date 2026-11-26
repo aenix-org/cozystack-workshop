@@ -6,7 +6,7 @@ Im Repository gibt es zwei Arten von Dateien, und sie liegen an unterschiedliche
 Wichtigste, was Sie verstehen sollten, bevor Sie mit dem praktischen Teil beginnen.
 
 **Manifeste — `manifests/*.yaml`. Werden von Ihrem Laptop aus angewendet.**
-Sie beschreiben, was im Cluster erstellt werden soll. Der Befehl ist immer derselbe: `kubectl apply -f <datei>`.
+Sie beschreiben, was im Cluster erstellt werden soll. Der Befehl ist immer derselbe: `kubectl apply -f <file>`.
 
 • `01-bucket.yaml` — Speicher für das Image · Schritt 1
 • `02-conversion-vm.yaml` — die Konverter-Maschine · Schritt 2
@@ -27,7 +27,7 @@ Auf Ihrem Laptop brauchen Sie sie überhaupt nicht.
 Die **Konverter-Maschine** hat ein Netzwerk, also lädt sie die Datei selbst herunter. Das Repository
 ist öffentlich, es werden keine Schlüssel benötigt:
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/laptop/scripts/convert.sh
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/laptop/scripts/convert.sh
 ```
 
 **Ihre app-VM hat anfangs überhaupt kein Netzwerk** — genau dieser kaputte Zustand ist es, den wir

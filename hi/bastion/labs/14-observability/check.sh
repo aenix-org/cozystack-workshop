@@ -1,131 +1,135 @@
 #!/usr/bin/env bash
-# लैब 14 की जाँच: ऑब्ज़र्वेबिलिटी वास्तव में काम करती है।
+# Check for lab 14: observability actually works.
 #
-# «प्रतिभागी ने ग्राफ़ देखा» — इसकी जाँच नहीं की जा सकती, और यह दिखावा करना कि की जा सकती है, बेईमानी है।
-# इसलिए हम वह जाँचते हैं जिसके बिना ग्राफ़ संभव ही नहीं है:
-#   1) मेट्रिक्स संग्रह एजेंट क्लस्टर में चल रहा है,
-#   2) वह जो इकट्ठा करता है उसे आपके टेनेंट को भेजता है, शून्य में नहीं,
-#   3) लॉग संग्रह भी काम करता है — इसके बिना आधी लैब बेमानी है,
-#   4) क्लस्टर में लैब 3 के लोड का निशान है, जिसे ग्राफ़ में खोजा जा सकता है।
+# "The participant looked at a graph" cannot be checked, and pretending it can be is dishonest.
+# So we check what makes a graph possible in the first place:
+#   1) the metrics collection agent is running in the cluster,
+#   2) it sends what it collects to your tenant, not into the void,
+#   3) log collection works too — without it half the lab is pointless,
+#   4) there is a trace of the load from lab 3 in the cluster that can be found in the graphs.
 
 LAB_NAME="14-observability"
-LAB_TITLE="लैब 14 · ऑब्ज़र्वेबिलिटी: ग्राफ़ में अपना स्पाइक खोजें"
+LAB_TITLE="Lab 14 · Observability: find your own spike in the graphs"
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
 need_kubeconfig
 
 MON_NS=cozy-monitoring
 
-# --- संग्रह namespace -------------------------------------------------------
-# Namespace अपने आप में कुछ साबित नहीं करता: प्लेटफ़ॉर्म वहीं metrics-server भी रखता है,
-# जो etcd वाले किसी भी क्लस्टर पर इंस्टॉल होता है और ऐडऑन पर निर्भर नहीं करता। हम इसकी
-# उपस्थिति केवल इसलिए जाँचते हैं ताकि «क्लस्टर अनुपलब्ध» को «संग्रह बंद है» से अलग किया जा सके।
+# --- collection namespace ---------------------------------------------------
+# The namespace by itself proves nothing: the platform also puts metrics-server there,
+# which is installed on any cluster with etcd and does not depend on the addon. We check
+# its presence only to tell "cluster unreachable" apart from "collection is off".
 if ! kubectl get ns "$MON_NS" >/dev/null 2>&1; then
-  fail "क्लस्टर में namespace ${MON_NS} नहीं है — क्लस्टर ने अपेक्षा के अनुसार जवाब नहीं दिया" \
-       "ऐडऑन चालू करें: डैशबोर्ड -> Kubernetes -> lab -> संपादित करें -> Addons -> Monitoring agents. ध्यान दें: रिकॉर्ड इसी क्षण से दिखेंगे"
+  fail "the cluster has no namespace ${MON_NS} — the cluster responded not as expected" \
+       "enable the addon: dashboard -> Kubernetes -> lab -> edit -> Addons -> Monitoring agents. Note: records will appear only from this moment on"
   finish
   exit $?
 fi
 
-# --- मेट्रिक्स एजेंट ---------------------------------------------------------
+# --- metrics agent ----------------------------------------------------------
 VMAGENT_RUNNING="$(kubectl get pods -n "$MON_NS" --no-headers 2>/dev/null \
   | awk '$1 ~ /^vmagent/ && $3=="Running"' | grep -c . )"
 VMAGENT_TOTAL="$(kubectl get pods -n "$MON_NS" --no-headers 2>/dev/null \
   | awk '$1 ~ /^vmagent/' | grep -c . )"
 
 if [ "$VMAGENT_RUNNING" -ge 1 ]; then
-  ok "मेट्रिक्स संग्रह एजेंट चल रहा है (vmagent पॉड: ${VMAGENT_RUNNING})"
+  ok "the metrics collection agent is running (vmagent pods: ${VMAGENT_RUNNING})"
 elif [ "$VMAGENT_TOTAL" -ge 1 ]; then
-  fail "मेट्रिक्स संग्रह एजेंट मौजूद है, पर चल नहीं रहा (${VMAGENT_TOTAL} में से ${VMAGENT_RUNNING} Running में)" \
-       "कारण देखें: kubectl -n ${MON_NS} describe pod -l app.kubernetes.io/name=vmagent | sed -n '/Events:/,\$p'"
+  fail "the metrics collection agent exists but is not running (${VMAGENT_RUNNING} of ${VMAGENT_TOTAL} in Running)" \
+       "look at the cause: kubectl -n ${MON_NS} describe pod -l app.kubernetes.io/name=vmagent | sed -n '/Events:/,\$p'"
 else
-  fail "${MON_NS} में एक भी vmagent पॉड नहीं है — Monitoring agents ऐडऑन बंद है" \
-       "इसे चालू करें: डैशबोर्ड -> Kubernetes -> lab -> संपादित करें -> Addons -> Monitoring agents. रिकॉर्ड इसी क्षण से जमा होना शुरू होंगे, बीता हुआ वापस नहीं आएगा"
+  fail "there is not a single vmagent pod in ${MON_NS} — the Monitoring agents addon is off" \
+       "enable it: dashboard -> Kubernetes -> lab -> edit -> Addons -> Monitoring agents. Records start accumulating only from this moment on, the past cannot be brought back"
 fi
-evidence "${MON_NS} में संग्रह पॉड" "$(kubectl get pods -n "$MON_NS" 2>/dev/null)"
+evidence "Collection pods in ${MON_NS}" "$(kubectl get pods -n "$MON_NS" 2>/dev/null)"
 
-# --- डिलीवरी: एजेंट सच में भेज रहा है, या शून्य में लिख रहा है? --------
+# --- delivery: is the agent really sending, or writing into the void? --------
+# A working agent that writes into the void looks exactly like a working one, so we
+# ask the agent itself how many successful (2XX) sends it made. Zero means the tenant
+# has no Monitoring app: vmagent has nowhere to write, there is no storage, and the
+# Grafana steps will not work.
 if [ "$VMAGENT_RUNNING" -ge 1 ]; then
   VMPOD="$(kubectl get pods -n "$MON_NS" --no-headers 2>/dev/null | awk '$1 ~ /^vmagent/ && $3=="Running"{print $1; exit}')"
   SENT="$(kubectl exec -n "$MON_NS" "$VMPOD" -c vmagent -- sh -c 'wget -qO- http://127.0.0.1:8429/metrics 2>/dev/null' 2>/dev/null \
     | awk '/^vmagent_remotewrite_requests_total.*status_code="2XX"/{s+=$NF} END{printf "%d", s+0}')"
   if [ "${SENT:-0}" -gt 0 ]; then
-    ok "मेट्रिक्स वाक़ई भंडारण तक पहुँच रही हैं (सफल प्रेषण: ${SENT})"
+    ok "metrics are actually delivered to storage (successful sends: ${SENT})"
   else
-    fail "एजेंट चल रहा है, पर भंडारण तक एक भी मेट्रिक नहीं पहुँचाई (सफल प्रेषण 0)" \
-         "टेनेंट में कोई Monitoring ऐप नहीं है — vmagent के पास लिखने की कोई जगह नहीं, इसलिए न ऐतिहासिक मेट्रिक्स होंगी और न Grafana (स्टेप 2-5)। कैटलॉग (Administration) से Monitoring डिप्लॉय करें या प्रशिक्षक से पूछें"
+    fail "the agent is running but delivered zero metrics to storage (0 successful sends)" \
+         "the tenant has no Monitoring app - vmagent has nowhere to write, so there are no historical metrics and no Grafana (steps 2-5). Deploy Monitoring from the catalog (Administration) or ask the instructor"
   fi
 fi
 
-# --- मेट्रिक्स आख़िर जाती कहाँ हैं ------------------------------------------
-# एक चालू एजेंट जो शून्य में लिखता है, बिल्कुल एक कार्यशील एजेंट जैसा ही दिखता है।
+# --- where exactly the metrics go -------------------------------------------
+# A working agent that writes into the void looks exactly like a working one.
 RW_URL="$(kubectl get vmagent -n "$MON_NS" \
   -o jsonpath='{.items[0].spec.remoteWrite[0].url}' 2>/dev/null)"
 if [ -n "$RW_URL" ]; then
   case "$RW_URL" in
     *tenant-*)
       TARGET_NS="$(printf '%s' "$RW_URL" | sed -n 's|.*vminsert-[a-z]*\.\([^.]*\)\..*|\1|p')"
-      ok "मेट्रिक्स टेनेंट को भेजी जा रही हैं${TARGET_NS:+ (${TARGET_NS})}"
+      ok "metrics are being sent to the tenant${TARGET_NS:+ (${TARGET_NS})}"
       ;;
     *)
-      warn "मेट्रिक्स ऐसे पते पर भेजी जा रही हैं जो टेनेंट पते जैसा नहीं दिखता" \
-           "यह ठीक हो सकता है यदि होस्ट ने साझा भंडारण सेट किया हो; पता साक्ष्य में है"
+      warn "metrics are being sent to an address that does not look like a tenant one" \
+           "this may be fine if the host set up shared storage; the address is in the evidence"
       ;;
   esac
-  evidence "मेट्रिक्स कहाँ भेजी जाती हैं" "$RW_URL"
+  evidence "Where metrics are sent" "$RW_URL"
 else
-  warn "मेट्रिक्स भेजने का पता पढ़ा नहीं जा सका" \
-       "हाथ से देखें: kubectl get vmagent -n ${MON_NS} -o yaml"
+  warn "could not read the metrics send address" \
+       "look by hand: kubectl get vmagent -n ${MON_NS} -o yaml"
 fi
 
-# --- लॉग संग्रह -------------------------------------------------------------
+# --- log collection ---------------------------------------------------------
 FB_DESIRED="$(kubectl get ds -n "$MON_NS" --no-headers 2>/dev/null \
   | awk '$1 ~ /fluent-bit/ {print $2; exit}')"
 FB_READY="$(kubectl get ds -n "$MON_NS" --no-headers 2>/dev/null \
   | awk '$1 ~ /fluent-bit/ {print $4; exit}')"
 if [ -n "$FB_DESIRED" ] && [ "${FB_READY:-0}" = "$FB_DESIRED" ] && [ "${FB_READY:-0}" != "0" ]; then
-  ok "लॉग संग्रह सभी नोड्स पर काम कर रहा है (${FB_READY}/${FB_DESIRED})"
+  ok "log collection works on all nodes (${FB_READY}/${FB_DESIRED})"
 elif [ -n "$FB_DESIRED" ]; then
-  fail "लॉग संग्रह सभी नोड्स पर नहीं चल रहा (${FB_DESIRED} में से ${FB_READY:-0})" \
-       "देखें: kubectl -n ${MON_NS} get pods | grep fluent-bit — इसके बिना लॉग-खोज वाला चरण काम नहीं करेगा"
+  fail "log collection is not running on all nodes (${FB_READY:-0} of ${FB_DESIRED})" \
+       "look: kubectl -n ${MON_NS} get pods | grep fluent-bit — without it the log-search step will not work"
 else
-  warn "fluent-bit लॉग कलेक्टर नहीं मिला" \
-       "Grafana में vlogs-generic स्रोत खाली रहेगा; लॉग-खोज वाला चरण पूरा नहीं किया जा सकेगा"
+  warn "the fluent-bit log collector was not found" \
+       "the vlogs-generic source in Grafana will be empty; the log-search step cannot be completed"
 fi
 
-# --- ग्राफ़ में खोजने के लिए कुछ है भी या नहीं ------------------------------
-# मेट्रिक्स बिल्कुल सही ढंग से इकट्ठा हो सकती हैं, पर यदि कोई लोड नहीं था, तो खोजने के लिए कुछ नहीं है।
+# --- is there anything to look for in the graphs ----------------------------
+# Metrics may be collected perfectly, but if there was no load, there is nothing to find.
 if kubectl get hpa rickroll >/dev/null 2>&1; then
   LAST_SCALE="$(kubectl get hpa rickroll -o jsonpath='{.status.lastScaleTime}' 2>/dev/null)"
   CUR="$(kubectl get hpa rickroll -o jsonpath='{.status.currentReplicas}' 2>/dev/null)"
   DES="$(kubectl get hpa rickroll -o jsonpath='{.status.desiredReplicas}' 2>/dev/null)"
   if [ -n "$LAST_SCALE" ]; then
-    ok "लोड का निशान है: ऑटोस्केलिंग सक्रिय हुई थी (आख़िरी बार ${LAST_SCALE})"
-    evidence "ऑटोस्केलिंग की स्थिति" "$(kubectl get hpa rickroll 2>/dev/null)
-आख़िरी बार सक्रिय हुई: ${LAST_SCALE}
-अभी कॉपियाँ: ${CUR:-?}, आवश्यक: ${DES:-?}"
+    ok "there is a trace of load: autoscaling fired (last time ${LAST_SCALE})"
+    evidence "Autoscaling state" "$(kubectl get hpa rickroll 2>/dev/null)
+last fired: ${LAST_SCALE}
+now replicas: ${CUR:-?}, desired: ${DES:-?}"
   else
-    warn "ऑटोस्केलिंग कॉन्फ़िगर है, पर एक बार भी सक्रिय नहीं हुई" \
-         "कॉपियों की वृद्धि वाली सीढ़ी आपको नहीं मिलेगी; लैब 3 का लोड fortio जनरेटर से दोहराएँ"
+    warn "autoscaling is configured but never fired" \
+         "you will not find the replica-growth step; repeat the load from lab 3 with the fortio generator"
   fi
 else
-  warn "क्लस्टर में rickroll नाम का कोई HorizontalPodAutoscaler नहीं है" \
-       "इस लैब के ग्राफ़ वाले चरण लैब 3 पर निर्भर हैं; उसके बिना आपको केवल CPU स्पाइक मिलेगा, सीढ़ी नहीं"
+  warn "the cluster has no HorizontalPodAutoscaler named rickroll" \
+       "the graph steps in this lab rely on lab 3; without it you will only find the CPU spike, not the step"
 fi
 
-# --- स्वयं एप्लिकेशन की मेट्रिक्स --------------------------------------------
-# अप्रत्यक्ष, पर सारगर्भित: यदि एप्लिकेशन के पॉड जीवित हैं, तो उनका उपभोग ग्राफ़ में है।
+# --- the application's own metrics ------------------------------------------
+# Indirect but essential: if the application pods are alive, their consumption is in the graphs.
 APP_PODS="$(kubectl get pods -l app=rickroll --no-headers 2>/dev/null | grep -c . )"
 if [ "${APP_PODS:-0}" -ge 1 ]; then
-  ok "एप्लिकेशन के पॉड मौजूद हैं (${APP_PODS} अदद) — उनका उपभोग ग्राफ़ में दिखता है"
-  evidence "एप्लिकेशन के पॉड" "$(kubectl get pods -l app=rickroll -o wide 2>/dev/null)"
+  ok "the application pods are in place (${APP_PODS} of them) — their consumption is visible in the graphs"
+  evidence "Application pods" "$(kubectl get pods -l app=rickroll -o wide 2>/dev/null)"
 else
-  warn "क्लस्टर में rickroll एप्लिकेशन के कोई पॉड नहीं हैं" \
-       "लैब 3 के समय की ऐतिहासिक मेट्रिक्स फिर भी सुरक्षित हैं; बस Grafana में वह समय-सीमा सेट करें"
+  warn "there are no rickroll application pods in the cluster" \
+       "the historical metrics from the time of lab 3 are still preserved; just set that time range in Grafana"
 fi
 
-# --- Grafana कहाँ खोजें -----------------------------------------------------
-# जाँच नहीं, बल्कि मदद: Grafana का पता प्रतिभागी सबसे ज़्यादा देर तक ढूँढते हैं।
+# --- where to find Grafana --------------------------------------------------
+# Not a check but a help: the Grafana address is what participants search for the longest.
 : "${COZY_KUBECONFIG:=$HOME/.kube/config}"
 if [ -n "${COZY_TENANT:-}" ] && [ -r "$COZY_KUBECONFIG" ]; then
   TNS="tenant-${COZY_TENANT}"
@@ -136,21 +140,21 @@ if [ -n "${COZY_TENANT:-}" ] && [ -r "$COZY_KUBECONFIG" ]; then
       -o jsonpath='{range .items[*]}{.spec.rules[0].host}{"\n"}{end}' 2>/dev/null \
       | grep '^grafana\.' | head -1)"
     if [ -n "$GRAF_HOST" ]; then
-      ok "आपकी मेट्रिक्स के लिए Grafana: https://${GRAF_HOST}"
+      ok "Grafana for your metrics: https://${GRAF_HOST}"
       evidence "Grafana" "https://${GRAF_HOST}
-टेनेंट ${TNS} की मेट्रिक्स namespace ${MON_TARGET} में संग्रहीत हैं"
+metrics of tenant ${TNS} are stored in namespace ${MON_TARGET}"
     else
-      warn "आपके टेनेंट की मॉनिटरिंग ${MON_TARGET} में रहती है, पर Grafana का पता पढ़ा नहीं जा सका" \
-           "यदि ${MON_TARGET} आपका namespace नहीं है, तो Grafana साझा है: पता होस्ट से पूछें"
-      evidence "टेनेंट की मॉनिटरिंग" "मॉनिटरिंग वाला namespace: ${MON_TARGET}"
+      warn "your tenant's monitoring lives in ${MON_TARGET}, but the Grafana address could not be read" \
+           "if ${MON_TARGET} is not your namespace, then Grafana is shared: ask the host for the address"
+      evidence "Tenant monitoring" "namespace with monitoring: ${MON_TARGET}"
     fi
   else
-    warn "यह निर्धारित नहीं किया जा सका कि टेनेंट ${TNS} की मेट्रिक्स कहाँ जाती हैं" \
-         "Grafana का पता होस्ट से पूछें या डैशबोर्ड में खोजें: Monitoring एप्लिकेशन -> Ingress"
+    warn "could not determine where the metrics of tenant ${TNS} go" \
+         "ask the host for the Grafana address or find it in the dashboard: Monitoring application -> Ingress"
   fi
 else
-  warn "Grafana का पता निर्धारित नहीं हुआ" \
-       "COZY_TENANT और COZY_KUBECONFIG सेट करें, और स्क्रिप्ट इसे स्वयं खोज लेगी; इससे लैब पास करने पर कोई असर नहीं पड़ता"
+  warn "the Grafana address is not determined" \
+       "set COZY_TENANT and COZY_KUBECONFIG and the script will find it itself; this does not affect passing the lab"
 fi
 
 finish

@@ -17,14 +17,14 @@ password: Orders2019!
 Три команди поспіль, по одній причині на кожну:
 
 ```bash
-# 1. Підключаємо репозиторій PGDG — джерело пакетів PostgreSQL.
+# 1. Wire up the PGDG repository — the source of PostgreSQL packages.
 yum install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm
 
-# 2. Бібліотека libzstd, без неї клієнт не встановиться. У репозиторіях CentOS 7 її немає,
-#    беремо з архіву EPEL.
+# 2. The libzstd library, without which the client won't install. It's not in the CentOS 7
+#    repositories, so we take it from the EPEL archive.
 yum install -y https://archives.fedoraproject.org/pub/archive/epel/7/x86_64/Packages/l/libzstd-1.5.5-1.el7.x86_64.rpm
 
-# 3. Сам клієнт — тільки з живого репозиторію pgdg15.
+# 3. The client itself — only from the live pgdg15 repository.
 yum install -y --disablerepo='pgdg*' --enablerepo=pgdg15 postgresql15
 ```
 
@@ -55,7 +55,7 @@ psql --version
 **Забираємо файл схеми** — мережа в машини вже є:
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/bastion/scripts/orders-schema.sql
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/bastion/scripts/orders-schema.sql
 ```
 
 **Накочуємо.** Розберемо команду по частинах, щоб не вводити наосліп:

@@ -1,39 +1,39 @@
 ---
-# Лаба 5 · Інфраструктура в Git. Джерело: звідки Flux бере бажаний стан.
+# Lab 5 · Infrastructure in Git. The source: where Flux gets the desired state from.
 #
-# Застосовується на вашому кластері `lab` разом із сусіднім kustomization.yaml:
+# Applied on your `lab` cluster together with the neighboring kustomization.yaml:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl apply -f flux/
 #
-# УВАГА: ЗАМІНІТЬ url на адресу СВОГО репозиторію, перш ніж застосовувати: рядок
-# ЗАМЕНИТЕ-МЕНЯ — заглушка, з нею Flux піде на неіснуючу адресу й зупиниться
-# з помилкою. Гілку теж перевірте: GitHub створює нові репозиторії з гілкою main.
+# ATTENTION: REPLACE the url with the address of YOUR repository before applying: the
+# REPLACE-ME string is a stub, with it Flux will go to a nonexistent address and stall
+# with an error. Check the branch too: GitHub creates new repositories with the main branch.
 #
-# У кожному об'єкті: apiVersion — версія схеми опису, kind — що створюємо,
-# metadata.name — ім'я, за яким на об'єкт посилаються далі. Нижче не повторюється.
+# In each object: apiVersion — the version of the description schema, kind — what we create,
+# metadata.name — the name by which the object is referenced further on. Not repeated below.
 #
-# Єдине завдання цього об'єкта — тримати в кластері свіжу копію репозиторію.
-# Він нічого не застосовує: лише завантажує. Застосовує сусідній Kustomization,
-# і він посилається сюди за ім'ям `passes`, тому ім'я не можна міняти поодинці.
+# The only task of this object is to keep a fresh copy of the repository in the cluster.
+# It applies nothing: it only downloads. The neighboring Kustomization applies things,
+# and it references here by the name `passes`, so the name cannot be changed on its own.
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: GitRepository
 metadata:
   name: passes
-  # flux-system — namespace, який завела команда flux install; у ньому живуть
-  # самі служби Flux. Об'єкти-налаштування кладуть туди ж, інакше служби їх не побачать.
+  # flux-system — the namespace that the flux install command set up; the Flux services
+  # themselves live in it. Configuration objects go there too, otherwise the services won't see them.
   namespace: flux-system
 spec:
-  # Як часто ходити в Git за новим станом. Одна хвилина — для лаби;
-  # у бою зазвичай 1–5 хвилин, а миттєву реакцію роблять вебхуком із GitHub.
+  # How often to go to Git for the new state. One minute — for the lab;
+  # in production usually 1–5 minutes, and an instant reaction is done with a webhook from GitHub.
   interval: 1m
-  # Адреса репозиторію. Він публічний, тому ні логіна, ні ключа тут немає —
-  # це спрощення тестового середовища. У бою репозиторій приватний, і поряд з'являється
-  # посилання на секрет із deploy-ключем (поле secretRef).
-  url: https://github.com/ЗАМЕНИТЕ-МЕНЯ/passes-gitops
-  # Яку гілку вважати джерелом істини. У кластер поїде те, що влито в main;
-  # те, що лежить в інших гілках, не поїде. Звідси й береться рев'ю: зміна
-  # спочатку живе у своїй гілці, де її можна подивитися, і лише злиття в main
-  # робить її чинною. Якщо репозиторій створено зі старою гілкою master —
-  # виправте тут, інакше Flux не знайде, що читати.
+  # The repository address. It's public, so there's neither a login nor a key here —
+  # this is a simplification of the training stand. In production the repository is private, and next to it
+  # appears a reference to a secret with a deploy key (the secretRef field).
+  url: https://github.com/REPLACE-ME/passes-gitops
+  # Which branch to consider the source of truth. What is merged into main goes to the cluster;
+  # what lies in other branches does not go. This is where review comes from: a change
+  # first lives in its own branch, where it can be looked at, and only a merge into main
+  # makes it effective. If the repository was created with the old master branch —
+  # fix it here, otherwise Flux won't find what to read.
   ref:
     branch: main

@@ -30,7 +30,7 @@
 सभी फ़ाइलें पहले से आपके पास हैं — आपने उन्हें रिपॉज़िटरी के साथ ही ले लिया था। कुछ बनाने या दोबारा टाइप करने की ज़रूरत नहीं: नीचे जहाँ भी आप `kubectl apply -f name.yaml` देखें, फ़ाइल यहीं से आती है।
 
 ```bash
-# इस लैब की हर कमांड इसी फ़ोल्डर से चलाई जाती है — वरना उनमें दिए फ़ाइल नाम नहीं मिलेंगे।
+# Every command in this lab is run from this folder — otherwise the file names in them won't be found.
 cd labs/03-scale
 ```
 
@@ -47,19 +47,19 @@ cd labs/03-scale
 पूरी लैब इस पर टिकी है कि प्रतिकृतियों की संख्या ध्यान देने लायक़ बढ़े। इसलिए हमें एक से शुरू करना होगा — वरना बढ़त की तुलना किसी से नहीं होगी। देखते हैं कि अभी कितनी प्रतिकृतियाँ चल रही हैं।
 
 ```bash
-# KUBECONFIG उस फ़ाइल का पथ है जिसमें क्लस्टर का पता और लॉगिन विवरण होते हैं।
-# जब तक यह वेरिएबल सेट नहीं होता, kubectl क्लस्टर को खुद लैपटॉप पर ढूँढता है और नहीं पाता।
+# KUBECONFIG is the path to the file with the cluster's address and login details.
+# Until the variable is set, kubectl looks for the cluster on the laptop itself and doesn't find it.
 export KUBECONFIG=~/lab.kubeconfig
 
-# READY कॉलम "तैयार / अनुरोधित" के रूप में पढ़ा जाता है: 1/1 का अर्थ है एक प्रतिकृति अनुरोधित और चल रही।
+# The READY column reads as "ready / requested": 1/1 means one replica requested and running.
 kubectl get deployment rickroll
 ```
 
 `1/1` दिखना चाहिए। अगर इससे अधिक है, तो इसे वापस एक पर लाएँ, वरना बढ़त उतनी दिखाई नहीं देगी:
 
 ```bash
-# scale एप्लिकेशन के रिकॉर्ड में ठीक एक फ़ील्ड बदलता है — प्रतिकृतियों की संख्या।
-# अतिरिक्त प्रतिकृतियों को क्लस्टर खुद ही, कुछ सेकंड में हटा देगा।
+# scale changes exactly one field in the application's record — the replica count.
+# The cluster will retire the extra replicas on its own, within seconds.
 kubectl scale deployment rickroll --replicas=1
 ```
 
@@ -68,11 +68,11 @@ kubectl scale deployment rickroll --replicas=1
 ऑटोस्केलिंग कॉन्फ़िगर करने से पहले, आपको समझना होगा कि वह प्रतिशत किसके सापेक्ष गिनेगा।
 
 ```bash
-# क्लस्टर में किसी ऑब्जेक्ट के सैकड़ों फ़ील्ड होते हैं; टेबल उन्हें नहीं दिखाती। jsonpath जवाब में से
-# ठीक एक जगह निकालता है। पथ को ऊपर से नीचे पढ़ें: spec.template वह टेम्पलेट है
-# जिससे प्रतिकृतियाँ बनती हैं, containers[0] उसमें पहला कंटेनर है, resources उसका
-# CPU और मेमोरी के लिए अनुरोध और सीमा है। पूँछ {"\n"} एक नई पंक्ति है, ताकि जवाब
-# अगले कमांड प्रॉम्प्ट से न सट जाए।
+# An object in the cluster has hundreds of fields; the table doesn't show them. jsonpath extracts
+# exactly one spot from the response. Read the path top to bottom: spec.template is the template
+# from which replicas are created, containers[0] is the first container in it, resources is its
+# request and ceiling for CPU and memory. The tail {"\n"} is a newline, so the response
+# doesn't run into the next command prompt.
 kubectl get deployment rickroll \
   -o jsonpath='{.spec.template.spec.containers[0].resources}{"\n"}'
 ```
@@ -147,7 +147,7 @@ spec:
 यहाँ "औसत" शब्द कुंजी है, और सारी अंकगणित इसी पर निर्भर है। HPA इस तरह गिनता है:
 
 ```
-आवश्यक प्रतिकृतियाँ = ceil( वर्तमान प्रतिकृतियाँ × वर्तमान लोड ÷ लक्ष्य लोड )
+replicas needed = ceil( current replicas × current load ÷ target load )
 ```
 
 एक प्रतिकृति 645% लोड पर, 50% लक्ष्य के साथ, `ceil(1 × 645 / 50) = 13` देती है। तेरह, छह से अधिक है, इसलिए HPA `maxReplicas` पर टकराएगा।
@@ -184,8 +184,8 @@ spec:
 लागू करें:
 
 ```bash
-# apply = "क्लस्टर को वैसा बना दो जैसा फ़ाइल में वर्णित है।" HPA ऑब्जेक्ट तुरंत दिखाई देगा,
-# लेकिन गिनना वह तुरंत शुरू नहीं करेगा — अगले स्टेप में हम इसी पर ठोकर खाएँगे।
+# apply = "bring the cluster to what's described in the file." The HPA object will appear at once,
+# but it won't start computing right away — that's what we'll trip over in the next step.
 kubectl apply -f hpa.yaml
 ```
 
@@ -194,9 +194,9 @@ kubectl apply -f hpa.yaml
 देखते हैं हमें क्या मिला:
 
 ```bash
-# hpa, horizontalpodautoscaler का संक्षिप्त रूप है; kubectl दोनों वर्तनी समझता है।
-# TARGETS कॉलम "वर्तमान लोड / लक्ष्य" के रूप में पढ़ा जाता है, REPLICAS यह है कि अभी
-# कितनी प्रतिकृतियाँ अनुरोधित हैं।
+# hpa is shorthand for horizontalpodautoscaler; kubectl understands both spellings.
+# The TARGETS column reads as "current load / target," REPLICAS is how many
+# replicas are requested right now.
 kubectl get hpa rickroll
 ```
 
@@ -223,7 +223,7 @@ rickroll   Deployment/rickroll   cpu: <unknown>/50%   1         6         1     
 समय पर्याप्त नहीं है। डेढ़ से दो मिनट रुकें और दोबारा देखें:
 
 ```bash
-# वही कमांड जो ऊपर थी। हम वही TARGETS कॉलम देख रहे हैं।
+# The same command as above. We're looking at the same TARGETS column.
 kubectl get hpa rickroll
 ```
 
@@ -237,9 +237,9 @@ rickroll   Deployment/rickroll   cpu: 0%/50%     1         6         1          
 आप सीधे जाँच सकते हैं कि मेट्रिक्स आ रहे हैं:
 
 ```bash
-# top = "ये Pod अभी कितने संसाधन खा रहे हैं।" ये संख्याएँ उसी
-# metrics-server से आती हैं जो ऑटोस्केलिंग को खिलाता है: अगर top जवाब देता है, तो
-# डेटा स्रोत जीवित है और यह केवल समय की बात है।
+# top = "how many resources these Pods are eating right now." The numbers come from
+# the same metrics-server that feeds autoscaling: if top answers, then the
+# data source is alive and it's only a matter of time.
 kubectl top pods -l app=rickroll
 ```
 
@@ -253,9 +253,9 @@ rickroll-6f4b9c8d57-p9wqt   1m           4Mi
 `metrics-server` क्लस्टर के साथ ही खुद इंस्टॉल हो जाता है — इसे अलग से चालू करने की ज़रूरत नहीं। यह `cozy-monitoring` namespace में रहता है, और आप इस तरह जाँच सकते हैं:
 
 ```bash
-# -n = किस namespace में देखना है। namespace क्लस्टर का एक हिस्सा है;
-# डिफ़ॉल्ट रूप से kubectl default में देखता है और वहाँ सिस्टम Pod नहीं दिखते।
-# deploy, deployment का संक्षिप्त रूप है।
+# -n = which namespace to look in. A namespace is a section of the cluster;
+# by default kubectl looks in default and doesn't see the system Pods there.
+# deploy is shorthand for deployment.
 kubectl -n cozy-monitoring get deploy metrics-server
 ```
 
@@ -264,8 +264,8 @@ kubectl -n cozy-monitoring get deploy metrics-server
 सटीक कारण बताएगा:
 
 ```bash
-# describe = ऑब्जेक्ट का पूरा कार्ड: सभी फ़ील्ड, इवेंट और कंडीशन,
-# get के विपरीत, जो टेबल की कुछ कॉलम छापता है।
+# describe = the object's full card: all fields, events, and conditions,
+# unlike get, which prints a few table columns.
 kubectl describe hpa rickroll
 ```
 
@@ -341,12 +341,12 @@ spec:
 लागू करें और प्रतीक्षा करें:
 
 ```bash
-# फ़ाइल में एक साथ दो ऑब्जेक्ट हैं: जनरेटर वाला Deployment और एक Service — उसके
-# वेब इंटरफ़ेस के लिए एक स्थिर पता।
+# There are two objects at once in the file: the Deployment with the generator and a Service — a
+# stable address for its web interface.
 kubectl apply -f fortio.yaml
 
-# rollout status टर्मिनल को रोके रखता है और प्रतिकृति तैयार होने तक प्रगति छापता है।
-# हम यहाँ जानबूझकर रुकते हैं: जब तक जनरेटर नहीं उठता, लोड देने को कुछ नहीं।
+# rollout status holds the terminal and prints progress until the replica is ready.
+# We wait here on purpose: until the generator is up, there's nothing to drive load with.
 kubectl rollout status deployment/fortio
 ```
 
@@ -357,10 +357,10 @@ kubectl rollout status deployment/fortio
 ```bash
 export KUBECONFIG=~/lab.kubeconfig
 
-# port-forward आपके लैपटॉप से क्लस्टर के भीतर एक टनल चलाता है।
-#   svc/fortio    किससे जुड़ते हैं: fortio नाम का Service
-#   8081:8080     "आपकी ओर का पोर्ट : क्लस्टर का पोर्ट" के रूप में पढ़ा जाता है — एक अनुरोध
-#                 localhost:8081 पर आने वाला इस Service के पोर्ट 8080 पर जाता है
+# port-forward runs a tunnel from your laptop into the cluster.
+#   svc/fortio    what we connect to: the Service named fortio
+#   8081:8080     reads as "port on your side : port in the cluster" — a request
+#                 to localhost:8081 goes to port 8080 of this Service
 kubectl port-forward svc/fortio 8081:8080
 ```
 
@@ -379,16 +379,16 @@ kubectl port-forward svc/fortio 8081:8080
 ```bash
 export KUBECONFIG=~/lab.kubeconfig
 
-# हम rickroll की प्रतिकृतियाँ देखते हैं: हर नई पंक्ति उनमें से किसी एक की स्थिति में बदलाव है।
-# कमांड समाप्त नहीं होती; बाहर निकलने के लिए Ctrl+C — इसका खुद प्रतिकृतियों पर कोई असर नहीं।
+# We watch rickroll's replicas: each new line is a state change of one of them.
+# The command doesn't finish; to exit, Ctrl+C — this has no effect on the replicas themselves.
 kubectl get pods -l app=rickroll -w
 ```
 
 अगर आपके पास तीसरी विंडो है, तो इसे भी उसमें रखें — इस तरह आप निर्णय लेने की प्रक्रिया को ही देख सकते हैं:
 
 ```bash
-# वही निगरानी, पर ऑटोस्केलिंग के निर्णयों की: TARGETS दिखाता है कि लोड कैसे
-# बदलता है, REPLICAS दिखाता है कि जवाब में उसने कितनी प्रतिकृतियाँ अनुरोधित कीं।
+# The same watching, but of the autoscaling decisions: TARGETS shows how the load
+# changes, REPLICAS shows how many replicas it requested in response.
 kubectl get hpa rickroll -w
 ```
 
@@ -410,13 +410,13 @@ kubectl get hpa rickroll -w
 ⚠️ **अगर आपके Fortio संस्करण में फ़ील्ड के नाम अलग हैं** (मसलन, कनेक्शन की संख्या पर `Threads` लिखा है), तो अर्थ से चलें: URL, अनुरोध दर, अवधि, समानांतरता। वही लोड आप एक कमांड से भी, ब्राउज़र को दरकिनार करते हुए, दे सकते हैं:
 
 ```bash
-# exec किसी पहले से चल रहे Pod के भीतर कमांड चलाता है, आपके लैपटॉप पर नहीं।
-#   deploy/fortio   इस एप्लिकेशन के किसी Pod में; ठीक कौन सा Pod — kubectl खुद चुनता है
-#   --              इस विभाजक के बाद सब कुछ Pod के लिए कमांड है
-#   -qps 1200       बारह सौ अनुरोध प्रति सेकंड
-#   -c 80           अस्सी समानांतर कनेक्शन
-#   -t 90s          लोड को डेढ़ मिनट तक बनाए रखो
-# अंतिम आर्गुमेंट लक्ष्य है: हमारे एप्लिकेशन के Service का नाम।
+# exec runs a command inside an already-running Pod, not on your laptop.
+#   deploy/fortio   in a Pod of this application; which Pod exactly — kubectl picks itself
+#   --              everything after this separator is the command for the Pod
+#   -qps 1200       twelve hundred requests per second
+#   -c 80           eighty parallel connections
+#   -t 90s          hold the load for a minute and a half
+# The last argument is the target: the Service name of our application.
 kubectl exec deploy/fortio -- fortio load -qps 1200 -c 80 -t 90s http://rickroll/
 ```
 
@@ -439,7 +439,7 @@ rickroll-6f4b9c8d57-t8zxc   1/1     Running             3s
 📍 **HPA देखें** — वह क्या देखता है और उसने क्या तय किया:
 
 ```bash
-# TARGETS लक्ष्य के मुकाबले वर्तमान औसत लोड है, REPLICAS यह है कि कितनी प्रतिकृतियाँ अनुरोधित हैं।
+# TARGETS is the current average load against the target, REPLICAS is how many replicas are requested.
 kubectl get hpa rickroll
 ```
 
@@ -459,8 +459,8 @@ rickroll   Deployment/rickroll   cpu: 645%/50%   1         6         6          
 HPA की अंकगणित ख़ुद जाँचें:
 
 ```bash
-# हर प्रतिकृति की खपत अलग-अलग। CPU(cores) मिलीसीपीयू में छपता है:
-# 100m एक कोर का सौवाँ हिस्सा है, 1000m एक पूरा कोर।
+# The consumption of each replica separately. CPU(cores) is printed in millicpu:
+# 100m is a hundredth of a core, 1000m is a whole core.
 kubectl top pods -l app=rickroll
 ```
 
@@ -497,8 +497,8 @@ rickroll-6f4b9c8d57-mn4kd   1/1     Terminating   4m
 ⚠️ **Windows पर स्क्रिप्ट WSL से चलाई जाती है**, PowerShell से नहीं — इसे कैसे इंस्टॉल करें, यह लैब 0 की शुरुआत में लिखा है। WSL के बिना आप लैब पूरी कर सकते हैं, पर रिपोर्ट-आर्टिफ़ैक्ट नहीं होगा।
 
 ```bash
-# ./ का अर्थ है "वर्तमान फ़ोल्डर की एक फ़ाइल", सिस्टम के PATH की कोई कमांड नहीं।
-# स्क्रिप्ट क्लस्टर में कुछ नहीं बदलती: यह केवल पढ़ती है और एक रिपोर्ट छापती है।
+# ./ means "a file from the current folder," not a command from the system PATH.
+# The script changes nothing in the cluster: it only reads and prints a report.
 ./check.sh
 ```
 
@@ -507,15 +507,15 @@ rickroll-6f4b9c8d57-mn4kd   1/1     Terminating   4m
 **HPA हटाएँ।** लैब 4 में हम लोड के तहत एक नया संस्करण रोलआउट करेंगे, और उसी समय प्रतिकृतियों की संख्या बदलने वाला एक अतिरिक्त तंत्र तस्वीर को केवल उलझाएगा:
 
 ```bash
-# delete -f = "क्लस्टर से वह हटाओ जो इस फ़ाइल में वर्णित है।" एप्लिकेशन बना रहता है:
-# फ़ाइल में केवल HPA वर्णित है। हटाने के बाद प्रतिकृतियों की संख्या वर्तमान मान पर जम जाती है।
+# delete -f = "remove from the cluster what's described in this file." The application stays:
+# only the HPA is described in the file. After deletion the replica count freezes at the current value.
 kubectl delete -f hpa.yaml
 ```
 
 **Fortio रखें** — लैब 4 में इसे लोड स्रोत के रूप में चाहिए होगा। अगर आप लैब 4 की योजना नहीं बना रहे, तो इसे भी हटा दें:
 
 ```bash
-# फ़ाइल के दोनों ऑब्जेक्ट हटाता है — जनरेटर का Deployment और उसका Service।
+# Removes both objects from the file — the generator's Deployment and its Service.
 kubectl delete -f fortio.yaml
 ```
 

@@ -14,7 +14,7 @@ Sie mit dem Cluster arbeiten**. Die Lehrkraft teilt Ihnen mit, welche für Sie v
 | **Werkzeuge** | Sie installieren sie selbst: `kubectl`, `virtctl`, `kubelogin` | bereits auf dem Bastion installiert |
 | **Cluster-Zugang** | kubeconfig aus dem Dashboard, Anmeldung über den Browser | Sie melden sich per SSH an, Zugang ist bereits eingerichtet |
 | **Tenant-Nummer in den Dateien** | tragen Sie selbst ein | im Voraus eingetragen |
-| **App prüfen** | `virtctl port-forward` + `localhost:8080` | über den Domainnamen `app.<Nummer>.workshop.aenix.io` |
+| **App prüfen** | `virtctl port-forward` + `localhost:8080` | über den Domainnamen `app.<number>.workshop.aenix.io` |
 | **Für wen** | alle ohne gemeinsamen Bastion | eine vorbereitete Testumgebung mit Bastion |
 
 In jedem Ordner liegt ein in sich geschlossener Satz: ein eigenes `README.md` (die Route), `chat/`

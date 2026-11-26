@@ -1,6 +1,6 @@
-# demo 환경(tenant-workshop00)에서 사용자 활동을 에뮬레이션합니다.
-# 소량 데이터 + 오래된 데이터 정리. 인스턴스는 건드리지 않고 그 안의 데이터만 다룹니다.
-# CronJob은 테넌트 namespace에서 실행됩니다(네트워크 정책이 내부에서만 서비스 접근을 허용).
+# Emulating user activity in the demo environment (tenant-workshop00).
+# Small volumes + cleanup of old data. We don't touch the instances, only the data inside them.
+# The CronJobs live in the tenant namespace (network policies allow access to the services only from within).
 ---
 apiVersion: batch/v1
 kind: CronJob

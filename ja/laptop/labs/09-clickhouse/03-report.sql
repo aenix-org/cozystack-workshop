@@ -1,42 +1,42 @@
--- ラボ9 · 経営陣が求めたレポート。各月に何人のゲストが来たか、
--- 訪問は平均でどれくらい続くか、何時に来ることが最も多いか、そしてどの入口が
--- より混雑しているか。
+-- Lab 9 · the report management asked for: how many guests each month,
+-- how long a visit lasts on average, at what hour they arrive most often, and which entrance
+-- is busier.
 --
--- 実行場所: ノートPC上、ラボクラスタで、READMEにある短いコマンド `ch`
--- を使う:
+-- Where it runs: on the laptop, in the lab cluster, with the short command `ch`
+-- from the README:
 --     cd labs/09-clickhouse && ch < 03-report.sql
--- これの前に、01-schema.sql と 02-generate.sql が実行済みでなければならない。
+-- Before this, 01-schema.sql and 02-generate.sql must have been run.
 --
--- 結果の読み方: データに存在する月ごとに1行（全部で8つ）、月は昇順、
--- ゲスト数は月を追うごとに増えていく。
+-- How to read the result: one row per month present in the data (there are
+-- eight), months in ascending order, the guest count growing from month to month.
 --
--- なぜ100万行がミリ秒で集計されるのか。ClickHouse は各カラムを
--- 別々のファイルとして保存する。このクエリは7カラムのうち3カラムに触れる — 残りの4つ、
--- 最も重い guest_name を含めて、ディスクからまったく読まれない。行が
--- ディスク上に丸ごと格納されるデータベースでは、そのうち3つを集計するためだけに、
--- 全100万行を全フィールドごと持ち上げなければならない。ここに時間の差が生まれる。
--- 数字で見るには: クエリの末尾に FORMAT JSON の行を追記する — 応答に
--- 消費時間と読み取り量を示す統計ブロックが現れる。
+-- Why a million rows are counted in milliseconds. ClickHouse stores each column
+-- as a separate file. This query touches three columns out of seven — the other four,
+-- including the heaviest one, guest_name, are not read from disk at all. In a database where a row
+-- is stored on disk in full, you would have to pull all million rows with all their fields
+-- just to compute over three of them. Hence the difference in time.
+-- To see it in numbers: append the line FORMAT JSON to the end of the query — the response
+-- will include a statistics block with the time spent and the volume read.
 --
--- データに現れた月ごとにレポート1行。
+-- One report row per month that appeared in the data.
 SELECT
-    -- この通過をどの月に割り当てるか。toStartOfMonth は正確な時刻を
-    -- その月の1日に変換する: グループ化にもソートにも使える単一の値であり、
-    -- 「年プラス月」のペアの代わりになる。
+    -- Which month to attribute the pass to. toStartOfMonth turns the exact time
+    -- into the first day of the month: a single value to both group and sort by,
+    -- instead of a "year plus month" pair.
     toStartOfMonth(created_at)          AS month,
-    -- グループに何行入ったか — これが「その月のゲスト数」である。
+    -- How many rows fell into the group — this is "how many guests per month".
     count()                             AS guests,
-    -- 平均訪問時間、整数の分に丸めたもの。
+    -- Average visit duration, rounded to whole minutes.
     round(avg(duration_min))            AS avg_minutes,
-    -- 最も頻度の高い来訪時刻 — まさにラッシュアワー。topK(1)(x) は最も頻度の高い
-    -- 単一の値からなる配列を返し、[1] がそこからそれを取り出す（1から数える）。
+    -- The most frequent arrival hour — the rush hour itself. topK(1)(x) returns an array
+    -- of the single most frequent value, and [1] pulls it out of there (counting from one).
     topK(1)(toHour(created_at))[1]      AS peak_hour,
-    -- この月で最も混雑した入口、同じ手法で。
+    -- The busiest entrance of this month, by the same trick.
     topK(1)(entrance)[1]                AS busiest_entrance
--- クエリに何が無いかに注目: サブクエリ、一時テーブル、join が無い。
--- すべてがデータに対する1回のパスで計算される。
+-- Note what the query does not have: subqueries, temporary tables, and joins.
+-- Everything is computed in a single pass over the data.
 FROM passes
--- 1つの月のすべての行を1つの応答行に畳み込む。
+-- Collapse all rows of one month into a single response row.
 GROUP BY month
--- 月を昇順で出力し、成長が上から下へ読めるようにする。
+-- Output the months in ascending order, so the growth reads top to bottom.
 ORDER BY month

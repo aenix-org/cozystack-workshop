@@ -1,32 +1,32 @@
 ---
-# लैब 12. लेगेसी स्टाफ डायरेक्टरी के लिए एक वर्चुअल मशीन: डिस्क और स्वयं मशीन,
-# एक ही फ़ाइल में दो ऑब्जेक्ट, एक `---` लाइन से अलग किए गए।
+# Lab 12. A virtual machine for a legacy staff directory: the disk and the machine itself,
+# two objects in one file, separated by a `---` line.
 #
-# ये टेनेंट ऑब्जेक्ट हैं: ये `lab` क्लस्टर में नहीं, बल्कि प्रबंधन क्लस्टर पर आपके
-# namespace में रहते हैं। आपको टेनेंट kubeconfig की ज़रूरत है।
+# These are tenant objects: they live NOT in the `lab` cluster, but in your namespace
+# on the management cluster. You need the tenant kubeconfig.
 #
-# लागू करने से पहले, tenant-workshopXX को अपने namespace से बदलें, वरना ऑर्डर आपके बजाय
-# गलत टेनेंट में चला जाएगा।
+# Before applying, replace tenant-workshopXX with your own namespace, otherwise the order will go
+# to the wrong tenant instead of yours.
 #
 #     export KUBECONFIG=~/.kube/config
 #     kubectl apply -f staff-directory-vm.yaml
 #
-# यही काम टेनेंट डैशबोर्ड में माउस से किया जा सकता है (Create application -> VM Disk,
-# फिर VM Instance) — परिणाम एक जैसा होता है।
+# The same thing can be done with the mouse in the tenant dashboard (Create application -> VM Disk,
+# then VM Instance) — the result is identical.
 #
-# ध्यान दें: जिस नाम से मशीन को आगे बुलाया जाता है वह metadata.name से मेल नहीं खाता, और यह
-# लैब में कोई टाइपो नहीं है। प्लेटफ़ॉर्म X नाम वाले VMInstance ऑब्जेक्ट को
-# `vm-instance` चार्ट से तैनात करता है, और चार्ट का नाम रिलीज़ के नाम से जुड़ जाता है: चल रहा इंस्टेंस
-# vm-instance-X कहलाता है। इसके अलावा, लक्ष्य को टाइप उपसर्ग के साथ निर्दिष्ट किया जाता है, क्योंकि
-# टेनेंट अनुमतियाँ इंस्टेंस (virtualmachineinstances, यानी vmi) पर दी जाती हैं, न कि
-# virtualmachines पर — नंगा नाम forbidden लौटाएगा। इसलिए कंसोल में लॉगिन का कमांड:
+# ATTENTION: the name the machine is called by later does NOT match metadata.name, and this is not
+# a typo in the lab. The platform deploys a VMInstance object named X with the
+# `vm-instance` chart, and the chart name is glued to the release name: the running instance
+# is called vm-instance-X. On top of that, the target is specified with a type prefix, because
+# tenant permissions are granted on instances (virtualmachineinstances, aka vmi), not on
+# virtualmachines — a bare name will return forbidden. Hence the console login command:
 #     virtctl console --namespace=tenant-workshopXX vmi/vm-instance-spravochnik
-# चल रहे इंस्टेंस की सूची: kubectl get vmi -n tenant-workshopXX
-# और `kubectl get vminstance spravochnik` इंस्टेंस नहीं, बल्कि उसके लिए आपका ऑर्डर दिखाता है —
-# वही ऑब्जेक्ट जो नीचे वर्णित है।
+# List of running instances: kubectl get vmi -n tenant-workshopXX
+# And `kubectl get vminstance spravochnik` shows not the instance, but your order for it —
+# the very object described below.
 #
-# डिस्क और मशीन — दो अलग-अलग ऑब्जेक्ट हैं, और यह नौकरशाही नहीं है: डिस्क मशीन से
-# ज़्यादा जीवित रहती है। मशीन को हटाकर फिर से बनाया जा सकता है, उसी डिस्क को जोड़ते हुए।
+# The disk and the machine are TWO DIFFERENT objects, and this is not bureaucracy: the disk outlives
+# the machine. The machine can be deleted and recreated, attaching the same disk.
 apiVersion: apps.cozystack.io/v1alpha1
 kind: VMDisk
 metadata:
@@ -35,16 +35,16 @@ metadata:
 spec:
   source:
     image:
-      # प्लेटफ़ॉर्म के साझा इमेज संग्रह से एक नाम, URL नहीं।
-      # डिस्क बनाते समय यह सूची डैशबोर्ड में दिखती है।
+      # A name from the platform's shared image collection, not a URL.
+      # The list is visible in the dashboard when creating a disk.
       name: ubuntu-22.04
-  # डिस्क का आकार। यह स्रोत इमेज से छोटा नहीं हो सकता: ubuntu-22.04 विस्तृत होकर
-  # 20Gi बनता है, और प्लेटफ़ॉर्म 10Gi डिस्क को भरने से इनकार कर देगा। डिस्क को बाद में बढ़ाया जा सकता है,
-  # पर घटाया नहीं जा सकता, इसलिए यहाँ कम आँकना ज़्यादा आँकने से महँगा पड़ता है।
+  # Disk size. It cannot be smaller than the source image: ubuntu-22.04 expands
+  # to 20Gi, and the platform would refuse to fill a 10Gi disk. The disk can be expanded later,
+  # but not shrunk, so underestimating here costs more than overestimating.
   storage: 20Gi
-  # स्टोरेज क्लास। `replicated` — डेटा को कई प्रतियों में अलग-अलग प्लेटफ़ॉर्म नोड्स पर
-  # लिखा जाता है: प्रति रखने वाला नोड मर सकता है, और मशीन काम करती रहती है। मूल रूप में यह
-  # एक मिरर है, बस नेटवर्क पर बना हुआ। पड़ोसी लैब में डेटाबेस भी वही क्लास लेते हैं।
+  # Storage class. `replicated` — data is written in several copies to different platform
+  # nodes: a node holding a copy can die, and the machine keeps working. In essence this is
+  # a mirror, only assembled over the network. The databases in the neighboring labs use the same class.
   storageClass: replicated
 ---
 apiVersion: apps.cozystack.io/v1alpha1
@@ -53,44 +53,44 @@ metadata:
   name: spravochnik
   namespace: tenant-workshopXX
 spec:
-  # 1 CPU, 4 GB. वही कैटलॉग संदर्भ जिससे Kubernetes नोड्स के आकार
-  # लिए जाते हैं: मशीनें और नोड्स यहाँ एक ही तरह से मापे जाते हैं।
+  # 1 CPU, 4 GB. The same catalog reference from which the sizes of
+  # Kubernetes nodes are taken: machines and nodes are measured the same way here.
   instanceType: u1.medium
-  # गेस्ट OS प्रोफ़ाइल: मशीन को कौन से ड्राइवर और डिवाइस सौंपने हैं।
+  # Guest OS profile: which drivers and devices to hand to the machine.
   instanceProfile: ubuntu
-  # Always का मतलब «चालू रखो»: अगर यह अपने आप बंद हो जाए — तो इसे फिर से चालू किया जाएगा।
-  # Halted — बंद, Manual — जैसा छोड़ा गया था।
+  # Always means "keep it running": if it shuts down on its own — it will be started again.
+  # Halted — off, Manual — as left.
   runStrategy: Always
-  # मशीन से कौन सी डिस्क जोड़नी हैं। संदर्भ ऊपर वाले VMDisk ऑब्जेक्ट के नाम से जाता है — वही
-  # जो इस मशीन से ज़्यादा जीवित रहेगा।
+  # Which disks to attach to the machine. The reference is by the name of the VMDisk object above — the
+  # very one that will outlive this machine.
   disks:
     - name: spravochnik
-  # ध्यान दें: यहाँ replicas फ़ील्ड नहीं है और न ही होगा।
-  # एक वर्चुअल मशीन एक ही ऑब्जेक्ट है। दो मशीनें चाहिए — तो दो ऑब्जेक्ट
-  # अलग-अलग नामों के साथ। यह Deployment से एक मूलभूत अंतर है,
-  # देखें README का वह खंड जहाँ यह अंतर चुभता है।
-  # गेस्ट OS की प्रारंभिक सेटअप। cloud-init Linux क्लाउड इमेज का मानक तंत्र है:
-  # पहले बूट पर मशीन इस टेक्स्ट को पढ़ती है और इसे स्वयं पर लागू करती है। अपनी भूमिका में
-  # यह vSphere में गेस्ट कस्टमाइज़ेशन है — पासवर्ड, फ़ाइलें, सेवाएँ, — बस विवरण से, न कि
-  # किसी विज़ार्ड से। `|` के बाद के इंडेंट से नीचे का सब कुछ गेस्ट में शब्दशः जाता है और वहीं
-  # पार्स होता है, Kubernetes द्वारा नहीं।
+  # Note: there is NO replicas field here, and there won't be.
+  # A virtual machine is a single object. Need two machines — two objects
+  # with different names. This is a fundamental difference from Deployment,
+  # see the README section about where this difference hurts.
+  # Initial setup of the guest OS. cloud-init is the standard mechanism of Linux cloud
+  # images: on first boot the machine reads this text and applies it to itself. In its role
+  # it is guest customization in vSphere — passwords, files, services — only by description, not
+  # by a wizard. Everything below the indentation after `|` goes to the guest verbatim and is parsed
+  # there, not by Kubernetes.
   #
-  # यहाँ cloud-init डायरेक्टरी को एक सर्वर में बदल देता है: यह एक HTML पेज रखता है और एक सेवा शुरू करता है
-  # जो इसे HTTP पर पोर्ट 8080 पर परोसती है। python3 पहले से ही ubuntu इमेज में है — इसके लिए इंटरनेट
-  # की ज़रूरत नहीं। पोर्ट 8080 यादृच्छिक नहीं है: प्रस्तुतकर्ता ने पहले से ही आपके टेनेंट में
-  # Service `spravochnik-http` (80 -> 8080) और Ingress `spravochnik` बना दिया है, और जैसे ही मशीन के अंदर
-  # सेवा ऊपर आती है, डायरेक्टरी टेनेंट डोमेन पर प्रकाशित हो जाएगी।
+  # Here cloud-init turns the directory into a server: it places an HTML page and sets up a service
+  # that serves it over HTTP on port 8080. python3 is already in the ubuntu image — the internet
+  # is not needed for this. Port 8080 is not random: the instructor has already created a
+  # Service `spravochnik-http` (80 -> 8080) and an Ingress `spravochnik` in your tenant, and as soon as the service
+  # inside the machine comes up, the directory will be published on the tenant domain.
   cloudInit: |
     #cloud-config
-    # पासवर्ड डैशबोर्ड से कंसोल में लॉगिन करने के लिए चाहिए। प्रोडक्शन मशीन पर
-    # ऐसा नहीं करना चाहिए — वहाँ sshKeys।
+    # The password is needed to log in to the console from the dashboard. On a production machine
+    # you should not do this — use sshKeys there.
     password: ubuntu
     chpasswd: { expire: false }
     ssh_pwauth: true
     write_files:
       - path: /opt/directory/index.html
         content: |
-          <!doctype html><html lang="hi"><head><meta charset="utf-8"><title>निर्देशिका</title></head><body><h1>कर्मचारी निर्देशिका</h1><ul><li>शर्मा आर. — 101</li><li>पाण्डेय प. — 102</li></ul></body></html>
+          <!doctype html><html lang="en"><head><meta charset="utf-8"><title>Directory</title></head><body><h1>Staff directory</h1><ul><li>Whitfield J. — 101</li><li>Petersen P. — 102</li></ul></body></html>
       - path: /etc/systemd/system/directory.service
         content: |
           [Unit]

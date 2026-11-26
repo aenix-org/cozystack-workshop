@@ -1,51 +1,51 @@
 ---
-# 实验 11。移动应用「通行证」的源码 —— 作为输入喂给构建的内容。
+# Lab 11. Sources of the "Propusk" mobile application — what is fed to the build as input.
 #
-# 在你的培训集群 `lab` 上应用，而不是在管理集群的租户里：
+# Applied on your training cluster `lab`, not in a tenant on the management cluster:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl apply -f propusk-src.yaml
-# 这里没有诸如 tenant-workshopXX 之类的占位符 —— 你不需要在任何地方替换自己的编号。
-# Namespace 也没有指定：对象会落到你的 kubeconfig 中所设定的那一个里。
+# There are no placeholders like tenant-workshopXX here — you don't need to substitute your number anywhere.
+# The namespace is not specified either: the object lands in the one set in your kubeconfig.
 #
-# 应用刻意做得极小：一个 activity，屏幕上一行文字。
-# 这个实验的重点不在 Android，而在于构建会送进集群这件事。
+# The application is deliberately tiny: one activity, one line of text on the screen.
+# The point of the lab is not Android, but the fact that a build travels to the cluster.
 #
-# 这些是什么文件，如果你从未构建过移动应用。
-# Android 项目不是一个装着代码的单一文件，而是由三种文件构成的树：
-#   *.gradle.kts  构建描述：从哪里取库、用什么编译、为哪些
-#                 Android 版本构建。按其角色它就是 makefile，只不过用的是 Kotlin 语言；
-#   *.kt          应用本身的代码；
-#   *.xml         资源：文本以及描述点击图标时打开哪个屏幕
-#                 的说明。
-# Gradle 构建器读取这棵树并产出一个 APK —— 一个供手机使用的单一安装文件，
-# 按角色等同于 Windows 的 .msi。你不需要自己安装 Android SDK 并
-# 手动构建：这由 android-build.yaml 里的 Job 来负责，而这里只放它的输入。
+# WHAT THESE FILES ARE, if you've never built mobile applications.
+# An Android project is not a single file with code, but a tree of three kinds of files:
+#   *.gradle.kts  the build description: where to get libraries, what to compile with, for which
+#                 Android versions to build. By its role it's a makefile, only in the Kotlin language;
+#   *.kt          the actual application code;
+#   *.xml         resources: texts and the description of which screen to open when the icon
+#                 is tapped.
+# The Gradle builder reads this tree and produces an APK — a single installer file for the phone,
+# by its role the same as an .msi for Windows. You don't need to install the Android SDK yourself and
+# build by hand: a Job from android-build.yaml takes care of that, and here lies only its input.
 #
-# 源码放在 ConfigMap 里而不是镜像里，原因和
-# 第一个应用那个实验里 nginx 页面放在 ConfigMap 里的完全一样：
-# 是为了改动它们而不必重新构建任何东西。ConfigMap 是集群对象，其内部
-# 存放着文本文件；容器启动时，集群会把它们
-# 作为磁盘上的普通文件放入其中。
+# The sources live in a ConfigMap, not in an image, for exactly the same reason
+# that in the lab with the first application the nginx page lived in a ConfigMap:
+# so you can change them without rebuilding anything. A ConfigMap is a cluster object, inside
+# which text files live; when the container starts, the cluster places them
+# inside it as ordinary files on disk.
 #
-# `data` 里的键是文件名，而 `|` 之后缩进以下的一切，是
-# 文件的逐字内容，而非 YAML。放到这种块内部的注释
-# 会变成文件本身的一行，因此下面所有说明都放在外面，
-# 键的前面。
+# The keys inside `data` are file names, and everything below the indent after `|` is
+# the verbatim content of the file, not YAML. A comment placed inside such a
+# block would become a line of the file itself, so all explanations below stand outside,
+# before the key.
 #
-# 这张由六个键组成的扁平映射，不是在这里、而是在
-# 挂载时展开成目录树：「键 -> 路径」的对应关系在 android-build.yaml 的
-# volumes.items 块里设定。ConfigMap 的键不能包含斜杠 —— 因此有了扁平的名字
-# app-build.gradle.kts，它在项目里会变成 app/build.gradle.kts。
+# The flat map of six keys unfolds into a directory tree not here, but at
+# mount time: the "key -> path" correspondence is set in android-build.yaml, in the
+# volumes.items block. A ConfigMap key cannot contain a slash — hence the flat name
+# app-build.gradle.kts, which in the project becomes app/build.gradle.kts.
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: propusk-src
 data:
-  # 项目的顶层文件：列出 Gradle 从哪里拉取插件和库，以及哪些
-  # 模块属于该项目（这里只有一个 —— app）。三个仓库都是公开的，在互联网上：
-  # 构建容器空手启动，从那里拉取一切，构建的耗时也由此而来。
-  # 当信息安全部门封掉对外出口时，你首先要改的也是这个地方 —— 这里会写进
-  # 一个内部代理仓库，正如当初把 Docker Hub 换成 Harbor 那样。
+  # The project's top-level file: lists where Gradle pulls plugins and libraries from and which
+  # modules are part of the project (here there is one — app). All three repositories are public, on the internet:
+  # the build container starts empty and pulls everything from there, hence the build's duration.
+  # This is also the first place you'll fix when infosec closes off outbound access — an
+  # internal proxy repository will be written in here, exactly as Docker Hub was swapped for Harbor.
   settings.gradle.kts: |
     pluginManagement {
       repositories {
@@ -63,26 +63,26 @@ data:
     rootProject.name = "propusk"
     include(":app")
 
-  # 根构建文件：固定两个插件的版本 —— Android 构建器和 Kotlin
-  # 编译器。`apply false` 意为「声明版本，但不在根项目里启用」：
-  # 由 app 模块来启用它们。版本是刻意钉死的。一个拉取
-  # 「最新」的构建，一个月后会和今天构建得不一样，而要弄清这一点的人就是你。
+  # The root build file: pins the versions of two plugins — the Android builder and the Kotlin
+  # compiler. `apply false` means "declare the version, but don't enable it in the root project":
+  # the app module will enable them. The versions are nailed down deliberately. A build that pulls
+  # "the latest", a month later builds differently than today, and you'll be the one to figure it out.
   build.gradle.kts: |
     plugins {
       id("com.android.application") version "8.5.2" apply false
       id("org.jetbrains.kotlin.android") version "1.9.24" apply false
     }
 
-  # 应用模块本身的描述。这里有三个数字，构建会下载什么、
-  # 以及应用究竟能在哪里运行，都取决于它们：
-  #   compileSdk 34   我们用来编译的 Android SDK 版本。SDK 安装步骤下载的就是它 ——
-  #                   约一个半 GB，是构建里最慢的一步；
-  #   minSdk 24       应用能运行的最老的 Android（这是 Android 7）。
-  #                   调高 —— 你会砍掉旧手机，调低 —— 你就得拖进
-  #                   兼容性库；
-  #   jvmTarget 17    Kotlin 编译成 Java 字节码，而这个数字必须与
-  #                   构建镜像里的 JDK 版本一致（android-build.yaml 里的 gradle:8.9-jdk17）。
-  #                   一旦不一致 —— 构建会在字节码版本不匹配上失败。
+  # Description of the application module itself. Here are three numbers on which both what the build
+  # downloads and where the application will even run depend:
+  #   compileSdk 34   the Android SDK version we compile with. This is what the SDK install step
+  #                   downloads — about one and a half gigabytes, the longest build step;
+  #   minSdk 24       the oldest Android on which the application will run (this is Android 7).
+  #                   Raise it — you cut off old phones, lower it — you'll have to drag in
+  #                   compatibility libraries;
+  #   jvmTarget 17    Kotlin compiles to Java bytecode, and this number must match
+  #                   the JDK version in the build image (gradle:8.9-jdk17 in android-build.yaml).
+  #                   If they diverge — the build fails on a bytecode version mismatch.
   app-build.gradle.kts: |
     plugins {
       id("com.android.application")
@@ -117,9 +117,9 @@ data:
       }
     }
 
-  # 应用面向手机的护照：它有哪些屏幕，以及点击图标时
-  # 打开其中的哪一个。带有 MAIN 和 LAUNCHER 的 intent-filter 块干的正是这件事 ——
-  # 没有它应用能装上，但菜单里不会出现图标。
+  # The application's passport for the phone: which screens it has and which one opens
+  # when the icon is tapped. That's exactly what the intent-filter block with MAIN and LAUNCHER is for —
+  # without it the application will install, but no icon will appear in the menu.
   AndroidManifest.xml: |
     <?xml version="1.0" encoding="utf-8"?>
     <manifest xmlns:android="http://schemas.android.com/apk/res/android">
@@ -135,12 +135,12 @@ data:
       </application>
     </manifest>
 
-  # 应用唯一的屏幕 —— 也是项目里总共全部的代码。
-  # 用的是裸的 android.app.Activity，而不是兼容性库：项目有零个外部
-  # 依赖，这样每次构建都能省下几分钟下载。
-  # R.string.greeting —— 对 strings.xml 中一段文本的引用。R 类不在源码里，它由
-  # 构建生成。所以错误「unresolved reference: R」意味着资源生成步骤失败，
-  # 而不是代码里的拼写错误。
+  # The application's only screen — and all the code the project has at all.
+  # Bare android.app.Activity is used, not a compatibility library: the project has zero external
+  # dependencies, and this saves a couple of minutes of downloading on every build.
+  # R.string.greeting — a reference to a text from strings.xml. The R class is not in the sources, it's
+  # generated by the build. So the error "unresolved reference: R" means a failed resource
+  # generation step, not a typo in the code.
   MainActivity.kt: |
     package io.aenix.propusk
 
@@ -159,11 +159,11 @@ data:
       }
     }
 
-  # 从代码中抽出的文本：这样修改和翻译它们时无需惊动程序员。
-  # app_name 显示在手机图标下方，greeting —— 显示在屏幕上。
+  # Texts extracted from the code: this way they are edited and translated without touching the programmer.
+  # app_name is visible under the icon on the phone, greeting — on the screen itself.
   strings.xml: |
     <?xml version="1.0" encoding="utf-8"?>
     <resources>
-      <string name="app_name">通行证</string>
-      <string name="greeting">申请访客通行证</string>
+      <string name="app_name">Guest Pass</string>
+      <string name="greeting">Request a guest pass</string>
     </resources>

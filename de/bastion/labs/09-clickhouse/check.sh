@@ -1,83 +1,82 @@
 #!/usr/bin/env bash
-# Prüfung von Lab 9: In ClickHouse liegt ein Journal der Durchgänge, und darüber wird ein Bericht berechnet.
+# Check for lab 9: ClickHouse holds a log of entry passes and a report is computed over it.
 #
-# Wir prüfen nicht «der Dienst wurde erstellt», sondern das Wesentliche: die Tabelle existiert, hat
-# nicht weniger als eine Million Zeilen, die Daten sind vielfältig und haben ausgeprägte Spitzen, der
-# Monatsbericht läuft in Millisekunden, und eine Abfrage über eine einzelne Spalte liest nur einen
-# kleinen Teil der Tabelle — das heißt, die Spaltenorientierung funktioniert wirklich und wird nicht
-# nur behauptet.
+# We check not "the service was created", but the substance: the table exists, has no fewer
+# than a million rows, the data is varied and has pronounced peaks, the monthly report runs in
+# milliseconds, and a query over a single column reads a small fraction of the table — that is,
+# columnar storage actually works, not just claimed.
 #
-# Ausführen (in jedem neuen Terminalfenster müssen die Variablen erneut gesetzt werden):
+# Run (in every new terminal window the variables must be set again):
 #   export KUBECONFIG=~/lab.kubeconfig
-#   export COZY_TENANT=workshopXX       # deine Nummer statt XX
-#   export CH_PASSWORD='Passwort des Benutzers analyst'
+#   export COZY_TENANT=workshopXX       # your number instead of XX
+#   export CH_PASSWORD='password of the analyst user'
 #   cd labs/09-clickhouse && ./check.sh
 #
-# Das Passwort wird nicht ausgegeben und landet nicht im Bericht.
-# Das Skript startet Einweg-Pods mit curl, daher dauert es etwa eine Minute.
+# The password is not printed and does not end up in the report.
+# The script spins up one-off pods with curl, so it takes about a minute.
 
-# Name und Titel werden von der gemeinsamen Bibliothek benötigt: sie signiert damit das Bericht-Artefakt.
-# In lib.sh liegen ok/fail/warn/evidence/finish und die Umgebungsprüfungen unten — damit
-# fünfzehn Prüfskripte einheitlich ausgeben und nicht jedes auf seine eigene Weise.
+# The name and title are needed by the shared library: it signs the report artifact with them.
+# lib.sh holds ok/fail/warn/evidence/finish and the environment checks below — so that
+# fifteen check scripts print identically, rather than each in its own way.
 LAB_NAME="09-clickhouse"
-LAB_TITLE="Lab 9 · Analytik über eine Million Zeilen"
+LAB_TITLE="Lab 9 · Analytics over a million rows"
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
-# Beide Prüfungen stoppen das Skript mit einer klaren Meldung, wenn die Cluster-Zugriffsdatei oder die
-# Tenant-Nummer nicht gesetzt ist. Ohne sie würden weiter unten laufend kubectl-Fehler auflaufen.
+# Both checks stop the script with a clear message if the cluster access file or the tenant
+# number is not set. Without them kubectl errors would keep piling up further down.
 need_kubeconfig
 need_tenant
 
-# Der Teilnehmer setzt COZY_TENANT als `workshop07`, während der Namespace
-# `tenant-workshop07` heißt. Wir akzeptieren beide Schreibweisen.
+# The participant sets COZY_TENANT as `workshop07`, while the namespace is called
+# `tenant-workshop07`. We accept both spellings.
 NS="$COZY_TENANT"
 case "$NS" in
   tenant-*) ;;
   *) NS="tenant-$NS" ;;
 esac
 
-# Die Standardnamen sind dieselben wie im Lab. Die Schreibweise ${X:-Wert} bedeutet «nimm die
-# Umgebungsvariable, und falls sie fehlt, setze den Wert ein»: die App anders benannt —
-# führe sie als CH_APP=Name ./check.sh aus, das Skript muss nicht bearbeitet werden.
-# Die Adresse ist intern, aus dem Cluster selbst: 8123 ist der Port der ClickHouse-HTTP-Schnittstelle.
+# The default names are the same as in the lab. The form ${X:-value} means "take the
+# environment variable, and if it is missing, substitute the value": named the app
+# differently — run it as CH_APP=name ./check.sh, no need to edit the script.
+# The address is internal, from within the cluster itself: 8123 is the ClickHouse HTTP-interface port.
 CH_APP="${CH_APP:-analytics}"
 CH_USER="${CH_USER:-analyst}"
 CH_TABLE="${CH_TABLE:-passes}"
 CH_HOST="chendpoint-clickhouse-${CH_APP}.${NS}.svc.cozy.local:8123"
 CH_URL="http://${CH_HOST}/"
 
-evidence "ClickHouse-Adresse" "$CH_URL"
+evidence "ClickHouse address" "$CH_URL"
 
-# --- 1. antwortet der Dienst überhaupt --------------------------------------
-# /ping benötigt kein Passwort, daher ist dies die erste und günstigste Prüfung:
-# sie trennt «keine Verbindung» von «Verbindung besteht, falsches Passwort».
+# --- 1. does the service respond at all -------------------------------------
+# /ping does not require a password, so this is the first and cheapest check:
+# it separates "no connection" from "connection is there, wrong password".
 PING="$(in_cluster_curl "${CH_URL}ping")"
 if printf '%s' "$PING" | grep -qi 'ok'; then
-  ok "ClickHouse antwortet unter der internen Adresse des Tenants"
+  ok "ClickHouse responds at the tenant's internal address"
 else
-  fail "ClickHouse antwortet nicht unter ${CH_HOST}" \
-       "prüfe die Tenant-Nummer in COZY_TENANT und den App-Namen (Standard 'analytics'; sonst CH_APP=Name ./check.sh); im Dashboard muss die App im Bereitschaftszustand sein"
+  fail "ClickHouse does not respond at ${CH_HOST}" \
+       "check the tenant number in COZY_TENANT and the app name (default 'analytics'; otherwise CH_APP=name ./check.sh); in the dashboard the app must be in a ready state"
   finish
   exit $?
 fi
 
-# Alles Weitere erfordert die Anmeldung an der Datenbank. Ohne Passwort rät das Skript nicht und
-# schweigt nicht, sondern sagt ehrlich, dass der Inhalt der Datenbank nicht geprüft wurde, und
-# schließt den Bericht ab: sonst würde der Teilnehmer denken, die Prüfung sei bestanden.
+# Everything below requires logging into the database. Without a password the script does not
+# guess and does not stay silent, but honestly says that the database contents were not checked,
+# and finishes the report: otherwise the participant would decide the check had passed.
 if [ -z "${CH_PASSWORD:-}" ]; then
-  fail "die Variable CH_PASSWORD ist nicht gesetzt, der Inhalt der Datenbank wurde nicht geprüft" \
-       "export CH_PASSWORD='Passwort des Benutzers ${CH_USER}' und starte das Skript erneut; das Passwort ist im Dashboard sichtbar, Secret clickhouse-${CH_APP}-credentials"
+  fail "the CH_PASSWORD variable is not set, the database contents were not checked" \
+       "export CH_PASSWORD='password of the ${CH_USER} user' and run the script again; the password is visible in the dashboard, secret clickhouse-${CH_APP}-credentials"
   finish
   exit $?
 fi
 
-# SQL von der Standardeingabe ausführen und die Antwort zurückgeben.
-# Eine eigene Funktion, nicht in_cluster_curl: die Abfrage geht als POST-Body raus, und der Body
-# braucht die Standardeingabe, die die gemeinsame Funktion nicht hat.
-# Das Passwort gelangt als Umgebungsvariable aus einem temporären Secret in den Pod, nicht als Argument:
-# alles, was in args landet, ist für jeden mit `get pods` sichtbar, liegt in etcd und taucht im Audit-
-# Log auf. Genau darum geht es im Lab selbst — es mit einem Skript zu prüfen, das das Gegenteil tut,
-# wäre mit zweierlei Maß gemessen.
+# Run SQL from standard input and return the response.
+# A separate function, not in_cluster_curl: the query goes out as the POST body, and the body
+# needs standard input, which the shared function does not have.
+# The password goes into the pod as an environment variable from a temporary Secret, not as an
+# argument: anything that lands in args is visible to anyone with `get pods`, lives in etcd and
+# shows up in the audit log. The lab itself is about exactly this — checking it with a script that
+# does the opposite would be a double standard.
 ch_query() {
   # The query body is NOT sent via the pod's stdin: kubectl run -i does not reliably
   # deliver piped stdin to the container (attach/start race), so curl received an empty body.
@@ -92,7 +91,7 @@ CH_Q_B64=${CH_Q_B64}" \
     sh -c 'echo "$CH_Q_B64" | base64 -d | curl -sS --max-time 90 -u "$CH_USER:$CH_PASSWORD" --data-binary @- "$CH_URL?default_format=TSV"'
 }
 
-# Eine Zahl aus dem statistics-Block einer Antwort im JSON-Format herausziehen.
+# Pull a number out of the statistics block of a JSON-format response.
 chstat() {
   python3 -c '
 import sys, json
@@ -109,25 +108,25 @@ print(val)
 ' "$1" 2>/dev/null
 }
 
-# --- 2. die Tabelle existiert -----------------------------------------------
+# --- 2. the table exists ----------------------------------------------------
 EXISTS="$(printf 'EXISTS TABLE %s' "$CH_TABLE" | ch_query | tr -d '[:space:]')"
 if [ "$EXISTS" = "1" ]; then
-  ok "Tabelle ${CH_TABLE} existiert"
+  ok "table ${CH_TABLE} exists"
 else
   if printf '%s' "$EXISTS" | grep -qi 'auth'; then
-    fail "ClickHouse hat das Passwort des Benutzers ${CH_USER} nicht akzeptiert" \
-         "prüfe das Passwort im Dashboard: App ${CH_APP} → Secrets → clickhouse-${CH_APP}-credentials"
+    fail "ClickHouse did not accept the password of the ${CH_USER} user" \
+         "verify the password in the dashboard: app ${CH_APP} → Secrets → clickhouse-${CH_APP}-credentials"
   else
-    fail "Tabelle ${CH_TABLE} existiert nicht" \
-         "erstelle sie: ch < 01-schema.sql (Schema-Erläuterung — in der README)"
+    fail "table ${CH_TABLE} does not exist" \
+         "create it: ch < 01-schema.sql (schema walkthrough — in the README)"
   fi
   finish
   exit $?
 fi
 
-# --- 3. wie viele Daten und wie vielfältig sie sind -------------------------
-# Eine Abfrage statt sechs: jeder ch_query-Aufruf startet einen Pod, und sechs Pods hintereinander
-# würden die Prüfung ohne Grund in ein minutenlanges Warten verwandeln.
+# --- 3. how much data and how varied it is ----------------------------------
+# One query instead of six: each ch_query call spins up a pod, and six pods in a row would
+# turn the check into a minute-long wait for no reason.
 STATS="$(ch_query <<SQL
 SELECT
     (SELECT count() FROM ${CH_TABLE}),
@@ -157,29 +156,29 @@ for v in ROWS UNIQ_ENT UNIQ_TYPE UNIQ_MONTH PEAK_MAX PEAK_MIN TABLE_BYTES; do
 done
 
 if [ "$ROWS" -ge 1000000 ]; then
-  ok "die Tabelle hat ${ROWS} Zeilen — eine Million wurde erzeugt"
+  ok "the table has ${ROWS} rows — a million were generated"
 else
-  fail "die Tabelle hat ${ROWS} Zeilen, erwartet wurde eine Million" \
-       "starte den Generator: ch < 02-generate.sql (Generator-Erläuterung — in der README)"
+  fail "the table has ${ROWS} rows, a million was expected" \
+       "run the generator: ch < 02-generate.sql (generator walkthrough — in the README)"
 fi
 
 if [ "$UNIQ_ENT" -ge 2 ] && [ "$UNIQ_TYPE" -ge 3 ] && [ "$UNIQ_MONTH" -ge 3 ]; then
-  ok "die Daten sind vielfältig: Eingänge ${UNIQ_ENT}, Ausweistypen ${UNIQ_TYPE}, Monate ${UNIQ_MONTH}"
+  ok "data is varied: entrances ${UNIQ_ENT}, pass types ${UNIQ_TYPE}, months ${UNIQ_MONTH}"
 else
-  fail "die Daten sind eintönig: Eingänge ${UNIQ_ENT}, Typen ${UNIQ_TYPE}, Monate ${UNIQ_MONTH}" \
-       "auf solchen Daten zeigt der Bericht nichts; erzeuge neu: TRUNCATE TABLE ${CH_TABLE}, dann ch < 02-generate.sql"
+  fail "data is monotonous: entrances ${UNIQ_ENT}, types ${UNIQ_TYPE}, months ${UNIQ_MONTH}" \
+       "on such data the report will show nothing; regenerate: TRUNCATE TABLE ${CH_TABLE}, then ch < 02-generate.sql"
 fi
 
 if [ "$PEAK_MIN" -gt 0 ] && [ "$PEAK_MAX" -ge $((PEAK_MIN * 2)) ]; then
-  ok "die Daten haben ausgeprägte Spitzen nach Stunden (die geschäftigste Stunde zur ruhigsten — mindestens doppelt so viel)"
-  evidence "Verteilung nach Stunden" "Maximum pro Stunde: ${PEAK_MAX}
-Minimum pro Stunde: ${PEAK_MIN}"
+  ok "the data has pronounced hourly peaks (the busiest hour vs the quietest — at least twice as much)"
+  evidence "Hourly distribution" "max per hour: ${PEAK_MAX}
+min per hour: ${PEAK_MIN}"
 else
-  warn "keine Spitzen nach Stunden erkennbar: Maximum ${PEAK_MAX}, Minimum ${PEAK_MIN}" \
-       "der Bericht «wann sind die Spitzen» ist auf solchen Daten sinnlos; prüfe, dass der Generator vollständig durchgelaufen ist"
+  warn "no hourly peaks are visible: max ${PEAK_MAX}, min ${PEAK_MIN}" \
+       "the \"when are the peaks\" report is meaningless on such data; check that the generator finished completely"
 fi
 
-# --- 4. der Monatsbericht wird schnell berechnet ----------------------------
+# --- 4. the monthly report is computed quickly ------------------------------
 REPORT="$(ch_query <<SQL
 SELECT toStartOfMonth(created_at) AS month, count() AS guests
 FROM ${CH_TABLE}
@@ -193,31 +192,31 @@ ELAPSED="$(printf '%s' "$REPORT" | chstat elapsed)"
 READ_ROWS="$(printf '%s' "$REPORT" | chstat rows_read)"
 
 if [ -z "$ELAPSED" ]; then
-  fail "der Monatsbericht lief nicht" \
-       "führe ihn manuell aus: ch < 03-report.sql und sieh dir den Fehlertext an"
+  fail "the monthly report did not run" \
+       "run it manually: ch < 03-report.sql and look at the error text"
 else
   MS="$(python3 -c "print(round(float('$ELAPSED') * 1000, 1))" 2>/dev/null)"
-  # Wir halten die Schwelle nahe an dem, was das Lab verspricht. Die früheren fünf Sekunden zählten
-  # einen Vier-Sekunden-Bericht als Erfolg — obwohl in der Lab-Kopfzeile «in Millisekunden berechnet»
-  # steht. Das Skript darf nicht bestätigen, was es nicht geprüft hat.
+  # We keep the threshold close to what the lab promises. The previous five seconds counted a
+  # four-second report as a success — even though the lab header says "computed in
+  # milliseconds". The script must not confirm what it has not checked.
   FAST="$(python3 -c "print(1 if float('$ELAPSED') < 0.5 else 0)" 2>/dev/null)"
   SLOW="$(python3 -c "print(1 if float('$ELAPSED') > 3 else 0)" 2>/dev/null)"
   if [ "$FAST" = "1" ]; then
-    ok "der Monatsbericht wurde in ${MS} ms berechnet, gelesene Zeilen: ${READ_ROWS}"
+    ok "the monthly report was computed in ${MS} ms, rows read: ${READ_ROWS}"
   elif [ "$SLOW" = "1" ]; then
-    fail "der Monatsbericht dauerte ${MS} ms — das ist nicht die Größenordnung, um die es im Lab geht" \
-         "eine Million Zeilen passen auf einem freien Stand in zehner Millisekunden; prüfe, dass der Dienst nicht mit einer benachbarten Last beschäftigt ist, und wiederhole"
+    fail "the monthly report took ${MS} ms — not the order of magnitude the lab is about" \
+         "a million rows on a free stand fit within tens of milliseconds; check that the service is not busy with a neighboring load, and retry"
   else
-    warn "der Monatsbericht wurde in ${MS} ms berechnet — langsamer als erwartet, aber im vertretbaren Rahmen" \
-         "auf einem ausgelasteten Stand kommt das vor; auf einem freien passt ein solcher Bericht in zehner Millisekunden"
+    warn "the monthly report was computed in ${MS} ms — slower than expected, but within reason" \
+         "this happens on a busy stand; on a free one such a report fits within tens of milliseconds"
   fi
-  evidence "Monatsbericht" "Zeit: ${MS} ms
-gelesene Zeilen: ${READ_ROWS}"
+  evidence "Monthly report" "time: ${MS} ms
+rows read: ${READ_ROWS}"
 fi
 
-# --- 5. Spaltenorientierung funktioniert, wird nicht nur behauptet ----------
-# Die Abfrage berührt eine kleine Spalte. Ist der Speicher spaltenorientiert, wird deutlich
-# weniger gelesen, als die ganze Tabelle wiegt.
+# --- 5. columnar storage works, not just claimed ----------------------------
+# The query touches one small column. If the storage is columnar, the amount read
+# will be noticeably less than the weight of the whole table.
 NARROW="$(ch_query <<SQL
 SELECT count() FROM ${CH_TABLE} WHERE duration_min > 100 FORMAT JSON
 SQL
@@ -227,32 +226,32 @@ case "$NARROW_BYTES" in
   ''|*[!0-9]*) NARROW_BYTES=0 ;;
 esac
 
-# Beide Größen sind UNKOMPRIMIERT: `bytes_read` in der Abfragestatistik ist das entpackte
-# Volumen, und aus system.columns nehmen wir `data_uncompressed_bytes`. Der Vergleich mit
-# `data_compressed_bytes` ergab einen Anteil der Größe auf der Platte und gab dem Teilnehmer
-# eine falsche Zahl aus — bei einer gut komprimierten Tabelle konnte sie hundert Prozent übersteigen.
+# Both quantities are UNCOMPRESSED: `bytes_read` in the query statistics is the decompressed
+# volume, and from system.columns we take `data_uncompressed_bytes`. Comparing against
+# `data_compressed_bytes` gave a share of the on-disk size and printed the participant a
+# wrong number — on a well-compressed table it could exceed a hundred percent.
 if [ "$NARROW_BYTES" -gt 0 ] && [ "$TABLE_BYTES" -gt 0 ]; then
   SHARE="$(python3 -c "print(round(100 * $NARROW_BYTES / $TABLE_BYTES))" 2>/dev/null)"
-  evidence "Lesen einer einzelnen Spalte" "gelesene Bytes: ${NARROW_BYTES}
-ganze Tabelle ohne Kompression, Bytes: ${TABLE_BYTES}
-Anteil: ${SHARE}%"
-  # Eine Schwelle, nicht einfach «weniger als das Ganze». Eine schmale Spalte von sieben sollte
-  # einstellige Prozent ergeben; «99% statt 100%» ist formal weniger, beweist aber nichts — und genau
-  # das ist die Behauptung, die das Lab in seinen Titel stellt.
+  evidence "Reading a single column" "bytes read: ${NARROW_BYTES}
+whole table uncompressed, bytes: ${TABLE_BYTES}
+share: ${SHARE}%"
+  # A threshold, not just "less than the whole". One narrow column out of seven should give
+  # single-digit percent; "99% instead of 100%" is formally less, but proves nothing — and that
+  # is exactly the claim the lab puts in its title.
   if [ "$SHARE" -le 25 ]; then
-    ok "die Abfrage über eine einzelne Spalte las ${SHARE}% der Tabellendaten — spaltenorientierter Speicher funktioniert"
+    ok "the single-column query read ${SHARE}% of the table's data — columnar storage works"
   elif [ "$NARROW_BYTES" -lt "$TABLE_BYTES" ]; then
-    warn "die Abfrage über eine einzelne Spalte las ${SHARE}% der Tabellendaten — weniger als das Ganze, aber der Gewinn ist bescheidener als erwartet" \
-         "einstellige Prozent wurden erwartet; prüfe, dass die Abfrage eine schmale Spalte anspricht und nicht mehrere"
+    warn "the single-column query read ${SHARE}% of the table's data — less than the whole, but the gain is more modest than expected" \
+         "single-digit percent was expected; check that the query addresses one narrow column, not several"
   else
-    warn "die Abfrage über eine einzelne Spalte las nicht weniger als die ganze Tabelle" \
-         "das kommt bei sehr kleinen Tabellen vor; prüfe, dass es wirklich eine Million Zeilen gibt"
+    warn "the single-column query read no less than the whole table" \
+         "this happens on very small tables; check that there really are a million rows"
   fi
 else
-  warn "es ließ sich nicht messen, wie viel die schmale Abfrage gelesen hat" \
-       "führe manuell aus: SELECT count() FROM ${CH_TABLE} WHERE duration_min > 100 FORMAT JSON und sieh dir bytes_read an"
+  warn "could not measure how much the narrow query read" \
+       "run manually: SELECT count() FROM ${CH_TABLE} WHERE duration_min > 100 FORMAT JSON and look at bytes_read"
 fi
 
-# finish gibt das Ergebnis aus und legt das Bericht-Artefakt in eine Datei ab; der Rückgabecode ist
-# ungleich null, wenn mindestens eine Prüfung fehlgeschlagen ist.
+# finish prints the summary and stores the report artifact in a file; the return code is non-zero
+# if at least one check failed.
 finish

@@ -1,32 +1,32 @@
 #!/bin/bash
-# माइग्रेट किए गए एप्लिकेशन को legacy hardcoded IP से managed DNS-endpoints पर स्विच करें।
-# app-VM में root के रूप में netfix-dhcp.sh + रीबूट के बाद ही चलाएँ (वरना DNS रिज़ॉल्व नहीं होगा)।
+# Switch the migrated application from legacy hardcoded IPs to managed DNS endpoints.
+# Run in the app-VM as root AFTER netfix-dhcp.sh + reboot (otherwise DNS won't resolve).
 set -e
 CONF=/etc/orders/application.properties
 
 # =========================================================================
-# अपने managed-सर्विसेज़ के नाम यहाँ डालें।
-#   आपके टेनंट में Service DNS का फ़ॉर्मैट (namespace = tenant-<आपका-लॉगिन>):
-#     Postgres: postgres-<postgres-नाम>-rw.<namespace>.svc.cozy.local
-#     Kafka:    kafka-<kafka-नाम>-kafka-bootstrap.<namespace>.svc.cozy.local
-#   सर्विस के नाम डैशबोर्ड में दिखते हैं: Postgres/Kafka -> आपका इंस्टेंस -> Services।
+# PASTE THE NAMES OF YOUR managed services.
+#   Service DNS format in your tenant (namespace = tenant-<your-login>):
+#     Postgres: postgres-<postgres-name>-rw.<namespace>.svc.cozy.local
+#     Kafka:    kafka-<kafka-name>-kafka-bootstrap.<namespace>.svc.cozy.local
+#   Service names are visible in the dashboard: Postgres/Kafka -> your instance -> Services.
 # =========================================================================
-# डिफ़ॉल्ट वैल्यूज़ manifests/04-managed.yaml से मेल खाती हैं (Postgres=db, Kafka=kafka)।
-# केवल tenant-workshopXX को अपने namespace से बदलें। अगर आपने Postgres/Kafka को अलग नाम दिया है —
-# तो db/kafka को अपने नामों से बदलें।
+# default values match manifests/04-managed.yaml (Postgres=db, Kafka=kafka).
+# Replace only tenant-workshopXX with your namespace. If you named Postgres/Kafka differently —
+# change db/kafka to your own names.
 PG_HOST="postgres-db-rw.tenant-workshopXX.svc.cozy.local"
 KAFKA_HOST="kafka-kafka-kafka-bootstrap.tenant-workshopXX.svc.cozy.local"
 # =========================================================================
 
-echo "== पहले (legacy hardcoded IP) =="
+echo "== before (legacy hardcoded IP) =="
 grep -E 'datasource.url|bootstrap-servers' "$CONF"
 
 sed -i "s#192.168.10.30:5432#${PG_HOST}:5432#; s#192.168.10.40:9092#${KAFKA_HOST}:9092#" "$CONF"
 
-echo "== अब (managed DNS) =="
+echo "== after (managed DNS) =="
 grep -E 'datasource.url|bootstrap-servers' "$CONF"
 
-echo "== एप्लिकेशन को रीस्टार्ट कर रहे हैं =="
+echo "== restarting the application =="
 systemctl restart orders-api
 sleep 8
 systemctl is-active orders-api

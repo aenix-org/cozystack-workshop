@@ -1,24 +1,24 @@
-# Лаба 3. Генератор навантаження Fortio: сам генератор і стала адреса до його
-# веб-інтерфейсу. Два об'єкти, розділені `---`.
+# Lab 3. Fortio load generator: the generator itself and a stable address for its
+# web interface. Two objects, separated by `---`.
 #
-# Застосовується на вашому навчальному кластері `lab`, а не в тенанті на кластері керування:
+# Applied to your `lab` training cluster, not to a tenant on the management cluster:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl apply -f fortio.yaml
-# Заглушок на кшталт tenant-workshopXX тут немає — підставляти свій номер нікуди не потрібно.
-# Цей самий файл знадобиться в лабі 4: `kubectl apply -f ../03-scale/fortio.yaml`.
+# There are no placeholders like tenant-workshopXX here — you don't need to substitute your number anywhere.
+# This same file will be needed in lab 4: `kubectl apply -f ../03-scale/fortio.yaml`.
 #
-# Загальні поля маніфесту (apiVersion, kind, metadata.name, selector, template,
-# securityContext) порядково розібрані в ../01-deploy/rickroll.yaml і тут
-# не повторюються. Коментуємо лише те, що властиве саме генератору навантаження.
+# The manifest's common fields (apiVersion, kind, metadata.name, selector, template,
+# securityContext) are dissected line by line in ../01-deploy/rickroll.yaml and are not
+# repeated here. We comment only on what is specific to the load generator.
 ---
-# Генератор навантаження з веб-мордою.
-# Взятий замість hey/ab навмисно: навантаження запускають кнопкою в браузері,
-# а гістограму затримок видно там само. На минулих воркшопах ми втрачали
-# людей саме на консольних інструментах.
+# Load generator with a web interface.
+# Chosen over hey/ab on purpose: you start the load with a button in the browser,
+# and you see the latency histogram right there. At past workshops we lost
+# people precisely on console tools.
 #
-# Fortio живе в кластері як звичайний застосунок і б'є по адресі rickroll зсередини.
-# Навантажувати ззовні, з ноутбука, було б чесніше за трафіком, але впиралося б у канал
-# до кластера, і ви вимірювали б свій Wi-Fi, а не застосунок.
+# Fortio lives in the cluster as an ordinary application and hits the rickroll address from inside.
+# Loading it from outside, from a laptop, would be more honest in terms of traffic, but it would run into the channel
+# to the cluster, and you would be measuring your Wi-Fi rather than the application.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -26,9 +26,9 @@ metadata:
   labels:
     app: fortio
 spec:
-  # Однієї копії генератора вистачає: навантаження вона дає в багато потоків сама.
-  # Друга копія тут лише розмила б картину — лічильники у веб-інтерфейсі
-  # у кожної копії свої, і ви бачили б половину запитів.
+  # One copy of the generator is enough: it produces load in many threads by itself.
+  # A second copy here would only blur the picture — the counters in the web interface
+  # are per-copy, and you would see half the requests.
   replicas: 1
   selector:
     matchLabels:
@@ -38,9 +38,9 @@ spec:
       labels:
         app: fortio
     spec:
-      # Той самий профіль безпеки, що й у rickroll: робота не від root, конкретний
-      # UID, стандартний seccomp. Залишено навмисно — щоб файл можна було застосувати
-      # і в кластері з увімкненим профілем `restricted`, де інакше Pod не запуститься.
+      # The same security profile as rickroll: runs not as root, a specific
+      # UID, standard seccomp. Left in on purpose — so the file can also be applied
+      # in a cluster with the `restricted` profile enabled, where otherwise the pod would not start.
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
@@ -52,32 +52,32 @@ spec:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # Тег latest — свідоме спрощення для воркшопу, щоб не звіряти версії.
-          # У робочому кластері так не роблять: образ під цим тегом може непомітно
-          # змінитися між двома apply, і ви не зможете повторити вчорашній результат.
+          # The latest tag is a deliberate simplification for the workshop, to avoid matching versions.
+          # In a production cluster you don't do this: the image under this tag may silently
+          # change between two applies, and you won't be able to reproduce yesterday's result.
           image: fortio/fortio:latest
-          # Режим `server` піднімає веб-інтерфейс і тримає його. Без цього аргументу
-          # Fortio відпрацював би один прогін з командного рядка і завершився б, а кластер
-          # перезапускав би контейнер по колу.
+          # The `server` mode brings up the web interface and keeps it running. Without this argument
+          # Fortio would run a single pass from the command line and exit, and the cluster
+          # would restart the container in a loop.
           args: ["server"]
           ports:
             - containerPort: 8080
               name: http
           resources:
-            # Запит вищий, ніж у самого rickroll (20m): генератору потрібне місце на вузлі
-            # заздалегідь, інакше планувальник поставить його впритул і розгін буде нерівним.
+            # The request is higher than rickroll's own (20m): the generator needs room on the node
+            # in advance, otherwise the scheduler will pack it in tightly and the ramp-up will be uneven.
             requests:
               cpu: 100m
               memory: 64Mi
             limits:
-              # Генератору потрібен запас за процесором, інакше він упреться
-              # в себе і ви будете навантажувати не застосунок, а Fortio.
+              # The generator needs CPU headroom, otherwise it will hit
+              # its own limit and you will be loading Fortio, not the application.
               cpu: "1"
               memory: 256Mi
 ---
-# Стала адреса генератора всередині кластера. Потрібна, щоб відкрити веб-інтерфейс
-# з ноутбука через `kubectl port-forward svc/fortio 8081:8080` — ззовні кластер
-# нічого не публікує, і інших дверей до Fortio немає.
+# A stable address for the generator inside the cluster. Needed to open the web interface
+# from a laptop via `kubectl port-forward svc/fortio 8081:8080` — from the outside the cluster
+# publishes nothing, and there are no other doors to Fortio.
 apiVersion: v1
 kind: Service
 metadata:
@@ -86,7 +86,7 @@ spec:
   selector:
     app: fortio
   ports:
-    # 8080 з обох боків: і сервіс, і контейнер. Номер той самий, що й у rickroll
-    # всередині Pod, але перетину немає — у кожного Pod свій мережевий стек.
+    # 8080 on both sides: both the service and the container. The number is the same as rickroll's
+    # inside the pod, but there is no collision — each pod has its own network stack.
     - port: 8080
       targetPort: http

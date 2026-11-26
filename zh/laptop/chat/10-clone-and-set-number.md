@@ -63,4 +63,4 @@ Get-ChildItem -Recurse manifests,scripts -File | ForEach-Object {
 grep -rn tenant-workshopXX manifests scripts || echo "clean, you can continue"
 ```
 
-有一个地方这条命令不会碰到：`manifests/03-app-vm.yaml` 里的那一行 `url: "ВСТАВЬТЕ_PRESIGNED_URL"`。那个链接你会稍后拿到，就在你转换完镜像之后。现在只需知道它正在那里等着你。
+有一个地方这条命令不会碰到：`manifests/03-app-vm.yaml` 里的那一行 `url: "PASTE_PRESIGNED_URL"`。那个链接你会稍后拿到，就在你转换完镜像之后。现在只需知道它正在那里等着你。

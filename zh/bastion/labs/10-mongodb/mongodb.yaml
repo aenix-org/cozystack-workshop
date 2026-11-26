@@ -1,53 +1,53 @@
-# 实验 10 · 为不同类型的通行证订购一个 MongoDB 数据库。
-# 描述你想要得到的东西；由平台来组装并配置该服务。
-# 与你在仪表盘中用鼠标下单是同一件事 —— 只不过这里用文本。
-# 不是应用到实验集群，而是应用到管理集群上的租户：
+# Lab 10 · ordering a MongoDB database for passes of different kinds.
+# A description of what you want to get; the platform assembles and configures the service.
+# The same thing you would order with the mouse in the dashboard — only as text.
+# Applied NOT to the lab cluster, but to a tenant on the management cluster:
 #   kubectl --kubeconfig="$HOME/.kube/config" apply -f mongodb.yaml
 #
-# 应用之前：把 tenant-workshopXX 替换成你自己的 namespace，
-# 把 ЗдесьВашПароль 替换成你自己设定的密码。
+# BEFORE APPLYING: replace tenant-workshopXX with your namespace,
+# and YourPasswordHere with a password of your own choosing.
 apiVersion: apps.cozystack.io/v1alpha1
 kind: MongoDB
 metadata:
   name: passes
   namespace: tenant-workshopXX
 spec:
-  # 单个副本。MongoDB 是为三节点的副本集设计的：它们投票选出谁是主节点，
-  # 并能承受其中一个的丢失。只有一个副本时没有别人可以一起投票，
-  # 因此 chart 为此启用了一个单独的“不安全”模式。用于实验足够了，
-  # 用于生产则不行。
+  # A single copy. MongoDB is designed for a replica set of three: they vote on which
+  # one is primary and survive the loss of one. With a single copy there is no one to
+  # vote with, and the chart enables a separate "unsafe" mode for that. Fine for a lab,
+  # not for production.
   replicas: 1
-  # 存放数据的磁盘。四份教学文档一兆字节就够了，但预留些余量的卷
-  # 会比日后再扩容更省事。
+  # Disk for the data. A megabyte would be enough for four training documents, but it is
+  # easier to take a volume with some headroom than to expand it later.
   size: 5Gi
-  # replicated —— 在集群另一个节点上有副本的卷：某个节点掉线时，
-  # 数据依然保留。
+  # replicated — volumes that have a copy on another node of the cluster: a node drops out,
+  # the data remains.
   storageClass: replicated
-  # 分配给数据库 pod 的 CPU 和内存。对四份文档来说绰绰有余。
+  # CPU and memory allocated to the database pod. More than enough for four documents.
   resourcesPreset: s1.small
-  # MongoDB 分支。事后在运行中的数据库上更改它，不经过升级是不可能的。
+  # MongoDB branch. Changing it after the fact on a live database is not possible without an upgrade.
   version: v8
-  # false —— 数据库只能从集群内部访问，不向外暴露端口。
-  # 你将从旁边运行的工作 pod 里访问它。
+  # false — the database is accessible only from inside the cluster, no port is exposed outward.
+  # You will access it from a work pod running next to it.
   external: false
-  # 分片会把数据切分到多组服务器上。当数据在单台服务器上放不下时才需要；
-  # 四张通行证是放得下的。
+  # Sharding splits the data across several sets of servers. Needed when
+  # the data does not fit on a single server; four passes do fit.
   sharding: false
-  # 数据库用户及其密码。请自己设定密码并记住它：工作 pod
-  #（在 MONGO_URI 连接字符串中）和校验脚本
-  #（MONGO_PASSWORD 变量）都需要它。账号是在服务数据库 admin 中创建的 ——
-  # 因此连接字符串中必须带上 authSource=admin。
+  # The database user and its password. Choose your own password and remember it: it is needed by
+  # the work pod (in the MONGO_URI connection string) and by the check script
+  # (the MONGO_PASSWORD variable). The account is created in the service database admin —
+  # which is why authSource=admin is mandatory in the connection string.
   users:
     passapp:
-      password: ЗдесьВашПароль
-  # passes 数据库及其中的权限：passapp 用户被授予该数据库的 admin 角色，
-  # 也就是说它可以读、写、构建索引以及更改集合设置。
-  # 这不会授予对其他数据库的任何权限。
+      password: YourPasswordHere
+  # The passes database and permissions in it: the passapp user is granted the admin role of this
+  # database, meaning it can read, write, build indexes and change collection settings.
+  # This grants no permissions on other databases.
   databases:
     passes:
       roles:
         admin:
           - passapp
-  # 备份到对象存储。在教学环境中已禁用。
+  # Backups to object storage. Disabled on the training stand.
   backup:
     enabled: false

@@ -1,61 +1,61 @@
 ---
-# 实验 13。Cozystack 目录的应用定义 —— 也就是那个「目录条目」。
+# Lab 13. Application definition for the Cozystack catalog — that very "catalog entry".
 #
-# 这个对象本身不部署任何东西。它把三样东西绑在一起：你的 chart
-# （部署什么）、API 中的一个新对象类型（如何下单该应用），以及仪表盘
-# 中的一张卡片（下单时用户看到什么）。在它存在之前，chart 只是一个
-# 平台一无所知的文件夹，而在 Postgres 和 Redis 旁边的应用列表里空空如也。
+# On its own this object deploys nothing. It ties together three things: your chart
+# (what to deploy), a new object type in the API (how the application is ordered) and a card
+# in the dashboard (what a person sees while doing so). Until it exists, the chart remains a folder
+# of files that the platform knows nothing about, and the application list next to Postgres and Redis is empty.
 #
-# 用一条命令应用，无需 namespace：
+# Applied with a single command, without a namespace:
 #   kubectl apply -f applicationdefinition.yaml
 #
-# 重要：这个对象是 CLUSTER-SCOPED（集群级）—— 它没有 namespace，整个集群
-# 只有一个。租户无法应用它，这一点已验证：
+# IMPORTANT: this object is CLUSTER-SCOPED — it has no namespace, there is one for the whole
+# cluster. A tenant CANNOT apply it, this is verified:
 #   kubectl auth can-i create applicationdefinitions   ->   no
-# 你的工作在文件写好并在本地校验完成后就结束了。
-# 由平台管理员来应用它。参见 README 中「你的权限到哪里为止」
-# 一节。
+# Your work ends once the file is written and checked locally.
+# The platform admin applies it. See the README, section "Where your
+# rights end".
 apiVersion: cozystack.io/v1alpha1
 kind: ApplicationDefinition
 metadata:
   name: guest-pass
 spec:
-  # --- 这在 API 中长什么样 ----------------------------------------------
+  # --- HOW THIS LOOKS IN THE API ----------------------------------------------
   application:
-    # 新对象类型的 Kind。应用之后，集群中会出现一个 kind: GuestPass，
-    # 你就可以用普通的 kubectl 操作它。
+    # Kind of the new object type. After applying, a kind: GuestPass will appear
+    # in the cluster, and you will be able to work with it using ordinary kubectl.
     kind: GuestPass
     plural: guestpasses
     singular: guestpass
-    # 值的 schema —— 与 chart 中 values.schema.json 文件里的那份相同，
-    # 只是写成了一行。API 用它来拒绝无效的值，
-    # 而仪表盘用它来渲染创建表单。
+    # Values schema — the same one that sits in the chart as the values.schema.json file,
+    # only written on a single line. The API uses it to reject invalid
+    # values, and the dashboard uses it to render the creation form.
     openAPISchema: |-
       {"title":"Chart Values","type":"object","properties":{"replicas":{"description":"Number of application replicas.","type":"integer","default":2},"greeting":{"description":"Text shown on the main page.","type":"string","default":"Order a pass for your guest"},"external":{"description":"Enable external access from outside the cluster.","type":"boolean","default":false},"resources":{"description":"Explicit CPU and memory configuration.","type":"object","default":{},"properties":{"cpu":{"description":"CPU available to each replica.","pattern":"^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$","anyOf":[{"type":"integer"},{"type":"string"}],"x-kubernetes-int-or-string":true},"memory":{"description":"Memory (RAM) available to each replica.","pattern":"^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$","anyOf":[{"type":"integer"},{"type":"string"}],"x-kubernetes-int-or-string":true}}}}}
 
-  # --- 部署什么 ----------------------------------------------
+  # --- WHAT TO DEPLOY ----------------------------------------------
   release:
-    # 释放名 = prefix + 对象名。一个名为 `main` 的 GuestPass 对象
-    # 会部署为名为 `guest-pass-main` 的 release。prefix 是必填的，其存在是
-    # 为了让不同应用的 release 不会因为重名而冲突。
+    # Release name = prefix + object name. A GuestPass object named `main`
+    # deploys as release `guest-pass-main`. The prefix is mandatory and exists
+    # so that releases of different applications do not clash by name.
     prefix: guest-pass-
     labels:
-      # Cozystack 用同一个 key 把租户的 release 分布到各个 Flux 分片上。
-      # 没有它，就没有谁来服务这个 release。
+      # With the same key Cozystack distributes tenant releases across Flux shards.
+      # Without it there will be no one to service the release.
       sharding.fluxcd.io/key: tenants
     chartRef:
-      # 从哪里获取 chart。允许的 kind：OCIRepository、HelmChart、
-      # ExternalArtifact。外部目录通常经由
-      # GitRepository -> HelmChart 引入，它们的 namespace 是 cozy-public。
+      # Where to take the chart from. Allowed kinds: OCIRepository, HelmChart,
+      # ExternalArtifact. External catalogs usually arrive via
+      # GitRepository -> HelmChart, and their namespace is cozy-public.
       kind: HelmChart
       name: cozystack-guest-pass
       namespace: cozy-public
 
-  # --- 这在仪表盘中长什么样 ------------------------------------------
+  # --- HOW THIS LOOKS IN THE DASHBOARD ------------------------------------------
   dashboard:
-    # 目录分区。使用的有：PaaS、IaaS、NaaS、Administration、
-    # Networking —— 取一个已有的，而不要自己发明，
-    # 否则应用会落到一个只有一项的分区里。
+    # Catalog section. Used: PaaS, IaaS, NaaS, Administration,
+    # Networking — take an existing one, do not invent your own,
+    # otherwise the application ends up in a section with a single item.
     category: PaaS
     singular: Guest Pass
     plural: Guest Passes
@@ -63,9 +63,9 @@ spec:
     tags:
       - internal
       - web
-    # 图标 —— base64 编码的 SVG。就是要 base64，不是路径也不是 URL：仪表盘
-    # 不会去任何地方下载任何东西。源文件就在旁边的 icon.svg 里。
+    # Icon — SVG in base64. Specifically base64, not a path and not a URL: the dashboard
+    # does not go anywhere to download anything. The source sits next to it in icon.svg.
     icon: PHN2ZyB3aWR0aD0iMTQ0IiBoZWlnaHQ9IjE0NCIgdmlld0JveD0iMCAwIDE0NCAxNDQiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxNDQiIGhlaWdodD0iMTQ0IiByeD0iMjQiIGZpbGw9IiMyRjZGRUQiLz4KPHJlY3QgeD0iMzAiIHk9IjQwIiB3aWR0aD0iODQiIGhlaWdodD0iNjQiIHJ4PSI4IiBmaWxsPSJ3aGl0ZSIvPgo8Y2lyY2xlIGN4PSI1NCIgY3k9IjY0IiByPSIxMSIgZmlsbD0iIzJGNkZFRCIvPgo8cGF0aCBkPSJNMzggOTJjMC05IDcuMi0xNCAxNi0xNHMxNiA1IDE2IDE0djRIMzh2LTR6IiBmaWxsPSIjMkY2RkVEIi8+CjxyZWN0IHg9Ijc4IiB5PSI1OCIgd2lkdGg9IjI2IiBoZWlnaHQ9IjYiIHJ4PSIzIiBmaWxsPSIjOURCQkY3Ii8+CjxyZWN0IHg9Ijc4IiB5PSI3MiIgd2lkdGg9IjI2IiBoZWlnaHQ9IjYiIHJ4PSIzIiBmaWxsPSIjOURCQkY3Ii8+CjxyZWN0IHg9Ijc4IiB5PSI4NiIgd2lkdGg9IjE4IiBoZWlnaHQ9IjYiIHJ4PSIzIiBmaWxsPSIjOURCQkY3Ii8+CjxyZWN0IHg9IjYyIiB5PSIyNCIgd2lkdGg9IjIwIiBoZWlnaHQ9IjIwIiByeD0iNiIgZmlsbD0iIzFCNENDMCIvPgo8L3N2Zz4K
-    # 对象的 YAML 表示中的字段顺序。这是外观上的小事，但没有它，
-    # 字段会杂乱地排列，表单读起来更差。
+    # Field order in the object's YAML representation. Cosmetic, but without it
+    # the fields line up haphazardly and the form reads worse.
     keysOrder: [["apiVersion"], ["kind"], ["metadata"], ["metadata", "name"], ["spec", "replicas"], ["spec", "greeting"], ["spec", "external"], ["spec", "resources"]]

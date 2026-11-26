@@ -1,9 +1,9 @@
-# Clúster de Kubernetes de formación para los labs 1-14.
-# Antes de aplicar, reemplace tenant-workshopXX por su propio namespace.
+# Training Kubernetes cluster for labs 1-14.
+# Before applying, replace tenant-workshopXX with your own namespace.
 #
-# Se aplica en el clúster de GESTIÓN — con el acceso que se entregó junto
-# con el tenant. El kubeconfig de este clúster todavía no existe: aparecerá
-# solo después de que el clúster se levante.
+# Applied on the MANAGEMENT cluster — using the access that was issued together
+# with the tenant. The kubeconfig of this cluster itself does not exist yet: it will
+# appear only after the cluster comes up.
 #
 #   kubectl apply -f cluster.yaml
 #
@@ -16,18 +16,18 @@ spec:
   version: v1.35
   storageClass: replicated
   controlPlane:
-    # Una sola copia del control plane: un banco de pruebas de formación, ahorrar
-    # recursos importa más que la tolerancia a fallos.
+    # A single copy of the control plane: a training stand, saving resources
+    # matters more than fault tolerance.
     replicas: 1
   addons:
     monitoringAgents:
-      # Habilitar de inmediato. La recolección de métricas no se puede habilitar de forma
-      # retroactiva: todo lo que ocurrió antes de marcar la casilla se pierde. El lab 14 depende de estos datos.
+      # Enable right away. Metrics collection cannot be enabled retroactively: everything
+      # that happened before the checkbox was set is lost. Lab 14 relies on this data.
       enabled: true
   nodeGroups:
     md0:
-      # El grupo puede añadir nodos por sí mismo si las copias empiezan a quedarse sin espacio.
-      # En el lab de escalado no llegará tan lejos: allí crecen las copias, no los nodos.
+      # The group can add nodes on its own if the copies start running out of space.
+      # In the scaling lab it won't get that far: there the copies grow, not the nodes.
       minReplicas: 1
       maxReplicas: 3
       instanceType: u1.medium

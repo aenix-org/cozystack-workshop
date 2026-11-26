@@ -70,11 +70,11 @@ kubectl get vminstance -n tenant-workshopXX
 ```bash
 cd ~/workshop
 ls manifests scripts
-grep -rl tenant-workshop manifests | head -1 | xargs grep -m1 namespace   # 자신의 번호가 보일 겁니다
+grep -rl tenant-workshop manifests | head -1 | xargs grep -m1 namespace   # you will see your number
 ```
 
 한 곳만 일부러 자리 표시자로 남겨 두었습니다: `manifests/03-app-vm.yaml`의
-`url: "ВСТАВЬТЕ_PRESIGNED_URL"` 줄입니다 — 이 링크는 두 번째 단계 이후에 얻어서 직접 채워 넣습니다.
+`url: "PASTE_PRESIGNED_URL"` 줄입니다 — 이 링크는 두 번째 단계 이후에 얻어서 직접 채워 넣습니다.
 
 자세히: [chat/10](chat/10-clone-and-set-number.md) ·
 파일 맵 [chat/11](chat/11-file-map.md)
@@ -140,7 +140,7 @@ kubectl get vminstance convert -n tenant-workshopXX -w
 virtctl console --namespace=tenant-workshopXX vm-instance-convert
 ```
 
-내부에서: `nano convert.sh`로 `scripts/convert.sh`의 내용을 붙여 넣고, `ВСТАВЬТЕ_...` 자리에
+내부에서: `nano convert.sh`로 `scripts/convert.sh`의 내용을 붙여 넣고, `PASTE_...` 자리에
 자신의 `bucketName`, `accessKey`, `secretKey`를 넣습니다.
 
 **저희 행사가 아니라 혼자서 워크숍을 진행하고 계신가요?** `convert.sh`의 `OVA_URL`은 워크숍 클라우드의 오브젝트 스토리지에 있는 데모 이미지를 가리킵니다. 행사 중에 이미지를 빠르게, 외부 트래픽 없이 내려받도록 그곳에 두지만, 워크숍이 끝나면 그 사본은 사라집니다. 링크를 공개 사본 `https://github.com/aenix-org/cozystack-workshop/releases/download/vmware-demo-ova/app-1.ova`(약 810 MB)이나 직접 준비한 OVA로 바꾸세요.
@@ -150,9 +150,9 @@ virtctl console --namespace=tenant-workshopXX vm-instance-convert
 둡니다:
 
 ```bash
-screen -S convert          # 별도 세션을 엽니다
-sudo bash convert.sh       # 그 세션 안에서 실행합니다
-#  연결이 끊겼나요? bastion에 다시 ssh로 접속한 뒤:  screen -r convert
+screen -S convert          # open a separate session
+sudo bash convert.sh       # run it inside that session
+#  connection dropped? ssh back into the bastion, then:  screen -r convert
 ```
 
 **이렇게 보여야 합니다:** 출력의 끝, `Share:`라는 단어 뒤에 — 이미지로 향하는 서명된 링크가 있습니다.
@@ -177,7 +177,7 @@ kubectl delete vminstance convert --namespace tenant-workshopXX
 kubectl delete vmdisk convert-tools --namespace tenant-workshopXX
 ```
 
-받은 링크를 `manifests/03-app-vm.yaml`의 `url: "ВСТАВЬТЕ_PRESIGNED_URL"` 자리에 넣은 뒤:
+받은 링크를 `manifests/03-app-vm.yaml`의 `url: "PASTE_PRESIGNED_URL"` 자리에 넣은 뒤:
 
 ```bash
 kubectl apply -f manifests/03-app-vm.yaml
@@ -267,13 +267,13 @@ curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/actuator/health
 `SCRAM authentication requires libpq version 10 or above`라고 응답합니다. 새 것을 설치합니다:
 
 ```bash
-# 1. PGDG 저장소 — PostgreSQL 패키지의 출처
+# 1. The PGDG repository — the source of PostgreSQL packages
 yum install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm
 
-# 2. libzstd: CentOS 7 저장소에 없으므로 EPEL 아카이브에서 가져옵니다
+# 2. libzstd: not in the CentOS 7 repositories, so we take it from the EPEL archive
 yum install -y https://archives.fedoraproject.org/pub/archive/epel/7/x86_64/Packages/l/libzstd-1.5.5-1.el7.x86_64.rpm
 
-# 3. 클라이언트 본체 — 살아 있는 pgdg15 저장소에서만
+# 3. The client itself — only from the live pgdg15 repository
 yum install -y --disablerepo='pgdg*' --enablerepo=pgdg15 postgresql15
 ```
 
@@ -293,7 +293,7 @@ psql --version
 스키마를 가져와서 적용합니다(이 app-VM은 인터넷에 닿으므로 파일이 내려받아집니다):
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/bastion/scripts/orders-schema.sql
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/bastion/scripts/orders-schema.sql
 
 PGPASSWORD='Orders2019!' psql \
   -h postgres-db-rw.tenant-workshopXX.svc.cozy.local -U orders -d orders \
@@ -348,13 +348,13 @@ curl -s https://app.workshopXX.workshop.aenix.io/api/orders
 > `virtctl port-forward`는 `vmi/<name>` 형식을 요구합니다.
 
 ```bash
-# app-VM에 로그인 (root / cozydemo)
+# log into the app-VM (root / cozydemo)
 virtctl console --namespace=tenant-workshopXX vm-instance-app-1
 
-# conversion-VM에 로그인 (ubuntu / ubuntu)
+# log into the conversion-VM (ubuntu / ubuntu)
 virtctl console --namespace=tenant-workshopXX vm-instance-convert
 
-# SSH로 app-VM 안의 셸 (머신의 네트워크가 올라온 뒤)
+# a shell inside the app-VM over SSH (once the machine's network is up)
 virtctl ssh ubuntu@vmi/vm-instance-app-1 --namespace=tenant-workshopXX
 ```
 

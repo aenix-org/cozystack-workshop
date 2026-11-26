@@ -1,17 +1,17 @@
 #!/bin/bash
-# माइग्रेट किया गया CentOS 7 इमेज एक स्टैटिक VMware IP रखता है (ifcfg-eth0 BOOTPROTO=static,
-# IPADDR=192.168.10.x, GATEWAY=192.168.10.1). इसके कारण VM pod-NIC पर नहीं है और
-# managed-सेवाओं को resolve नहीं करता (CoreDNS अनुपलब्ध). हम eth0 को DHCP पर स्विच करते हैं.
+# The migrated CentOS 7 image carries a static VMware IP (ifcfg-eth0 BOOTPROTO=static,
+# IPADDR=192.168.10.x, GATEWAY=192.168.10.1). Because of this the VM is not on the pod-NIC and does not
+# resolve managed services (CoreDNS unreachable). We switch eth0 to DHCP.
 #
-# app-VM (CentOS 7) के अंदर root के रूप में चलाएँ, फिर VM को पुनः आरंभ करें (डैशबोर्ड -> Restart).
-# बदलाव persistent है — यह रिबूट के बाद भी बना रहता है.
-# यह netplan नहीं है (वह Ubuntu का है) — CentOS 7 में नेटवर्क ifcfg-eth0 में होता है.
+# Run inside the app-VM (CentOS 7) as root, THEN restart the VM (dashboard -> Restart).
+# The change is persistent — it survives a reboot.
+# THIS IS NOT netplan (that is Ubuntu) — on CentOS 7 the network is in ifcfg-eth0.
 set -e
 IFCFG=/etc/sysconfig/network-scripts/ifcfg-eth0
 
-echo "== पहले =="; cat "$IFCFG"
+echo "== before =="; cat "$IFCFG"
 sed -i 's/^BOOTPROTO=.*/BOOTPROTO=dhcp/; /^IPADDR/d; /^GATEWAY/d; /^NETMASK/d; /^PREFIX/d; /^DNS/d' "$IFCFG"
 grep -q '^BOOTPROTO' "$IFCFG" || echo 'BOOTPROTO=dhcp' >> "$IFCFG"
-echo "== बाद में =="; cat "$IFCFG"
-echo "== eth0 को DHCP पर स्विच किया गया. अब VM को पुनः आरंभ करें: डैशबोर्ड -> Restart. =="
-echo "   रिबूट के बाद: eth0 को pod-NIC (10.244.x) मिलेगा, managed-सेवाएँ resolve होने लगेंगी."
+echo "== after =="; cat "$IFCFG"
+echo "== eth0 switched to DHCP. NOW restart the VM: dashboard -> Restart. =="
+echo "   After reboot: eth0 will get a pod-NIC (10.244.x), managed services will start resolving."

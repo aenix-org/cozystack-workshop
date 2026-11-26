@@ -7,7 +7,7 @@
 В репозитории два типа файлов, и запускаются они в разных местах.
 
 **Манифесты — `manifests/*.yaml`. Применяются с bastion.**
-Это описание того, что создать в кластере. Команда всегда одна: `kubectl apply -f <файл>`.
+Это описание того, что создать в кластере. Команда всегда одна: `kubectl apply -f <file>`.
 
 • `01-bucket.yaml` — хранилище под образ · шаг 1
 • `02-conversion-vm.yaml` — машина-конвертер · шаг 2
@@ -28,7 +28,7 @@
 В **машине-конвертере** есть сеть, поэтому она скачивает файл сама. Репозиторий
 открытый, ключи не нужны:
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/bastion/scripts/convert.sh
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/bastion/scripts/convert.sh
 ```
 
 В **вашей app-VM сети сначала нет вообще** — она и есть та поломка, которую мы чиним
@@ -40,5 +40,5 @@ curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-work
 ⚠️ **Номер тенанта в манифестах уже подставлен** — при подготовке виртуалки заглушки
 `tenant-workshopXX` заменены на ваш номер. Вписывать вручную ничего не нужно. Единственное,
 что вы заполняете сами, — это `bucketName`, `accessKey` и `secretKey` в `convert.sh`
-(он скачивается в конвертер свежим, с заглушками `ВСТАВЬТЕ_...`), и presigned-ссылку
+(он скачивается в конвертер свежим, с заглушками `PASTE_...`), и presigned-ссылку
 в `manifests/03-app-vm.yaml` на четвёртом шаге.

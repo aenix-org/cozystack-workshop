@@ -30,11 +30,11 @@ curl -s -o /dev/null -w '%{http_code}\n' localhost:8080/actuator/health
 # health
 curl -s https://app.workshopXX.workshop.aenix.io/actuator/health
 
-# 주문 생성
+# create an order
 curl -s -X POST https://app.workshopXX.workshop.aenix.io/api/orders \
   -H 'Content-Type: application/json' -d '{"item":"test"}'
 
-# 기록되었는지 확인
+# see that it was recorded
 curl -s https://app.workshopXX.workshop.aenix.io/api/orders
 ```
 

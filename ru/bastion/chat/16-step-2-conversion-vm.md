@@ -39,8 +39,8 @@ virtctl console --namespace=tenant-workshopXX vm-instance-convert
 
 **Доступ в машину-конвертер:**
 ```
-логин:  ubuntu
-пароль: ubuntu
+login:    ubuntu
+password: ubuntu
 ```
 
 Выйти из консоли — `Ctrl+]`. Если экран пустой, нажмите Enter.

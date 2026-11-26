@@ -27,7 +27,7 @@
 **変換用マシン**にはネットワークがあるので、自分でファイルをダウンロードします。リポジトリは
 公開されていて、鍵は不要です:
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/laptop/scripts/convert.sh
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/laptop/scripts/convert.sh
 ```
 
 **あなたの app-VM は最初はネットワークがまったくありません** — その壊れた状態こそ、

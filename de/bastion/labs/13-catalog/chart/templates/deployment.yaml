@@ -1,54 +1,54 @@
-# Lab 13. Deployment-Vorlage: was ausgeführt werden soll und in wie vielen Kopien.
+# Lab 13. Deployment template: what to run and in how many copies.
 #
-# Dateien in templates/ sind Vorlagen, keine fertigen Manifeste. Helm setzt Werte in sie ein
-# und übergibt das Ergebnis dem Cluster: `helm template main chart` zeigt den gerenderten Text, ohne
-# etwas anzuwenden, `helm install main chart` wendet es an.
+# Files in templates/ are blueprints, not ready-made manifests. Helm substitutes values into them
+# and hands the result to the cluster: `helm template main chart` shows the rendered text without
+# applying anything, `helm install main chart` applies it.
 #
-# Doppelte geschweifte Klammern sind eine Einsetzstelle. Darin findest du:
-#   .Values.name  — einen Parameterwert: aus values.yaml, wenn der Kunde ihn nicht angerührt hat,
-#                   oder aus dem Bestellformular im Dashboard, wenn er einen eigenen gewählt hat;
-#   .Release.Name — den Release-Namen, also den Namen einer konkreten Bereitstellung des Charts.
-# Text außerhalb der Klammern geht unverändert ins Manifest.
+# Double curly braces are a substitution point. Inside them you'll find:
+#   .Values.name  — a parameter value: from values.yaml if the customer didn't touch it,
+#                   or from the order form in the dashboard if they chose their own;
+#   .Release.Name — the release name, i.e. the name of a specific deployment of the chart.
+# Text outside the braces goes into the manifest as is.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  # Objektnamen werden aus dem Release-Namen zusammengesetzt, nicht fest verdrahtet. Derselbe Chart
-  # wird mehr als einmal in einen Namespace bereitgestellt, und ein fester Name würde bedeuten, dass
-  # die zweite Bestellung die erste überschreibt. Release `main` ergibt ein Deployment, einen Service und eine ConfigMap
-  # mit dem Namen `main` — der Name macht auf einen Blick deutlich, dass sie eine Gruppe sind.
+  # Object names are assembled from the release name, not hardcoded. The same chart
+  # is deployed into one namespace more than once, and a fixed name would mean the
+  # second order overwrites the first. Release `main` yields a Deployment, Service and ConfigMap
+  # named `main` — the name makes it obvious at a glance that they are one group.
   name: {{ .Release.Name }}
-  # Labels: name ist bei jeder Bestellung dieser Anwendung gleich, instance unterscheidet die Bestellungen.
-  # Objekte finden einander über sie, und danach wird auch die Ausgabe von `kubectl get` gefiltert.
+  # Labels: name is the same for every order of this application, instance distinguishes orders.
+  # Objects find each other by them, and `kubectl get` output is filtered by them too.
   labels:
     app.kubernetes.io/name: guest-pass
     app.kubernetes.io/instance: {{ .Release.Name }}
 spec:
-  # Wie viele Kopien laufend gehalten werden. Verschwindet eine Kopie, erstellt der Cluster eine neue,
-  # ohne zu fragen — daher Selbstheilung ohne diensthabenden Administrator.
+  # How many copies to keep running. If a copy disappears, the cluster creates a new one
+  # without asking — hence self-healing without an on-duty administrator.
   replicas: {{ .Values.replicas }}
-  # selector sagt dem Deployment, welche Pods als seine eigenen gelten — anhand von Labels, nicht von Namen.
-  # Die Labels hier und die Labels in template.metadata.labels müssen übereinstimmen. Weichen sie ab,
-  # findet das Deployment seine eigenen Kopien nicht und stanzt sie immer wieder aus.
+  # selector tells the Deployment which pods to consider its own — by labels, not by names.
+  # The labels here and the labels in template.metadata.labels must match. If they diverge,
+  # the Deployment doesn't find its own copies and stamps them out again and again.
   selector:
     matchLabels:
       app.kubernetes.io/name: guest-pass
       app.kubernetes.io/instance: {{ .Release.Name }}
-  # template ist die Pod-Vorlage. Alles darunter beschreibt nicht das Deployment selbst, sondern die
-  # Anwendungskopien, die es nach dieser Vorlage erstellt.
+  # template is the pod blueprint. Everything below describes not the Deployment itself, but the
+  # application copies it creates from this blueprint.
   template:
     metadata:
       labels:
         app.kubernetes.io/name: guest-pass
         app.kubernetes.io/instance: {{ .Release.Name }}
       annotations:
-        # Konfigurations-Hash in einer Pod-Annotation. Ohne ihn startet das Bearbeiten der ConfigMap die
-        # Pods nicht neu, und der neue Text erscheint nicht, bis jemand sie von Hand löscht.
-        # Das ist die häufigste Beschwerde über Charts überhaupt.
+        # Configuration hash in a pod annotation. Without it, editing the ConfigMap doesn't restart
+        # the pods, and the new text won't appear until someone deletes them by hand.
+        # This is the most common complaint about charts in general.
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
     spec:
-      # Die Anwendung läuft nicht als root und mit reduzierten Rechten. Ein Chart aus dem Katalog
-      # wird von fremden Tenants in ihren Namespaces bereitgestellt, und die Rechte des Containers sind Teil dessen,
-      # was du ihnen zusammen mit der Anwendung zusicherst.
+      # The application runs not as root and with reduced privileges. A chart from the catalog
+      # is deployed by other tenants in their namespaces, and the container's privileges are part of
+      # what you promise them along with the application.
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
@@ -60,45 +60,45 @@ spec:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # Das Image ist in der Vorlage festgeschrieben und bewusst nicht als Parameter herausgezogen: der Kunde
-          # wählt Größe und Text, tauscht aber nicht die Anwendung selbst gegen eine beliebige aus.
+          # The image is written in the template and deliberately not exposed as a parameter: the customer
+          # chooses the size and text, but does not swap the application itself for an arbitrary one.
           image: nginxinc/nginx-unprivileged:1.27-alpine
-          # Ohne diese Variable startet nginx einen Worker-Prozess pro Kern des Knotens.
-          # Auf einem Knoten mit mehreren Dutzend Kernen werden es Dutzende, und ein Pod mit einem
-          # Speicherlimit von hundert Megabyte stirbt mit OOMKilled noch vor der ersten Anfrage. Der Chart wird
-          # in fremde Tenants ausgeliefert, wo die Knoten beliebig sein können, daher ist das hier zwingend.
+          # Without this variable nginx starts one worker process per node core.
+          # On a node with several dozen cores there will be dozens of them, and a pod with a memory
+          # limit of a hundred megabytes will die with OOMKilled before the first request. The chart ships
+          # into other tenants, where nodes can be anything, so this is mandatory here.
           env:
             - name: NGINX_ENTRYPOINT_WORKER_PROCESSES_AUTOTUNE
               value: "1"
-          # Der Port innerhalb des Containers. Der Name http wird weiter unten in der Probe und im Service verwendet,
-          # damit die Portnummer an einer Stelle steht, nicht an dreien.
+          # The port inside the container. The name http is used further on in the probe and in the Service,
+          # so that the port number is recorded in one place, not in three.
           ports:
             - containerPort: 8080
               name: http
-          # requests — wie viel garantiert zugeteilt wird; anhand dieser Zahlen wählt der Scheduler
-          # einen Knoten. limits sind hier nur Speicher: wird es überschritten, wird der Container getötet
-          # und wieder hochgefahren. Ein CPU-Limit gibt es bewusst nicht, sonst stößt die Anwendung
-          # an eine Decke, statt einfach langsamer zu laufen.
-          # Der Filter `| quote` schließt den eingesetzten Wert in Anführungszeichen ein: der Benutzer
-          # kann 1 eingeben, und ohne Anführungszeichen ginge eine Zahl ins Manifest, wo eine Zeichenkette
-          # wie "1" oder "100m" erwartet wird.
+          # requests — how much to allocate guaranteed; the scheduler picks a node by these numbers.
+          # limits here are memory-only: exceed it and the container is killed and brought back up.
+          # There is deliberately no CPU limit, otherwise the application hits a ceiling instead
+          # of just running slower.
+          # The `| quote` filter wraps the substituted value in quotes: the user
+          # may enter 1, and without quotes a number would go into the manifest where a string
+          # like "1" or "100m" is expected.
           resources:
             requests:
               cpu: {{ .Values.resources.cpu | quote }}
               memory: {{ .Values.resources.memory | quote }}
             limits:
               memory: {{ .Values.resources.memory | quote }}
-          # readinessProbe — die Frage «bereit, Anfragen anzunehmen?». Solange /healthz nicht antwortet,
-          # sendet der Service keinen Traffic an diese Kopie. Daher Updates ohne Unterbrechung: die alte
-          # Kopie wird aus dem Balancing genommen, nachdem die neue geantwortet hat.
+          # readinessProbe — the question "ready to accept requests?". Until /healthz answers,
+          # the Service sends no traffic to this copy. Hence updates without interruption: the old
+          # copy is taken out of balancing after the new one has answered.
           readinessProbe:
             httpGet:
               path: /healthz
               port: http
             initialDelaySeconds: 2
-          # Die nginx-Seite und -Konfiguration werden als Dateien aus der ConfigMap eingehängt. subPath setzt
-          # genau eine Datei ein: ohne ihn würde das eingehängte Verzeichnis das gesamte /etc/nginx/
-          # conf.d ersetzen und die Standardeinstellungen des Images würden verschwinden.
+          # The nginx page and config are mounted as files from the ConfigMap. subPath substitutes
+          # exactly one file: without it the mounted directory would replace the entire /etc/nginx/
+          # conf.d and the image's stock settings would disappear.
           volumeMounts:
             - name: page
               mountPath: /usr/share/nginx/html/index.html
@@ -106,8 +106,8 @@ spec:
             - name: conf
               mountPath: /etc/nginx/conf.d/default.conf
               subPath: default.conf
-      # Der ConfigMap-Name wird aus dem Release-Namen zusammengesetzt, sodass der Pod immer die Konfiguration
-      # seiner eigenen Bestellung einhängt, nicht die eines Nachbarn.
+      # The ConfigMap name is assembled from the release name, so the pod always mounts the configuration
+      # of its own order, not a neighbor's.
       volumes:
         - name: page
           configMap:

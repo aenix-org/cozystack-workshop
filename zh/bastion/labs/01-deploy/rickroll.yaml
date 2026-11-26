@@ -1,27 +1,27 @@
-# 实验 1。整个 rickroll 教学应用都在一个文件里：nginx 配置、页面、
-# 部署本身，以及访问它的固定地址。四个对象，用 `---` 分隔。
+# Lab 1. The entire rickroll training application in a single file: nginx settings, the page,
+# the deployment itself, and a permanent address to reach it. Four objects separated by `---`.
 #
-# 应用在你的教学集群 `lab` 上，而不是管理集群上的租户里：
+# Applied on your training cluster `lab`, not in a tenant on the management cluster:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl apply -f rickroll.yaml
-# 这里没有 tenant-workshopXX 之类的占位符——无需在任何地方替换你的编号。
+# There are no placeholders like tenant-workshopXX here — you don't need to substitute your number anywhere.
 #
-# 在所有四个对象里重复出现的字段，这里统一讲一次：
-#   apiVersion — 该对象类型所在的 API 区块；
-#   kind       — 对象类型本身；
-#   metadata.name — 之后通过 `kubectl get` 查找对象所用的名字。
-# 名字在它自己的类型内唯一，所以下面的 Deployment 和 Service 都叫
-# rickroll 也不会冲突。
+# The fields that repeat across all four objects we go over once here:
+#   apiVersion — the API section this object type lives in;
+#   kind       — the object type itself;
+#   metadata.name — the name by which the object is later looked up via `kubectl get`.
+# The name is unique within its own type, so the Deployment and Service below are both called
+# rickroll and don't conflict.
 ---
-# nginx 配置。它在不同页面版本之间不变，所以单独拆出来。
-# ConfigMap — 一个独立存放在集群里的配置文件，启动时挂载
-# 到容器内部。意义在于修改配置而无需重新构建镜像。
-# `default.conf` 这个键会成为卷挂载目录下的文件名。
+# nginx settings. They don't change between page versions, so they're kept separate.
+# ConfigMap — a settings file that lives in the cluster on its own and is mounted
+# into the container at startup. The point is to change settings without rebuilding the
+# image. The `default.conf` key becomes the file name in the directory where the volume is mounted.
 #
-# `|` 之后缩进的所有内容都不是 YAML，而是文件的逐字内容。这个块里
-# 带井号的行会原样进入 nginx 配置，而不会在解析时消失。出于同样的
-# 原因，下面的页面块里没有加注释：
-# 那是 HTML，其中的井号会显示在用户屏幕上。
+# Everything below the indent after `|` is not YAML but the verbatim contents of the file. Lines
+# with a hash inside this block go into the nginx config as-is, rather than disappearing during
+# parsing. For the same reason no comments were added to the page block below:
+# it's HTML, and a hash in it would be visible to the user on the screen.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -33,8 +33,8 @@ data:
       root /usr/share/nginx/html;
 
       location / {
-        # 整个实验的精髓：nginx 把自己 pod 的名字直接替换进 HTML。
-        # pod 内部的 $hostname 就是 pod 名字。
+        # The whole gist of the lab: nginx substitutes its own pod's name right into the HTML.
+        # $hostname inside the pod is exactly the pod name.
         sub_filter '__POD__' '$hostname';
         sub_filter_once off;
       }
@@ -45,10 +45,10 @@ data:
       }
     }
 ---
-# 页面，版本 1。与配置分开成独立对象——以便在实验 4 里把应用
-# 切换到第二个版本，而不动 nginx 配置、也不重新构建镜像。
-# 名字里的 -v1 后缀不是装饰：旁边会出现 rickroll-page-v2，在两者之间
-# 切换卷就是发布新版本。
+# The page, version 1. A separate object from the settings — so that in lab 4 the application
+# can be switched to the second version without touching the nginx config or rebuilding the image.
+# The -v1 suffix in the name is not decoration: rickroll-page-v2 will appear next to it, and switching
+# the volume between them is exactly what rolling out a new version is.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -76,13 +76,13 @@ data:
     </style>
     <h1>Never Gonna Give You Up</h1>
     <p class="lyr">Never gonna let you down &middot; Never gonna run around and desert you</p>
-    <div class="pod">为您服务的 Pod<b>__POD__</b></div>
-    <p class="hint">刷新页面。当副本变多时，名字就会开始变化。</p>
+    <div class="pod">served by pod<b>__POD__</b></div>
+    <p class="hint">Refresh the page. Once there are more replicas, the name will start changing.</p>
     </html>
 ---
-# 应用本身。Deployment 描述期望状态——运行哪个镜像、
-# 保持多少个副本、更新时如何替换它们。之后集群自己把
-# 现实调整到与该描述一致，并持续监控，而不是只在创建时做一次。
+# The application itself. A Deployment describes the desired state — which image to run,
+# how many copies to keep, how to replace them during an update. The cluster then brings
+# reality into line with this description and watches it continuously, not just once at creation.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -90,28 +90,28 @@ metadata:
   labels:
     app: rickroll
 spec:
-  # 保持运行多少个副本。措辞是刻意的：不是「运行一个」，
-  # 而是「保持一个」。副本消失了——集群会不问自主地创建新的。在实验 3 里
-  # 这个字段会由自动伸缩来改动，所以之后不再用手去动它。
+  # How many copies to keep running. The wording is deliberate: not "run one",
+  # but "keep one". A copy disappears — the cluster creates a new one without asking. In lab 3
+  # this same field starts being changed by autoscaling, so you don't touch it by hand anymore.
   replicas: 1
-  # Deployment 靠哪个标签把 pod 认作自己的。这里的标签和下面 template 里的
-  # 标签必须一致：不一致的话对象根本不会被创建。
+  # By which label the Deployment considers pods its own. The label here and the label in the template
+  # below must match: on a mismatch the object won't be created at all.
   selector:
     matchLabels:
       app: rickroll
-  # pod 模板——每个副本都以它为模具冲压出来。改动 template 内的任何字段
-  # 都意味着应用的新修订版，并逐个替换副本（这正是实验 4）。
-  # 改动 template 之外的字段（例如 replicas）不会创建修订版。
+  # The pod template — every copy is stamped from it. Editing any field inside template
+  # means a new revision of the application and replacing copies one by one (that's exactly lab 4).
+  # Editing fields outside template (for example, replicas) does not create a revision.
   template:
     metadata:
       labels:
-        # 同样的标签也贴在 pod 本身上：文件末尾的 Service 靠它找到它们。
+        # The same label sits on the pods themselves: the Service at the end of the file finds them by it.
         app: rickroll
     spec:
-      # 整个 pod 层面上 `restricted` 安全配置的要求：不以 root
-      # 运行、指定的 UID，以及标准的 seccomp 配置。在启用了 `restricted` 的
-      # 企业集群里，缺少这些字段的 pod 不会被准入运行，
-      # 而且拒绝发生在 pod 创建的那一刻，而不是 apply 清单时。
+      # Requirements of the `restricted` security profile at the level of the whole pod: running
+      # not as root, a specific UID, and the standard seccomp profile. In a corporate
+      # cluster with `restricted` enabled, a pod without these fields won't be admitted to run,
+      # and the rejection comes at the moment the pod is created, not when the manifest is applied.
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
@@ -119,77 +119,77 @@ spec:
           type: RuntimeDefault
       containers:
         - name: nginx
-          # 同样的严格性，但在容器层面：内部的进程被禁止
-          # 提升自己的权限，并且被剥夺了所有 linux 能力。
+          # The same strictness, but at the container level: the process inside is forbidden
+          # to escalate its privileges, and all linux capabilities are taken away from it.
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # 非特权变体：监听 8080 并且不以 root 运行。
-          # 单凭这点对 `baseline` 配置就够了，但对 `restricted` 不够——后者需要
-          # pod 和容器上都有明确的 securityContext，它们已在上面设置。在
-          # 企业集群里通常启用的正是 `restricted`。
+          # An unprivileged variant: listens on 8080 and runs not as root.
+          # This alone is enough for the `baseline` profile, but not for `restricted` — that one needs
+          # explicit securityContext on the pod and on the container, they're set above. In a
+          # corporate cluster it's usually `restricted` that's enabled.
           image: nginxinc/nginx-unprivileged:1.27-alpine
-          # 默认情况下 nginx 会按节点核数每核启动一个工作进程。在单核的教学
-          # 机器上就是一个进程，但在有 64 核的生产节点上就是 64 个，
-          # 内存限额很小的 pod 会在第一个请求到来前就以 OOMKilled 崩溃。
-          # 自动调优按 CPU 限额计算工作进程数：300m 时就是一个进程。
-          # 通过环境变量，而不是通过 -g：该指令已在镜像的基础
-          # 配置里，第二次声明会让 nginx 以「duplicate」错误崩溃。
+          # By default nginx spins up one worker process per node core. On a training
+          # machine with a single core that's one process, but on a production node with 64 cores it's 64,
+          # and a pod with a small memory limit crashes with OOMKilled before the first request.
+          # Autotune counts workers by the CPU limit: at 300m that's one process.
+          # Via an environment variable, not via -g: the directive is already in the image's base
+          # config, and a second declaration crashes nginx with a "duplicate" error.
           env:
             - name: NGINX_ENTRYPOINT_WORKER_PROCESSES_AUTOTUNE
               value: "1"
-          # 给端口起了名字，而不只是编号：下面的 readinessProbe
-          # 和 Service 的 targetPort 都引用 `http`。改编号——只需改一处。
+          # The port is given a name, not just a number: `http` is referenced by the readinessProbe
+          # below and by the Service's targetPort. Change the number — you edit it in one place.
           ports:
             - containerPort: 8080
               name: http
-          # 两个经常被混淆的不同东西。requests — 保证预留多少
-          # 资源；调度器据它挑选节点，实验 3 里的
-          # 自动伸缩也据它按百分比计算负载。
-          # limits — 不允许超过的上限：CPU 到顶时
-          # 会被限流，内存到顶时会杀掉容器。
+          # Two different things that are constantly confused. requests — how much of a resource
+          # to reserve guaranteed; by it the scheduler picks a node, and off it
+          # the autoscaling in lab 3 also computes load in percent.
+          # limits — the ceiling you're not allowed to go above: on the CPU when pushed
+          # they throttle you, on memory they kill the container.
           resources:
-            # 刻意设得极小：工作坊上会有很多这样的应用。
-            # 20m 是一核的百分之二。这个值故意压低：requests 越小，
-            # 负载越快冲过阈值，实验 3 里副本的增长
-            # 几秒内就能看到，而不是半小时。
+            # Deliberately tiny: at the workshop there will be many such applications.
+            # 20m is two hundredths of a core. The value is low on purpose: the smaller the
+            # requests, the faster the load overshoots the threshold and the growth of copies in lab 3
+            # is visible in seconds, not in half an hour.
             requests:
               cpu: 20m
               memory: 32Mi
             limits:
               cpu: 300m
               memory: 128Mi
-          # 就绪检查。在这个地址返回响应之前，集群不会
-          # 把流量路由到该副本。为了它，nginx 配置里专门设了一个
-          # 返回「ok」的 location /healthz。正是这个字段换来了实验 4 里的
-          # 零停机发布：只有在新副本响应之后，旧副本才被关闭。
-          # 去掉它——更新就会开始丢请求。
+          # Readiness check. Until a response comes back from this address, the cluster does not
+          # route traffic to the copy. For its sake a separate location /healthz with an "ok" response
+          # is set up in the nginx config. This field is what pays for the zero-downtime rollout
+          # in lab 4: the old copy is shut down only after the new one has responded.
+          # Remove it — and the update will start dropping requests.
           readinessProbe:
             httpGet:
               path: /healthz
               port: http
-            # 第一次探测前等两秒——经验得来的。更少没
-            # 意义，nginx 启动就要这么久；更多则会白白拉长每次发布。
+            # Two seconds before the first knock — arrived at through experience. Less makes no
+            # sense, nginx takes that long to start; more would stretch out every rollout for nothing.
             initialDelaySeconds: 2
-          # 把 ConfigMap 的内容放到容器内部的哪里。目录不是随意
-          # 选的：nginx 从第一个目录提供文件，从第二个目录读取配置。
-          # 没有这两行，两个 ConfigMap 就只会躺在集群里，
-          # 而 nginx 会显示它的默认页面。
+          # Where to place the ConfigMap contents inside the container. The directories are chosen
+          # not arbitrarily: from the first nginx serves files, from the second it reads settings.
+          # Without these two lines both ConfigMaps would just sit in the cluster,
+          # and nginx would show its default page.
           volumeMounts:
             - name: page
               mountPath: /usr/share/nginx/html
             - name: conf
               mountPath: /etc/nginx/conf.d
-      # 给 pod 挂接哪些 ConfigMap。这里的卷名把它和上面 volumeMounts 里的
-      # 条目绑定起来——绑定靠的是名字必须一致，顺序对绑定无所谓。
-      # 但对实验 4 有所谓，见下面的警告。
+      # Which ConfigMaps to attach to the pod. The volume name here ties it to the entry
+      # in volumeMounts above — it's the names that must match, the order doesn't matter for the tie.
+      # But for lab 4 it does matter, see the warning below.
       volumes:
-        # 警告：这个卷必须是第一个（volumes[0]）。
-        # 实验 4 通过按索引打补丁来切换页面版本。
-        # JSON Patch 按编号而不是名字定位列表元素。把卷调换
-        # 位置——补丁就会悄悄替换掉 nginx 配置而不是页面，应用
-        # 会崩溃，而错误信息说的完全是另一回事。
+        # WARNING: this volume must be first (volumes[0]).
+        # Lab 4 switches the page version with a patch by index.
+        # JSON Patch addresses a list element by number, not by name. Swap the volumes
+        # around — and the patch will silently replace the nginx settings instead of the page, the application
+        # will break, and the error message will be talking about something else entirely.
         - name: page
           configMap:
             name: rickroll-page-v1
@@ -197,23 +197,23 @@ spec:
           configMap:
             name: rickroll-conf
 ---
-# 应用的固定地址。副本生生灭灭、地址不断变化，但集群内部的名字
-# `rickroll` 保持不变——邻居们就是用它来称呼这个应用的。
-# 这个名字背后活着的副本清单，集群靠标签自己维护。
+# The permanent address of the application. Copies are born and die, their addresses change, but the name
+# `rickroll` inside the cluster stays the same — that's what neighbors call the application by.
+# The list of live copies behind this name the cluster maintains itself, by labels.
 apiVersion: v1
 kind: Service
 metadata:
   name: rickroll
 spec:
-  # 把谁放到这个地址后面：所有带这个标签的 pod，不论是谁
-  # 创建的。由此有个典型的烦恼——一个带 app: rickroll 标签的野 pod
-  # 会悄悄进入负载均衡，开始回应你的用户。本文件夹里的
-  # check.sh 脚本会单独检查没有这种冒名者。
+  # Who to put behind this address: all pods with such a label, whoever they were
+  # created by. Hence a typical annoyance — a stray pod with the label app: rickroll
+  # will silently end up in the balancing and start answering your users. The script
+  # check.sh in this folder separately verifies that there are no such impostors.
   selector:
     app: rickroll
   ports:
-    # port — 服务自身在哪个端口应答，targetPort — 它敲进 pod 的
-    # 哪里。这里 targetPort 用容器里端口的名字设置，而不是数字：改
-    # 容器里的编号——你就不用改这个文件。
+    # port — on which port the service itself answers, targetPort — where it knocks into
+    # the pod. Here targetPort is set by the name of the port from the container, not by a number: change
+    # the number in the container — and you won't have to edit this file.
     - port: 80
       targetPort: http

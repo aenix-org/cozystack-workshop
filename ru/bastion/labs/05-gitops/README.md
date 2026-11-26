@@ -60,10 +60,10 @@
 ## Что лежит в папке лабы
 
 Все файлы уже у вас — вы забрали их вместе с репозиторием. Создавать и печатать заново
-ничего не нужно: там, где ниже написано `kubectl apply -f имя.yaml`, файл берётся отсюда.
+ничего не нужно: там, где ниже написано `kubectl apply -f name.yaml`, файл берётся отсюда.
 
 ```bash
-# Дальше все команды выполняются отсюда: пути в `kubectl apply -f` отсчитываются от этой папки.
+# From here on, all commands run from this folder: the paths in `kubectl apply -f` are relative to it.
 cd labs/05-gitops
 ```
 
@@ -95,11 +95,11 @@ cd labs/05-gitops
 Заберите репозиторий к себе:
 
 ```bash
-# clone = скачать репозиторий целиком, вместе со всей историей правок. Вы получаете
-# не доступ к общей папке, а свою полную копию на диске: работать с ней можно и без сети.
-# `ВАШ-ЛОГИН` замените на свой логин на GitHub, иначе команда пойдёт в чужой репозиторий.
-git clone https://github.com/ВАШ-ЛОГИН/passes-gitops.git
-# clone создаёт папку с именем репозитория. Дальше работаем изнутри неё.
+# clone = download the repository in full, together with its entire edit history. You get
+# not access to a shared folder but your own full copy on disk: you can work with it offline.
+# Replace `YOUR-LOGIN` with your own GitHub login, or the command will go to someone else's repository.
+git clone https://github.com/YOUR-LOGIN/passes-gitops.git
+# clone creates a folder named after the repository. From here on we work inside it.
 cd passes-gitops
 ```
 
@@ -111,12 +111,12 @@ cd passes-gitops
 их в свой репозиторий, в папку `apps`:
 
 ```bash
-# apps — папка, из которой Flux будет забирать описания. Имя выбрано нами, и ровно оно же
-# указано в настройке Flux, поэтому менять его без нужды не стоит.
-#   -p  не считать ошибкой, если папка уже существует
+# apps — the folder Flux will pull descriptions from. We chose the name, and it's the exact
+# same one named in the Flux configuration, so there's no reason to change it without cause.
+#   -p  don't treat it as an error if the folder already exists
 mkdir -p apps
-# Копируем оба файла из материалов воркшопа (они лежат в ~/workshop) к себе
-# в репозиторий; `*.yaml` возьмёт оба файла разом.
+# Copy both files from the workshop materials (they live in ~/workshop) into your own
+# repository; `*.yaml` will take both files at once.
 cp ~/workshop/labs/05-gitops/app/*.yaml apps/
 ```
 
@@ -201,13 +201,13 @@ spec:
 команд три, и каждая делает своё:
 
 ```bash
-# add = отметить файлы, которые войдут в следующую запись истории.
+# add = mark the files that will go into the next history entry.
 git add apps
-# commit = сохранить отмеченное одной записью: содержимое, автор, время и причина.
-#   -m "..."  та самая причина. Она останется в истории навсегда, и её будут читать.
-# Коммит пока лежит только у вас на виртуалке — в GitHub его ещё нет.
+# commit = save what's marked as one entry: contents, author, time, and reason.
+#   -m "..."  that very reason. It stays in the history forever, and people will read it.
+# The commit lives only on your bastion for now — it's not yet in GitHub.
 git commit -m "add passes service v1"
-# push = отправить накопленные коммиты в GitHub. До этой команды там ничего не изменится.
+# push = send the accumulated commits to GitHub. Until this command, nothing there changes.
 git push
 ```
 
@@ -230,36 +230,36 @@ Flux — это несколько служб внутри вашего клас
 macOS:
 
 ```bash
-# Homebrew возьмёт формулу из репозитория проекта Flux и положит один исполняемый файл.
+# Homebrew takes the formula from the Flux project's repository and drops one executable file.
 brew install fluxcd/tap/flux
 ```
 
 Linux:
 
 ```bash
-# Скрипт с сайта Flux определяет вашу архитектуру и кладёт файл в /usr/local/bin.
-#   -s          curl работает молча, без индикатора загрузки
-#   | sudo bash скачанный текст сразу выполняется с правами администратора — из-за
-#               записи в системную папку они и нужны
+# The script from the Flux site detects your architecture and drops the file into /usr/local/bin.
+#   -s          curl works silently, without a download indicator
+#   | sudo bash the downloaded text is executed straight away with administrator rights — they're
+#               needed because of the write into a system folder
 curl -s https://fluxcd.io/install.sh | sudo bash
 ```
 
 Windows (PowerShell, если установлен Chocolatey):
 
 ```powershell
-# choco — сторонний менеджер пакетов для Windows; ставит тот же один файл flux.exe.
+# choco — a third-party package manager for Windows; it installs the same single flux.exe file.
 choco install flux
 ```
 
 Теперь ставим сами службы в кластер:
 
 ```bash
-# Задаём файл доступа: команда ниже создаёт объекты в кластере, и важно, в каком именно.
+# Set the access file: the command below creates objects in the cluster, and it matters in which one.
 export KUBECONFIG=~/lab.kubeconfig
-# flux install заводит в кластере namespace `flux-system` и разворачивает в нём службы.
-#   --components=...  какие именно ставить:
-#     source-controller     ходит в Git и держит у себя свежую копию репозитория
-#     kustomize-controller  применяет скачанное в кластер и следит за расхождениями
+# flux install sets up a `flux-system` namespace in the cluster and deploys the services into it.
+#   --components=...  which ones exactly to install:
+#     source-controller     reaches into Git and keeps a fresh copy of the repository
+#     kustomize-controller  applies what was downloaded to the cluster and watches for divergences
 flux install --components=source-controller,kustomize-controller
 ```
 
@@ -281,8 +281,8 @@ Helm-чарты и слать уведомления в мессенджеры �
 Убедитесь, что службы поднялись:
 
 ```bash
-# -n flux-system — namespace, в котором поселился Flux. Без этого ключа kubectl смотрит
-# в namespace по умолчанию и покажет пустоту.
+# -n flux-system — the namespace Flux settled into. Without this flag kubectl looks in the
+# default namespace and shows nothing.
 kubectl get pods -n flux-system
 ```
 
@@ -294,8 +294,8 @@ kubectl get pods -n flux-system
 Всё то же самое ставится обычным манифестом, без инструмента:
 
 ```bash
-# Тот же набор служб, но готовым описанием: -f принимает не только путь на диске,
-# но и ссылку. kubectl скачает файл и применит его содержимое.
+# The same set of services, but as a ready-made description: -f accepts not only a path on disk
+# but also a link. kubectl will download the file and apply its contents.
 kubectl apply -f https://github.com/fluxcd/flux2/releases/latest/download/install.yaml
 ```
 
@@ -313,10 +313,10 @@ kubectl apply -f https://github.com/fluxcd/flux2/releases/latest/download/instal
 Flux установлен, но он пока не знает, куда ходить. Скажем ему это двумя объектами.
 
 Откройте `flux/gitrepository.yaml` из папки этой лабы и подставьте адрес **своего**
-репозитория вместо заглушки `ЗАМЕНИТЕ-МЕНЯ`:
+репозитория вместо заглушки `REPLACE-ME`:
 
 ```yaml
-  url: https://github.com/ЗАМЕНИТЕ-МЕНЯ/passes-gitops
+  url: https://github.com/REPLACE-ME/passes-gitops
 ```
 
 <details>
@@ -328,7 +328,7 @@ Flux установлен, но он пока не знает, куда ходи
 kind: GitRepository
 spec:
   interval: 1m
-  url: https://github.com/ЗАМЕНИТЕ-МЕНЯ/passes-gitops
+  url: https://github.com/REPLACE-ME/passes-gitops
   ref:
     branch: main
 ```
@@ -382,18 +382,18 @@ spec:
 Применяем оба:
 
 ```bash
-# -f указывает на папку, а не на файл: применятся все манифесты, которые в ней лежат, —
-# и GitRepository, и Kustomization. Оба создаются в namespace flux-system.
+# -f points at a folder, not a file: all the manifests in it will be applied —
+# both GitRepository and Kustomization. Both are created in the flux-system namespace.
 kubectl apply -f flux/
 ```
 
 Смотрим, что получилось:
 
 ```bash
-# Спрашиваем у Flux состояние сверки.
-#   --watch  держать окно занятым и обновлять строку по мере изменений
-# READY: True означает, что содержимое репозитория доехало до кластера и применилось.
-# REVISION — ветка и короткий идентификатор коммита, который сейчас применён.
+# We ask Flux about the reconciliation state.
+#   --watch  keep the window busy and refresh the line as things change
+# READY: True means the repository's contents reached the cluster and were applied.
+# REVISION — the branch and the short identifier of the commit currently applied.
 flux get kustomizations --watch
 ```
 
@@ -408,8 +408,8 @@ passes   main@sha1:a1b2c3d   False      True   Applied revision: main@sha1:a1b2c
 Прервите наблюдение по `Ctrl+C` и посмотрите, что появилось в кластере:
 
 ```bash
-# all — сокращение для основных типов объектов сразу: поды, Deployment, Service и прочее.
-# Namespace `passes` вы не создавали руками: он приехал из репозитория вместе с приложением.
+# all — a shorthand for the main object types at once: Pods, Deployment, Service, and the rest.
+# You didn't create the `passes` namespace by hand: it arrived from the repository along with the application.
 kubectl get all -n passes
 ```
 
@@ -436,7 +436,7 @@ spec:
 Отправляйте:
 
 ```bash
-# Те же три шага, что и при первой отправке: отметить файл, сохранить с причиной, отправить.
+# The same three steps as in the first send: mark the file, save with a reason, send.
 git add apps/passes.yaml
 git commit -m "passes: two replicas so the gate does not go dark during rollout"
 git push
@@ -445,8 +445,8 @@ git push
 Теперь смотрите на кластер и ждите:
 
 ```bash
-# -w = «следи и дописывай»: окно остаётся занятым, новая строка появляется каждый раз,
-# когда меняется состояние копий. Выход — Ctrl+C.
+# -w = "watch and keep appending": the window stays busy, a new line appears every time
+# the state of the copies changes. Exit with Ctrl+C.
 kubectl get pods -n passes -w
 ```
 
@@ -455,10 +455,10 @@ kubectl get pods -n passes -w
 Не хочется ждать минуту — можно попросить Flux сверить прямо сейчас:
 
 ```bash
-# reconcile = «сверься прямо сейчас, не дожидаясь очередной минуты».
-#   kustomization passes  какой объект сверять
-#   --with-source         сначала сходить в Git за свежим коммитом и только потом применять;
-#                         без этого флага сверка пойдёт по копии, скачанной раньше
+# reconcile = "reconcile right now, without waiting for the next minute."
+#   kustomization passes  which object to reconcile
+#   --with-source         first go to Git for the fresh commit and only then apply;
+#                         without this flag the reconciliation goes off the copy downloaded earlier
 flux reconcile kustomization passes --with-source
 ```
 
@@ -467,9 +467,9 @@ rollout` — это причина. Через полгода, когда кто
 одна», ответ найдётся за пять секунд:
 
 ```bash
-# log = история коммитов, свежие сверху.
-#   --oneline         по одной строке на коммит: короткий идентификатор и текст причины
-#   apps/passes.yaml  показать только коммиты, которые трогали именно этот файл
+# log = the history of commits, freshest on top.
+#   --oneline         one line per commit: a short identifier and the reason text
+#   apps/passes.yaml  show only the commits that touched this exact file
 git log --oneline apps/passes.yaml
 ```
 
@@ -482,8 +482,8 @@ git log --oneline apps/passes.yaml
 Ночь, инцидент, сервису не хватает копий. Вы делаете то, что делали всегда:
 
 ```bash
-# Меняем количество копий прямо в кластере, минуя Git, — как делали до сегодняшнего дня.
-#   -n passes  приложение живёт в этом namespace, без ключа команда его не найдёт
+# Change the number of copies right in the cluster, bypassing Git — as you did until today.
+#   -n passes  the application lives in this namespace; without the flag the command won't find it
 kubectl scale deployment passes -n passes --replicas=5
 ```
 
@@ -494,14 +494,14 @@ deployment.apps/passes scaled
 Сработало. Проверяем:
 
 ```bash
-# Колонка READY читается как «готово/заказано»: сколько копий отвечает и сколько их должно быть.
+# The READY column reads as "ready/ordered": how many copies respond and how many there should be.
 kubectl get deployment passes -n passes
 ```
 
 Пять копий. Подождите минуту и посмотрите ещё раз:
 
 ```bash
-# Та же команда. Разница только в том, что между двумя запусками прошла минута.
+# The same command. The only difference is that a minute passed between the two runs.
 kubectl get deployment passes -n passes
 ```
 
@@ -555,15 +555,15 @@ passes   2/2     2            2           8m
 что-то немедленно и обсуждать некогда. Для таких случаев Flux умеет приостанавливаться:
 
 ```bash
-# suspend = приостановить сверку для этого объекта. Flux перестаёт приводить кластер
-# к описанию, и ручные изменения начинают жить. Содержимое Git при этом не меняется.
+# suspend = pause reconciliation for this object. Flux stops bringing the cluster to the
+# description, and manual changes start to live. The contents of Git don't change meanwhile.
 flux suspend kustomization passes
 ```
 
 После этого сверка не идёт, и руками можно всё. Обратно:
 
 ```bash
-# resume = снова включить сверку. Ближайшая же сверка уберёт всё, что сделано руками.
+# resume = turn reconciliation back on. The very next reconciliation removes everything done by hand.
 flux resume kustomization passes
 ```
 
@@ -596,8 +596,8 @@ flux resume kustomization passes
 между вашим `push` и кластером сейчас нет — в этом и суть шага.
 
 ```bash
-# Те же add, commit, push. Причина в коммите написана честно — она пригодится через
-# пять минут, когда изменение придётся отменять.
+# The same add, commit, push. The reason in the commit is written honestly — it'll come in handy
+# in five minutes, when the change has to be undone.
 git add apps/passes.yaml
 git commit -m "passes: trim memory limit"
 git push
@@ -606,7 +606,7 @@ git push
 Ждём и смотрим:
 
 ```bash
-# Следим за копиями, пока сверка не принесёт новое описание.
+# Watch the copies until the reconciliation brings the new description.
 kubectl get pods -n passes -w
 ```
 
@@ -616,7 +616,7 @@ kubectl get pods -n passes -w
 влезает в четыре мегабайта и умирает сразу после старта.
 
 ```bash
-# Тот же список, но одним снимком, без слежения.
+# The same list, but as a single snapshot, without watching.
 kubectl get pods -n passes
 ```
 
@@ -631,7 +631,7 @@ passes-7f8a1b2c3-qq7lp    0/1     CrashLoopBackOff   3          90s
 **Как вы откатывались бы раньше:**
 
 ```bash
-# undo вернул бы Deployment к предыдущей ревизии — к настройкам, что были до правки.
+# undo would return the Deployment to the previous revision — to the settings from before the edit.
 kubectl rollout undo deployment/passes -n passes
 ```
 
@@ -642,11 +642,11 @@ kubectl rollout undo deployment/passes -n passes
 **Не делайте `rollout undo`. Откатывайте там, где живёт истина** — в Git:
 
 ```bash
-# revert = добавить новый коммит, который отменяет изменения указанного.
-#   HEAD       «последний коммит текущей ветки» — тот самый, с плохим лимитом
-#   --no-edit  не открывать редактор для текста коммита, Git напишет заголовок сам
+# revert = add a new commit that undoes the changes of the specified one.
+#   HEAD       "the last commit of the current branch" — the very one with the bad limit
+#   --no-edit  don't open an editor for the commit message; Git writes the header itself
 git revert --no-edit HEAD
-# Пока отменяющий коммит не отправлен в GitHub, Flux о нём не знает.
+# Until the reverting commit is sent to GitHub, Flux knows nothing about it.
 git push
 ```
 
@@ -654,9 +654,9 @@ git push
 limit"`, а через минуту в кластере снова две работающие копии.
 
 ```bash
-# Копии снова поднимаются: рабочий лимит памяти вернулся.
+# The copies come up again: the working memory limit is back.
 kubectl get pods -n passes
-# А здесь видно, какой коммит сейчас применён, — он должен совпасть с отменяющим.
+# And here you can see which commit is applied now — it should match the reverting one.
 flux get kustomizations
 ```
 
@@ -668,7 +668,7 @@ flux get kustomizations
 откатили.
 
 ```bash
-# -4 — показать четыре последних коммита; верхний самый свежий.
+# -4 — show the four most recent commits; the top one is the freshest.
 git log --oneline -4
 ```
 
@@ -703,9 +703,9 @@ c71a4f9 passes: two replicas so the gate does not go dark during rollout
 Заведите ветку под изменение:
 
 ```bash
-# checkout -b = завести новую ветку и сразу перейти в неё. Ветка — отдельная линия
-# изменений: коммиты, сделанные в ней, в `main` не попадают, а значит и в кластер тоже.
-#   passes/version-line  имя ветки; косая черта в имени разрешена и служит для группировки
+# checkout -b = start a new branch and switch to it right away. A branch is a separate line
+# of changes: commits made in it don't reach `main`, and therefore don't reach the cluster either.
+#   passes/version-line  the branch name; a slash in the name is allowed and serves for grouping
 git checkout -b passes/version-line
 ```
 
@@ -715,9 +715,9 @@ git checkout -b passes/version-line
 ```bash
 git add apps/passes.yaml
 git commit -m "passes: bump the version shown on the page"
-# origin — имя, под которым Git помнит адрес, откуда вы клонировали репозиторий.
-#   -u origin passes/version-line  создать ветку с таким же именем в GitHub и запомнить
-#                                  связь с ней, чтобы дальше хватало голого `git push`
+# origin — the name under which Git remembers the address you cloned the repository from.
+#   -u origin passes/version-line  create a branch of the same name in GitHub and remember
+#                                  the link with it, so that a bare `git push` is enough later
 git push -u origin passes/version-line
 ```
 
@@ -735,10 +735,10 @@ git push -u origin passes/version-line
 в кластер. Через минуту открываем туннель и смотрим, что отдаёт сервис:
 
 ```bash
-# port-forward = временный туннель с виртуалки внутрь кластера.
-#   -n passes     namespace, в котором живёт сервис
-#   svc/passes    куда ведём: в Service, а не в конкретную копию
-#   8080:80       слева порт на виртуалке, справа порт сервиса внутри кластера
+# port-forward = a temporary tunnel from the bastion into the cluster.
+#   -n passes     the namespace the service lives in
+#   svc/passes    where we lead: to the Service, not a specific copy
+#   8080:80       on the left the port on the bastion, on the right the service's port inside the cluster
 kubectl port-forward -n passes svc/passes 8080:80
 ```
 
@@ -773,10 +773,10 @@ kubectl port-forward -n passes svc/passes 8080:80
 📍 **Где:** на виртуалке, в том же окне терминала, где вы работали с `kubectl`.
 
 ```bash
-# Возвращаемся в папку лабы: скрипт лежит там, а вы работали в папке своего репозитория.
+# Return to the lab folder: the script lives there, and you worked in your own repository's folder.
 cd labs/05-gitops
 export KUBECONFIG=~/lab.kubeconfig
-# Скрипт ничего не меняет в кластере: только читает состояние и печатает отчёт.
+# The script changes nothing in the cluster: it only reads the state and prints a report.
 ./check.sh
 ```
 
@@ -792,8 +792,8 @@ export KUBECONFIG=~/lab.kubeconfig
 ему, где лежит клон:
 
 ```bash
-# LAB_REPO — переменная, из которой скрипт узнаёт, где лежит клон вашего репозитория.
-# Путь подставьте свой, если клонировали не в домашнюю папку.
+# LAB_REPO — the variable from which the script learns where the clone of your repository lives.
+# Put in your own path if you cloned it somewhere other than the home folder.
 export LAB_REPO=~/passes-gitops
 ./check.sh
 ```
@@ -809,8 +809,8 @@ export LAB_REPO=~/passes-gitops
 Когда закончите со всеми лабами, убрать всё разом можно так:
 
 ```bash
-# delete kustomization = убрать объект сверки из кластера.
-#   --silent  не переспрашивать подтверждение
+# delete kustomization = remove the reconciliation object from the cluster.
+#   --silent  don't ask for confirmation again
 flux delete kustomization passes --silent
 ```
 

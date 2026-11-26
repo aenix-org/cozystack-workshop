@@ -23,7 +23,7 @@ virtctl port-forward --namespace=tenant-workshopXX vmi/vm-instance-app-1 8080:80
 ```
 不要关掉运行这条命令的窗口：隧道只在它持续运行时才存在。
 
-⚠️ **这里 `vmi/` 是必需的，而在 `virtctl console` 里正相反 —— 它反而碍事。** 这不是笔误，也不是我们的随性：这两条命令的目标写法不一样。`port-forward` 要求 `类型/名称`，缺了前缀就会回答 `target must contain type and name separated by '/'`。`console` 期望只给名称，带了前缀就会回答 `forbidden`，因为它把 `vmi` 这个词当成了机器的名字。
+⚠️ **这里 `vmi/` 是必需的，而在 `virtctl console` 里正相反 —— 它反而碍事。** 这不是笔误，也不是我们的随性：这两条命令的目标写法不一样。`port-forward` 要求 `type/name`，缺了前缀就会回答 `target must contain type and name separated by '/'`。`console` 期望只给名称，带了前缀就会回答 `forbidden`，因为它把 `vmi` 这个词当成了机器的名字。
 
 如果 virtctl 抱怨客户端和集群之间版本不一致 —— 那是一个警告，不是错误，也不碍事。
 
@@ -35,14 +35,14 @@ kubectl port-forward -n tenant-workshopXX <pod-name-from-output> 8080:8080
 
 在另一个终端窗口里：
 ```bash
-# 健康检查
+# health
 curl -s http://localhost:8080/actuator/health
 
-# 创建一个订单
+# create an order
 curl -s -X POST http://localhost:8080/api/orders \
   -H 'Content-Type: application/json' -d '{"item":"test"}'
 
-# 看看它是否被记录下来了
+# see that it was recorded
 curl -s http://localhost:8080/api/orders
 ```
 

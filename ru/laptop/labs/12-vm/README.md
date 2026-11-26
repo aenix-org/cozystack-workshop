@@ -32,7 +32,7 @@
 
 ## Что лежит в папке лабы
 
-Все файлы уже у вас — вы забрали их вместе с репозиторием. Создавать и печатать заново ничего не нужно: там, где ниже написано `kubectl apply -f имя.yaml`, файл берётся отсюда.
+Все файлы уже у вас — вы забрали их вместе с репозиторием. Создавать и печатать заново ничего не нужно: там, где ниже написано `kubectl apply -f name.yaml`, файл берётся отсюда.
 
 ```bash
 cd labs/12-vm
@@ -94,7 +94,7 @@ ssh_pwauth: true
 write_files:
   - path: /opt/directory/index.html
     content: |
-      <!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Справочник</title></head><body><h1>Справочник сотрудников</h1><ul><li>Иванов И. — 101</li><li>Петров П. — 102</li></ul></body></html>
+      <!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Directory</title></head><body><h1>Staff directory</h1><ul><li>Whitfield J. — 101</li><li>Petersen P. — 102</li></ul></body></html>
   - path: /etc/systemd/system/directory.service
     content: |
       [Unit]
@@ -115,12 +115,12 @@ runcmd: [ "systemctl daemon-reload", "systemctl enable --now directory" ]
 **То же самое текстом.** Оба объекта, диск и машина, лежат в одном файле `staff-directory-vm.yaml` и создаются одной командой: сначала диск, потом машина. Перед применением откройте файл и замените в нём заглушку `tenant-workshopXX` на имя своего тенанта — иначе объекты уедут не туда.
 
 ```bash
-# KUBECONFIG — переменная, из которой kubectl берёт адрес кластера и данные для входа.
-# Здесь нужен ТЕНАНТНЫЙ файл доступа: виртуалка живёт в тенанте на управляющем кластере.
+# KUBECONFIG is the variable kubectl reads the cluster address and login data from.
+# Here you need the TENANT access file: the VM lives in the tenant on the management cluster.
 export KUBECONFIG=~/.kube/workshop
-# apply = «приведи кластер к тому, что написано в файле». Нет объектов — создаст,
-# есть — доведёт до описанного состояния.
-#   -f   читать описание из файла
+# apply = "bring the cluster to what's written in the file". No objects — it creates them,
+# objects present — it brings them to the described state.
+#   -f   read the description from a file
 kubectl apply -f staff-directory-vm.yaml
 ```
 
@@ -205,8 +205,8 @@ cloud-init — стандартный механизм первичной нас
 Ведущий заранее опубликовал справочник: в вашем тенанте уже есть `Ingress spravochnik` с хостом `spravochnik.workshopXX.workshop.aenix.io` и `Service spravochnik-http`, который ведёт на порт 8080 внутри машины. Публикация готова принять справочник, как только тот начнёт отвечать. Проверим её прямо сейчас, не дожидаясь, пока машина догрузится.
 
 ```bash
-# curl — «сходи по адресу и покажи ответ». XX замените на свой номер тенанта.
-#   --max-time 5   сдаться через 5 секунд, а не ждать долго
+# curl — "go to the address and show the response". Replace XX with your own tenant number.
+#   --max-time 5   give up after 5 seconds instead of waiting a long time
 curl --max-time 5 http://spravochnik.workshopXX.workshop.aenix.io
 ```
 
@@ -251,16 +251,16 @@ curl --max-time 5 http://spravochnik.workshopXX.workshop.aenix.io
 
 **Тот же вход из терминала.** `virtctl` — отдельная команда для работы с виртуальными машинами: консоль, проброс порта, включение и выключение. Ставится одним файлом, как именно — написано в `workshop/README.md`.
 
-Одну особенность её синтаксиса стоит разобрать заранее, иначе первая же команда вернёт отказ. Цель у `virtctl` указывается не голым именем, а с префиксом типа: `vmi/<имя>`. `vmi` — это virtual machine instance, **запущенный экземпляр** машины; объект `VMInstance`, который вы создали, и работающий экземпляр — это два разных объекта в API. Под тенантным доступом права выданы на **subresource** `virtualmachineinstances` (`console` и `portforward`), а не на объекты `virtualmachines` целиком, — голое имя бьёт в vm-объект и вернёт `forbidden`. Имя экземпляра платформа складывает из префикса `vm-instance-` и имени вашей машины: `spravochnik` — это экземпляр `vm-instance-spravochnik`.
+Одну особенность её синтаксиса стоит разобрать заранее, иначе первая же команда вернёт отказ. Цель у `virtctl` указывается не голым именем, а с префиксом типа: `vmi/<name>`. `vmi` — это virtual machine instance, **запущенный экземпляр** машины; объект `VMInstance`, который вы создали, и работающий экземпляр — это два разных объекта в API. Под тенантным доступом права выданы на **subresource** `virtualmachineinstances` (`console` и `portforward`), а не на объекты `virtualmachines` целиком, — голое имя бьёт в vm-объект и вернёт `forbidden`. Имя экземпляра платформа складывает из префикса `vm-instance-` и имени вашей машины: `spravochnik` — это экземпляр `vm-instance-spravochnik`.
 
 ```bash
-# тенантный доступ: машина живёт в тенанте
+# tenant access: the machine lives in the tenant
 export KUBECONFIG=~/.kube/workshop
-# console = подключиться к последовательной консоли машины. Это тот же экран, что даёт
-# «Open Console» в vSphere, только текстовый:
-#   --namespace  в каком разделе кластера искать; у вашего тенанта он называется
-#                tenant- плюс ваш логин, XX замените на свой номер
-#   vmi/...      цель: запущенный экземпляр машины, а не описание VMInstance
+# console = connect to the machine's serial console. It's the same screen that
+# "Open Console" gives you in vSphere, only text-based:
+#   --namespace  which section of the cluster to look in; for your tenant it's called
+#                tenant- plus your login, replace XX with your own number
+#   vmi/...      the target: the running instance of the machine, not the VMInstance description
 virtctl console --namespace=tenant-workshopXX vmi/vm-instance-spravochnik
 ```
 
@@ -269,9 +269,9 @@ virtctl console --namespace=tenant-workshopXX vmi/vm-instance-spravochnik
 Изнутри это обычная Ubuntu. Убедитесь, что справочник поднялся:
 
 ```bash
-uname -a                       # ядро и архитектура: та же строка, что и на железном сервере
-systemctl status directory     # служба справочника: должна быть active (running)
-curl -s localhost:8080 | head  # та же страница, но запрошенная изнутри самой машины
+uname -a                       # kernel and architecture: the same line as on a bare-metal server
+systemctl status directory     # the directory service: should be active (running)
+curl -s localhost:8080 | head  # the same page, but requested from inside the machine itself
 ```
 
 Если `systemctl status directory` показывает `active (running)`, а `curl` на `localhost:8080` вернул HTML со списком сотрудников — сервер готов, и публикация снаружи вот-вот сменит `503` на страницу. Никаких следов Kubernetes внутри нет и не должно быть: гость не знает, что он в кластере, — ровно как виртуалке в vSphere не нужно знать про vCenter.
@@ -289,7 +289,7 @@ curl http://spravochnik.workshopXX.workshop.aenix.io
 **Что вы должны увидеть** — HTML страницы справочника:
 
 ```html
-<h1>Справочник сотрудников</h1><ul><li>Иванов И. — 101</li><li>Петров П. — 102</li></ul>
+<h1>Staff directory</h1><ul><li>Whitfield J. — 101</li><li>Petersen P. — 102</li></ul>
 ```
 
 Откройте этот адрес в браузере — увидите тот же список. Справочник виден снаружи по человеческому доменному имени, с HTTPS от платформы, без единой заявки в сеть и на сертификат.
@@ -307,12 +307,12 @@ curl http://spravochnik.workshopXX.workshop.aenix.io
 Скрипт проверяет не наличие объектов, а работу по существу: по доменному имени приходит `200` и это страница справочника, сама машина запущена, а публикующий её `Ingress` на месте. Проверка по домену работает и без доступа к тенанту — ей хватает `curl`; тенантный доступ добавляет проверки состояния машины.
 
 ```bash
-# тенантный доступ: отсюда скрипт возьмёт саму виртуальную машину и Ingress
+# tenant access: from here the script takes the VM itself and the Ingress
 export KUBECONFIG=~/.kube/workshop
-# ваш логин без слова tenant-: из него скрипт соберёт и имя раздела tenant-workshopXX,
-# и доменное имя spravochnik.workshopXX.workshop.aenix.io
+# your login without the word tenant-: from it the script builds both the section name tenant-workshopXX
+# and the domain name spravochnik.workshopXX.workshop.aenix.io
 export COZY_TENANT=workshopXX
-# ./ перед именем означает «файл из текущей папки», то есть из labs/12-vm
+# the ./ before the name means "the file from the current folder", i.e. from labs/12-vm
 ./check.sh
 ```
 

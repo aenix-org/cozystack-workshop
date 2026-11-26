@@ -170,8 +170,8 @@ lab क्लस्टर में नहीं।** ये दो अलग-�
 यह फ़ाइल **lab क्लस्टर में नहीं** बल्कि टेनेंट में लागू होती है:
 
 ```bash
-# --kubeconfig एक्सेस फ़ाइल का नाम स्पष्ट रूप से देता है और KUBECONFIG वेरिएबल को ओवरराइड करता है।
-# इसलिए ऑर्डर प्रबंधन क्लस्टर पर टेनेंट में जाता है, lab क्लस्टर में नहीं।
+# --kubeconfig names the access file explicitly and overrides the KUBECONFIG variable.
+# So the order goes to the tenant on the management cluster, not to the lab cluster.
 kubectl --kubeconfig ~/.kube/config apply -f clickhouse.yaml
 ```
 
@@ -213,22 +213,22 @@ chendpoint-clickhouse-analytics.tenant-workshopXX.svc.cozy.local:8123
 कार्यशील Pod को उठाएँ। अपना टेनेंट नंबर और अपना पासवर्ड डालें:
 
 ```bash
-# यहाँ से आगे सब कुछ lab क्लस्टर में होता है, इसलिए हम kubectl को उस पर स्विच करते हैं।
+# Everything from here happens in the lab cluster, so we switch kubectl to it.
 export KUBECONFIG=~/lab.kubeconfig
-# run दी गई इमेज से एक अकेला Pod बनाता है — क्लस्टर के भीतर एक फेंक देने लायक छोटी मशीन।
-# इमेज में curl आता है, और इतना काफ़ी है: एक अलग ClickHouse क्लाइंट की ज़रूरत नहीं पड़ेगी।
-#   --restart=Never  अंदर की कमांड ख़त्म होने पर इसे दोबारा न उठाएँ
-#   --env=CH_URL     स्टोरेज के HTTP इंटरफ़ेस का पता; अंत का स्लैश ज़रूरी है
-#   --env=CH_AUTH    साधारण HTTP प्रमाणन के लिए "user:password" जोड़ा
-#   --command --     दो डैश के बाद सब कुछ वह कमांड है जिसे Pod चलाएगा
-# sleep 86400 = "एक दिन तक कुछ न करो": Pod केवल एक कार्य-क्षेत्र के रूप में चाहिए।
+# run creates a single Pod from the given image — a disposable little machine inside the cluster.
+# The image ships curl, and that's enough: a separate ClickHouse client won't be needed.
+#   --restart=Never  don't bring it up again when the command inside finishes
+#   --env=CH_URL     the address of the storage's HTTP interface; the trailing slash is required
+#   --env=CH_AUTH    the "user:password" pair for ordinary HTTP authentication
+#   --command --     everything after the two dashes is the command the Pod will run
+# sleep 86400 = "do nothing for a day": the Pod is needed only as a workspace.
 kubectl run ch-workbench \
   --image=curlimages/curl:8.11.1 \
   --restart=Never \
   --env=CH_URL="http://chendpoint-clickhouse-analytics.tenant-workshopXX.svc.cozy.local:8123/" \
   --env=CH_AUTH="analyst:YourPasswordHere" \
   --command -- sleep 86400
-# wait टर्मिनल को तब तक रोकता है जब तक Pod शुरू न हो जाए, पर दो मिनट से ज़्यादा नहीं।
+# wait holds the terminal until the Pod starts, but no longer than two minutes.
 kubectl wait --for=condition=Ready pod/ch-workbench --timeout=120s
 ```
 
@@ -272,9 +272,9 @@ ClickHouse तक पहुँचने के लिए आपको किस�
 </details>
 
 ```bash
-# हम ch परिभाषित करते हैं — एक लंबी कमांड का छोटा नाम। यहाँ से "ch" का मतलब: ClickHouse को
-# वह SQL भेजो जो मानक इनपुट पर आता है, और जवाब को एक टेबल के रूप में दिखाओ।
-# यह नाम तब तक ज़िंदा रहता है जब तक आप यह टर्मिनल विंडो बंद न करें; नई विंडो में इसे दोबारा परिभाषित करें।
+# We define ch — a short name for a long command. From here "ch" means: send to
+# ClickHouse the SQL that arrives on standard input, and show the answer as a table.
+# The name lives until you close this terminal window; in a new window define it again.
 ch() {
   kubectl exec -i ch-workbench -- sh -c \
     'curl -sS -u "$CH_AUTH" --data-binary @- "$CH_URL?default_format=PrettyCompact"'
@@ -284,8 +284,8 @@ ch() {
 आइए कनेक्शन जाँचें:
 
 ```bash
-# echo एक स्ट्रिंग छापता है, | उसे ch के इनपुट में पास करता है। SELECT version() सबसे सस्ती
-# संभव क्वेरी है: सर्वर डिस्क से कुछ नहीं पढ़ता, वह बस अपना वर्शन बता देता है।
+# echo prints a string, | passes it to ch's input. SELECT version() is the cheapest
+# query possible: the server reads nothing from disk, it just names its version.
 echo 'SELECT version()' | ch
 ```
 
@@ -299,8 +299,8 @@ echo 'SELECT version()' | ch
 Windows PowerShell उपयोगकर्ता, आपका वर्शन:
 
 ```powershell
-# $input — बाईं ओर पाइपलाइन से फ़ंक्शन में जो आया।
-# पंक्ति के अंत में बैकटिक कमांड को अगली पंक्ति पर जारी रखता है।
+# $input — what came into the function through the pipeline on the left.
+# The backtick at the end of a line continues the command onto the next line.
 function ch {
   $input | kubectl exec -i ch-workbench -- sh -c `
     'curl -sS -u "$CH_AUTH" --data-binary @- "$CH_URL?default_format=PrettyCompact"'
@@ -320,19 +320,19 @@ function ch {
 <summary><b>स्कीमा को पंक्ति दर पंक्ति देखते हैं</b></summary>
 
 ```sql
--- IF NOT EXISTS — अगर टेबल पहले से मौजूद है तो शिकायत न करो। फ़ाइल दो बार लागू की जा सकती है।
+-- IF NOT EXISTS — don't complain if the table already exists. The file can be applied twice.
 CREATE TABLE IF NOT EXISTS passes
 (
-    pass_id      UInt64,                 -- पास नंबर
-    created_at   DateTime,               -- व्यक्ति टर्नस्टाइल से कब गुज़रा
-    guest_name   String,                 -- मेहमान का नाम: हर किसी का अपना
-    host_dept    LowCardinality(String), -- मेज़बान का विभाग: कुछ ही मान
-    entrance     LowCardinality(String), -- प्रवेश द्वार: तीन हैं
-    pass_type    LowCardinality(String), -- एकबारगी, साप्ताहिक, वाहन
-    duration_min UInt16                  -- मेहमान अंदर कितने मिनट रुका
+    pass_id      UInt64,                 -- the pass number
+    created_at   DateTime,               -- when the person went through the turnstile
+    guest_name   String,                 -- the guest's name: everyone's is their own
+    host_dept    LowCardinality(String), -- the host's department: few values
+    entrance     LowCardinality(String), -- the entrance: there are three
+    pass_type    LowCardinality(String), -- one-time, weekly, vehicle
+    duration_min UInt16                  -- how many minutes the guest stayed inside
 )
-ENGINE = MergeTree               -- कैसे संग्रहित करें: डिस्क पर हिस्से, पृष्ठभूमि में मर्जिंग
-ORDER BY (created_at, entrance)  -- डेटा किस क्रम में रखें; यही इंडेक्स भी है
+ENGINE = MergeTree               -- how to store: parts on disk, merging in the background
+ORDER BY (created_at, entrance)  -- what order to put the data in; also the index
 ```
 
 `UInt64`, `UInt16` — 8 और 2 बाइट के अचिह्नित (unsigned) पूर्णांक। ClickHouse में आप किसी टाइप का आकार
@@ -375,8 +375,8 @@ ORDER BY (created_at, entrance)
 **इसे लागू करें।**
 
 ```bash
-# < फ़ाइल पढ़कर उसे ch के इनपुट में देता है, यानी फ़ाइल की सामग्री एक ही क्वेरी में
-# ClickHouse को भेज देता है। CREATE TABLE खाली जवाब लौटाता है — यही सफलता है।
+# < reads the file and feeds it to ch's input, that is, sends the file's contents
+# to ClickHouse in a single query. CREATE TABLE returns an empty answer — that is success.
 ch < 01-schema.sql
 ```
 
@@ -434,8 +434,8 @@ FROM numbers(1000000)
 ⚠️ ClickHouse में ऐरे-इंडेक्सिंग एक से शुरू होती है, शून्य से नहीं। इसीलिए `1 + …`।
 
 ```sql
-    ['उत्तरी', 'उत्तरी', 'उत्तरी',
-     'दक्षिणी', 'दक्षिणी', 'पश्चिमी'][1 + cityHash64(number, 'entrance') % 6] AS entrance
+    ['North', 'North', 'North',
+     'South', 'South', 'West'][1 + cityHash64(number, 'entrance') % 6] AS entrance
 ```
 
 एक असमान वितरण के लिए वही तरकीब: उत्तरी प्रवेश-द्वार को आधा प्रवाह मिलता है, दक्षिणी को एक-तिहाई, पश्चिमी को
@@ -457,8 +457,8 @@ FROM numbers(1000000)
 **इसे लागू करें।**
 
 ```bash
-# फ़ाइल में एक अकेला INSERT … SELECT है: ClickHouse स्वयं दस लाख पंक्तियाँ गढ़ेगा और उन्हें लिख देगा,
-# सर्वर को छोड़े बिना।
+# The file holds a single INSERT … SELECT: ClickHouse will invent a million rows itself and write them,
+# without ever leaving the server.
 ch < 02-generate.sql
 ```
 
@@ -468,7 +468,7 @@ ch < 02-generate.sql
 आइए जाँचें कि हमें क्या मिला:
 
 ```bash
-# बिना शर्तों के count() इस सवाल का जवाब देता है कि "टेबल में कुल कितनी पंक्तियाँ हैं।"
+# count() with no conditions answers the question "how many rows are in the table in total."
 echo 'SELECT count() FROM passes' | ch
 ```
 
@@ -486,16 +486,16 @@ echo 'SELECT count() FROM passes' | ch
 <summary><b>रिपोर्ट को पंक्ति दर पंक्ति देखते हैं</b></summary>
 
 ```sql
--- डेटा में आने वाले हर महीने के लिए एक रिपोर्ट-पंक्ति।
+-- One report row for each month that occurs in the data.
 SELECT
-    toStartOfMonth(created_at)          AS month,        -- इसे किस महीने को सौंपना है
-    count()                             AS guests,       -- उसमें कितने प्रवेश
-    round(avg(duration_min))            AS avg_minutes,  -- औसत मुलाक़ात अवधि
-    topK(1)(toHour(created_at))[1]      AS peak_hour,    -- आगमन का सबसे बारंबार घंटा
-    topK(1)(entrance)[1]                AS busiest_entrance  -- सबसे बारंबार प्रवेश-द्वार
+    toStartOfMonth(created_at)          AS month,        -- which month to assign it to
+    count()                             AS guests,       -- how many entries in it
+    round(avg(duration_min))            AS avg_minutes,  -- average visit duration
+    topK(1)(toHour(created_at))[1]      AS peak_hour,    -- the most frequent hour of arrival
+    topK(1)(entrance)[1]                AS busiest_entrance  -- the most frequent entrance
 FROM passes
-GROUP BY month   -- एक महीने की सारी पंक्तियों को एक अकेली जवाब-पंक्ति में समेटो
-ORDER BY month   -- महीनों को आरोही क्रम में निकालो
+GROUP BY month   -- collapse all rows of one month into a single answer row
+ORDER BY month   -- output the months in ascending order
 ```
 
 `toStartOfMonth` एक सटीक समय को महीने के पहले दिन में बदल देता है। अवधि के अनुसार समूहन की एक क्लासिक तरकीब:
@@ -514,8 +514,8 @@ ORDER BY month   -- महीनों को आरोही क्रम म�
 **इसे लागू करें।**
 
 ```bash
-# पूरी टेबल पर एक समूहन। जवाब में उतनी ही पंक्तियाँ होंगी जितने महीने
-# डेटा में आते हैं।
+# One grouping over the whole table. The answer will have as many rows as there are months
+# that occur in the data.
 ch < 03-report.sql
 ```
 
@@ -525,16 +525,16 @@ ch < 03-report.sql
 देता है:
 
 ```bash
-# <<'SQL' … SQL — बिना किसी फ़ाइल के, किसी कमांड के इनपुट में बहु-पंक्ति टेक्स्ट पास करने का तरीका।
-# SQL के इर्द-गिर्द कोट का मतलब है "सामग्री को ज्यों का त्यों छोड़ो": वरना शेल
-# क्वेरी के भीतर के अक्षरों को अपने अक्षरों के रूप में समझने की कोशिश करेगा।
+# <<'SQL' … SQL — a way to pass multi-line text to a command's input, without a file.
+# The quotes around SQL mean "leave the contents alone": otherwise the shell would try
+# to interpret the characters inside the query as its own.
 ch <<'SQL'
--- वही रिपोर्ट, दो कॉलम तक छाँटी गई: महीना और मेहमानों की संख्या।
+-- The same report, trimmed to two columns: month and guest count.
 SELECT toStartOfMonth(created_at) AS month, count() AS guests
 FROM passes
 GROUP BY month
 ORDER BY month
-FORMAT JSON  -- जवाब टेबल के रूप में नहीं बल्कि JSON के रूप में लौटाओ: उसमें एक आँकड़ा-ब्लॉक होता है
+FORMAT JSON  -- return the answer not as a table but as JSON: it contains a statistics block
 SQL
 ```
 
@@ -595,15 +595,15 @@ SQL
 
 ```bash
 ch <<'SQL'
--- हम ClickHouse से ही पूछते हैं कि टेबल का हर कॉलम कितनी जगह लेता है।
+-- We ask ClickHouse itself how much space each column of the table takes.
 SELECT
-    name,                                                    -- कॉलम का नाम
-    formatReadableSize(data_compressed_bytes)   AS on_disk,  -- डिस्क पर कितना बैठता है
-    formatReadableSize(data_uncompressed_bytes) AS raw,      -- संपीड़न के बिना कितना होता
-    round(data_uncompressed_bytes / data_compressed_bytes, 1) AS ratio  -- कितने गुना संपीड़ित हुआ
-FROM system.columns   -- एक सिस्टम टेबल: इसमें ClickHouse ख़ुद को वर्णित करता है
-WHERE database = currentDatabase() AND table = 'passes'   -- केवल हमारी टेबल
-ORDER BY data_compressed_bytes DESC   -- सबसे भारी कॉलम ऊपर
+    name,                                                    -- the column's name
+    formatReadableSize(data_compressed_bytes)   AS on_disk,  -- how much sits on disk
+    formatReadableSize(data_uncompressed_bytes) AS raw,      -- how much it would be without compression
+    round(data_uncompressed_bytes / data_compressed_bytes, 1) AS ratio  -- how many times it compressed
+FROM system.columns   -- a system table: in it ClickHouse describes itself
+WHERE database = currentDatabase() AND table = 'passes'   -- only our table
+ORDER BY data_compressed_bytes DESC   -- the heaviest columns on top
 SQL
 ```
 
@@ -655,8 +655,8 @@ host_dept     52.3 KiB   1.10 MiB  21.4
 
 ```bash
 ch <<'SQL'
--- हम सौ मिनट से लंबी मुलाक़ातें गिनते हैं। क्वेरी सात में से एक कॉलम का नाम लेती है — तो
--- उसे टेबल का केवल एक छोटा हिस्सा पढ़ना चाहिए। हम इसे bytes_read से जाँचेंगे।
+-- We count visits longer than a hundred minutes. The query names one column out of seven — so
+-- it should read only a small part of the table. We'll check that by bytes_read.
 SELECT count() FROM passes WHERE duration_min > 100 FORMAT JSON
 SQL
 ```
@@ -665,8 +665,8 @@ SQL
 
 ```bash
 ch <<'SQL'
--- हम सारे कॉलमों का असंपीड़ित आयतन जोड़ते हैं। ठीक यही "कुल कितना डेटा है" है —
--- वह आँकड़ा जिससे पिछले आउटपुट के bytes_read की तुलना की जानी चाहिए।
+-- We sum the uncompressed volume of all columns. That's exactly "how much data there is in total" —
+-- the figure that bytes_read from the previous output should be compared against.
 SELECT formatReadableSize(sum(data_uncompressed_bytes)) AS total
 FROM system.columns
 WHERE database = currentDatabase() AND table = 'passes'
@@ -709,17 +709,17 @@ SQL
 ```bash
 ch <<'SQL'
 SELECT
-    hour,                                     -- दिन का घंटा
-    guests,                                   -- इस घंटे पर कितने प्रवेश पड़े
-    bar(guests, 0, max(guests) OVER (), 50) AS chart  -- छद्म-ग्राफ़िक्स का एक बार
+    hour,                                     -- the hour of the day
+    guests,                                   -- how many entries fell on this hour
+    bar(guests, 0, max(guests) OVER (), 50) AS chart  -- a bar of pseudo-graphics
 FROM
 (
-    -- भीतरी क्वेरी: घंटे के अनुसार एक साधारण समूहन
+    -- The inner query: an ordinary grouping by hour
     SELECT toHour(created_at) AS hour, count() AS guests
     FROM passes
     GROUP BY hour
 )
-ORDER BY hour   -- घंटे आरोही क्रम में, ताकि तस्वीर ऊपर से नीचे पढ़ी जाए
+ORDER BY hour   -- hours ascending, so the picture reads top to bottom
 SQL
 ```
 
@@ -732,20 +732,20 @@ SQL
 
 ```bash
 ch <<'SQL'
--- ClickHouse हर निष्पादित क्वेरी को सिस्टम टेबल system.query_log में दर्ज करता है।
+-- ClickHouse records every executed query in the system table system.query_log.
 SELECT
-    event_time,                                       -- क्वेरी कब ख़त्म हुई
-    query_duration_ms,                                -- कितने मिलीसेकंड लगे
-    formatReadableQuantity(read_rows) AS rows_read,   -- कितनी पंक्तियाँ पढ़ीं
-    formatReadableSize(read_bytes)    AS bytes_read,  -- ऐसा करते हुए कितने बाइट खींचे
-    -- क्वेरी का टेक्स्ट: हम इसमें पंक्ति-विच्छेदों को समेटते हैं और पहले 50 अक्षर लेते हैं,
-    -- वरना आउटपुट स्क्रीन पर नहीं समाएगा
+    event_time,                                       -- when the query finished
+    query_duration_ms,                                -- how many milliseconds it took
+    formatReadableQuantity(read_rows) AS rows_read,   -- how many rows it read
+    formatReadableSize(read_bytes)    AS bytes_read,  -- how many bytes it pulled up in doing so
+    -- The query text: we collapse line breaks in it and take the first 50 characters,
+    -- otherwise the output won't fit on the screen
     substring(replaceRegexpAll(query, '\\s+', ' '), 1, 50) AS query
 FROM system.query_log
-WHERE type = 'QueryFinish'  -- केवल समाप्त हुई क्वेरियाँ: शुरुआत के लिए एक अलग रिकॉर्ड होता है
-  AND user = 'analyst'      -- केवल आपकी, सर्वर की अपनी सेवा-क्वेरियों के बिना
-ORDER BY event_time DESC    -- हाल की क्वेरियाँ ऊपर
-LIMIT 10                    -- और दस काफ़ी हैं
+WHERE type = 'QueryFinish'  -- only finished ones: there's a separate record for the start
+  AND user = 'analyst'      -- only yours, without the server's own service queries
+ORDER BY event_time DESC    -- the recent ones on top
+LIMIT 10                    -- and ten is enough
 SQL
 ```
 
@@ -764,7 +764,7 @@ SQL
 
 ```bash
 ch <<'SQL'
--- हम पास नंबर से एक अकेली पंक्ति ढूँढते हैं। SELECT * का मतलब है "सारे कॉलम लौटाओ।"
+-- We look for a single row by pass number. SELECT * means "return all columns."
 SELECT * FROM passes WHERE pass_id = 424242 FORMAT JSON
 SQL
 ```
@@ -792,8 +792,8 @@ SQL
 अब वही चीज़, पर सही ढंग से। सुरक्षा को आमतौर पर सिर्फ़ नंबर ही नहीं, बल्कि यह भी पता होता है कि **यह कब हुआ**:
 
 ```sql
--- वही खोज, पर एक समय-सीमा के साथ। created_at पर शर्त सॉर्टिंग की में
--- उतरती है, और ClickHouse उस दिन के बाहर की हर चीज़ को छोड़ देता है।
+-- The same search, but with a time frame. The condition on created_at lands
+-- in the sorting key, and ClickHouse discards everything outside that day.
 SELECT * FROM passes
 WHERE created_at >= '2026-03-01' AND created_at < '2026-03-02'
   AND pass_id = 424242
@@ -837,9 +837,9 @@ FORMAT JSON
 
 ```bash
 ch <<'SQL'
--- हम एक पंक्ति में एक मेहमान का नाम बदलते हैं। कमांड तुरंत नियंत्रण लौटा देती है, पर काम
--- यहीं ख़त्म नहीं होता: ClickHouse इसे क़तार में लगाएगा और पृष्ठभूमि में पूरा करेगा।
-ALTER TABLE passes UPDATE guest_name = 'शर्मा आर.' WHERE pass_id = 424242
+-- We change a guest's name in one row. The command returns control immediately, but the work
+-- doesn't end there: ClickHouse will queue it and carry it out in the background.
+ALTER TABLE passes UPDATE guest_name = 'Whitfield J.' WHERE pass_id = 424242
 SQL
 ```
 
@@ -847,12 +847,12 @@ SQL
 
 ```bash
 ch <<'SQL'
--- टेबल में स्थगित बदलावों की क़तार — एक और ClickHouse सिस्टम टेबल।
+-- The queue of deferred changes to the table — another ClickHouse system table.
 SELECT
-    command,       -- उसे ठीक-ठीक क्या करने को कहा गया
-    is_done,       -- 1 अगर काम ख़त्म हो गया
-    parts_to_do,   -- कितने हिस्से अभी फिर से लिखे जाने बाकी हैं
-    create_time    -- काम कब क़तार में डाला गया
+    command,       -- what exactly it's been told to do
+    is_done,       -- 1 if the work is finished
+    parts_to_do,   -- how many parts remain to be rewritten
+    create_time    -- when the task was put in the queue
 FROM system.mutations
 WHERE table = 'passes'
 ORDER BY create_time DESC
@@ -896,11 +896,11 @@ ClickHouse **पूरे हिस्से को** फिर से लिख
 
 ```bash
 cd labs/09-clickhouse
-# स्क्रिप्ट इन तीन एनवायरनमेंट वेरिएबल को पढ़ती है, इसलिए आपको इन्हें चलाने से पहले
-# और उसी टर्मिनल विंडो में सेट करना होगा।
-export KUBECONFIG=~/lab.kubeconfig       # किस क्लस्टर को जाँचना है
-export COZY_TENANT=workshop03            # आपका टेनेंट नंबर
-export CH_PASSWORD='आपका-analyst-पासवर्ड'  # वही जो आपने ClickHouse ऑर्डर करते समय सेट किया
+# The script reads these three environment variables, so you must set them before running it
+# and in the same terminal window.
+export KUBECONFIG=~/lab.kubeconfig       # which cluster to check
+export COZY_TENANT=workshop03            # your tenant number
+export CH_PASSWORD='your-analyst-password'  # the one you set when ordering ClickHouse
 ./check.sh
 ```
 
@@ -916,8 +916,8 @@ export CH_PASSWORD='आपका-analyst-पासवर्ड'  # वही ज
 ## सफ़ाई
 
 ```bash
-# कार्यशील Pod कुछ नहीं रखता: सारा काम ClickHouse के भीतर हुआ, और Pod ने बस
-# क्वेरियाँ आगे पहुँचाईं। इसे बिना अफ़सोस हटा दें।
+# The working Pod stores nothing: all the work happened inside ClickHouse, and the Pod only
+# passed queries along. Delete it without regret.
 kubectl delete pod ch-workbench
 ```
 

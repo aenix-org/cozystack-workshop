@@ -30,7 +30,7 @@
 你已经拥有了所有文件——它们是随仓库一起拿到的。没有什么要创建或重新敲的：下面凡是写着 `kubectl apply -f name.yaml` 的地方，文件都来自这里。
 
 ```bash
-# 本实验的每一条命令都在这个文件夹里执行——否则命令里的文件名会找不到。
+# Every command in this lab is run from this folder — otherwise the file names in them won't be found.
 cd labs/03-scale
 ```
 
@@ -47,19 +47,19 @@ cd labs/03-scale
 整个实验都建立在副本数量明显增长的基础上。所以我们必须从一个开始——否则增长就没有可以对照的参照。我们来看看现在有几个副本在运行。
 
 ```bash
-# KUBECONFIG 是那个存放集群地址和登录凭据的文件的路径。
-# 在这个变量设置好之前，kubectl 会在笔记本电脑本机上找集群，然后找不到。
+# KUBECONFIG is the path to the file with the cluster's address and login details.
+# Until the variable is set, kubectl looks for the cluster on the laptop itself and doesn't find it.
 export KUBECONFIG=~/lab.kubeconfig
 
-# READY 这一列读作「就绪 / 请求」：1/1 表示请求了一个副本并且正在运行。
+# The READY column reads as "ready / requested": 1/1 means one replica requested and running.
 kubectl get deployment rickroll
 ```
 
 它应该显示 `1/1`。如果更多，就把它降回一个，否则增长就不会那么明显：
 
 ```bash
-# scale 只改动应用记录里的一个字段——副本数量。
-# 多余的副本，集群会在几秒内自行退役。
+# scale changes exactly one field in the application's record — the replica count.
+# The cluster will retire the extra replicas on its own, within seconds.
 kubectl scale deployment rickroll --replicas=1
 ```
 
@@ -68,11 +68,11 @@ kubectl scale deployment rickroll --replicas=1
 在配置自动扩缩容之前，你需要弄清楚它会拿什么来计算百分比。
 
 ```bash
-# 集群里的一个对象有上百个字段，表格里看不到它们。jsonpath 从响应中
-# 精确地取出一处。这条路径从上往下读：spec.template 是用来创建副本的模板，
-# containers[0] 是其中的第一个容器，resources 是它对 CPU 和内存的
-# 请求量和上限。末尾的 {"\n"} 是一个换行符，好让响应不至于
-# 和下一个命令行提示符粘在一起。
+# An object in the cluster has hundreds of fields; the table doesn't show them. jsonpath extracts
+# exactly one spot from the response. Read the path top to bottom: spec.template is the template
+# from which replicas are created, containers[0] is the first container in it, resources is its
+# request and ceiling for CPU and memory. The tail {"\n"} is a newline, so the response
+# doesn't run into the next command prompt.
 kubectl get deployment rickroll \
   -o jsonpath='{.spec.template.spec.containers[0].resources}{"\n"}'
 ```
@@ -147,7 +147,7 @@ spec:
 「平均」这个词在这里是关键，全部算术都取决于它。HPA 是这样算的：
 
 ```
-所需副本数 = ceil( 当前副本数 × 当前负载 ÷ 目标负载 )
+replicas needed = ceil( current replicas × current load ÷ target load )
 ```
 
 一个副本在 645% 负载、目标 50% 的情况下，得出 `ceil(1 × 645 / 50) = 13`。十三大于六，所以 HPA 会顶到 `maxReplicas`。
@@ -184,8 +184,8 @@ spec:
 应用它：
 
 ```bash
-# apply =「把集群带到文件里描述的样子」。HPA 对象会立刻出现，
-# 但它不会马上开始计算——我们会在下一步栽在这上面。
+# apply = "bring the cluster to what's described in the file." The HPA object will appear at once,
+# but it won't start computing right away — that's what we'll trip over in the next step.
 kubectl apply -f hpa.yaml
 ```
 
@@ -194,9 +194,9 @@ kubectl apply -f hpa.yaml
 我们来看看得到了什么：
 
 ```bash
-# hpa 是 horizontalpodautoscaler 的简写；kubectl 两种写法都认。
-# TARGETS 这一列读作「当前负载 / 目标」，REPLICAS 是此刻请求了
-# 多少个副本。
+# hpa is shorthand for horizontalpodautoscaler; kubectl understands both spellings.
+# The TARGETS column reads as "current load / target," REPLICAS is how many
+# replicas are requested right now.
 kubectl get hpa rickroll
 ```
 
@@ -223,7 +223,7 @@ rickroll   Deployment/rickroll   cpu: <unknown>/50%   1         6         1     
 时间还不够。等一分半到两分钟，再看一次：
 
 ```bash
-# 和上面同一条命令。我们看的是同一列 TARGETS。
+# The same command as above. We're looking at the same TARGETS column.
 kubectl get hpa rickroll
 ```
 
@@ -237,9 +237,9 @@ rickroll   Deployment/rickroll   cpu: 0%/50%     1         6         1          
 你可以直接检查指标是不是在流动：
 
 ```bash
-# top =「这些 Pod 现在正吃掉多少资源」。这些数字是从
-# 那个同样喂给自动扩缩容的 metrics-server 拿的：如果 top 有回应，
-# 那么数据源就是活的，剩下的只是时间问题。
+# top = "how many resources these Pods are eating right now." The numbers come from
+# the same metrics-server that feeds autoscaling: if top answers, then the
+# data source is alive and it's only a matter of time.
 kubectl top pods -l app=rickroll
 ```
 
@@ -253,9 +253,9 @@ rickroll-6f4b9c8d57-p9wqt   1m           4Mi
 `metrics-server` 会随集群一起自行装好——你不需要单独启用它。它住在 `cozy-monitoring` 这个 namespace 里，可以这样检查：
 
 ```bash
-# -n = 在哪个 namespace 里找。namespace 是集群的一个分区；
-# kubectl 默认在 default 里看，看不到那里没有的系统 Pod。
-# deploy 是 deployment 的简写。
+# -n = which namespace to look in. A namespace is a section of the cluster;
+# by default kubectl looks in default and doesn't see the system Pods there.
+# deploy is shorthand for deployment.
 kubectl -n cozy-monitoring get deploy metrics-server
 ```
 
@@ -264,8 +264,8 @@ kubectl -n cozy-monitoring get deploy metrics-server
 确切的成因由这条告诉你：
 
 ```bash
-# describe = 对象的完整档案卡：所有字段、事件和 conditions，
-# 不像 get 只打印几列表格。
+# describe = the object's full card: all fields, events, and conditions,
+# unlike get, which prints a few table columns.
 kubectl describe hpa rickroll
 ```
 
@@ -341,12 +341,12 @@ spec:
 应用并等待：
 
 ```bash
-# 文件里一下子有两个对象：带生成器的 Deployment，以及一个 Service——
-# 给它 Web 界面的一个稳定地址。
+# There are two objects at once in the file: the Deployment with the generator and a Service — a
+# stable address for its web interface.
 kubectl apply -f fortio.yaml
 
-# rollout status 会占住终端并打印进度，直到副本就绪。
-# 我们在这里特意等待：在生成器起来之前，没有东西可以拿来施加负载。
+# rollout status holds the terminal and prints progress until the replica is ready.
+# We wait here on purpose: until the generator is up, there's nothing to drive load with.
 kubectl rollout status deployment/fortio
 ```
 
@@ -357,10 +357,10 @@ kubectl rollout status deployment/fortio
 ```bash
 export KUBECONFIG=~/lab.kubeconfig
 
-# port-forward 从你的笔记本电脑拉一条隧道进集群。
-#   svc/fortio    我们连接的对象：名为 fortio 的 Service
-#   8081:8080     读作「你这一侧的端口 : 集群里的端口」——一个发往
-#                 localhost:8081 的请求会去到这个 Service 的 8080 端口
+# port-forward runs a tunnel from your laptop into the cluster.
+#   svc/fortio    what we connect to: the Service named fortio
+#   8081:8080     reads as "port on your side : port in the cluster" — a request
+#                 to localhost:8081 goes to port 8080 of this Service
 kubectl port-forward svc/fortio 8081:8080
 ```
 
@@ -379,16 +379,16 @@ kubectl port-forward svc/fortio 8081:8080
 ```bash
 export KUBECONFIG=~/lab.kubeconfig
 
-# 我们观察 rickroll 的副本：每一行新的，都是其中某个副本的一次状态变化。
-# 这条命令不会结束；要退出就按 Ctrl+C——这对副本本身没有任何影响。
+# We watch rickroll's replicas: each new line is a state change of one of them.
+# The command doesn't finish; to exit, Ctrl+C — this has no effect on the replicas themselves.
 kubectl get pods -l app=rickroll -w
 ```
 
 如果你有第三个窗口，也把这条放进去——这样你就能看到决策过程本身：
 
 ```bash
-# 同样是观察，但观察的是自动扩缩容的决策：TARGETS 显示负载如何
-# 变化，REPLICAS 显示它作为回应请求了多少个副本。
+# The same watching, but of the autoscaling decisions: TARGETS shows how the load
+# changes, REPLICAS shows how many replicas it requested in response.
 kubectl get hpa rickroll -w
 ```
 
@@ -410,13 +410,13 @@ kubectl get hpa rickroll -w
 ⚠️ **如果你这个版本的 Fortio 里字段名字不一样**（比如连接数被标为 `Threads`），就按含义来对：URL、请求速率、时长、并行度。同样的负载也可以用一条命令施加，绕开浏览器：
 
 ```bash
-# exec 在一个已经运行的 Pod 内部执行一条命令，而不是在你的笔记本电脑上。
-#   deploy/fortio   在这个应用的一个 Pod 里；具体哪个 Pod——kubectl 自己挑
-#   --              这个分隔符之后的一切，都是给 Pod 的命令
-#   -qps 1200       每秒一千二百个请求
-#   -c 80           八十个并行连接
-#   -t 90s          把负载保持一分半
-# 最后一个参数是目标：我们应用的 Service 名字。
+# exec runs a command inside an already-running Pod, not on your laptop.
+#   deploy/fortio   in a Pod of this application; which Pod exactly — kubectl picks itself
+#   --              everything after this separator is the command for the Pod
+#   -qps 1200       twelve hundred requests per second
+#   -c 80           eighty parallel connections
+#   -t 90s          hold the load for a minute and a half
+# The last argument is the target: the Service name of our application.
 kubectl exec deploy/fortio -- fortio load -qps 1200 -c 80 -t 90s http://rickroll/
 ```
 
@@ -439,7 +439,7 @@ rickroll-6f4b9c8d57-t8zxc   1/1     Running             3s
 📍 **看看 HPA**——它看到了什么、又决定了什么：
 
 ```bash
-# TARGETS 是当前的平均负载对上目标，REPLICAS 是请求了多少个副本。
+# TARGETS is the current average load against the target, REPLICAS is how many replicas are requested.
 kubectl get hpa rickroll
 ```
 
@@ -459,8 +459,8 @@ rickroll   Deployment/rickroll   cpu: 645%/50%   1         6         6          
 自己验证一下 HPA 的算术：
 
 ```bash
-# 每个副本各自的消耗量。CPU(cores) 以毫核打印：
-# 100m 是核心的百分之一，1000m 是一整个核心。
+# The consumption of each replica separately. CPU(cores) is printed in millicpu:
+# 100m is a hundredth of a core, 1000m is a whole core.
 kubectl top pods -l app=rickroll
 ```
 
@@ -497,8 +497,8 @@ rickroll-6f4b9c8d57-mn4kd   1/1     Terminating   4m
 ⚠️ **在 Windows 上，脚本从 WSL 里运行**，而不是从 PowerShell——怎么装它，写在实验 0 的开头。没有 WSL 也能完成本实验，但不会有报告产物。
 
 ```bash
-# ./ 意思是「当前文件夹里的一个文件」，而不是系统 PATH 里的一条命令。
-# 这个脚本不改动集群里的任何东西：它只是读取并打印一份报告。
+# ./ means "a file from the current folder," not a command from the system PATH.
+# The script changes nothing in the cluster: it only reads and prints a report.
 ./check.sh
 ```
 
@@ -507,15 +507,15 @@ rickroll-6f4b9c8d57-mn4kd   1/1     Terminating   4m
 **删除 HPA。** 在实验 4 里，我们会在负载下滚动发布一个新版本，而一个此时同时在改变副本数量的多余机制只会把画面搅乱：
 
 ```bash
-# delete -f =「把这个文件里描述的东西从集群里移除」。应用会留下：
-# 文件里只描述了 HPA。删除之后副本数量会冻结在当前值。
+# delete -f = "remove from the cluster what's described in this file." The application stays:
+# only the HPA is described in the file. After deletion the replica count freezes at the current value.
 kubectl delete -f hpa.yaml
 ```
 
 **保留 Fortio**——在实验 4 里它会作为负载来源被用到。如果你不打算做实验 4，就把它也移除：
 
 ```bash
-# 移除文件里的两个对象——生成器的 Deployment 和它的 Service。
+# Removes both objects from the file — the generator's Deployment and its Service.
 kubectl delete -f fortio.yaml
 ```
 

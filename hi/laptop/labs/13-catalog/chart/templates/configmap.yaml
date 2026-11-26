@@ -1,20 +1,20 @@
-# लैब 13. ConfigMap टेम्पलेट: «पास» पृष्ठ और nginx कॉन्फ़िगरेशन।
+# Lab 13. ConfigMap template: the "Passes" page and nginx configuration.
 #
-# ConfigMap टेक्स्ट फ़ाइलें संग्रहीत करता है और उन्हें पॉड्स को देता है। पृष्ठ यहाँ रखा गया है, न कि इमेज के
-# अंदर, ताकि टेक्स्ट को पुनर्निर्माण के बिना बदला जा सके: greeting मान रेंडर के समय प्रतिस्थापित होता है,
-# और रिलीज़ को अपडेट करना ही पर्याप्त है।
+# A ConfigMap stores text files and serves them to pods. The page lives here rather than inside
+# the image so the text can be changed without a rebuild: the greeting value is substituted at render time,
+# and it is enough to update the release.
 #
-# प्रतिस्थापन `|` ब्लॉक के अंदर भी काम करता है: Helm टेम्पलेट फ़ाइल को सादे टेक्स्ट के रूप में
-# संसाधित करता है और YAML संरचना के बारे में कुछ नहीं जानता। अधिक जानकारी — templates/deployment.yaml में।
+# Substitution works inside `|` blocks too: Helm treats the template file as plain
+# text and knows nothing about YAML structure. See templates/deployment.yaml for details.
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ .Release.Name }}
-# data में कुंजियाँ फ़ाइलों के नाम हैं, और `|` के नीचे जो है, वह उनकी पूरी सामग्री है।
-# प्रत्येक कुंजी कंटेनर में एक अलग फ़ाइल के रूप में माउंट होती है, Deployment में volumeMounts देखें।
+# The keys in data are file names, and what is under `|` is their full content.
+# Each key is mounted into the container as a separate file, see volumeMounts in the Deployment.
 data:
-  # वह पृष्ठ जिसे कर्मचारी देखेगा। यहाँ दो मान आते हैं: ऑर्डर फ़ॉर्म से greeting और
-  # रिलीज़ का नाम — ताकि खुले पृष्ठ से दिखे कि यह किसका ऑर्डर है।
+  # The page an employee will see. Two values land here: greeting from the
+  # order form and the release name — so that the open page shows whose order it is.
   index.html: |
     <!doctype html>
     <html lang="en">
@@ -31,9 +31,9 @@ data:
     <p>Guest Pass service, release <b>{{ .Release.Name }}</b></p>
     <div class="pod">served by __POD__</div>
     </html>
-  # nginx कॉन्फ़िगरेशन। sub_filter पृष्ठ की डिलीवरी के समय __POD__ चिह्न को पॉड के नाम से
-  # बदल देता है: इस तरह ब्राउज़र से दिखता है कि किस प्रति ने उत्तर दिया। /healthz पर अलग उत्तर
-  # Deployment की readinessProbe के लिए आवश्यक है — वह ठीक इसी पते को पूछती है।
+  # nginx configuration. sub_filter replaces the __POD__ marker with the pod name at the moment the
+  # page is served: this way the browser shows which of the copies answered. A separate response on /healthz
+  # is needed by the readinessProbe from the Deployment — it queries exactly this address.
   default.conf: |
     server {
       listen 8080;

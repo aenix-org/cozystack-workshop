@@ -32,12 +32,12 @@
 просто зараз: про свої права кластер можна запитати, нічого при цьому не створюючи.
 
 ```bash
-# KUBECONFIG — змінна, з якої kubectl бере адресу кластера та дані для входу.
-# Тут це тенантний доступ, той самий файл, що й в інших лабах.
+# KUBECONFIG — the variable kubectl reads to find the cluster's address and your credentials.
+# Here it is the tenant access, the same file as in every other lab.
 export KUBECONFIG=~/.kube/workshop
-# auth can-i = «а мені це можна?». Кластер відповідає yes або no і нічого не змінює:
-#   create                   яку дію перевіряємо
-#   applicationdefinitions   над яким типом об'єктів
+# auth can-i = "am I allowed to?". The cluster answers yes or no and changes nothing:
+#   create                   which action we are checking
+#   applicationdefinitions   on which type of object
 kubectl auth can-i create applicationdefinitions
 ```
 
@@ -88,18 +88,18 @@ cd labs/13-catalog
 
 ## Крок 1. Дивимося, що ми упаковуємо
 
-У теці `chart/` лежить готовий чарт «Перепусткаа». Застосунок усередині навмисно простий —
+У теці `chart/` лежить готовий чарт «Перепустки». Застосунок усередині навмисно простий —
 nginx зі сторінкою, — бо лаба не про застосунок, а про упаковку.
 
 ```
 chart/
-├── Chart.yaml            ім'я, версія, опис
-├── values.yaml           параметри та значення за замовчуванням
-├── values.schema.json    які значення вважати допустимими
+├── Chart.yaml            name, version, description
+├── values.yaml           parameters and default values
+├── values.schema.json    which values to consider valid
 └── templates/
-    ├── configmap.yaml    сторінка і конфіг nginx
-    ├── deployment.yaml   сам застосунок
-    └── service.yaml      адреса
+    ├── configmap.yaml    the page and the nginx config
+    ├── deployment.yaml   the application itself
+    └── service.yaml      the address
 ```
 
 <details>
@@ -119,7 +119,7 @@ appVersion: "1.0"
 виправили одруківку в описі — підняли її.
 
 `appVersion` — версія **застосунку** всередині. Вона змінюється, коли виходить нова
-версія самого «Перепусткаа», і з версією упаковки ніяк не пов'язана.
+версія самого «Перепустки», і з версією упаковки ніяк не пов'язана.
 
 Практичний сенс: за `version` адмін розуміє, чи оновлюється в нього сам механізм
 розгортання, а за `appVersion` — чи оновлюється те, чим користуються люди.
@@ -154,10 +154,10 @@ Cozystack (`cozyvalues-gen`) збирає `values.schema.json` і таблицю
 підсуньте в числовий параметр рядок.
 
 ```bash
-# template = «збери маніфести з чарта і надрукуй їх», кластер при цьому не чіпається:
-#   gp                    ім'я релізу, під яким чарт нібито розгортається
-#   chart                 тека з чартом
-#   --set replicas=abc    перевизначити один параметр прямо в командному рядку
+# template = "assemble the manifests from the chart and print them", the cluster is not touched:
+#   gp                    the release name the chart is notionally deployed under
+#   chart                 the folder with the chart
+#   --set replicas=abc    override a single parameter right on the command line
 helm template gp chart --set replicas=abc
 ```
 
@@ -228,9 +228,9 @@ Kubernetes **не перезапускає Pod-и, коли змінюється
 
 ```bash
 cd labs/13-catalog
-# lint = «перевір пакет на помилки оформлення і обов'язкові поля»
-#   chart   шлях до теки з чартом; усередині неї Helm чекає Chart.yaml, values.yaml
-#           і теку templates/
+# lint = "check the package for formatting errors and required fields"
+#   chart   path to the chart folder; inside it Helm expects Chart.yaml, values.yaml
+#           and the templates/ folder
 helm lint chart
 ```
 
@@ -251,8 +251,8 @@ helm lint chart
 бере значення з `values.yaml`, підставляє їх у текст і друкує результат.
 
 ```bash
-# main — ім'я релізу, тобто цього конкретного розгортання чарта. Воно потрапляє
-# в імена створюваних об'єктів, тому дві установки поруч не зіткнуться іменами.
+# main — the release name, that is, of this specific deployment of the chart. It goes
+# into the names of the objects created, so two installations side by side will not clash.
 helm template main chart
 ```
 
@@ -263,10 +263,10 @@ helm template main chart
 значеннями і залишаємо у виводі лише той рядок, який мав змінитися.
 
 ```bash
-# --set replicas=5 перевизначає значення з values.yaml на час одного запуску.
-# | grep 'replicas:' — з усього виводу залишити тільки рядки з цим словом.
+# --set replicas=5 overrides the value from values.yaml for the duration of one run.
+# | grep 'replicas:' — from the whole output keep only the lines with this word.
 helm template main chart --set replicas=5 | grep 'replicas:'
-# те саме для булевого параметра: від external залежить, який тип Service потрапить у маніфест
+# the same for the boolean parameter: external decides which Service type ends up in the manifest
 helm template main chart --set external=true | grep 'type:'
 ```
 
@@ -319,11 +319,11 @@ metadata:
 запрацюють у будь-якого тенанта, щойно адмін застосує визначення:
 
 ```bash
-# get = «покажи, що є». guestpasses — те саме ім'я з поля plural нижче:
-#   -n tenant-workshopXX   в якому namespace дивитися; XX замініть на свій номер
+# get = "show me what's there". guestpasses is that very name from the plural field below:
+#   -n tenant-workshopXX   which namespace to look in; replace XX with your own number
 kubectl get guestpasses -n tenant-workshopXX
-# describe = «покажи все про один об'єкт»: параметри, стан, останні події.
-# main тут — ім'я конкретного замовленого застосунку, а не ім'я типу.
+# describe = "show me everything about one object": parameters, state, recent events.
+# main here is the name of a specific ordered application, not the name of the type.
 kubectl describe guestpass main -n tenant-workshopXX
 ```
 
@@ -416,9 +416,9 @@ kubectl describe guestpass main -n tenant-workshopXX
 потрібен один суцільний — тому переноси рядків прибираються окремим кроком.
 
 ```bash
-# base64 = перетворити двійковий файл на рядок із літер, цифр і знаків + / =
-#   -i icon.svg   що кодувати (написання ключа для macOS і BSD)
-# tr -d '\n' = викинути з виводу всі переноси рядків, склеївши його в один
+# base64 = turn a binary file into a string of letters, digits and the signs + / =
+#   -i icon.svg   what to encode (the flag spelling for macOS and BSD)
+# tr -d '\n' = drop every line break from the output, gluing it into one
 base64 -i icon.svg | tr -d '\n'
 ```
 
@@ -447,9 +447,9 @@ base64 -i icon.svg | tr -d '\n'
 сказано, чого саме не вистачило.
 
 ```bash
-# тенантний доступ — той самий, з яким ви працювали весь воркшоп
+# tenant access — the same one you have worked with throughout the workshop
 export KUBECONFIG=~/.kube/workshop
-# apply = «приведи кластер до того, що написано у файлі»; -f — читати з файлу
+# apply = "bring the cluster into line with what's written in the file"; -f — read from a file
 kubectl apply -f applicationdefinition.yaml
 ```
 
@@ -497,10 +497,10 @@ resource "applicationdefinitions" in API group "cozystack.io" at the cluster sco
 відправляючи.
 
 ```bash
-# auth can-i = «а мені це можна?». Відповідь yes або no, кластер при цьому не змінюється.
+# auth can-i = "am I allowed to?". The answer is yes or no, and the cluster is not changed.
 kubectl auth can-i create applicationdefinitions
-# --dry-run=client = «розбери файл і покажи, що вийшло б, але в кластер не ходи».
-# client означає, що вся перевірка йде на ноутбуці і кластер про неї навіть не дізнається.
+# --dry-run=client = "parse the file and show what would come out, but do not go to the cluster".
+# client means the whole check runs on the laptop and the cluster never even hears about it.
 kubectl apply -f applicationdefinition.yaml --dry-run=client
 ```
 
@@ -571,7 +571,7 @@ Makefile для збирання.
 головне, що схема у визначенні збігається зі схемою в чарті.
 
 ```bash
-# ./ перед іменем означає «файл із поточної теки», тобто з labs/13-catalog
+# ./ before the name means "the file from the current folder", that is, from labs/13-catalog
 ./check.sh
 ```
 

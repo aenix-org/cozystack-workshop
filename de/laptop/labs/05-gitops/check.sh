@@ -1,43 +1,43 @@
 #!/usr/bin/env bash
-# Prüfung für Labor 5: Der Cluster-Zustand kommt aus Git und wird durch Abgleich gehalten.
+# Check for lab 5: the cluster state arrives from Git and is held in place by reconciliation.
 #
-# Wird auf Ihrem `lab`-Cluster ausgeführt, aus dem Labor-Ordner, von Ihnen:
+# Runs against your `lab` cluster, from the lab folder, by you:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     ./check.sh
-# Es ändert nichts — es schaut nur und druckt einen Bericht: was geprüft wurde, was bestanden hat,
-# was nicht, und die beigefügten Nachweise.
+# It changes nothing — it only looks and prints a report: what was checked, what passed,
+# what did not, and the attached evidence.
 #
-# Wir prüfen nicht «Flux ist installiert», sondern «der Mechanismus funktioniert»: die Quelle wird gelesen, das Angewandte
-# gehört Flux, der Dienst antwortet, der Abgleich ist nicht abgeschaltet. Ein installierter, aber
-# angehaltener Flux ist der häufigste Weg, das Labor am Sinn vorbei zu bestehen.
+# We check not "Flux is installed" but "the mechanism works": the source is read, what is
+# applied belongs to Flux, the service responds, reconciliation is not turned off. An installed
+# but suspended Flux is the most common way to pass the lab while missing its point.
 
 LAB_NAME="05-gitops"
-LAB_TITLE="Labor 5 · Infrastruktur in Git"
-# Die gemeinsame Umgebung aller Labore: daraus stammen ok / fail / warn / evidence / finish und
-# die Umgebungsprüfungen. Der Pfad wird vom Speicherort dieser Datei aus bestimmt, daher kann das Skript
-# aus jedem Ordner ausgeführt werden.
+LAB_TITLE="Lab 5 · Infrastructure in Git"
+# The shared harness for all labs: it provides ok / fail / warn / evidence / finish and
+# the environment checks. The path is resolved from the location of this file, so the script
+# can be run from any folder.
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
-# Ohne Cluster-Zugriffsdatei gibt es nichts zu prüfen — wir beenden sofort mit einem klaren Grund.
+# Without a cluster access file there is nothing to check — exit right away with a clear reason.
 need_kubeconfig
 
-# Die Namen, die das Labor erstellt. An einer Stelle gesammelt: wenn der Teilnehmer die Objekte
-# anders benannt hat, hier korrigieren statt Namen im ganzen Skript zu suchen.
+# The names that the lab creates. Gathered in one place: if the participant named the objects
+# differently, fix them here instead of hunting for names across the whole script.
 NS_APP="passes"
 GITREPO="passes"
 KUSTOMIZATION="passes"
 
-# Ein Feld eines Objekts lesen, ohne zu scheitern, wenn das Objekt oder die CRD fehlt.
+# Read a field of an object without failing if the object or the CRD is missing.
 kget() { kubectl get "$@" 2>/dev/null; }
 
-# --- Flux-Dienste -----------------------------------------------------------
-# Wir schauen nicht «die Pods existieren», sondern «mindestens eine Replik ist im Zustand Ready»: ein Pod kann
-# in Pending hängen, ohne Speicher auf dem Knoten, und trotzdem in der get-pods-Ausgabe erscheinen.
-# Beide Dienste sind erforderlich und teilen sich die Arbeit: source-controller lädt das Repository herunter,
-# kustomize-controller wendet das Heruntergeladene an. Ohne den zweiten gelangt nichts in den Cluster.
+# --- Flux services ---------------------------------------------------------
+# We check not "the pods exist" but "at least one replica is Ready": a pod can hang in
+# Pending with no memory on the node and still show up in the get pods output.
+# Both services are required and split the work: source-controller downloads the repository,
+# kustomize-controller applies what was downloaded. Without the second one nothing reaches the cluster.
 if ! kget namespace flux-system >/dev/null; then
-  fail "der Cluster hat keinen flux-system-Namespace" \
-       "Flux ist nicht installiert: flux install --components=source-controller,kustomize-controller"
+  fail "the cluster has no flux-system namespace" \
+       "Flux is not installed: flux install --components=source-controller,kustomize-controller"
 else
   FLUX_BAD=""
   for d in source-controller kustomize-controller; do
@@ -45,24 +45,24 @@ else
     [ "${READY:-0}" -ge 1 ] 2>/dev/null || FLUX_BAD="$FLUX_BAD $d"
   done
   if [ -z "$FLUX_BAD" ]; then
-    ok "Flux-Dienste laufen: source-controller und kustomize-controller"
-    evidence "Flux-Pods" "$(kget pods -n flux-system -o wide)"
+    ok "Flux services are running: source-controller and kustomize-controller"
+    evidence "Flux pods" "$(kget pods -n flux-system -o wide)"
   else
-    fail "Flux-Dienste laufen nicht:${FLUX_BAD}" \
-         "siehe kubectl get pods -n flux-system; auf einem kleinen Knoten fehlt ihnen möglicherweise Speicher"
+    fail "Flux services are not running:${FLUX_BAD}" \
+         "see kubectl get pods -n flux-system; on a small node they may be short on memory"
   fi
 fi
 
-# --- Quelle: GitRepository ------------------------------------------------
-# Drei verschiedene Ausgänge, und man darf sie nicht verwechseln: das Objekt existiert gar nicht; das Objekt
-# existiert, aber in ihm ist noch der Platzhalter-Adresse geblieben; das Objekt existiert mit einer echten
-# Adresse, aber Flux konnte das Repository nicht lesen. Der Rat unterscheidet sich in jedem Fall, daher unterscheiden sich auch die Zweige.
+# --- source: GitRepository ------------------------------------------------
+# Three different outcomes, and they must not be confused: the object does not exist at all;
+# the object exists but still holds the placeholder address; the object exists with a real
+# address, but Flux could not read the repository. The advice differs in each case, so the branches differ.
 #
-# Das Erfolgssignal nehmen wir aus status.conditions — das ist, was Flux selbst über sich meldet
-# nach dem Versuch, Git zu erreichen, und nicht unsere Vermutung aufgrund des Vorhandenseins des Objekts.
+# We take the success signal from status.conditions — that is what Flux reports about itself
+# after trying to reach Git, not our guess based on the object's presence.
 if ! kubectl api-resources --api-group=source.toolkit.fluxcd.io 2>/dev/null | grep -q gitrepositories; then
-  fail "der Cluster hat keinen Typ GitRepository" \
-       "Flux ist nicht installiert oder ohne source-controller installiert"
+  fail "the cluster has no GitRepository type" \
+       "Flux is not installed, or installed without source-controller"
 else
   GR_URL="$(kget gitrepository "$GITREPO" -n flux-system -o jsonpath='{.spec.url}')"
   GR_READY="$(kget gitrepository "$GITREPO" -n flux-system \
@@ -72,30 +72,30 @@ else
   GR_REV="$(kget gitrepository "$GITREPO" -n flux-system -o jsonpath='{.status.artifact.revision}')"
 
   if [ -z "$GR_URL" ]; then
-    fail "kein GitRepository mit Namen ${GITREPO} in flux-system gefunden" \
-         "wenden Sie flux/gitrepository.yaml an und setzen Sie die Adresse Ihres eigenen Repositorys ein"
-  elif printf '%s' "$GR_URL" | grep -q 'ЗАМЕНИТЕ-МЕНЯ'; then
-    fail "im GitRepository ist noch die Platzhalter-Adresse geblieben" \
-         "öffnen Sie flux/gitrepository.yaml und tragen Sie die Adresse Ihres eigenen GitHub-Repositorys ein"
+    fail "no GitRepository named ${GITREPO} found in flux-system" \
+         "apply flux/gitrepository.yaml, substituting your own repository address"
+  elif printf '%s' "$GR_URL" | grep -q 'REPLACE-ME'; then
+    fail "the GitRepository still holds the placeholder address" \
+         "open flux/gitrepository.yaml and enter the address of your own GitHub repository"
   elif [ "$GR_READY" = "True" ]; then
-    ok "Flux liest Ihr Repository: ${GR_URL}"
-    evidence "Quelle in Git" "url: ${GR_URL}
-revision: ${GR_REV:-unbekannt}"
+    ok "Flux reads your repository: ${GR_URL}"
+    evidence "Source in Git" "url: ${GR_URL}
+revision: ${GR_REV:-unknown}"
   else
-    fail "Flux kann das Repository ${GR_URL} nicht lesen" \
-         "siehe flux get sources git; meist ist es ein Tippfehler in der Adresse, ein privates Repository oder ein anderer Branch"
-    evidence "Quellenfehler" "${GR_MSG:-keine Meldung}"
+    fail "Flux cannot read the repository ${GR_URL}" \
+         "see flux get sources git; most often it is a typo in the address, a private repository, or a different branch"
+    evidence "Source error" "${GR_MSG:-no message}"
   fi
 fi
 
-# --- Anwendung: Kustomization ----------------------------------------------
-# Hier wird nicht die Tatsache der Anwendung geprüft, sondern drei Eigenschaften des Mechanismus, ohne die das Labor
-# seinen Sinn verliert: die angewandte Revision stimmt mit Git überein, der Abgleich ist nicht angehalten und
-# das Löschen des aus dem Repository Verschwundenen ist aktiviert.
+# --- application: Kustomization ----------------------------------------------
+# Here we check not the fact of application, but three properties of the mechanism without
+# which the lab loses its meaning: the applied revision matches Git, reconciliation is not
+# suspended, and pruning of what disappeared from the repository is enabled.
 KS_READY=""
 if ! kubectl api-resources --api-group=kustomize.toolkit.fluxcd.io 2>/dev/null | grep -q kustomizations; then
-  fail "der Cluster hat keinen Typ Kustomization" \
-       "Flux ist ohne kustomize-controller installiert — installieren Sie mit beiden Komponenten neu"
+  fail "the cluster has no Kustomization type" \
+       "Flux is installed without kustomize-controller — reinstall with both components"
 else
   KS_READY="$(kget kustomization "$KUSTOMIZATION" -n flux-system \
     -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')"
@@ -107,114 +107,114 @@ else
   KS_INTERVAL="$(kget kustomization "$KUSTOMIZATION" -n flux-system -o jsonpath='{.spec.interval}')"
 
   if [ -z "$KS_REV" ] && [ -z "$KS_READY" ]; then
-    fail "kein Kustomization mit Namen ${KUSTOMIZATION} in flux-system gefunden" \
-         "wenden Sie flux/kustomization.yaml an"
+    fail "no Kustomization named ${KUSTOMIZATION} found in flux-system" \
+         "apply flux/kustomization.yaml"
   elif [ "$KS_READY" = "True" ]; then
-    ok "Flux hat den Zustand aus Git angewandt, Revision ${KS_REV}"
-    evidence "Angewandte Revision" "$KS_REV"
+    ok "Flux applied the state from Git, revision ${KS_REV}"
+    evidence "Applied revision" "$KS_REV"
   else
-    fail "Flux konnte den Zustand aus Git nicht anwenden" \
-         "siehe flux get kustomizations und kubectl describe kustomization ${KUSTOMIZATION} -n flux-system"
-    evidence "Anwendungsfehler" "${KS_MSG:-keine Meldung}"
+    fail "Flux could not apply the state from Git" \
+         "see flux get kustomizations and kubectl describe kustomization ${KUSTOMIZATION} -n flux-system"
+    evidence "Apply error" "${KS_MSG:-no message}"
   fi
 
-  # Ein angehaltener Flux sieht installiert aus und tut nichts. Das ist der wichtigste
-  # Weg, das Labor zu «bestehen», ohne einen einzigen seiner Vorteile zu erhalten.
+  # A suspended Flux looks installed and does nothing. This is the main way to "pass"
+  # the lab without gaining a single one of its benefits.
   if [ "$KS_SUSPEND" = "true" ]; then
-    fail "der Abgleich ist angehalten (suspend: true) — Flux überwacht den Cluster nicht" \
-         "schalten Sie ihn wieder ein: flux resume kustomization ${KUSTOMIZATION}"
+    fail "reconciliation is suspended (suspend: true) — Flux is not watching the cluster" \
+         "turn it back on: flux resume kustomization ${KUSTOMIZATION}"
   else
-    ok "der Abgleich ist aktiv: eine Abweichung von Git wird von selbst korrigiert, Intervall ${KS_INTERVAL:-Standard}"
+    ok "reconciliation is active: drift from Git will be corrected on its own, interval ${KS_INTERVAL:-default}"
   fi
 
-  # Das ist ein warn, kein fail: ohne prune wird der Cluster trotzdem aus Git verwaltet, das Labor ist bestanden.
-  # Aber die Beschreibung wird einseitig — das Löschen einer Datei löscht nichts im Cluster.
+  # This is a warn, not a fail: without prune the cluster is still managed from Git, the lab is passed.
+  # But the description becomes one-sided — deleting a file deletes nothing in the cluster.
   if [ "$KS_PRUNE" = "true" ]; then
-    ok "das Löschen dessen, was aus Git verschwunden ist, ist aktiviert (prune)"
+    ok "pruning of what disappeared from Git is enabled (prune)"
   else
-    warn "prune ist aus — aus dem Repository Entferntes läuft weiter im Cluster" \
-         "setzen Sie prune: true in flux/kustomization.yaml, sonst beschreibt Git den Zustand nur zur Hälfte"
+    warn "prune is off — what was removed from the repository keeps running in the cluster" \
+         "set prune: true in flux/kustomization.yaml, otherwise Git describes only half of the state"
   fi
 fi
 
-# --- die Objekte im Cluster gehören Flux und wurden nicht von Hand angewandt ---------
-# Das ist die zentrale Prüfung des Labors, und es geht um die Herkunft, nicht um das Vorhandensein. Die Anwendung
-# ist in beiden Fällen im Cluster: sowohl wenn Flux sie hereingebracht hat, als auch wenn der Teilnehmer
-# dieselben Dateien von Hand über kubectl apply angewandt hat. Äußerlich nicht zu unterscheiden — das Deployment ist identisch.
-# Es unterscheidet das Eigentümer-Label: nur kustomize-controller setzt es, wenn es
-# den Inhalt des Repositorys anwendet. Ein von Hand angewandtes Objekt erhält dieses Label nicht.
+# --- the objects in the cluster belong to Flux, not applied by hand ---------
+# This is the key check of the lab, and it is about origin, not presence. The application
+# is in the cluster in both cases: whether Flux brought it in, or the participant applied
+# the same files by hand via kubectl apply. Externally they are indistinguishable — the Deployment is identical.
+# The owner label tells them apart: only kustomize-controller sets it, when it applies
+# the contents of the repository. An object applied by hand will not get that label.
 OWNER="$(kget deployment passes -n "$NS_APP" \
   -o jsonpath='{.metadata.labels.kustomize\.toolkit\.fluxcd\.io/name}')"
 if [ -z "$(kget deployment passes -n "$NS_APP" -o name)" ]; then
-  fail "im Namespace ${NS_APP} gibt es keine passes-Anwendung" \
-       "legen Sie app/*.yaml in den apps-Ordner Ihres Repositorys, pushen Sie und warten Sie auf den Abgleich"
+  fail "namespace ${NS_APP} has no passes application" \
+       "put app/*.yaml into the apps folder of your repository, push, and wait for reconciliation"
 elif [ "$OWNER" = "$KUSTOMIZATION" ]; then
-  ok "die Anwendung im Cluster gehört Flux und wurde nicht von Hand angewandt"
+  ok "the application in the cluster belongs to Flux, not applied by hand"
 else
-  fail "die passes-Anwendung existiert, aber nicht Flux hat sie erstellt" \
-       "entfernen Sie sie (kubectl delete ns ${NS_APP}) und lassen Sie Flux sie erneut aus Git bereitstellen"
+  fail "the passes application exists, but Flux did not create it" \
+       "remove it (kubectl delete ns ${NS_APP}) and let Flux deploy it from Git anew"
 fi
 
-# --- die Anwendung antwortet tatsächlich --------------------------------------
-# Ein Objekt im Cluster und ein funktionierender Dienst sind verschiedene Dinge: ein Deployment kann erstellt sein,
-# während die Pods in einer Schleife abstürzen. Deshalb gehen wir in den Cluster hinein und fragen den Dienst über seinen
-# internen Namen ab — auf demselben Weg, über den ihn benachbarte Anwendungen erreichen würden.
+# --- the application actually responds --------------------------------------
+# An object in the cluster and a working service are different things: a Deployment may be
+# created while the pods crash in a loop. So we go inside the cluster and request the service
+# by its internal name — the same path a neighboring application would use to reach it.
 PODS="$(kget pods -n "$NS_APP" -l app=passes --no-headers)"
 PODS_READY="$(printf '%s' "$PODS" | awk '$3=="Running"' | grep -c .)"
 BODY="$(in_cluster_curl "http://passes.${NS_APP}.svc.cluster.local/")"
 
-if printf '%s' "$BODY" | grep -q 'Gästeausweis'; then
-  ok "der Dienst «Gästeausweis» antwortet über HTTP innerhalb des Clusters (laufende Repliken: ${PODS_READY})"
+if printf '%s' "$BODY" | grep -q 'Guest Pass'; then
+  ok "the «Guest Pass» service responds over HTTP inside the cluster (running replicas: ${PODS_READY})"
 else
-  fail "der Dienst «Gästeausweis» antwortet nicht unter passes.${NS_APP}.svc.cluster.local" \
-       "siehe kubectl get pods -n ${NS_APP} und kubectl logs -n ${NS_APP} deploy/passes"
+  fail "the «Guest Pass» service does not respond at passes.${NS_APP}.svc.cluster.local" \
+       "see kubectl get pods -n ${NS_APP} and kubectl logs -n ${NS_APP} deploy/passes"
 fi
 
-# Der Pod-Name auf der Seite muss mit einer wirklich laufenden Replik übereinstimmen: so ist erkennbar,
-# dass genau der Pod antwortet, den wir im Cluster sehen, und nicht eine zwischengespeicherte
-# Antwort oder ein fremder Dienst, der zufällig denselben Namen belegt hat. Eine Abweichung ist ein warn, kein
-# fail: die Replik könnte zwischen den zwei Anfragen neu erstellt worden sein, und das ist nicht die Schuld des Teilnehmers.
+# The pod name on the page must match a really running replica: this shows that the response
+# comes from exactly the pod we see in the cluster, and not a cached answer or some other
+# service that happened to take the same name. A mismatch is a warn, not a fail: a replica
+# could have been recreated between the two requests, and that is not the participant's fault.
 SERVED_POD="$(printf '%s' "$BODY" | grep -o 'passes-[a-z0-9]*-[a-z0-9]*' | head -1)"
 if [ -n "$SERVED_POD" ] && printf '%s' "$PODS" | grep -q "$SERVED_POD"; then
-  ok "die Seite wurde von einem wirklich existierenden Pod ${SERVED_POD} ausgeliefert"
-  evidence "Dienst-Repliken" "$(kget pods -n "$NS_APP" -o wide)"
+  ok "the page was served by a really existing pod ${SERVED_POD}"
+  evidence "Service replicas" "$(kget pods -n "$NS_APP" -o wide)"
 elif [ -n "$SERVED_POD" ]; then
-  warn "der Pod ${SERVED_POD} aus der Antwort wurde nicht unter den laufenden gefunden" \
-       "höchstwahrscheinlich wurde die Replik zwischen den zwei Anfragen neu erstellt — führen Sie die Prüfung erneut aus"
+  warn "the pod ${SERVED_POD} from the response was not found among the running ones" \
+       "most likely the replica was recreated between the two requests — run the check again"
 fi
 
-# --- die Änderungshistorie in Ihrem Klon des Repositorys ----------------------------
-# Ein optionaler Teil: das Skript weiß nicht, wo der Klon liegt, bis man es ihm sagt.
-# Geprüft wird hier die Art des Rückgängigmachens. Mit kubectl rollout undo kehrt der Cluster ebenfalls
-# zur vorherigen Version zurück, aber Git erfährt davon nichts, und der nächste Abgleich bringt die schlechte
-# Änderung wieder zurück. Deshalb suchen wir in der Historie nach einem revert — das Rückgängigmachen wird dort gemacht, wo die
-# Wahrheit lebt. Und wir prüfen, dass die im Cluster angewandte Revision mit Ihrem HEAD übereinstimmt:
-# committen und das Pushen vergessen ist alltäglich, und von außen sieht es aus wie «Flux hängt».
+# --- the change history in your clone of the repository ----------------------------
+# An optional part: the script does not know where the clone lives until it is told.
+# What is checked here is the way of rolling back. With kubectl rollout undo the cluster also
+# returns to the previous version, but Git will not know about it, and the very next reconciliation
+# will bring the bad change back. So we look for a revert in the history — the rollback is made
+# where the truth lives. And we verify that the revision applied in the cluster matches your HEAD:
+# committing and forgetting to push is common, and from the outside it looks like "Flux is stuck".
 REPO="${LAB_REPO:-}"
 if [ -z "$REPO" ]; then
-  warn "die Repository-Historie wurde nicht geprüft: die Variable LAB_REPO ist nicht gesetzt" \
-       "um auch sie zu prüfen: export LAB_REPO=~/passes-gitops && ./check.sh"
+  warn "the repository history was not checked: the LAB_REPO variable is not set" \
+       "to check it too: export LAB_REPO=~/passes-gitops && ./check.sh"
 elif [ ! -d "$REPO/.git" ]; then
-  warn "in ${REPO} gibt es keinen Klon des Repositorys" \
-       "geben Sie den Ordner an, in den Sie git clone gemacht haben"
+  warn "there is no clone of the repository in ${REPO}" \
+       "specify the folder into which you did git clone"
 else
   HEAD_SHA="$(git -C "$REPO" rev-parse HEAD 2>/dev/null | cut -c1-7)"
   LOG="$(git -C "$REPO" log --oneline -20 2>/dev/null)"
 
   if printf '%s' "$LOG" | grep -qi '^[0-9a-f]* *revert'; then
-    ok "die Historie enthält ein Rückgängigmachen über git revert — die schlechte Änderung wurde dort rückgängig gemacht, wo die Wahrheit lebt"
-    evidence "Änderungshistorie" "$LOG"
+    ok "the history has a rollback via git revert — the bad change was undone where the truth lives"
+    evidence "Change history" "$LOG"
   else
-    fail "in den letzten Commits gibt es kein einziges revert" \
-         "machen Sie die schlechte Änderung mit git revert --no-edit HEAD rückgängig und pushen Sie, nicht mit kubectl rollout undo"
+    fail "there is no single revert in the recent commits" \
+         "roll back the bad change with git revert --no-edit HEAD and push, not with kubectl rollout undo"
   fi
 
-  # Das im Cluster Angewandte muss mit dem letzten Commit im Branch übereinstimmen.
+  # What is applied in the cluster must match the latest commit in the branch.
   if [ -n "$HEAD_SHA" ] && printf '%s' "${KS_REV:-}" | grep -q "$HEAD_SHA"; then
-    ok "im Cluster läuft genau das, was in Ihrem Branch liegt (Commit ${HEAD_SHA})"
+    ok "the cluster runs exactly what is in your branch (commit ${HEAD_SHA})"
   elif [ -n "$HEAD_SHA" ]; then
-    warn "der Commit im Cluster (${KS_REV:-unbekannt}) unterscheidet sich vom lokalen HEAD (${HEAD_SHA})" \
-         "prüfen Sie, dass die lokalen Commits gepusht wurden (git push), und warten Sie das Abgleichsintervall ab"
+    warn "the commit in the cluster (${KS_REV:-unknown}) differs from the local HEAD (${HEAD_SHA})" \
+         "check that the local commits are pushed (git push), and wait for the reconciliation interval"
   fi
 fi
 

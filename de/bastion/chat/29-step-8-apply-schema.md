@@ -17,14 +17,14 @@ Wir nehmen ihn aus dem PGDG-Repository — für CentOS 7 ist dort maximal Versio
 Drei Befehle nacheinander, jeder aus einem eigenen Grund:
 
 ```bash
-# 1. Das PGDG-Repository einbinden — die Quelle der PostgreSQL-Pakete.
+# 1. Wire up the PGDG repository — the source of PostgreSQL packages.
 yum install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm
 
-# 2. Die Bibliothek libzstd, ohne die sich der Client nicht installieren lässt. In den
-#    CentOS-7-Repositories ist sie nicht enthalten, deshalb nehmen wir sie aus dem EPEL-Archiv.
+# 2. The libzstd library, without which the client won't install. It's not in the CentOS 7
+#    repositories, so we take it from the EPEL archive.
 yum install -y https://archives.fedoraproject.org/pub/archive/epel/7/x86_64/Packages/l/libzstd-1.5.5-1.el7.x86_64.rpm
 
-# 3. Der Client selbst — nur aus dem aktiven Repository pgdg15.
+# 3. The client itself — only from the live pgdg15 repository.
 yum install -y --disablerepo='pgdg*' --enablerepo=pgdg15 postgresql15
 ```
 
@@ -55,7 +55,7 @@ psql --version
 **Holen Sie sich die Schemadatei** — die Maschine hat bereits Netzwerk:
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/bastion/scripts/orders-schema.sql
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/bastion/scripts/orders-schema.sql
 ```
 
 **Anwenden.** Zerlegen wir den Befehl Stück für Stück, damit Sie nicht blind tippen:

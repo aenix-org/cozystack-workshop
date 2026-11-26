@@ -1,20 +1,20 @@
 ---
-# Lab 7 · un stub para el directorio legacy de empleados.
-# En la vida real este es el sistema de otra persona que no te permitirán reescribir: responde en 800 ms,
-# y de algún modo tienes que vivir con eso. Aquí hay un stub con el mismo comportamiento, para que haya algo que medir.
+# Lab 7 · a stub for the legacy employee directory.
+# In real life this is someone else's system that you won't be allowed to rewrite: it responds in 800 ms,
+# and you have to live with that somehow. Here is a stub with the same behavior, so there is something to measure.
 #
-# Dónde aplica: tu clúster `lab` (export KUBECONFIG=~/lab.kubeconfig), no el clúster de gestión
-# de Cozystack. Comando: kubectl apply -f hr-legacy.yaml
+# Where it applies: your `lab` cluster (export KUBECONFIG=~/lab.kubeconfig), not the Cozystack
+# management cluster. Command: kubectl apply -f hr-legacy.yaml
 #
-# HARBOR-HOST es un marcador de posición, no una dirección. Sustituye la dirección de tu propio Harbor, de lo contrario el clúster
-# intentará descargar la imagen desde un host inexistente:
+# HARBOR-HOST is a placeholder, not an address. Substitute the address of your own Harbor, otherwise the cluster
+# will try to pull the image from a nonexistent host:
 #   sed -i    's|HARBOR-HOST|harbor.workshop03.example.org|g' *.yaml   # Linux
 #   sed -i '' 's|HARBOR-HOST|harbor.workshop03.example.org|g' *.yaml   # macOS
 #
-# El archivo tiene dos objetos separados por una línea `---`: un Deployment (qué se ejecuta y en cuántas
-# copias) y un Service (un nombre permanente que se usa para alcanzar esas copias). Para cada objeto
-# apiVersion y kind dicen qué tipo de objeto es, y metadata.name es cómo se llama;
-# más abajo estos tres campos no se comentan.
+# The file has two objects separated by a `---` line: a Deployment (what runs and in how many
+# copies) and a Service (a permanent name used to reach those copies). For each object
+# apiVersion and kind say what kind of object it is, and metadata.name is what it's called;
+# further down these three fields are not commented.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -22,72 +22,72 @@ metadata:
   labels:
     app: hr-legacy
 spec:
-  # Cuántas copias mantener en ejecución. Si una copia desaparece, el clúster creará una nueva sin
-  # preguntar. Con una basta para el directorio: no está aquí para carga, sino para medición.
+  # How many copies to keep running. If a copy disappears, the cluster will create a new one without
+  # asking. One is enough for the directory: it's here not for load, but for measurement.
   replicas: 1
-  # Por esta etiqueta el Deployment reconoce sus pods entre todos los demás en el clúster.
-  # La etiqueta en selector y la etiqueta en template de abajo deben coincidir, de lo contrario el objeto
-  # no encontrará lo que él mismo creó.
+  # By this label the Deployment recognizes its pods among all the others in the cluster.
+  # The label in selector and the label in template below must match, otherwise the object
+  # won't find what it created itself.
   selector:
     matchLabels:
       app: hr-legacy
-  # template es la plantilla del pod. Todo lo que está debajo describe una copia: de qué construirla,
-  # con qué privilegios ejecutarla, y cómo saber que está lista para aceptar solicitudes.
+  # template is the pod template. Everything below describes one copy: what to build it from,
+  # with which privileges to run it, and how to tell that it's ready to accept requests.
   template:
     metadata:
       labels:
         app: hr-legacy
     spec:
-      # Requisitos de seguridad a nivel de pod. El proceso no se ejecuta como root (uid 10001),
-      # el perfil seccomp corta las llamadas al sistema que la aplicación no necesita.
-      # En un clúster con políticas habilitadas, un pod sin estos campos no arrancará en absoluto.
+      # Pod-level security requirements. The process runs not as root (uid 10001),
+      # the seccomp profile cuts off system calls the application doesn't need.
+      # In a cluster with policies enabled, a pod without these fields won't start at all.
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
         seccompProfile:
           type: RuntimeDefault
-      # Harbor está cerrado con un login y una contraseña, y el clúster necesita algo con que identificarse. El
-      # secreto `harbor` lo configuraste en la lab del registro. Sin esta referencia la imagen no se descargará,
-      # y el pod quedará en el estado ImagePullBackOff.
+      # Harbor is closed off by a login and password, and the cluster needs something to identify itself with. The
+      # `harbor` secret you set up in the registry lab. Without this reference the image won't be pulled,
+      # and the pod will stay in the ImagePullBackOff state.
       imagePullSecrets:
         - name: harbor
       containers:
         - name: hr
-          # Lo mismo que a nivel de pod, pero para un contenedor específico: prohibimos
-          # la escalada de privilegios y quitamos todas las capacidades del kernel. La aplicación en Go
-          # no necesita ninguna de ellas.
+          # The same as at the pod level, but for a specific container: we forbid
+          # privilege escalation and drop all kernel capabilities. The Go application
+          # needs none of them.
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # La imagen es la misma para el directorio y para el propio servicio «Pase de invitado».
-          # Qué proceso arranca realmente lo decide la variable MODE de abajo.
+          # The image is the same for the directory and for the "Guest Pass" service itself.
+          # Which process actually starts is decided by the MODE variable below.
           image: HARBOR-HOST/passes/passes-api:v2
-          # El puerto tiene un nombre, no solo un número: la sonda de readiness y el Service de abajo
-          # referencian el nombre. Si el número cambia, lo editarás en un solo lugar.
+          # The port has a name, not just a number: the readiness probe and the Service below
+          # reference the name. If the number changes, you'll edit it in one place.
           ports:
             - containerPort: 8080
               name: http
-          # Las variables de entorno son la única manera de configurar esta aplicación.
-          # No hace falta reconstruir la imagen para cambiar el comportamiento.
+          # Environment variables are the only way to configure this application.
+          # There's no need to rebuild the image to change behavior.
           env:
-            # MODE=hr — la instancia finge ser un sistema de RRHH: espera y responde.
+            # MODE=hr — the instance pretends to be an HR system: it waits and responds.
             - name: MODE
               value: "hr"
-            # Exactamente el retardo que muestra el directorio real.
-            # Al cambiarlo, cambias «qué tan mal están las cosas» — prueba 2s después.
+            # Exactly the delay that the real directory shows.
+            # By changing it, you change "how bad things are" — try 2s afterwards.
             - name: HR_DELAY
               value: "800ms"
-            # Un pod no conoce su propio nombre de antemano — el clúster se lo asigna al crearlo.
-            # fieldRef sustituye este nombre en la variable al arrancar, y este
-            # acaba en la respuesta del servicio: puedes ver qué copia respondió.
+            # A pod doesn't know its own name in advance — the cluster assigns it on creation.
+            # fieldRef substitutes this name into the variable at startup, and it
+            # ends up in the service's response: you can see which copy answered.
             - name: POD_NAME
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
-          # requests — cuántos recursos se reservan para el contenedor al elegir un nodo,
-          # limits — el techo que no se le permitirá superar. Similar a reservation
-          # y limit en vSphere, pero se establece por contenedor, no por máquina virtual.
+          # requests — how many resources are reserved for the container when choosing a node,
+          # limits — the ceiling it won't be allowed to exceed. Similar to reservation
+          # and limit in vSphere, but set per container, not per virtual machine.
           resources:
             requests:
               cpu: 50m
@@ -95,9 +95,9 @@ spec:
             limits:
               cpu: "1"
               memory: 64Mi
-          # Sonda de readiness. Hasta que /healthz responda, el Service no enviará ni una sola solicitud
-          # a esta copia. Sin la sonda, el tráfico iría a un proceso que aún no ha arrancado,
-          # y verías errores de la nada — aunque «todo se desplegó».
+          # Readiness probe. Until /healthz responds, the Service won't send a single request
+          # to this copy. Without the probe, traffic would go to a process that hasn't started yet,
+          # and you'd see errors out of nowhere — even though "everything rolled out".
           readinessProbe:
             httpGet:
               path: /healthz
@@ -105,19 +105,19 @@ spec:
             initialDelaySeconds: 2
             periodSeconds: 5
 ---
-# Service — un nombre permanente y una dirección permanente para un conjunto de pods. Los pods se recrean
-# y cada vez reciben una nueva IP, pero el nombre hr-legacy permanece igual. Similar a una VIP de
-# balanceador de carga, pero se configura en cuatro líneas y vive dentro del clúster.
+# Service — a permanent name and permanent address for a set of pods. Pods get recreated
+# and each time receive a new IP, but the name hr-legacy stays the same. Similar to a load
+# balancer VIP, but set up in four lines and living inside the cluster.
 apiVersion: v1
 kind: Service
 metadata:
   name: hr-legacy
 spec:
-  # Por esta etiqueta el Service reúne la lista de copias vivas. La misma etiqueta que en los pods de arriba:
-  # si no coincide, el Service existirá y no llevará a ninguna parte.
+  # By this label the Service gathers the list of live copies. The same label as on the pods above:
+  # if it doesn't match, the Service will exist and lead nowhere.
   selector:
     app: hr-legacy
   ports:
-    # Las solicitudes llegan por el puerto 80, dentro del pod esto va al puerto llamado http (8080).
+    # Requests come in on port 80, inside the pod this goes to the port named http (8080).
     - port: 80
       targetPort: http

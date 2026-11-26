@@ -1,32 +1,32 @@
 ---
-# 实验 12。用于承载遗留员工通讯录的虚拟机：磁盘和机器本身，
-# 一个文件里两个对象，用 `---` 行分隔。
+# Lab 12. A virtual machine for a legacy staff directory: the disk and the machine itself,
+# two objects in one file, separated by a `---` line.
 #
-# 这些是租户对象：它们不在 `lab` 集群里，而在管理集群上你自己的
-# namespace 中。需要用租户的 kubeconfig。
+# These are tenant objects: they live NOT in the `lab` cluster, but in your namespace
+# on the management cluster. You need the tenant kubeconfig.
 #
-# 应用前请把 tenant-workshopXX 替换成你自己的 namespace，否则订单会发到
-# 别人的租户，而不是你的。
+# Before applying, replace tenant-workshopXX with your own namespace, otherwise the order will go
+# to the wrong tenant instead of yours.
 #
 #     export KUBECONFIG=~/.kube/config
 #     kubectl apply -f staff-directory-vm.yaml
 #
-# 同样的操作也可以在租户仪表盘里用鼠标完成（创建应用 -> VM Disk，
-# 然后 VM Instance）——结果完全一样。
+# The same thing can be done with the mouse in the tenant dashboard (Create application -> VM Disk,
+# then VM Instance) — the result is identical.
 #
-# 注意：之后调用这台机器所用的名字与 metadata.name 不一致，这并不是
-# 实验里的笔误。平台用 `vm-instance` 图表部署一个名为 X 的 VMInstance 对象，
-# 而图表名会拼接到发布名上：运行中的实例
-# 叫 vm-instance-X。此外，目标要带上类型前缀，因为
-# 租户权限授予的是实例（virtualmachineinstances，即 vmi），而不是
-# virtualmachines——裸名字会返回 forbidden。因此进入控制台的命令是：
+# ATTENTION: the name the machine is called by later does NOT match metadata.name, and this is not
+# a typo in the lab. The platform deploys a VMInstance object named X with the
+# `vm-instance` chart, and the chart name is glued to the release name: the running instance
+# is called vm-instance-X. On top of that, the target is specified with a type prefix, because
+# tenant permissions are granted on instances (virtualmachineinstances, aka vmi), not on
+# virtualmachines — a bare name will return forbidden. Hence the console login command:
 #     virtctl console --namespace=tenant-workshopXX vmi/vm-instance-spravochnik
-# 列出运行中的实例：kubectl get vmi -n tenant-workshopXX
-# 而 `kubectl get vminstance spravochnik` 显示的不是实例，而是你对它的订单——
-# 也就是下面描述的那个对象。
+# List of running instances: kubectl get vmi -n tenant-workshopXX
+# And `kubectl get vminstance spravochnik` shows not the instance, but your order for it —
+# the very object described below.
 #
-# 磁盘和机器是两个不同的对象，这不是官僚主义：磁盘比机器
-# 活得更久。机器可以删除后重新创建，再挂上同一块磁盘。
+# The disk and the machine are TWO DIFFERENT objects, and this is not bureaucracy: the disk outlives
+# the machine. The machine can be deleted and recreated, attaching the same disk.
 apiVersion: apps.cozystack.io/v1alpha1
 kind: VMDisk
 metadata:
@@ -35,16 +35,16 @@ metadata:
 spec:
   source:
     image:
-      # 来自平台共享镜像集合的名字，不是 URL。
-      # 创建磁盘时在仪表盘里能看到这个列表。
+      # A name from the platform's shared image collection, not a URL.
+      # The list is visible in the dashboard when creating a disk.
       name: ubuntu-22.04
-  # 磁盘大小。它不能小于源镜像：ubuntu-22.04 展开
-  # 需要 20Gi，平台会拒绝往 10Gi 的磁盘里灌。磁盘以后可以扩容，
-  # 但不能缩小，所以在这里估小比估大代价更高。
+  # Disk size. It cannot be smaller than the source image: ubuntu-22.04 expands
+  # to 20Gi, and the platform would refuse to fill a 10Gi disk. The disk can be expanded later,
+  # but not shrunk, so underestimating here costs more than overestimating.
   storage: 20Gi
-  # 存储类。`replicated`——数据会以多份副本写到平台的不同
-  # 节点上：持有副本的节点挂掉，机器仍能继续工作。本质上这就是
-  # 一面镜子，只不过是通过网络组起来的。相邻实验里的数据库用的是同一个类。
+  # Storage class. `replicated` — data is written in several copies to different platform
+  # nodes: a node holding a copy can die, and the machine keeps working. In essence this is
+  # a mirror, only assembled over the network. The databases in the neighboring labs use the same class.
   storageClass: replicated
 ---
 apiVersion: apps.cozystack.io/v1alpha1
@@ -53,44 +53,44 @@ metadata:
   name: spravochnik
   namespace: tenant-workshopXX
 spec:
-  # 1 个 CPU，4 GB。就是从同一份目录参考里取的，
-  # Kubernetes 节点的规格也从这里取：机器和节点在这里用同样的方式度量。
+  # 1 CPU, 4 GB. The same catalog reference from which the sizes of
+  # Kubernetes nodes are taken: machines and nodes are measured the same way here.
   instanceType: u1.medium
-  # 客户机操作系统的配置档：给机器塞哪些驱动和设备。
+  # Guest OS profile: which drivers and devices to hand to the machine.
   instanceProfile: ubuntu
-  # Always 表示“保持开机”：自己关了——就再开起来。
-  # Halted——关机，Manual——保持原样。
+  # Always means "keep it running": if it shuts down on its own — it will be started again.
+  # Halted — off, Manual — as left.
   runStrategy: Always
-  # 给机器挂哪些磁盘。引用是按上面 VMDisk 对象的名字——就是
-  # 那个会比这台机器活得更久的对象。
+  # Which disks to attach to the machine. The reference is by the name of the VMDisk object above — the
+  # very one that will outlive this machine.
   disks:
     - name: spravochnik
-  # 请注意：这里没有 replicas 字段，以后也不会有。
-  # 虚拟机是单个对象。需要两台机器——就是两个对象，
-  # 名字不同。这是与 Deployment 的根本区别，
-  # 见 README 中讲这个区别在哪里会带来痛点的那一节。
-  # 客户机操作系统的初次配置。cloud-init 是 Linux 云
-  # 镜像的标准机制：首次启动时机器读取这段文本并把它应用到自身。就其作用而言
-  # 它相当于 vSphere 里的客户机定制——密码、文件、服务——只不过是用描述，而不是
-  # 用向导。`|` 之后缩进以下的一切都会原样进入客户机，并在
-  # 那里解析，而不是由 Kubernetes 解析。
+  # Note: there is NO replicas field here, and there won't be.
+  # A virtual machine is a single object. Need two machines — two objects
+  # with different names. This is a fundamental difference from Deployment,
+  # see the README section about where this difference hurts.
+  # Initial setup of the guest OS. cloud-init is the standard mechanism of Linux cloud
+  # images: on first boot the machine reads this text and applies it to itself. In its role
+  # it is guest customization in vSphere — passwords, files, services — only by description, not
+  # by a wizard. Everything below the indentation after `|` goes to the guest verbatim and is parsed
+  # there, not by Kubernetes.
   #
-  # 这里 cloud-init 把通讯录变成一个服务器：放上一个 HTML 页面并建立一个服务，
-  # 通过 HTTP 在 8080 端口把它提供出去。python3 已经在 ubuntu 镜像里了——为此
-  # 不需要互联网。8080 端口不是随便选的：主讲人事先已在你的租户里创建了
-  # Service `spravochnik-http`（80 -> 8080）和 Ingress `spravochnik`，一旦机器
-  # 内部的服务起来，通讯录就会发布到租户域名上。
+  # Here cloud-init turns the directory into a server: it places an HTML page and sets up a service
+  # that serves it over HTTP on port 8080. python3 is already in the ubuntu image — the internet
+  # is not needed for this. Port 8080 is not random: the instructor has already created a
+  # Service `spravochnik-http` (80 -> 8080) and an Ingress `spravochnik` in your tenant, and as soon as the service
+  # inside the machine comes up, the directory will be published on the tenant domain.
   cloudInit: |
     #cloud-config
-    # 需要这个密码是为了从仪表盘登入控制台。在生产机器上
-    # 不该这么做——那里要用 sshKeys。
+    # The password is needed to log in to the console from the dashboard. On a production machine
+    # you should not do this — use sshKeys there.
     password: ubuntu
     chpasswd: { expire: false }
     ssh_pwauth: true
     write_files:
       - path: /opt/directory/index.html
         content: |
-          <!doctype html><html lang="zh"><head><meta charset="utf-8"><title>通讯录</title></head><body><h1>员工通讯录</h1><ul><li>王军 — 101</li><li>潘平 — 102</li></ul></body></html>
+          <!doctype html><html lang="en"><head><meta charset="utf-8"><title>Directory</title></head><body><h1>Staff directory</h1><ul><li>Whitfield J. — 101</li><li>Petersen P. — 102</li></ul></body></html>
       - path: /etc/systemd/system/directory.service
         content: |
           [Unit]

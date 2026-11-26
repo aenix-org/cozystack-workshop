@@ -20,13 +20,13 @@ password:  ...             ← I'll tell you in person
 **macOS und Linux**
 ```bash
 mkdir -p ~/.kube
-nano ~/.kube/workshop      # das Kopierte einfügen, dann speichern
+nano ~/.kube/workshop      # paste what you copied, then save
 export KUBECONFIG=~/.kube/workshop
 ```
 
 **Windows** (PowerShell)
 ```powershell
-notepad $HOME\.kube\workshop   # einfügen, dann speichern
+notepad $HOME\.kube\workshop   # paste, then save
 $env:KUBECONFIG = "$HOME\.kube\workshop"
 ```
 
@@ -50,13 +50,13 @@ kubeconfig, im Feld `certificate-authority-data`, und die Standarddatei enthält
 Gehen wir das Schritt für Schritt durch, in PowerShell:
 ```powershell
 $env:KUBECONFIG
-# leer — bedeutet, es wird die Standarddatei verwendet, nicht die, die Sie erhalten haben
+# empty — means it's using the default file, not the one you were given
 
 Select-String -Path "$HOME\.kube\workshop" -Pattern "certificate-authority-data" -Quiet
-# False — die Datei wurde unvollständig gespeichert; laden Sie das Secret erneut aus dem Dashboard herunter
+# False — the file was saved incompletely; download the secret from the dashboard again
 
 Get-Content "$HOME\.kube\workshop" -TotalCount 1
-# sollte mit apiVersion beginnen; kleine Quadrate oder Leere bedeuten, die Datei ist in UTF-16
+# should start with apiVersion; little squares or emptiness mean the file is in UTF-16
 ```
 
 Der dritte Punkt ist Windows' übelste Falle. Notepad und die Umleitung `>` speichern die

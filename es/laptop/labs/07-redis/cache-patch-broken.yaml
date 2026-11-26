@@ -1,21 +1,21 @@
 ---
-# Lab 7 · ESTE PARCHE ESTÁ DELIBERADAMENTE INCOMPLETO. Existe para que veas cómo se ve
-# «como que activamos la caché, pero no fue más rápido». La versión que funciona está en cache-patch.yaml.
+# Lab 7 · THIS PATCH IS INTENTIONALLY INCOMPLETE. It exists so that you can see what
+# "we sort of turned the cache on, but it didn't get any faster" looks like. The working version is in cache-patch.yaml.
 #
-# Se aplica en tu clúster `lab` (export KUBECONFIG=~/lab.kubeconfig):
+# Applied in your `lab` cluster (export KUBECONFIG=~/lab.kubeconfig):
 #   kubectl patch deployment passes-api --patch-file cache-patch-broken.yaml
 #
-# No hace falta mirar la respuesta. Aplícalo, haz un par de peticiones y mira los logs
-# de la aplicación: kubectl logs -l app=passes-api. La aplicación te dice qué le pasa
-# — la cuestión es leer el mensaje y averiguar qué le falta a este archivo.
+# No need to peek at the answer. Apply it, make a couple of requests, and look at the
+# application logs: kubectl logs -l app=passes-api. The application tells you what's wrong with it
+# — the point is to read the message and figure out what this file is missing.
 #
-# Sustituye la dirección de tu propio Redis en lugar de REDIS-ADDR (mira el paso sobre cómo encontrar la dirección).
-# No puedes dejar el marcador de posición: entonces obtendrás un error distinto, no el que se preparó para todo esto.
+# Substitute your own Redis address in place of REDIS-ADDR (see the step about finding the address).
+# You must not leave the placeholder: then you'll get a different error, not the one this whole thing was set up for.
 spec:
   template:
     spec:
       containers:
-        # El nombre del contenedor es la dirección por la que el clúster encuentra el lugar a parchear.
+        # The container name is the address by which the cluster finds the place to patch.
         - name: api
           env:
             - name: REDIS_ADDR

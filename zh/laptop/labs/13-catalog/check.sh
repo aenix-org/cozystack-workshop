@@ -1,153 +1,156 @@
 #!/usr/bin/env bash
-# 实验 13 的检查：chart 和应用定义已准备好交接给管理员。
+# Check for lab 13: the chart and app definition are ready to hand off to the admin.
 #
-# 本检查是有意做成本地的。租户无法应用 ApplicationDefinition
-#（该对象是 cluster-scoped 的），所以在集群里找它没有意义：
-# 对象不存在并不是参与者的过错。我们检查他们应负责的部分：
-# chart 能构建、schema 生效、定义能被解析并且与 chart 一致。
+# This check is DELIBERATELY local. A tenant cannot apply an ApplicationDefinition
+# (the object is cluster-scoped), so looking for it in the cluster is pointless:
+# the object's absence is not the participant's fault. We check what they are
+# responsible for: the chart builds, the schema works, the definition parses and
+# agrees with the chart.
 #
-# 从实验目录运行：
+# Run from the lab folder:
 #   cd labs/13-catalog && ./check.sh
-# 不要求有集群：没有 KUBECONFIG 时会有两项检查以警告跳过，
-# 而不是报错。
+# A cluster is not required: without KUBECONFIG two checks are skipped with a warning,
+# not an error.
 
 LAB_NAME="13-catalog"
-LAB_TITLE="实验 13 · 把你自己的应用放进 Cozystack 目录"
+LAB_TITLE="Lab 13 · Your own application in the Cozystack catalog"
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 CHART="$HERE/chart"
 APPDEF="$HERE/applicationdefinition.yaml"
 
-# --- 工具 ------------------------------------------------------------------
-# 没有 helm 就无从检查，所以脚本到这里直接停止，不再往下抛出一堆
-# 相同的失败信息。
+# --- tools -----------------------------------------------------------------
+# Without helm there is nothing to check, so the script stops right here and does not
+# spew a dozen identical failures further down.
 if ! command -v helm >/dev/null 2>&1; then
-  fail "本机未安装 helm" \
-       "请安装：brew install helm（macOS）或 https://helm.sh/docs/intro/install/ —— 没有它无法检查本实验"
+  fail "helm is not installed on this machine" \
+       "install it: brew install helm (macOS) or https://helm.sh/docs/intro/install/ — without it the lab cannot be checked"
   finish
   exit $?
 fi
 HELM_VER="$(helm version --short 2>/dev/null)"
-ok "helm 已就绪（${HELM_VER}）"
-evidence "helm 版本" "$HELM_VER"
+ok "helm is present (${HELM_VER})"
+evidence "helm version" "$HELM_VER"
 
-# --- chart 是否存在 --------------------------------------------------------
-# 要区分「chart 坏了」和「脚本从错误的目录运行」。后一种错误比前一种更常见，
-# 它的提示信息应当单独给出。
+# --- chart is present ------------------------------------------------------
+# Distinguish "the chart is broken" from "the script was run from the wrong folder".
+# The second mistake is more common than the first, and its message should be separate.
 if [ ! -f "$CHART/Chart.yaml" ]; then
-  fail "在 ${CHART} 中未找到 chart" \
-       "请从实验目录运行脚本：cd labs/13-catalog && ./check.sh"
+  fail "no chart found in ${CHART}" \
+       "run the script from the lab folder: cd labs/13-catalog && ./check.sh"
   finish
   exit $?
 fi
 
-# --- 检查器 ----------------------------------------------------------------
-# helm lint 把 chart 当作文本来读：它能发现模板里的拼写错误、缺失的 Chart.yaml
-# 字段、对不存在的 values 的引用。这一步还不会触及集群。
+# --- linter ----------------------------------------------------------------
+# helm lint reads the chart as text: it finds typos in templates, missing Chart.yaml
+# fields, references to nonexistent values. It never reaches the cluster here.
 LINT_OUT="$(helm lint "$CHART" 2>&1)"
 if printf '%s' "$LINT_OUT" | grep -q '0 chart(s) failed'; then
-  ok "chart 通过了 helm lint"
+  ok "the chart passes helm lint"
   evidence "helm lint" "$LINT_OUT"
 else
-  fail "chart 未通过 helm lint" \
-       "阅读下面的输出并修复所指出的文件：helm lint chart"
+  fail "the chart does not pass helm lint" \
+       "read the output below and fix the indicated files: helm lint chart"
   evidence "helm lint" "$LINT_OUT"
 fi
 
-# --- 渲染 ------------------------------------------------------------------
-# 空输出和只有注释的输出都能骗过检查器，所以我们检查渲染结果中是否含有
-# Deployment，并列出到底渲染出了什么。这里的重点不是「命令跑通了」，
-# 而是「产出了真正的对象」。
+# --- render ----------------------------------------------------------------
+# Empty output and output made only of comments would slip past the linter, so we check
+# that the rendered output contains a Deployment, and list what actually came out.
+# The point here is not "the command ran" but "real objects were produced".
 RENDER="$(helm template main "$CHART" 2>&1)"
 if printf '%s' "$RENDER" | grep -q '^kind: Deployment'; then
   KINDS="$(printf '%s' "$RENDER" | grep '^kind:' | awk '{print $2}' | sort -u | tr '\n' ' ')"
-  ok "chart 能渲染，产出对象：${KINDS}"
-  evidence "chart 渲染出的内容" "$KINDS"
+  ok "the chart renders, producing objects: ${KINDS}"
+  evidence "What the chart renders" "$KINDS"
 else
-  fail "helm template 没有产出任何 Deployment" \
-       "查看渲染错误：helm template main chart"
-  evidence "helm template 输出" "$(printf '%s' "$RENDER" | head -30)"
+  fail "helm template did not produce a single Deployment" \
+       "look at the render error: helm template main chart"
+  evidence "helm template output" "$(printf '%s' "$RENDER" | head -30)"
 fi
 
-# --- chart 被真实集群接受 --------------------------------------------------
-# 这是整套实验中唯一一项把清单与真实集群 schema 而非文本进行比对的检查。
+# --- the chart is accepted by a real cluster -------------------------------
+# The only check in the whole lab set that verifies the manifest against a real cluster
+# schema rather than against text.
 #
-# `helm lint` 和 `helm template` 检查的是模板，但不检查 Kubernetes schema：
-# 字段放错位置的清单能骗过它们，而集群会拒绝它。这是吃过亏才学到的 ——
-# 一个被误放进 volumes 里的 securityContext 通过了两者，
-# 却只在服务器上崩掉。这项检查在应用 chart 的地方才需要。
+# `helm lint` and `helm template` check the templates, but NOT the Kubernetes schema: a
+# manifest with a field in the wrong place slips past them, while the cluster rejects it.
+# Learned the hard way — a securityContext mistakenly placed inside volumes passed both
+# and only fell apart on the server. The check is needed where the chart is applied.
 #
-# 为什么 lint 和 template 不能取代它：
-#   helm lint      看的是 chart 的结构：文件是否齐全、模板能否解析；
-#   helm template  代入 values 并输出文本 —— 但那些字段是什么、这类对象
-#                  能不能有它们，它不知道也无从知道；
-#   apply --dry-run=server 把清单发送到 apiserver，由它把清单跑过类型 schema
-#                  和准入控制，回答是否会接受，同时什么也不创建。于是就有了
-#                  `unknown field` 和按策略的拒绝 —— 正是 chart 在客户现场
-#                  绊倒的地方。
-# --dry-run=client 标志给不出这项检查：它是在你的机器上解析清单。
+# Why lint and template do not replace it:
+#   helm lint      looks at the chart's structure: files are present, templates parse;
+#   helm template  substitutes values and emits text — but what those fields are and whether
+#                  such an object can even have them, it does not and cannot know;
+#   apply --dry-run=server sends the manifest to the apiserver, which runs it through the
+#                  type schema and admission control and answers whether it would accept it,
+#                  creating nothing. Hence `unknown field` and a policy rejection —
+#                  exactly what the chart trips over at the customer's site.
+# The --dry-run=client flag does not give this check: it parses the manifest on your machine.
 if [ -n "${KUBECONFIG:-}" ] && kubectl version -o json >/dev/null 2>&1; then
   DRY="$(printf '%s' "$RENDER" | kubectl apply --dry-run=server -f - 2>&1)"
-  # 权限被拒和 schema 被拒是两回事，绝不能混淆。在租户访问下
-  #（~/.kube/workshop）根本没有对 Deployment 和 ConfigMap 的权限，所以这里
-  # 会飞来一个 Forbidden —— 而这对 chart 的质量什么也说明不了。只有用对
-  # `lab` 集群的访问权限才能做有意义的检查，在那里你是完全的主人。
+  # A permission denial and a schema denial are different things, and must not be confused.
+  # Under tenant access (~/.kube/workshop) there are no rights on Deployment and ConfigMap
+  # at all, so a Forbidden will arrive here — and that says nothing about the chart's
+  # quality. A meaningful check is only possible with access to the `lab` cluster, where
+  # you are the full owner.
   if printf '%s' "$DRY" | grep -qiE 'forbidden|cannot create|is not allowed'; then
-    warn "跳过服务端 chart 检查：当前访问权限不允许执行它" \
-         "用对你自己集群的访问权限来运行它：KUBECONFIG=~/lab.kubeconfig ./check.sh"
+    warn "server-side chart check skipped: current access does not permit it" \
+         "run it with access to your own cluster: KUBECONFIG=~/lab.kubeconfig ./check.sh"
   elif printf '%s' "$DRY" | grep -qiE 'error|unknown field|invalid'; then
-    fail "集群拒绝了渲染出的 chart" \
-         "查看：helm template main chart | kubectl apply --dry-run=server -f -"
-    evidence "服务端拒绝" "$(printf '%s' "$DRY" | grep -iE 'error|unknown field' | head -5)"
+    fail "the cluster rejects the rendered chart" \
+         "look: helm template main chart | kubectl apply --dry-run=server -f -"
+    evidence "Server rejection" "$(printf '%s' "$DRY" | grep -iE 'error|unknown field' | head -5)"
   else
-    ok "集群接受了渲染出的 chart —— 字段及其位置都正确"
+    ok "the cluster accepts the rendered chart — the fields and their places are correct"
   fi
 else
-  warn "跳过对集群的 chart 检查：无访问权限" \
-       "设置 KUBECONFIG，以便用 kubectl apply --dry-run=server 跑一遍 helm template"
+  warn "chart check against the cluster skipped: no access" \
+       "set KUBECONFIG to run helm template through kubectl apply --dry-run=server"
 fi
 
-# --- 参数确实传到了清单 ----------------------------------------------------
-# chart 可能能构建、能渲染，而某个参数却没有被代入任何地方 ——
-# 例如把该值当作数字硬编码进了模板。所以我们对每个参数都动真格地测试：
-# 设一个明显不寻常的值，然后在成品清单里找它。
+# --- parameters actually reach the manifests -------------------------------
+# A chart may build and render while a parameter is substituted nowhere —
+# for example, the value was hard-coded into the template as a number. So we test each
+# parameter for real: set a deliberately unusual value and look for it in the finished manifest.
 R5="$(helm template main "$CHART" --set replicas=5 2>/dev/null | grep -c 'replicas: 5')"
 if [ "${R5:-0}" -ge 1 ]; then
-  ok "replicas 参数传到了清单（--set replicas=5 得到 replicas: 5）"
+  ok "the replicas parameter reaches the manifest (--set replicas=5 gives replicas: 5)"
 else
-  fail "replicas 参数没有传到清单" \
-       "templates/deployment.yaml 中应当写 replicas: {{ .Values.replicas }}"
+  fail "the replicas parameter does not reach the manifest" \
+       "templates/deployment.yaml should have replicas: {{ .Values.replicas }}"
 fi
 
 EXT="$(helm template main "$CHART" --set external=true 2>/dev/null | grep -c 'type: LoadBalancer')"
 if [ "${EXT:-0}" -ge 1 ]; then
-  ok "external 参数把 Service 类型切换为 LoadBalancer"
+  ok "the external parameter switches the Service type to LoadBalancer"
 else
-  warn "external 参数没有切换 Service 类型" \
-       "这不是 chart 的缺陷，而是 Cozystack 目录的约定：应用的 external 字段就是指对外访问"
+  warn "the external parameter does not switch the Service type" \
+       "not a chart defect, but a Cozystack catalog convention: an application's external field means exactly external access"
 fi
 
-# --- schema 确实起到防护作用 -----------------------------------------------
-# 一个什么都不拒绝的 schema 毫无用处。我们检查它是否会拒绝。
+# --- the schema actually protects ------------------------------------------
+# A schema that rejects nothing is useless. We check that it rejects.
 if helm template main "$CHART" --set replicas=abc >/dev/null 2>&1; then
-  fail "values schema 没有拒绝一个明显无效的值（replicas=abc 通过了）" \
-       "检查 values.schema.json 是否与 values.yaml 放在一起，且其中把 replicas 声明为 integer"
+  fail "the values schema does not reject an obviously invalid value (replicas=abc passed)" \
+       "check that values.schema.json sits next to values.yaml and declares replicas as an integer"
 else
-  ok "values schema 拒绝了错误的类型（replicas=abc 没通过）"
+  ok "the values schema rejects the wrong type (replicas=abc does not pass)"
 fi
 
-# --- ApplicationDefinition：必填字段 ---------------------------------------
-# 参与者无法应用该定义，因此也看不到 apiserver 的拒绝。所以我们在这里清点
-# 必填字段：缺少其中任何一个，管理员都会在自己那边收到拒绝，而要去排查的
-# 是文件的作者。
+# --- ApplicationDefinition: required fields --------------------------------
+# The participant cannot apply the definition, so they will not see the apiserver's
+# rejection either. So we tally the required fields here: without any one of them the admin
+# gets a rejection on their own side, and the file's author is the one who has to sort it out.
 if [ ! -f "$APPDEF" ]; then
-  fail "未找到：${APPDEF}" \
-       "该文件应当与 chart 放在一起；从实验仓库里取用它"
+  fail "not found: ${APPDEF}" \
+       "the file should sit next to the chart; take it from the labs repository"
 else
   MISSING=""
-  # 我们逐行查找键，而不解析 YAML：不是每台机器都装了 PyYAML，
-  # 仅为检查一个文件而引入依赖不值得。
+  # We look for keys line by line, without parsing YAML: PyYAML is not on every machine,
+  # and pulling in a dependency just to check one file is not worth it.
   check_key() {
     grep -Eq "$1" "$APPDEF" || MISSING="$MISSING $2"
   }
@@ -163,19 +166,19 @@ else
   check_key '^[[:space:]]{4}icon:[[:space:]]+\S+' 'dashboard.icon'
 
   if [ -z "$MISSING" ]; then
-    ok "ApplicationDefinition 中所有必填字段都在"
+    ok "all required fields are present in the ApplicationDefinition"
   else
-    fail "ApplicationDefinition 缺少字段：${MISSING}" \
-         "对照 README 中的讲解 —— 缺少其中任何一个，管理员在应用时都会收到拒绝"
+    fail "the ApplicationDefinition is missing fields:${MISSING}" \
+         "cross-check with the walkthrough in the README — without any one of them the admin gets a rejection on apply"
   fi
 
-  # --- 定义中的 schema 能解析并与 chart 的 schema 一致 --------------------
-  # 这是同一样东西的两份独立副本，两者之间没有任何关联。
-  # 一旦分道扬镳，dashboard 表单就会显示出 chart 并不期待的字段。
+  # --- the schema in the definition parses and matches the chart schema ----
+  # These are two separate copies of the same thing, with no link between them.
+  # If they drift apart, the dashboard form will show fields the chart does not expect.
   SCHEMA_LINE="$(awk '/openAPISchema:/{getline; sub(/^[[:space:]]+/,""); print; exit}' "$APPDEF")"
   if [ -z "$SCHEMA_LINE" ]; then
-    fail "ApplicationDefinition 中的 openAPISchema 为空" \
-         "把 chart/values.schema.json 的内容作为单行填进去"
+    fail "the ApplicationDefinition has an empty openAPISchema" \
+         "put the contents of chart/values.schema.json there on a single line"
   else
     CMP="$(SCHEMA_LINE="$SCHEMA_LINE" python3 - "$CHART/values.schema.json" <<'PY' 2>&1
 import os, sys, json
@@ -194,34 +197,34 @@ if a == b:
 else:
     only_def = sorted(set(a) - set(b))
     only_chart = sorted(set(b) - set(a))
-    print("DIFF 仅在定义中: %s | 仅在 chart 中: %s"
+    print("DIFF only in the definition: %s | only in the chart: %s"
           % (",".join(only_def) or "-", ",".join(only_chart) or "-"))
 PY
 )"
     case "$CMP" in
       SAME*)
-        ok "定义中的 schema 能解析并与 chart 的 schema 一致（${CMP#SAME }）"
-        evidence "应用参数" "${CMP#SAME }"
+        ok "the schema in the definition parses and matches the chart schema (${CMP#SAME })"
+        evidence "Application parameters" "${CMP#SAME }"
         ;;
       DIFF*)
-        fail "定义中的 schema 与 chart 的 schema 出现分歧：${CMP#DIFF }" \
-             "让它们保持一致：openAPISchema 的内容就是单行的 chart/values.schema.json"
+        fail "the schema in the definition has drifted from the chart schema: ${CMP#DIFF }" \
+             "bring them into agreement: the openAPISchema contents are chart/values.schema.json on a single line"
         ;;
       BADJSON*)
-        fail "openAPISchema 无法解析为 JSON：${CMP#BADJSON }" \
-             "schema 必须是 'openAPISchema: |-' 下的单行合法 JSON"
+        fail "openAPISchema does not parse as JSON: ${CMP#BADJSON }" \
+             "the schema must be a single line of valid JSON under 'openAPISchema: |-'"
         ;;
       *)
-        warn "无法比对两份 schema（${CMP}）" \
-             "手动检查 openAPISchema 是否与 chart/values.schema.json 一致"
+        warn "could not compare the schemas (${CMP})" \
+             "check by hand that openAPISchema matches chart/values.schema.json"
         ;;
     esac
   fi
 
-  # --- 图标 ------------------------------------------------------------------
-  # dashboard 期待一个打包进 base64 的 SVG，并且不会为这张图去别处取。这里
-  # 的错误是无声的：清单能应用，而目录里图标的位置却是空的。所以我们把该字符串
-  # 解码，看看里面是否真的是 SVG。
+  # --- icon -----------------------------------------------------------------
+  # The dashboard expects an SVG packed into base64, and does not go anywhere for the image.
+  # An error here is silent: the manifest applies, but in the catalog the icon spot is empty.
+  # So we decode the string and check that what is inside really is an SVG.
   ICON="$(grep -Eo '^[[:space:]]{4}icon:[[:space:]]+\S+' "$APPDEF" | head -1 | awk '{print $2}')"
   if [ -n "$ICON" ]; then
     ICON_HEAD="$(printf '%s' "$ICON" | python3 -c 'import sys,base64
@@ -231,45 +234,45 @@ except Exception:
     print("")' 2>/dev/null)"
     case "$ICON_HEAD" in
       *"<svg"*)
-        ok "图标从 base64 解码出来，结果是一个 SVG"
-        evidence "图标开头" "$ICON_HEAD"
+        ok "the icon decodes from base64 and turns out to be an SVG"
+        evidence "Start of the icon" "$ICON_HEAD"
         ;;
       "")
-        fail "图标无法从 base64 解码" \
-             "重新生成该字符串：base64 -i icon.svg | tr -d '\\n'（Linux 上：base64 -w0 icon.svg）"
+        fail "the icon does not decode from base64" \
+             "rebuild the string: base64 -i icon.svg | tr -d '\\n' (on Linux: base64 -w0 icon.svg)"
         ;;
       *)
-        fail "图标能解码，但它不是 SVG" \
-             "dashboard 期待的正是 SVG；位图它会显示成乱码"
+        fail "the icon decodes, but it is not an SVG" \
+             "the dashboard expects exactly an SVG; a raster image it will show as garbage"
         ;;
     esac
   fi
 fi
 
-# --- 权限：这里被拒是预期之中 ----------------------------------------------
-# 这不是对参与者的检查，而是对平台如何构建的确认。所以答案 `no`
-# 是成功，而 `yes` 是该惊讶而非高兴的理由。
+# --- rights: a denial here is expected --------------------------------------
+# This is not a check of the participant but a confirmation of how the platform is built.
+# So an answer of `no` is a success, and `yes` is cause for surprise, not celebration.
 if [ -n "${KUBECONFIG:-}" ] && kubectl version -o json >/dev/null 2>&1; then
   CANI="$(kubectl auth can-i create applicationdefinitions 2>/dev/null)"
   case "$CANI" in
     no)
-      ok "已确认：你无权应用 ApplicationDefinition（can-i -> no）"
-      evidence "ApplicationDefinition 上的权限" \
+      ok "confirmed: you are not allowed to apply an ApplicationDefinition (can-i -> no)"
+      evidence "Rights on ApplicationDefinition" \
         "kubectl auth can-i create applicationdefinitions -> no
-该对象是 cluster-scoped 的，会改变所有租户的目录，所以由平台管理员来应用它。"
+The object is cluster-scoped and changes the catalog for all tenants, so the platform admin applies it."
       ;;
     yes)
-      warn "你有权限应用 ApplicationDefinition（can-i -> yes）" \
-           "这意味着你是以管理员账号在工作，而非租户账号；本实验面向的是租户账号"
+      warn "you have rights to apply an ApplicationDefinition (can-i -> yes)" \
+           "that means you are working under an admin account, not a tenant one; the lab is meant for a tenant account"
       ;;
     *)
-      warn "无法向集群询问权限" \
-           "不影响本实验的完成：检查是本地的，这里不需要集群"
+      warn "could not ask the cluster about rights" \
+           "does not block passing the lab: the check is local, no cluster is needed here"
       ;;
   esac
 else
-  warn "未查询集群（KUBECONFIG 未设置或无响应）" \
-       "检查是本地的，这里不需要集群。若想看到权限被拒：export KUBECONFIG=~/.kube/workshop"
+  warn "the cluster was not queried (KUBECONFIG not set or not responding)" \
+       "the check is local, no cluster is needed here. To see the rights denial: export KUBECONFIG=~/.kube/workshop"
 fi
 
 finish

@@ -1,31 +1,33 @@
 ---
-# Лаба 6 · Свій приватний реєстр образів. ЦЕЙ ФАЙЛ НАВМИСНО НЕПОВНИЙ.
+# Lab 6 · Your own private image registry. THIS FILE IS DELIBERATELY INCOMPLETE.
 #
-# Він не запрацює, і це задумано: ви маєте побачити відмову на власні очі й самі
-# зрозуміти, чого кластеру не вистачило. Не вистачає тут одного — того, чим кластер
-# називається закритому реєстру, коли приходить по образ. Реєстр не віддає образи
-# будь-кому, а в цьому описі немає нічого, що допомогло б кластеру довести своє
-# право. Який саме рядок це лагодить — розберете по ходу лаби; робочий варіант
-# лежить поруч, у passes.yaml, і відкривати його до розбору сенсу немає.
+# It won't work, and that's by design: you should see the failure with your own eyes and
+# figure out for yourself what the cluster was missing. What's missing here is one thing —
+# the thing the cluster calls itself to a closed registry when it comes for an image. The
+# registry doesn't hand out images to just anyone, and there's nothing in this manifest
+# that would help the cluster prove its right to them. Which exact line fixes this — you'll
+# work out over the course of the lab; the working version sits next to it, in passes.yaml,
+# and there's no point opening it before you've reasoned it through.
 #
-# Тут лише Deployment, без Service: постійне ім'я сервісу поки не потрібне —
-# до Pod, що відповідає, ми все одно не дістанемося, раз образ не завантажується.
+# Here there's only a Deployment, no Service: a permanent name for the service isn't needed
+# yet — we won't reach a responding pod anyway, since the image doesn't download.
 #
-# Застосовується на вашому кластері `lab`, у namespace за замовчуванням:
+# Applied on your `lab` cluster, in the default namespace:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl apply -f passes-broken.yaml
 #     kubectl get pods -l app=passes-api -w
 #
-# УВАГА: HARBOR-HOST — заглушка, а не робоча адреса. Підставте адресу свого Harbor,
-# інакше отримаєте не ту помилку, заради якої файл написано (рядків із заглушкою два):
+# ATTENTION: HARBOR-HOST is a placeholder, not a working address. Substitute the address of
+# your own Harbor, otherwise you'll get a different error than the one the file was written for
+# (there are two lines with the placeholder):
 #   sed -i    's|HARBOR-HOST|harbor.workshop03.example.org|g' passes-broken.yaml   # Linux
 #   sed -i '' 's|HARBOR-HOST|harbor.workshop03.example.org|g' passes-broken.yaml   # macOS
 #
-# В об'єкті нижче: apiVersion — версія схеми опису, kind — що створюємо,
-# metadata.name — ім'я об'єкта. Окремо далі не пояснюються.
+# In the object below: apiVersion — the version of the description schema, kind — what we're
+# creating, metadata.name — the object's name. Not explained separately further down.
 #
-# Deployment — це не «запусти контейнер», а «тримай запущеними стільки-то копій ось
-# такого контейнера». Копія зникне — кластер створить нову, не питаючи.
+# A Deployment is not "run a container" but "keep so many copies of such-and-such a container
+# running". A copy disappears — the cluster creates a new one without asking.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -33,23 +35,23 @@ metadata:
   labels:
     app: passes-api
 spec:
-  # Одна копія: щоб розбирати відмову, вистачить і однієї, а в логах і у виводі
-  # kubectl describe буде менше шуму.
+  # One copy: to work through the failure one is enough, and the logs and the output of
+  # kubectl describe will have less noise.
   replicas: 1
-  # Умова «мої копії — це Pod з міткою app: passes-api». Мітка у зразку Pod нижче
-  # має збігатися з цією, інакше кластер відхилить маніфест.
+  # The condition "my copies are pods with the label app: passes-api". The label in the pod
+  # template below must match this one, otherwise the cluster will reject the manifest.
   selector:
     matchLabels:
       app: passes-api
-  # Зразок, за яким штампуються копії. Все, що всередині, описує один Pod.
+  # The template copies are stamped from. Everything inside describes a single pod.
   template:
     metadata:
       labels:
         app: passes-api
     spec:
-      # Обмеження безпеки на весь Pod: не запускати від root, працювати під
-      # непривілейованим користувачем 10001, обмежити набір системних викликів
-      # стандартним профілем. Образ зібрано під це саме (див. app/Dockerfile, рядок USER).
+      # Security restrictions for the whole pod: don't run as root, work under the
+      # unprivileged user 10001, limit the set of system calls to the standard profile.
+      # The image is built for the same (see app/Dockerfile, the USER line).
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
@@ -57,25 +59,27 @@ spec:
           type: RuntimeDefault
       containers:
         - name: api
-          # Права на рівні контейнера: не додавати собі привілеїв і віддати всі особливі
-          # повноваження ядра. Застосунку потрібен один мережевий порт, решта зайва.
+          # Rights at the container level: don't gain extra privileges and drop all special
+          # kernel capabilities. The application needs one network port, the rest is excess.
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # Перша частина імені образу — адреса реєстру. Саме тому переїзд на свій
-          # реєстр змінює маніфести: ім'я образу стає іншим. Не будь адреси,
-          # кластер пішов би по образ у Docker Hub — тобто туди, куди ІБ заборонила.
+          # The first part of the image name is the registry address. This is exactly why
+          # moving to your own registry changes the manifests: the image name becomes
+          # different. Without the address, the cluster would go for the image to Docker Hub —
+          # that is, to where the security team forbade.
           image: HARBOR-HOST/passes/passes-api:v1
-          # Порт застосунку. Ім'я `http` далі використовується перевіркою готовності,
-          # тож номер порту задано в одному місці, а не у двох.
+          # The application's port. The name `http` is used further down by the readiness
+          # probe, so the port number is set in one place, not two.
           ports:
             - containerPort: 8080
               name: http
-          # Змінні оточення, з яких застосунок дізнається, хто він і звідки приїхав.
-          # Рівно їх він і друкує у відповіді (див. app/main.go, структура identity).
-          # APP_VERSION і IMAGE_REGISTRY задані текстом — їх пишемо ми самі; три наступні
-          # заповнює сам кластер у момент запуску копії, застосунку їх знати нізвідки.
+          # Environment variables from which the application learns who it is and where it
+          # came from. Exactly these it prints in its response (see app/main.go, the identity
+          # struct). APP_VERSION and IMAGE_REGISTRY are set as text — those we write ourselves;
+          # the next three are filled in by the cluster itself when the copy starts, the
+          # application has no way to know them.
           env:
             - name: APP_VERSION
               value: "v1"
@@ -93,10 +97,10 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
-          # requests — що зарезервувати під копію: за цими числами планувальник обирає
-          # вузол. limits — стеля: за пам'ять вище стелі контейнер убивають, за
-          # процесор — пригальмовують. 16Mi вистачає тому, що застосунок на Go без
-          # залежностей. 20m — двадцять тисячних процесорного ядра.
+          # requests — what to reserve for a copy: by these numbers the scheduler picks a
+          # node. limits — the ceiling: for memory above the ceiling the container is killed,
+          # for CPU it's throttled. 16Mi is enough because the application is in Go with no
+          # dependencies. 20m is twenty thousandths of a CPU core.
           resources:
             requests:
               cpu: 20m
@@ -104,9 +108,9 @@ spec:
             limits:
               cpu: 300m
               memory: 64Mi
-          # Перевірка готовності: доки застосунок не відповість на /healthz, трафік на копію
-          # не піде. Сьогодні до неї справа не дійде — вона перевіряє вже запущений
-          # процес, а в нас застрягне більш ранній крок, завантаження образу.
+          # Readiness probe: until the application answers on /healthz, traffic won't go to
+          # the copy. Today it won't get that far — it checks an already-running process, and
+          # for us an earlier step, downloading the image, will get stuck.
           readinessProbe:
             httpGet:
               path: /healthz

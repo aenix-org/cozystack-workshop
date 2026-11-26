@@ -78,7 +78,7 @@ Kubernetes와 MongoDB 용어는 이 랩에서 처음 나올 때 설명하며, �
 ## 랩 폴더에 무엇이 있는가
 
 모든 파일은 이미 여러분에게 있습니다 — 저장소와 함께 받았습니다. 새로 만들거나 다시 입력할
-것은 없습니다: 아래에서 `kubectl apply -f 이름.yaml`이라고 쓰인 곳마다, 파일은 여기서
+것은 없습니다: 아래에서 `kubectl apply -f name.yaml`이라고 쓰인 곳마다, 파일은 여기서
 가져옵니다.
 
 ```bash
@@ -151,7 +151,7 @@ spec:
   sharding: false
   users:
     passapp:
-      password: 여기에비밀번호입력
+      password: YourPasswordHere
   databases:
     passes:
       roles:
@@ -185,10 +185,10 @@ spec:
 플랫폼에 넘기고, 플랫폼이 자기 쪽에서 필요한 모든 것을 세웁니다.
 
 ```bash
-# apply = "클러스터를 파일에 기술된 상태로 만들어라".
-#   --kubeconfig ~/.kube/workshop  어떤 접근 파일을 쓸지. 없으면 kubectl은
-#                                  기본 접근을 가져다 엉뚱한 클러스터로 가 버립니다
-#   -f mongodb.yaml                어떤 파일을 적용할지 (-f = file)
+# apply = "bring the cluster to what's described in the file".
+#   --kubeconfig ~/.kube/workshop  which access file to use. Without it kubectl
+#                                  will take the default access and wander off to the wrong cluster
+#   -f mongodb.yaml                which file to apply (-f = file)
 kubectl --kubeconfig ~/.kube/workshop apply -f mongodb.yaml
 ```
 
@@ -199,9 +199,9 @@ kubectl --kubeconfig ~/.kube/workshop apply -f mongodb.yaml
 만들어집니다. 일이 어떻게 되어 가는지는 이렇게 지켜볼 수 있습니다:
 
 ```bash
-# get = "거기 무엇이 있는지 보여줘". READY 컬럼이 주문이 동작 상태에 도달했는지 알려 줍니다.
-#   -n tenant-workshopXX  어떤 namespace에서 찾을지 (namespace는 클러스터 안의
-#                         칸막이입니다; 여러분의 테넌트가 바로 그런 별도의 namespace입니다)
+# get = "show me what's there". The READY column will tell you whether the order reached a working state.
+#   -n tenant-workshopXX  which namespace to look in (a namespace is a partition inside
+#                         the cluster; your tenant is exactly such a separate namespace)
 kubectl --kubeconfig ~/.kube/workshop get mongodb passes -n tenant-workshopXX
 ```
 
@@ -250,7 +250,7 @@ mongodb-passes-rs0.tenant-workshopXX.svc.cozy.local:27017
 <summary><b>연결 문자열 짚어 보기</b></summary>
 
 ```
-mongodb://passapp:비밀번호@호스트:27017/passes?authSource=admin&directConnection=true
+mongodb://passapp:password@host:27017/passes?authSource=admin&directConnection=true
 ```
 
 `mongodb://` — 스킴. 그다음 사용자 이름, 비밀번호, 주소, 포트.
@@ -283,32 +283,32 @@ mongodb://passapp:비밀번호@호스트:27017/passes?authSource=admin&directCon
 
 </details>
 
-Pod를 세웁니다. `workshopXX`를 여러분의 테넌트 번호로, `여기에비밀번호입력`을 여러분의
+Pod를 세웁니다. `workshopXX`를 여러분의 테넌트 번호로, `YourPasswordHere`를 여러분의
 비밀번호로 바꾸세요:
 
 ```bash
-# KUBECONFIG — kubectl이 어떤 접근 파일을 쓸지. 여기서는 랩 0의
-# lab 클러스터입니다: 자기 Pod는 오직 그 안에서만 띄우며, 이것으로는 테넌트에 들어갈 수 없습니다.
+# KUBECONFIG — which access file kubectl uses. Here it's the lab cluster
+# from lab 0: you launch your own Pods only in it, the tenant won't let you in with this.
 export KUBECONFIG=~/lab.kubeconfig
 
-# run = "Pod 하나를 만들고 그 안에서 이 이미지를 실행해라". 중요한 플래그:
-#   --image=mongo:8.0        무엇을 실행할지. 이미지에는 mongosh 셸이 들어 있습니다
-#   --restart=Never          Deployment가 아니라 딱 하나의 Pod를 만들기. 그러지 않으면
-#                            Pod가 끝날 때마다 클러스터가 다시 띄웁니다
-#   --env=MONGO_URI=...      Pod 안의 환경 변수. 비밀번호가 이 안에 머물러,
-#                            뒤따르는 모든 명령에서 반복되지 않습니다
-#   --command -- sleep 86400 컨테이너를 무엇으로 바쁘게 둘지. mongo 이미지는 기본적으로
-#                            데이터베이스 서버를 시작하는데 — 그것은 필요 없고, 들어갈 수 있는
-#                            살아 있는 컨테이너가 필요합니다. 86400초는 하루입니다
+# run = "create a single Pod and run this image in it". The flags that matter:
+#   --image=mongo:8.0        what to run. The image contains the mongosh shell
+#   --restart=Never          create exactly a single Pod, not a Deployment. Otherwise
+#                            the cluster would bring it back up every time it finished
+#   --env=MONGO_URI=...      an environment variable inside the Pod. The password stays in it,
+#                            rather than being repeated in every following command
+#   --command -- sleep 86400 what to keep the container busy with. The mongo image would by default start
+#                            the database server — we don't need it, we need a live container
+#                            you can step into. 86400 seconds is a day
 kubectl run mongo-workbench \
   --image=mongo:8.0 \
   --restart=Never \
-  --env=MONGO_URI="mongodb://passapp:여기에비밀번호입력@mongodb-passes-rs0.tenant-workshopXX.svc.cozy.local:27017/passes?authSource=admin&directConnection=true" \
+  --env=MONGO_URI="mongodb://passapp:YourPasswordHere@mongodb-passes-rs0.tenant-workshopXX.svc.cozy.local:27017/passes?authSource=admin&directConnection=true" \
   --command -- sleep 86400
 
-# wait = "조건이 충족될 때까지 제어를 돌려주지 마라"
-#   --for=condition=Ready  Pod가 스스로 준비 완료를 보고할 때까지 기다립니다
-#   --timeout=180s         영원히 매달리는 대신 오류를 반환하기까지 얼마나 기다릴지
+# wait = "don't return control until the condition is met"
+#   --for=condition=Ready  we wait until the Pod reports readiness itself
+#   --timeout=180s         how long to wait before returning an error rather than hanging forever
 kubectl wait --for=condition=Ready pod/mongo-workbench --timeout=180s
 ```
 
@@ -319,18 +319,18 @@ kubectl wait --for=condition=Ready pod/mongo-workbench --timeout=180s
 확인합니다:
 
 ```bash
-# mo — 터미널 창을 닫을 때까지 사는 단축 명령: 셸에서
-# 자기만의 명령을 선언하는 방법입니다.
-#   exec        이미 실행 중인 Pod 안에서 무언가를 실행
-#   -i          표준 입력을 안으로 전달: 없으면 프로그램을 넣어 줄 수 없습니다
-#   sh -c '...' Pod 안에서 셸을 실행해 그 셸이 스스로 $MONGO_URI를 치환하게 합니다.
-#               따옴표가 작은따옴표인 것은 의도적입니다: 변수를 치환하는 것은
-#               여러분의 터미널이 아니라 Pod여야 합니다 — 그러지 않으면 비밀번호가 명령 히스토리에 남습니다
-#   --quiet     mongosh 인사말을 출력하지 않고, 답만 남깁니다
+# mo — a shortcut that lives until you close the terminal window: this is how you
+# declare your own command in the shell.
+#   exec        run something inside an already-running Pod
+#   -i          forward standard input inside: without it you can't feed in a program
+#   sh -c '...' we run a shell in the Pod so that it substitutes $MONGO_URI itself.
+#               The quotes are single on purpose: the Pod should substitute the variable, not
+#               your terminal — otherwise the password ends up in the command history
+#   --quiet     don't print the mongosh greeting, leave only the answer
 mo() { kubectl exec -i mongo-workbench -- sh -c 'mongosh --quiet "$MONGO_URI"'; }
 
-# ping — 서비스 요청, "살아 있니?". 아무것도 읽거나 쓰지 않고, 연결과
-# 자격 증명이 받아들여졌는지를 확인합니다. | 기호가 이 줄을 mongosh의 입력으로 보냅니다
+# ping — a service request, "are you alive?". It reads and writes nothing, it checks the connection
+# and that the credentials were accepted. The | sign sends this line to mongosh's input
 echo 'db.runCommand({ ping: 1 })' | mo
 ```
 
@@ -352,8 +352,8 @@ echo 'db.runCommand({ ping: 1 })' | mo
 있고, 그 안에서 쿼리를 잇달아 입력합니다:
 
 ```bash
-# -i 대신 -it: t가 추가됩니다 — "터미널을 달라". 그래서 입력 프롬프트,
-# 위 화살표로 명령 히스토리, 그리고 강조 표시가 생깁니다. t가 없으면 셸은 말없이 입력을 기다립니다.
+# -it instead of -i: a t is added — "give me a terminal". Hence the input prompt,
+# command history on the up arrow, and highlighting. Without t the shell would silently wait for input.
 kubectl exec -it mongo-workbench -- sh -c 'mongosh "$MONGO_URI"'
 ```
 
@@ -371,12 +371,12 @@ kubectl exec -it mongo-workbench -- sh -c 'mongosh "$MONGO_URI"'
 
 ```bash
 cd labs/10-mongodb
-# < 기호는 파일의 내용을 명령의 입력으로 넣어 줍니다 — mongosh 셸에서 파일 전체
-# 텍스트를 손으로 입력하는 것과 같은 일입니다.
+# The < sign feeds the file's contents into the command's input — the same thing as if you
+# typed the whole text of the file by hand in the mongosh shell.
 mo < passes.js
 ```
 
-**여러분이 보게 될 것** — `컬렉션 문서 수: 4`.
+**여러분이 보게 될 것** — `documents in collection: 4`.
 
 <details>
 <summary><b>우리가 넣은 것 짚어 보기</b></summary>
@@ -391,12 +391,12 @@ mo < passes.js
 
 ```js
   {
-    type: "1회용",
-    guest: "김민준",
+    type: "single-use",
+    guest: "James P. Whitfield",
     host: "petrov@corp.example",
-    entrance: "북문",
+    entrance: "North",
     valid_on: ISODate("2026-09-01T09:00:00Z"),
-    purpose: "면접"
+    purpose: "job interview"
   }
 ```
 
@@ -411,7 +411,7 @@ mo < passes.js
 `entrances`가 이제 **목록**입니다:
 
 ```js
-    entrances: ["북문", "남문"],
+    entrances: ["North", "South"],
     badge_returned: false
 ```
 
@@ -426,8 +426,8 @@ mo < passes.js
 
 ```js
     car: {
-      plate: "34가 1174",
-      model: "현대 스타렉스",
+      plate: "AB-1174-CD",
+      model: "Ford Transit",
       trailer: false,
       weight_kg: 3500
     },
@@ -440,9 +440,9 @@ mo < passes.js
 
 ```js
     members: [
-      { name: "강현우", age: 16 },
-      { name: "윤하은", age: 15 },
-      { name: "장준서", age: 17 }
+      { name: "Peter Hale", age: 16 },
+      { name: "Mary Fenwick", age: 15 },
+      { name: "Isaac Hart", age: 17 }
     ]
 ```
 
@@ -466,9 +466,9 @@ mo < passes.js
 **특정 날짜의 모든 출입증:**
 
 ```js
-// find = "조건에 맞는 문서를 보여줘"
-// { valid_on: ISODate(...) } — 문서의 valid_on 필드가 정확히 이
-// 날짜와 같아야 합니다. ISODate는 문자열이 아니라 날짜입니다: 비교는 표기가 아니라 시간으로 이뤄집니다
+// find = "show the documents that match the condition"
+// { valid_on: ISODate(...) } — the document's valid_on field must equal exactly this
+// date. ISODate is a date, not a string: the comparison is by time, not by spelling
 db.passes.find({ valid_on: ISODate("2026-09-02T07:30:00Z") })
 ```
 
@@ -477,16 +477,16 @@ db.passes.find({ valid_on: ISODate("2026-09-02T07:30:00Z") })
 **차량 출입증만:**
 
 ```js
-// 평범한 문자열 필드에 대한 조건: 통째로 일치, 여기에 대소문자 무시는 없습니다
-db.passes.find({ type: "차량" })
+// A condition on an ordinary string field: a whole match, there's no case-insensitivity here
+db.passes.find({ type: "vehicle" })
 ```
 
 **번호판으로 검색 — 점을 통해 중첩 객체 안으로 접근:**
 
 ```js
-// "car.plate" — 문서 안으로의 경로: car 객체 안의 plate 필드.
-// 경로를 감싸는 따옴표는 필수입니다, 그러지 않으면 JavaScript가 점을 제멋대로 읽습니다
-db.passes.find({ "car.plate": "34가 1174" })
+// "car.plate" — a path into the document: the plate field inside the car object.
+// The quotes around the path are mandatory, otherwise JavaScript will read the dot its own way
+db.passes.find({ "car.plate": "AB-1174-CD" })
 ```
 
 <details>
@@ -496,7 +496,7 @@ db.passes.find({ "car.plate": "34가 1174" })
 접근할 수 있으며, 중첩 객체를 텍스트 덩어리로 저장하지 않습니다.
 
 차이는 실질적입니다. 만약 `car`가 관계형 테이블에서 JSON을 담은 `TEXT` 컬럼으로 있었다면,
-번호판으로 검색하는 것은 `LIKE '%34가 1174%'`를 뜻했을 것입니다 — 인덱스 없는 전체 스캔,
+번호판으로 검색하는 것은 `LIKE '%AB-1174-CD%'`를 뜻했을 것입니다 — 인덱스 없는 전체 스캔,
 게다가 거짓 양성까지. 여기서는 인덱스를 만들 수 있는 평범한 조건이고, 실제로 만들 것입니다.
 
 ⚠️ `"car.plate"`를 감싸는 따옴표는 필수입니다: 그것이 없으면 JavaScript는 점을 객체 속성에
@@ -507,21 +507,21 @@ db.passes.find({ "car.plate": "34가 1174" })
 **여러 출입구에서 유효한 출입증:**
 
 ```js
-// entrances는 문자열이 아니라 목록입니다: ["북문", "남문"]. 조건은 여전히 평범한 필드처럼
-// 적히고, MongoDB가 스스로 목록의 각 원소에 대해 그것을 검사합니다
-db.passes.find({ entrances: "남문" })
+// entrances is not a string but a list: ["North", "South"]. The condition is still written
+// as for an ordinary field, MongoDB will check it against each element of the list itself
+db.passes.find({ entrances: "South" })
 ```
 
-주목하세요: 조건은 마치 `entrances`가 값 `"남문"`를 가진 평범한 필드인 것처럼 적혔지만,
+주목하세요: 조건은 마치 `entrances`가 값 `"South"`를 가진 평범한 필드인 것처럼 적혔지만,
 실제로는 목록입니다. **MongoDB는 필드가 목록이면 조건을 각 원소에 대해 검사해야 한다는 것을
 스스로 이해합니다.** "포함한다"를 위한 별도의 구문은 필요 없습니다.
 
 **미성년자가 포함된 단체 출입증:**
 
 ```js
-// members.age 경로는 객체 목록 안으로 이어집니다 — 각 참가자의 age 필드로.
-// $lt = less than. $가 붙은 조건은 값이 아니라 비교 방법입니다:
-// "필드는 16보다 작아야 한다", "필드는 16과 같아야 한다"가 아니라
+// The path members.age leads inside a list of objects — to the age field of each participant.
+// $lt = less than. A condition with $ is not a value but a way of comparing:
+// "the field must be less than 16", not "the field must equal 16"
 db.passes.find({ "members.age": { $lt: 16 } })
 ```
 
@@ -532,8 +532,8 @@ db.passes.find({ "members.age": { $lt: 16 } })
 **차량이 조금이라도 지정된 모든 출입증:**
 
 ```js
-// $exists는 값이 아니라 문서에 그 필드가 있느냐 자체를 묻습니다:
-// "이 문서에 car 필드가 조금이라도 있는가?"
+// $exists asks not about the value but about the very presence of the field in the document:
+// "does this document have a car field at all?"
 db.passes.find({ car: { $exists: true } })
 ```
 
@@ -563,17 +563,17 @@ SQL에서 같은 결과 — `SELECT type, count(*) FROM passes GROUP BY type ORD
 </details>
 
 ```js
-// aggregate = "문서를 단계의 사슬에 통과시켜라". 단계는 순서대로 가며,
-// 각자 이전 단계가 내놓은 것을 받습니다:
-//   $group — 문서를 type 필드의 값에 따라 그룹으로 나누고, 각각을 셉니다
-//   $sort  — 그룹을 개수로 정렬, -1은 "내림차순"을 뜻합니다
+// aggregate = "run the documents through a chain of stages". The stages go in order,
+// each receiving what the previous one produced:
+//   $group — sort the documents into groups by the value of the type field, and count each one
+//   $sort  — order the groups by count, -1 means "descending"
 db.passes.aggregate([
   { $group: { _id: "$type", count: { $sum: 1 } } },
   { $sort: { count: -1 } }
 ])
 ```
 
-**여러분이 보게 될 것** — `{ _id: '1회용', count: 1 }` 형태의 네 줄.
+**여러분이 보게 될 것** — `{ _id: 'single-use', count: 1 }` 형태의 네 줄.
 
 ## 단계 5. 대부분이 갖고 있지 않은 필드에 대한 인덱스
 
@@ -583,12 +583,12 @@ db.passes.aggregate([
 같지만, 문서 대신 데이터베이스가 그것들을 어떻게 찾았는지에 대한 보고서를 요청합니다.
 
 ```js
-// explain = "문서를 주지 말고, 그것들을 어떻게 찾았는지 말해 줘"
-//   "executionStats"     보고서 모드: 계획뿐 아니라 실제로 일어난 일까지
-//   .executionStats      답에서 전부 읽지 않도록 바로 이 부분만 가져옵니다
-// 보고서에서 totalDocsExamined를 봅니다 — 하나를 돌려주려고
-// 데이터베이스가 문서를 몇 개 읽었는지
-db.passes.find({ "car.plate": "34가 1174" }).explain("executionStats").executionStats
+// explain = "don't give me the documents, tell me how you looked for them"
+//   "executionStats"     report mode: not only the plan, but what actually happened
+//   .executionStats      we take exactly this section from the answer, so as not to read all of it
+// In the report we look at totalDocsExamined — how many documents the database read,
+// to return one
+db.passes.find({ "car.plate": "AB-1174-CD" }).explain("executionStats").executionStats
 ```
 
 **여러분이 보게 될 것** — `totalDocsExamined`가 컬렉션의 문서 수와 같습니다. 데이터베이스는
@@ -599,14 +599,14 @@ db.passes.find({ "car.plate": "34가 1174" }).explain("executionStats").executio
 구조입니다:
 
 ```js
-// createIndex = "이 필드에 인덱스를 만들고 이제부터 스스로 계속 유지해라"
-//   { "car.plate": 1 }   어떤 필드에. 1은 "오름차순" 순서
-//   name: "car_plate"    인덱스를 뭐라 부를지, 나중에 알아보고 삭제할 수 있도록
-//   sparse: true         필드를 가진 문서만 인덱스에 들어갑니다
+// createIndex = "build an index on this field and keep maintaining it yourself from now on"
+//   { "car.plate": 1 }   on which field. 1 is "ascending" order
+//   name: "car_plate"    what to name the index, so you can recognize and delete it later
+//   sparse: true         only documents that have the field get into the index
 db.passes.createIndex({ "car.plate": 1 }, { name: "car_plate", sparse: true })
 
-// 같은 보고서를 되풀이하고 이전 것과 비교합니다
-db.passes.find({ "car.plate": "34가 1174" }).explain("executionStats").executionStats
+// We repeat the same report and compare it with the previous one
+db.passes.find({ "car.plate": "AB-1174-CD" }).explain("executionStats").executionStats
 ```
 
 **여러분이 보게 될 것** — `totalDocsExamined`가 1과 같고, 계획에는 `COLLSCAN` 대신 `IXSCAN`
@@ -651,10 +651,10 @@ MongoDB는 스스로 인덱스를 버리고 스캔으로 돌아가는데; 불쾌
 통해:
 
 ```js
-// insertOne = "문서 하나를 추가해라". 그 안에 어떤 필드가 있는지 데이터베이스는 묻지 않습니다
+// insertOne = "add one document". What fields are in it, the database doesn't ask
 db.passes.insertOne({
-  tipe: "1회용",
-  guest: "신재원",
+  tipe: "single-use",
+  guest: "Nathan S. Graham",
   host: "petrov@corp.example",
   data: ISODate("2026-09-04T09:00:00Z")
 })
@@ -664,17 +664,17 @@ db.passes.insertOne({
 만들어 낸 문서의 고유 키 — 가 돌아왔습니다. 이제 문서가 다섯 개인지 확인합시다:
 
 ```js
-// countDocuments = "조건에 맞는 문서를 세라".
-// 빈 중괄호는 제약이 없는 조건, 즉 "전부"입니다
+// countDocuments = "count the documents that match the condition".
+// Empty curly braces are a condition with no restrictions, that is, "all"
 db.passes.countDocuments({})
 ```
 
 다섯. 이제 경비가 매일 아침 하는 일 — 일회용 출입증 목록을 엽니다:
 
 ```js
-// 검색 단계와 같은 type 기준 선택: type 필드가 "1회용"와
-// 같은 출입증을 보여 주기
-db.passes.find({ type: "1회용" })
+// The same selection by type as in the search step: show the passes whose
+// type field equals "single-use"
+db.passes.find({ type: "single-use" })
 ```
 
 > **더 읽기 전에 멈추고 생각해 보십시오.**
@@ -696,8 +696,8 @@ db.passes.find({ type: "1회용" })
 피해자를 찾아봅시다 — `type` 필드가 아예 없는 문서:
 
 ```js
-// $exists: false — 이전 단계의 반대: "필드가 문서에 없다".
-// 이런 쿼리는 손 닿는 곳에 둘 가치가 있습니다: 스키마를 벗어나 쌓인 것을 보여 줍니다
+// $exists: false — the opposite of the previous step: "the field is not in the document".
+// It's worth keeping such a query handy: it shows what has accumulated past the schema
 db.passes.find({ type: { $exists: false } })
 ```
 
@@ -718,8 +718,8 @@ db.passes.find({ type: { $exists: false } })
 type이 없는 문서를 삭제합니다:
 
 ```js
-// deleteMany = "조건에 맞는 모든 문서를 삭제해라". 조건은 위의 검색과
-// 같습니다 — 즉 방금 본 바로 그것이 삭제됩니다
+// deleteMany = "delete all documents that match the condition". The condition is the same
+// as in the search above — which means exactly what you just saw will be deleted
 db.passes.deleteMany({ type: { $exists: false } })
 ```
 
@@ -754,7 +754,7 @@ db.runCommand({
 
 ```js
         type: {
-          enum: ["1회용", "주간", "차량", "단체"],
+          enum: ["single-use", "weekly", "vehicle", "group"],
         },
 ```
 
@@ -790,19 +790,19 @@ db.runCommand({
 규칙을 적용합니다:
 
 ```bash
-# passes.js와 같은 방식: 파일의 내용이 mongosh의 입력으로 들어갑니다.
-# 규칙은 살아 있는 컬렉션에 걸립니다 — 데이터베이스를 멈출 필요가 없습니다
+# The same trick as with passes.js: the file's contents are fed to mongosh's input.
+# The rule is hung on a live collection — no need to stop the database
 mo < validator.js
 ```
 
-**여러분이 보게 될 것** — `규칙이 설치됨`.
+**여러분이 보게 될 것** — `rule installed`.
 
 같은 오타를 되풀이해 봅니다 — 이제 규칙의 감시 아래에서:
 
 ```js
-// tipe 필드는 규칙에게 알려지지 않았고, 문서에는 필수인 type이 없습니다.
-// 전에는 이런 문서가 조용히 컬렉션에 자리 잡았습니다
-db.passes.insertOne({ tipe: "1회용", guest: "확인", host: "x@corp.example" })
+// The tipe field is unknown to the rule, and there's no required type in the document.
+// Before, such a document would silently settle into the collection
+db.passes.insertOne({ tipe: "single-use", guest: "Check", host: "x@corp.example" })
 ```
 
 **여러분이 보게 될 것** — `MongoServerError: Document failed validation`. 이제 오타는
@@ -833,15 +833,15 @@ SQL에서 이것은 한 줄입니다: `JOIN staff ON staff.email = passes.host`.
 
 ```js
 db.passes.aggregate([
-  // $lookup = "각 출입증마다 다른 컬렉션으로 가서 거기서 레코드를 가져와라"
+  // $lookup = "for each pass, go to another collection and bring back a record from there"
   { $lookup: {
-      from: "staff",          // 어디로 갈지 — 직원 컬렉션
-      localField: "host",     // 어떤 출입증 필드를 비교할지
-      foreignField: "email",  // 어떤 직원 필드와
-      as: "host_info"         // 찾은 것을 어떤 이름으로 문서에 넣을지
+      from: "staff",          // where to go — the employees collection
+      localField: "host",     // which pass field to compare
+      foreignField: "email",  // with which employee field
+      as: "host_info"         // under what name to put what's found into the document
   } },
-  // 찾은 것은 일치가 하나뿐이어도 항상 목록으로 들어갑니다.
-  // $unwind는 목록을 다시 하나의 값으로 풀어 냅니다
+  // What's found is always put as a list, even if there's a single match.
+  // $unwind unrolls the list back into a single value
   { $unwind: "$host_info" }
 ])
 ```
@@ -879,10 +879,10 @@ db.passes.aggregate([
 해 보세요:
 
 ```js
-// host 필드는 의미상 직원을 참조합니다. 그런 직원은 존재하지 않습니다 —
-// 데이터베이스가 이것을 검사할까요? 문서는 지난 단계의 규칙을 충족합니다: type이
-// 제자리에 있고 목록에서 왔으며, host는 문자열입니다
-db.passes.insertOne({ type: "1회용", host: "존재하지-않음@corp.example", guest: "테스트" })
+// The host field, by meaning, refers to an employee. No such employee exists —
+// will the database check this? The document satisfies the rule from the last step: type is
+// in place and from the list, host is a string
+db.passes.insertOne({ type: "single-use", host: "does-not-exist@corp.example", guest: "Test" })
 ```
 
 문서는 삽입됩니다. 그런 이메일을 가진 직원은 없지만, 데이터베이스는 그것을 보지 않습니다.
@@ -898,8 +898,8 @@ db.passes.insertOne({ type: "1회용", host: "존재하지-않음@corp.example",
 테스트 문서를 지우는 것을 잊지 마세요:
 
 ```js
-// deleteOne = "조건에 맞는 문서 하나를 삭제해라", 전부를 한꺼번에가 아니라
-db.passes.deleteOne({ host: "존재하지-않음@corp.example" })
+// deleteOne = "delete one document that matches the condition", not all of them at once
+db.passes.deleteOne({ host: "does-not-exist@corp.example" })
 ```
 
 </details>
@@ -917,11 +917,11 @@ db.passes.deleteOne({ host: "존재하지-않음@corp.example" })
 세션을 열고 명시적으로 트랜잭션을 시작하세요:
 
 ```js
-// 세션은 데이터베이스와의 별도의 "대화"이며, 그 안에서 트랜잭션을 선언할 수 있습니다
+// A session is a separate "conversation" with the database, within which you can declare a transaction
 const s = db.getMongo().startSession();
-s.startTransaction();          // 이 지점부터 변경이 쌓이지만, 누구에게도 보이지 않습니다
-// … s.getDatabase("passes")를 통한 연산 …
-s.commitTransaction();         // 전부 한꺼번에 적용. 전부 한꺼번에 취소하려면 — abortTransaction()
+s.startTransaction();          // from this point changes accumulate, but are visible to no one
+// … operations through s.getDatabase("passes") …
+s.commitTransaction();         // apply it all at once. To cancel it all at once — abortTransaction()
 ```
 
 **그리고 세 번째 진실, 가장 실용적인 것:** MongoDB의 트랜잭션은 관계형 데이터베이스보다 비싸고,
@@ -949,15 +949,15 @@ s.commitTransaction();         // 전부 한꺼번에 적용. 전부 한꺼번�
 
 ```js
 db.passes.aggregate([
-  // $$ROOT — 문서 전체 그대로. $objectToArray는 그것을
-  // "필드 이름 — 값" 쌍으로 쪼개서, 그다음 필드를 데이터로 다룰 수 있게 합니다
+  // $$ROOT — the whole document in full. $objectToArray breaks it into
+  // "field name — value" pairs, so you can then work with the fields as data
   { $project: { fields: { $objectToArray: "$$ROOT" } } },
-  // 쌍의 목록을 풀어 냅니다: 한 쌍 — 다음 단계의 입력에서 한 줄
+  // We unroll the list of pairs: one pair — one row at the input of the next stage
   { $unwind: "$fields" },
-  // 두 속성으로 한꺼번에 그룹화합니다: 필드 이름(k)과 그 값의 타입(t),
-  // 그리고 그런 조합이 몇 번 나왔는지 셉니다
+  // We group by two attributes at once: the field name (k) and its value type (t),
+  // and count how many times such a combination occurred
   { $group: { _id: { k: "$fields.k", t: { $type: "$fields.v" } }, n: { $sum: 1 } } },
-  { $sort: { "_id.k": 1 } }   // 알파벳순으로, 한 필드가 자기 타입들과 나란히 있도록
+  { $sort: { "_id.k": 1 } }   // alphabetically, so one field sits next to its own types
 ])
 ```
 
@@ -994,13 +994,13 @@ db.passes.aggregate([
 
 ```bash
 cd labs/10-mongodb
-# 위 단계들과 같은 접근 파일: 스크립트는 lab 클러스터 안에서 동작합니다
+# The same access file as in the steps above: the script works from inside the lab cluster
 export KUBECONFIG=~/lab.kubeconfig
-# 테넌트 번호: 이것으로부터 스크립트가 데이터베이스 주소를 조립합니다. 자기 것으로 바꾸세요
+# The tenant number: from it the script will assemble the database address. Substitute your own
 export COZY_TENANT=workshop03
-# 비밀번호는 작은따옴표 안에: 그 안에서 셸은 문자열 안의 $, ! 그리고 &를 건드리지 않습니다.
-# 비밀번호는 보고서에 들어가지 않습니다
-export MONGO_PASSWORD='passapp-비밀번호'
+# The password in single quotes: inside them the shell doesn't touch $, ! and & within the string.
+# The password doesn't make it into the report
+export MONGO_PASSWORD='your-passapp-password'
 ./check.sh
 ```
 
@@ -1019,8 +1019,8 @@ export MONGO_PASSWORD='passapp-비밀번호'
 있었습니다:
 
 ```bash
-# delete = "클러스터에서 제거해라". Pod는 자신의 MONGO_URI 변수와 함께 사라지므로,
-# 비밀번호가 클러스터에 남지 않습니다
+# delete = "remove from the cluster". The Pod disappears along with its MONGO_URI variable,
+# so the password doesn't remain in the cluster
 kubectl delete pod mongo-workbench
 ```
 

@@ -34,9 +34,9 @@ kubectl get buckets.apps.cozystack.io -n tenant-workshopXX
 **이 값들이 어디로 가는지.** 3단계에서 변환용 머신의 `convert.sh` 파일을 열게 되는데, 그 안에 세 줄로 된 "PASTE YOUR VALUES" 블록이 있습니다:
 
 ```
-BUCKET="ВСТАВЬТЕ_bucketName"
-ACCESS_KEY="ВСТАВЬТЕ_accessKey"
-SECRET_KEY="ВСТАВЬТЕ_secretKey"
+BUCKET="PASTE_bucketName"
+ACCESS_KEY="PASTE_accessKey"
+SECRET_KEY="PASTE_secretKey"
 ```
 
 바로 이 세 값을 각각 자기 따옴표 안에 붙여 넣게 됩니다. 그 외에는 어디에도 필요하지 않습니다: 스크립트가 완성된 이미지를 여러분의 버킷에 직접 업로드하고, 그에 대한 링크도 스스로 만들어 줍니다.

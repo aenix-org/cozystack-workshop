@@ -1,49 +1,49 @@
 ---
-# 实验 5 · 基础设施即 Git。任务：明确要把仓库中的哪些内容应用到集群。
+# Lab 5 · Infrastructure in Git. Task: what exactly from the repository to apply to the cluster.
 #
-# 与相邻的 gitrepository.yaml 一起应用到你的 `lab` 集群：
+# Applied on your `lab` cluster together with the neighboring gitrepository.yaml:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl apply -f flux/
 #
-# 每个对象中：apiVersion — 描述模式的版本，kind — 我们创建的东西，
-# metadata.name — 对象的名称。下面不再单独说明。
+# In each object: apiVersion — the version of the description schema, kind — what we create,
+# metadata.name — the object's name. Not explained separately below.
 #
-# 职责分离：GitRepository 只下载仓库、不做任何应用，
-# 这个对象接收下载下来的内容并使集群与之保持一致。名称 Kustomization 与
-# kustomize 工具的名称相同，但它们是不同的东西——这里它是集群中的一个对象。
+# Separation of duties: GitRepository downloads the repository and applies nothing,
+# this object takes what was downloaded and brings the cluster in line with it. The name Kustomization matches
+# the name of the kustomize utility, but these are different things — here it is an object in the cluster.
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
   name: passes
-  # 与 Flux 各服务位于同一处——否则 kustomize-controller 不会拾取它。
+  # Lives in the same place as the Flux services — otherwise kustomize-controller won't pick it up.
   namespace: flux-system
 spec:
-  # 多久将集群的实际状态与 Git 中所描述的状态对账一次。
-  # 这不是「每分钟重新应用一次」——而是「每分钟比较并修正
-  # 差异一次」。即使 Git 中没有任何改动，通过 kubectl edit
-  # 手工做的改动也会被悄悄回滚。稍后在本实验中，当你自己绕过 Git
-  # 在集群里改动某些东西时，就会看到这种差异。
+  # How often to reconcile the actual state of the cluster with the one described in Git.
+  # This is not "apply again once a minute" — it is "compare and fix
+  # discrepancies once a minute". Even if nothing changed in Git, an edit made
+  # by hand via kubectl edit will be silently rolled back. You will see the difference
+  # a bit later in the lab, when you change something in the cluster yourself, bypassing Git.
   interval: 1m
-  # 仓库内部的一个文件夹。其中的所有内容都会进入集群；与它相邻的文件
-  # ——例如根目录下的 README.md——不会被触及。名称 `apps` 是我们选的，但它
-  # 必须与你在自己仓库中放置清单的文件夹相匹配。
+  # A folder inside the repository. Everything in it will end up in the cluster; files next
+  # to it — for example README.md in the root — won't be touched. The name `apps` was chosen by us, but it
+  # must match the folder into which you put manifests in your repository.
   path: ./apps
-  # 从集群中删除那些已从 Git 中消失的对象。
-  # 没有这一项，Git 就不再是完整的描述：从仓库中删除的内容
-  # 仍会在集群里继续运行，而没有人会知道这一点。
+  # Delete from the cluster objects that have disappeared from Git.
+  # Without this Git stops being a complete description: what was deleted from the repository
+  # would keep running in the cluster, and no one would know about it.
   prune: true
-  # 要查看哪个源。名称 `passes` 是 gitrepository.yaml 里的 metadata.name，
-  # 而不是 GitHub 上仓库的名称。在那里改名了——这里也要改，否则 Flux
-  # 会等待一个不存在的源，Kustomization 也不会变为就绪。
+  # Which source to look at. The name `passes` is the metadata.name from gitrepository.yaml,
+  # not the repository's name on GitHub. Rename it there — fix it here too, otherwise Flux
+  # will wait for a source that doesn't exist, and the Kustomization won't become ready.
   sourceRef:
     kind: GitRepository
     name: passes
-  # 等待已应用的资源变为就绪，而不是在 apply 之后立刻报告成功。
-  # 这个区别正如「已提交申请」和「申请已完成」之间的差异：没有 wait，
-  # 即使随后 Pod 起不来，Flux 也会报告成功。
+  # Wait for the applied resources to become ready, rather than reporting success right after apply.
+  # The difference is exactly the same as between "request submitted" and "request completed": without wait
+  # Flux will report success even if the pods don't come up afterward.
   wait: true
-  # 在判定应用失败之前，要等待这种就绪多久。
-  # 三分钟——为在空节点上拉取镜像留有余量。取值太小
-  # 会在慢速网络上产生误报失败，太大——你就会长时间
-  # 盯着「进行中」而不是看到明确的错误。
+  # How long to wait for that readiness before declaring the apply unsuccessful.
+  # Three minutes — with a margin for pulling the image on an empty node. Too small a
+  # value will give false failures on a slow network, too large — you will
+  # stare at "in progress" for a long time instead of a clear error.
   timeout: 3m

@@ -7,8 +7,8 @@
 **Tus credenciales:**
 ```
 dashboard: https://dashboard.workshop.aenix.io
-login:     workshopXX      ← tu número, te lo diré en persona
-password:  ...             ← te lo diré en persona
+login:     workshopXX      ← your number, I'll tell you in person
+password:  ...             ← I'll tell you in person
 ```
 
 1. Abre el panel en el enlace de arriba.
@@ -20,13 +20,13 @@ password:  ...             ← te lo diré en persona
 **macOS y Linux**
 ```bash
 mkdir -p ~/.kube
-nano ~/.kube/workshop      # pega lo que copiaste, luego guarda
+nano ~/.kube/workshop      # paste what you copied, then save
 export KUBECONFIG=~/.kube/workshop
 ```
 
 **Windows** (PowerShell)
 ```powershell
-notepad $HOME\.kube\workshop   # pega, luego guarda
+notepad $HOME\.kube\workshop   # paste, then save
 $env:KUBECONFIG = "$HOME\.kube\workshop"
 ```
 
@@ -50,13 +50,13 @@ kubeconfig, en el campo `certificate-authority-data`, y el archivo por defecto n
 Resolvámoslo paso a paso, en PowerShell:
 ```powershell
 $env:KUBECONFIG
-# vacío — significa que se está usando el archivo por defecto, no el que te dieron
+# empty — means it's using the default file, not the one you were given
 
 Select-String -Path "$HOME\.kube\workshop" -Pattern "certificate-authority-data" -Quiet
-# False — el archivo se guardó incompleto; descarga de nuevo el Secret desde el panel
+# False — the file was saved incompletely; download the secret from the dashboard again
 
 Get-Content "$HOME\.kube\workshop" -TotalCount 1
-# debería empezar con apiVersion; cuadraditos o vacío significan que el archivo está en UTF-16
+# should start with apiVersion; little squares or emptiness mean the file is in UTF-16
 ```
 
 El tercer punto es la trampa más traicionera de Windows. El Bloc de notas y la redirección `>` guardan el

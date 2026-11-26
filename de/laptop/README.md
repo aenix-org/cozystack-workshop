@@ -78,7 +78,7 @@ kubectl get vminstance -n tenant-workshopXX
 
 ```powershell
 New-Item -ItemType Directory -Force "$HOME\.kube" | Out-Null
-notepad "$HOME\.kube\workshop"    # kubeconfig einfügen; Dateityp — "Alle Dateien"
+notepad "$HOME\.kube\workshop"    # paste the kubeconfig; file type — "All Files"
 [Environment]::SetEnvironmentVariable("KUBECONFIG", "$HOME\.kube\workshop", "User")
 $env:KUBECONFIG = "$HOME\.kube\workshop"
 kubectl get vminstance -n tenant-workshopXX
@@ -111,7 +111,7 @@ durch Ihre eigene Nummer (im Beispiel — `workshop03`):
 # Linux
 find manifests scripts -type f -exec sed -i 's/tenant-workshopXX/tenant-workshop03/g' {} +
 
-# macOS — dasselbe sed, aber es verlangt leere Anführungszeichen nach -i
+# macOS — the same sed, but it requires empty quotes after -i
 find manifests scripts -type f -exec sed -i '' 's/tenant-workshopXX/tenant-workshop03/g' {} +
 ```
 
@@ -130,7 +130,7 @@ grep -rn tenant-workshopXX manifests scripts || echo "all clean, you can continu
 ```
 
 Eine Stelle lässt der Befehl absichtlich unberührt: in `manifests/03-app-vm.yaml` die Zeile
-`url: "ВСТАВЬТЕ_PRESIGNED_URL"` — diesen Link erhalten Sie nach der zweiten Phase.
+`url: "PASTE_PRESIGNED_URL"` — diesen Link erhalten Sie nach der zweiten Phase.
 
 Im Detail: [chat/10](chat/10-clone-and-set-number.md) ·
 Dateiübersicht [chat/11](chat/11-file-map.md)
@@ -196,7 +196,7 @@ virtctl console --namespace=tenant-workshopXX vm-instance-convert
 ```
 
 Im Inneren: `nano convert.sh`, fügen Sie den Text von `scripts/convert.sh` ein, setzen Sie Ihre
-eigenen `bucketName`, `accessKey` und `secretKey` anstelle von `ВСТАВЬТЕ_...` ein und führen Sie
+eigenen `bucketName`, `accessKey` und `secretKey` anstelle von `PASTE_...` ein und führen Sie
 `bash convert.sh` aus.
 
 **Sie arbeiten den Workshop auf eigene Faust durch, nicht bei unserer Veranstaltung?** `OVA_URL` in `convert.sh` zeigt auf das Demo-Image im Object Storage der Workshop-Cloud. Dort liegt es, damit es während der Veranstaltung schnell und ohne externen Traffic heruntergeladen wird; nach dem Workshop gibt es diese Kopie nicht mehr. Ersetzen Sie den Link durch die öffentliche Kopie, `https://github.com/aenix-org/cozystack-workshop/releases/download/vmware-demo-ova/app-1.ova` (etwa 810 MB), oder durch Ihr eigenes OVA.
@@ -224,7 +224,7 @@ kubectl delete vmdisk convert-tools --namespace tenant-workshopXX
 ```
 
 Tragen Sie den erhaltenen Link in `manifests/03-app-vm.yaml` anstelle von
-`url: "ВСТАВЬТЕ_PRESIGNED_URL"` ein, dann:
+`url: "PASTE_PRESIGNED_URL"` ein, dann:
 
 ```bash
 kubectl apply -f manifests/03-app-vm.yaml
@@ -314,13 +314,13 @@ nicht verbunden.
 und antwortet `SCRAM authentication requires libpq version 10 or above`. Wir installieren ein frisches:
 
 ```bash
-# 1. Das PGDG-Repository — die Quelle der PostgreSQL-Pakete
+# 1. The PGDG repository — the source of PostgreSQL packages
 yum install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm
 
-# 2. libzstd: nicht in den CentOS-7-Repositories, deshalb holen wir es aus dem EPEL-Archiv
+# 2. libzstd: not in the CentOS 7 repositories, so we take it from the EPEL archive
 yum install -y https://archives.fedoraproject.org/pub/archive/epel/7/x86_64/Packages/l/libzstd-1.5.5-1.el7.x86_64.rpm
 
-# 3. Der Client selbst — nur aus dem aktiven pgdg15-Repository
+# 3. The client itself — only from the live pgdg15 repository
 yum install -y --disablerepo='pgdg*' --enablerepo=pgdg15 postgresql15
 ```
 
@@ -339,7 +339,7 @@ Falls `command not found` — der Client ist außerhalb von `PATH` gelandet: sch
 Wir holen das Schema und wenden es an:
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/laptop/scripts/orders-schema.sql
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/laptop/scripts/orders-schema.sql
 
 PGPASSWORD='Orders2019!' psql \
   -h postgres-db-rw.tenant-workshopXX.svc.cozy.local -U orders -d orders \
@@ -392,13 +392,13 @@ Im Detail: [chat/30](chat/30-step-9-verify-chain.md)
 > `target must contain type and name separated by '/'`.
 
 ```bash
-# an der App-VM anmelden (root / cozydemo)
+# log into the app-VM (root / cozydemo)
 virtctl console --namespace=tenant-workshopXX vm-instance-app-1
 
-# an der Conversion-VM anmelden (ubuntu / ubuntu)
+# log into the conversion-VM (ubuntu / ubuntu)
 virtctl console --namespace=tenant-workshopXX vm-instance-convert
 
-# den Port der Anwendung an den Laptop weiterleiten
+# forward the application's port to the laptop
 virtctl port-forward --namespace=tenant-workshopXX vmi/vm-instance-app-1 8080:8080
 ```
 

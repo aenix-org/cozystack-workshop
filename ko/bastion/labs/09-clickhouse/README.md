@@ -68,7 +68,7 @@
 ## 랩 폴더에 들어 있는 것
 
 모든 파일은 이미 가지고 있습니다 — 저장소와 함께 받았습니다. 새로 만들거나 다시 입력할 것은
-없습니다: 아래에서 `kubectl apply -f 이름.yaml`이라고 나오는 곳마다, 그 파일은 여기서 가져옵니다.
+없습니다: 아래에서 `kubectl apply -f name.yaml`이라고 나오는 곳마다, 그 파일은 여기서 가져옵니다.
 
 ```bash
 cd labs/09-clickhouse
@@ -139,7 +139,7 @@ spec:
   resourcesPreset: u1.small
   users:
     analyst:
-      password: 여러분의비밀번호
+      password: YourPasswordHere
   backup:
     enabled: false
   clickhouseKeeper:
@@ -171,8 +171,8 @@ spec:
 이 파일은 **lab 클러스터가 아니라** 테넌트에 적용됩니다:
 
 ```bash
-# --kubeconfig는 접근 파일을 명시적으로 지정하며 KUBECONFIG 변수를 덮어씁니다.
-# 그래서 주문은 lab 클러스터가 아니라 관리 클러스터의 테넌트로 갑니다.
+# --kubeconfig names the access file explicitly and overrides the KUBECONFIG variable.
+# So the order goes to the tenant on the management cluster, not to the lab cluster.
 kubectl --kubeconfig ~/.kube/config apply -f clickhouse.yaml
 ```
 
@@ -216,22 +216,22 @@ chendpoint-clickhouse-analytics.tenant-workshopXX.svc.cozy.local:8123
 작업용 Pod를 띄웁니다. 여러분의 테넌트 번호와 비밀번호로 바꾸세요:
 
 ```bash
-# 여기서부터는 모든 것이 lab 클러스터에서 일어나므로, kubectl을 그쪽으로 전환합니다.
+# Everything from here happens in the lab cluster, so we switch kubectl to it.
 export KUBECONFIG=~/lab.kubeconfig
-# run은 주어진 이미지로 단일 Pod를 생성합니다 — 클러스터 내부의 일회용 작은 머신입니다.
-# 이미지에는 curl이 들어 있고, 그것으로 충분합니다: 별도의 ClickHouse 클라이언트는 필요 없습니다.
-#   --restart=Never  안의 명령이 끝나도 다시 띄우지 않는다
-#   --env=CH_URL     스토리지의 HTTP 인터페이스 주소; 끝의 슬래시는 필수다
-#   --env=CH_AUTH    일반 HTTP 인증을 위한 "user:password" 쌍
-#   --command --     두 개의 대시 뒤에 오는 모든 것이 Pod가 실행할 명령이다
-# sleep 86400 = "하루 동안 아무것도 하지 않기": Pod는 작업 공간으로만 필요하다.
+# run creates a single Pod from the given image — a disposable little machine inside the cluster.
+# The image ships curl, and that's enough: a separate ClickHouse client won't be needed.
+#   --restart=Never  don't bring it up again when the command inside finishes
+#   --env=CH_URL     the address of the storage's HTTP interface; the trailing slash is required
+#   --env=CH_AUTH    the "user:password" pair for ordinary HTTP authentication
+#   --command --     everything after the two dashes is the command the Pod will run
+# sleep 86400 = "do nothing for a day": the Pod is needed only as a workspace.
 kubectl run ch-workbench \
   --image=curlimages/curl:8.11.1 \
   --restart=Never \
   --env=CH_URL="http://chendpoint-clickhouse-analytics.tenant-workshopXX.svc.cozy.local:8123/" \
-  --env=CH_AUTH="analyst:여러분의비밀번호" \
+  --env=CH_AUTH="analyst:YourPasswordHere" \
   --command -- sleep 86400
-# wait는 Pod가 시작될 때까지 터미널을 붙잡아 두지만, 2분을 넘기지는 않습니다.
+# wait holds the terminal until the Pod starts, but no longer than two minutes.
 kubectl wait --for=condition=Ready pod/ch-workbench --timeout=120s
 ```
 
@@ -275,9 +275,9 @@ kubectl wait --for=condition=Ready pod/ch-workbench --timeout=120s
 </details>
 
 ```bash
-# ch를 정의합니다 — 긴 명령에 붙인 짧은 이름입니다. 이제부터 "ch"는 다음을 뜻합니다:
-# 표준 입력으로 들어오는 SQL을 ClickHouse로 보내고, 응답을 테이블로 보여 준다.
-# 이 이름은 이 터미널 창을 닫을 때까지만 유효합니다; 새 창에서는 다시 정의하세요.
+# We define ch — a short name for a long command. From here "ch" means: send to
+# ClickHouse the SQL that arrives on standard input, and show the answer as a table.
+# The name lives until you close this terminal window; in a new window define it again.
 ch() {
   kubectl exec -i ch-workbench -- sh -c \
     'curl -sS -u "$CH_AUTH" --data-binary @- "$CH_URL?default_format=PrettyCompact"'
@@ -287,8 +287,8 @@ ch() {
 연결을 확인해 봅시다:
 
 ```bash
-# echo는 문자열을 출력하고, |는 그것을 ch의 입력으로 넘깁니다. SELECT version()은 가능한 한
-# 가장 값싼 쿼리입니다: 서버는 디스크에서 아무것도 읽지 않고, 그저 자신의 버전을 말해 줄 뿐입니다.
+# echo prints a string, | passes it to ch's input. SELECT version() is the cheapest
+# query possible: the server reads nothing from disk, it just names its version.
 echo 'SELECT version()' | ch
 ```
 
@@ -303,8 +303,8 @@ echo 'SELECT version()' | ch
 Windows PowerShell 사용자를 위한 버전:
 
 ```powershell
-# $input — 왼쪽 파이프라인을 통해 함수로 들어온 것.
-# 줄 끝의 백틱은 명령을 다음 줄로 이어 줍니다.
+# $input — what came into the function through the pipeline on the left.
+# The backtick at the end of a line continues the command onto the next line.
 function ch {
   $input | kubectl exec -i ch-workbench -- sh -c `
     'curl -sS -u "$CH_AUTH" --data-binary @- "$CH_URL?default_format=PrettyCompact"'
@@ -324,19 +324,19 @@ function ch {
 <summary><b>스키마를 한 줄씩 살펴보기</b></summary>
 
 ```sql
--- IF NOT EXISTS — 테이블이 이미 존재해도 불평하지 않는다. 이 파일은 두 번 적용해도 된다.
+-- IF NOT EXISTS — don't complain if the table already exists. The file can be applied twice.
 CREATE TABLE IF NOT EXISTS passes
 (
-    pass_id      UInt64,                 -- 출입증 번호
-    created_at   DateTime,               -- 그 사람이 개찰구를 통과한 시각
-    guest_name   String,                 -- 방문객 이름: 저마다 다르다
-    host_dept    LowCardinality(String), -- 초대한 부서: 값이 적다
-    entrance     LowCardinality(String), -- 출입구: 세 개다
-    pass_type    LowCardinality(String), -- 일회용, 주간, 차량용
-    duration_min UInt16                  -- 방문객이 안에 머문 시간(분)
+    pass_id      UInt64,                 -- the pass number
+    created_at   DateTime,               -- when the person went through the turnstile
+    guest_name   String,                 -- the guest's name: everyone's is their own
+    host_dept    LowCardinality(String), -- the host's department: few values
+    entrance     LowCardinality(String), -- the entrance: there are three
+    pass_type    LowCardinality(String), -- one-time, weekly, vehicle
+    duration_min UInt16                  -- how many minutes the guest stayed inside
 )
-ENGINE = MergeTree               -- 저장 방식: 디스크상의 파트, 백그라운드에서의 병합
-ORDER BY (created_at, entrance)  -- 데이터를 놓을 순서; 인덱스이기도 하다
+ENGINE = MergeTree               -- how to store: parts on disk, merging in the background
+ORDER BY (created_at, entrance)  -- what order to put the data in; also the index
 ```
 
 `UInt64`, `UInt16` — 각각 8바이트와 2바이트의 부호 없는 정수입니다. ClickHouse에서는 타입의
@@ -380,8 +380,8 @@ ORDER BY (created_at, entrance)
 **적용합니다.**
 
 ```bash
-# <는 파일을 읽어 ch의 입력으로 넣습니다, 즉 파일의 내용을 단일 쿼리로
-# ClickHouse에 보냅니다. CREATE TABLE은 빈 응답을 반환합니다 — 그것이 성공입니다.
+# < reads the file and feeds it to ch's input, that is, sends the file's contents
+# to ClickHouse in a single query. CREATE TABLE returns an empty answer — that is success.
 ch < 01-schema.sql
 ```
 
@@ -441,8 +441,8 @@ FROM numbers(1000000)
 ⚠️ ClickHouse에서 배열 인덱스는 0이 아니라 1부터 시작합니다. 그래서 `1 + …`가 붙습니다.
 
 ```sql
-    ['북문', '북문', '북문',
-     '남문', '남문', '서문'][1 + cityHash64(number, 'entrance') % 6] AS entrance
+    ['North', 'North', 'North',
+     'South', 'South', 'West'][1 + cityHash64(number, 'entrance') % 6] AS entrance
 ```
 
 고르지 않은 분포를 위한 같은 기법: 북쪽 출입구가 흐름의 절반을, 남쪽이 3분의 1을, 서쪽이 나머지를
@@ -464,8 +464,8 @@ FROM numbers(1000000)
 **적용합니다.**
 
 ```bash
-# 이 파일에는 단 하나의 INSERT … SELECT가 들어 있습니다: ClickHouse가 100만 행을 스스로 만들어 내어 기록합니다,
-# 서버를 한 번도 벗어나지 않은 채로.
+# The file holds a single INSERT … SELECT: ClickHouse will invent a million rows itself and write them,
+# without ever leaving the server.
 ch < 02-generate.sql
 ```
 
@@ -474,7 +474,7 @@ ch < 02-generate.sql
 무엇을 얻었는지 확인해 봅시다:
 
 ```bash
-# 조건 없는 count()는 "테이블에 행이 전부 몇 개인가"라는 질문에 답합니다.
+# count() with no conditions answers the question "how many rows are in the table in total."
 echo 'SELECT count() FROM passes' | ch
 ```
 
@@ -492,16 +492,16 @@ echo 'SELECT count() FROM passes' | ch
 <summary><b>리포트를 한 줄씩 살펴보기</b></summary>
 
 ```sql
--- 데이터에 등장하는 각 달마다 리포트 한 행.
+-- One report row for each month that occurs in the data.
 SELECT
-    toStartOfMonth(created_at)          AS month,        -- 어느 달로 귀속시킬지
-    count()                             AS guests,       -- 그 달의 입장 건수
-    round(avg(duration_min))            AS avg_minutes,  -- 평균 방문 지속 시간
-    topK(1)(toHour(created_at))[1]      AS peak_hour,    -- 가장 자주 도착하는 시각
-    topK(1)(entrance)[1]                AS busiest_entrance  -- 가장 자주 이용된 출입구
+    toStartOfMonth(created_at)          AS month,        -- which month to assign it to
+    count()                             AS guests,       -- how many entries in it
+    round(avg(duration_min))            AS avg_minutes,  -- average visit duration
+    topK(1)(toHour(created_at))[1]      AS peak_hour,    -- the most frequent hour of arrival
+    topK(1)(entrance)[1]                AS busiest_entrance  -- the most frequent entrance
 FROM passes
-GROUP BY month   -- 한 달의 모든 행을 하나의 응답 행으로 접는다
-ORDER BY month   -- 달을 오름차순으로 출력한다
+GROUP BY month   -- collapse all rows of one month into a single answer row
+ORDER BY month   -- output the months in ascending order
 ```
 
 `toStartOfMonth`는 정확한 시각을 그 달의 1일로 바꿉니다. 기간별로 그룹화하는 고전적인
@@ -521,8 +521,8 @@ ORDER BY month   -- 달을 오름차순으로 출력한다
 **적용합니다.**
 
 ```bash
-# 테이블 전체에 대한 그룹화 하나. 응답은 데이터에 등장하는 달의 수만큼
-# 행을 가집니다.
+# One grouping over the whole table. The answer will have as many rows as there are months
+# that occur in the data.
 ch < 03-report.sql
 ```
 
@@ -531,16 +531,16 @@ ch < 03-report.sql
 이제 핵심 — **계산에 얼마나 걸렸나**입니다. 쿼리 끝의 `JSON` 형식은 응답에 통계 블록을 추가합니다:
 
 ```bash
-# <<'SQL' … SQL — 파일 없이 여러 줄 텍스트를 명령의 입력으로 넘기는 방법입니다.
-# SQL을 감싼 따옴표는 "내용을 그대로 두라"는 뜻입니다: 그러지 않으면 셸이 쿼리 안의
-# 문자들을 자기 것으로 해석하려 듭니다.
+# <<'SQL' … SQL — a way to pass multi-line text to a command's input, without a file.
+# The quotes around SQL mean "leave the contents alone": otherwise the shell would try
+# to interpret the characters inside the query as its own.
 ch <<'SQL'
--- 같은 리포트를, 두 개의 열로 줄인 것: 달과 방문객 수.
+-- The same report, trimmed to two columns: month and guest count.
 SELECT toStartOfMonth(created_at) AS month, count() AS guests
 FROM passes
 GROUP BY month
 ORDER BY month
-FORMAT JSON  -- 응답을 테이블이 아니라 JSON으로 반환한다: 거기에 통계 블록이 들어 있다
+FORMAT JSON  -- return the answer not as a table but as JSON: it contains a statistics block
 SQL
 ```
 
@@ -603,15 +603,15 @@ SQL
 
 ```bash
 ch <<'SQL'
--- 테이블의 각 열이 공간을 얼마나 차지하는지 ClickHouse에 직접 물어봅니다.
+-- We ask ClickHouse itself how much space each column of the table takes.
 SELECT
-    name,                                                    -- 열의 이름
-    formatReadableSize(data_compressed_bytes)   AS on_disk,  -- 디스크에 놓인 양
-    formatReadableSize(data_uncompressed_bytes) AS raw,      -- 압축이 없었다면 얼마였을지
-    round(data_uncompressed_bytes / data_compressed_bytes, 1) AS ratio  -- 몇 배로 압축되었는지
-FROM system.columns   -- 시스템 테이블: 그 안에서 ClickHouse가 자기 자신을 기술한다
-WHERE database = currentDatabase() AND table = 'passes'   -- 우리 테이블만
-ORDER BY data_compressed_bytes DESC   -- 가장 무거운 열이 위로
+    name,                                                    -- the column's name
+    formatReadableSize(data_compressed_bytes)   AS on_disk,  -- how much sits on disk
+    formatReadableSize(data_uncompressed_bytes) AS raw,      -- how much it would be without compression
+    round(data_uncompressed_bytes / data_compressed_bytes, 1) AS ratio  -- how many times it compressed
+FROM system.columns   -- a system table: in it ClickHouse describes itself
+WHERE database = currentDatabase() AND table = 'passes'   -- only our table
+ORDER BY data_compressed_bytes DESC   -- the heaviest columns on top
 SQL
 ```
 
@@ -663,8 +663,8 @@ host_dept     52.3 KiB   1.10 MiB  21.4
 
 ```bash
 ch <<'SQL'
--- 100분보다 긴 방문을 셉니다. 이 쿼리는 일곱 개 중 한 개의 열만 지목하므로 — 테이블의
--- 작은 일부만 읽어야 합니다. 그것을 bytes_read로 확인하겠습니다.
+-- We count visits longer than a hundred minutes. The query names one column out of seven — so
+-- it should read only a small part of the table. We'll check that by bytes_read.
 SELECT count() FROM passes WHERE duration_min > 100 FORMAT JSON
 SQL
 ```
@@ -673,8 +673,8 @@ SQL
 
 ```bash
 ch <<'SQL'
--- 모든 열의 압축되지 않은 용량을 합산합니다. 그것이 바로 "데이터가 전부 얼마나 되는가" —
--- 앞선 출력의 bytes_read와 비교해야 할 수치입니다.
+-- We sum the uncompressed volume of all columns. That's exactly "how much data there is in total" —
+-- the figure that bytes_read from the previous output should be compared against.
 SELECT formatReadableSize(sum(data_uncompressed_bytes)) AS total
 FROM system.columns
 WHERE database = currentDatabase() AND table = 'passes'
@@ -720,17 +720,17 @@ SQL
 ```bash
 ch <<'SQL'
 SELECT
-    hour,                                     -- 하루 중의 시각
-    guests,                                   -- 이 시각에 떨어진 입장 건수
-    bar(guests, 0, max(guests) OVER (), 50) AS chart  -- 의사 그래픽 막대
+    hour,                                     -- the hour of the day
+    guests,                                   -- how many entries fell on this hour
+    bar(guests, 0, max(guests) OVER (), 50) AS chart  -- a bar of pseudo-graphics
 FROM
 (
-    -- 안쪽 쿼리: 시각별 평범한 그룹화
+    -- The inner query: an ordinary grouping by hour
     SELECT toHour(created_at) AS hour, count() AS guests
     FROM passes
     GROUP BY hour
 )
-ORDER BY hour   -- 시각 오름차순, 그래야 그림이 위에서 아래로 읽힌다
+ORDER BY hour   -- hours ascending, so the picture reads top to bottom
 SQL
 ```
 
@@ -743,20 +743,20 @@ SQL
 
 ```bash
 ch <<'SQL'
--- ClickHouse는 실행된 모든 쿼리를 시스템 테이블 system.query_log에 기록합니다.
+-- ClickHouse records every executed query in the system table system.query_log.
 SELECT
-    event_time,                                       -- 쿼리가 끝난 시각
-    query_duration_ms,                                -- 몇 밀리초 걸렸는지
-    formatReadableQuantity(read_rows) AS rows_read,   -- 몇 행을 읽었는지
-    formatReadableSize(read_bytes)    AS bytes_read,  -- 그 과정에서 몇 바이트를 끌어올렸는지
-    -- 쿼리 텍스트: 그 안의 줄바꿈을 하나로 접고 처음 50자를 가져온다,
-    -- 그러지 않으면 출력이 화면에 들어가지 않는다
+    event_time,                                       -- when the query finished
+    query_duration_ms,                                -- how many milliseconds it took
+    formatReadableQuantity(read_rows) AS rows_read,   -- how many rows it read
+    formatReadableSize(read_bytes)    AS bytes_read,  -- how many bytes it pulled up in doing so
+    -- The query text: we collapse line breaks in it and take the first 50 characters,
+    -- otherwise the output won't fit on the screen
     substring(replaceRegexpAll(query, '\\s+', ' '), 1, 50) AS query
 FROM system.query_log
-WHERE type = 'QueryFinish'  -- 끝난 것만: 시작에 대한 기록은 따로 있다
-  AND user = 'analyst'      -- 여러분 것만, 서버 자체의 서비스 쿼리는 제외하고
-ORDER BY event_time DESC    -- 최근 것이 위로
-LIMIT 10                    -- 그리고 열 개면 충분하다
+WHERE type = 'QueryFinish'  -- only finished ones: there's a separate record for the start
+  AND user = 'analyst'      -- only yours, without the server's own service queries
+ORDER BY event_time DESC    -- the recent ones on top
+LIMIT 10                    -- and ten is enough
 SQL
 ```
 
@@ -776,7 +776,7 @@ SQL
 
 ```bash
 ch <<'SQL'
--- 출입증 번호로 단일 행을 찾습니다. SELECT *는 "모든 열을 반환하라"는 뜻입니다.
+-- We look for a single row by pass number. SELECT * means "return all columns."
 SELECT * FROM passes WHERE pass_id = 424242 FORMAT JSON
 SQL
 ```
@@ -804,8 +804,8 @@ SQL
 이제 같은 일을, 제대로 한 버전. 보안팀은 보통 번호뿐 아니라 **그 일이 언제 있었는지**도 압니다:
 
 ```sql
--- 같은 검색이지만, 시간 범위를 곁들인 것. created_at에 대한 조건이 정렬 키에
--- 걸리고, ClickHouse는 그 날짜 바깥의 모든 것을 버립니다.
+-- The same search, but with a time frame. The condition on created_at lands
+-- in the sorting key, and ClickHouse discards everything outside that day.
 SELECT * FROM passes
 WHERE created_at >= '2026-03-01' AND created_at < '2026-03-02'
   AND pass_id = 424242
@@ -849,9 +849,9 @@ FORMAT JSON
 
 ```bash
 ch <<'SQL'
--- 한 행에서 방문객의 이름을 바꿉니다. 명령은 즉시 제어를 돌려주지만, 작업은 거기서
--- 끝나지 않습니다: ClickHouse는 그것을 큐에 넣고 백그라운드에서 수행합니다.
-ALTER TABLE passes UPDATE guest_name = '김민○' WHERE pass_id = 424242
+-- We change a guest's name in one row. The command returns control immediately, but the work
+-- doesn't end there: ClickHouse will queue it and carry it out in the background.
+ALTER TABLE passes UPDATE guest_name = 'Whitfield J.' WHERE pass_id = 424242
 SQL
 ```
 
@@ -859,12 +859,12 @@ SQL
 
 ```bash
 ch <<'SQL'
--- 테이블에 대한 지연된 변경의 큐 — 또 하나의 ClickHouse 시스템 테이블.
+-- The queue of deferred changes to the table — another ClickHouse system table.
 SELECT
-    command,       -- 정확히 무엇을 하라고 지시받았는지
-    is_done,       -- 작업이 끝났으면 1
-    parts_to_do,   -- 다시 써야 할 파트가 몇 개 남았는지
-    create_time    -- 작업이 큐에 들어간 시각
+    command,       -- what exactly it's been told to do
+    is_done,       -- 1 if the work is finished
+    parts_to_do,   -- how many parts remain to be rewritten
+    create_time    -- when the task was put in the queue
 FROM system.mutations
 WHERE table = 'passes'
 ORDER BY create_time DESC
@@ -909,11 +909,11 @@ SQL
 
 ```bash
 cd labs/09-clickhouse
-# 스크립트는 이 세 개의 환경 변수를 읽으므로, 실행하기 전에, 그리고 같은 터미널 창에서
-# 반드시 설정해야 합니다.
-export KUBECONFIG=~/lab.kubeconfig       # 어느 클러스터를 검사할지
-export COZY_TENANT=workshop03            # 여러분의 테넌트 번호
-export CH_PASSWORD='여러분의-analyst-비밀번호'  # ClickHouse를 주문할 때 정한 그것
+# The script reads these three environment variables, so you must set them before running it
+# and in the same terminal window.
+export KUBECONFIG=~/lab.kubeconfig       # which cluster to check
+export COZY_TENANT=workshop03            # your tenant number
+export CH_PASSWORD='your-analyst-password'  # the one you set when ordering ClickHouse
 ./check.sh
 ```
 
@@ -929,8 +929,8 @@ export CH_PASSWORD='여러분의-analyst-비밀번호'  # ClickHouse를 주문�
 ## 정리
 
 ```bash
-# 작업용 Pod는 아무것도 저장하지 않습니다: 모든 작업은 ClickHouse 안에서 일어났고, Pod는
-# 쿼리를 전달하기만 했습니다. 미련 없이 삭제하세요.
+# The working Pod stores nothing: all the work happened inside ClickHouse, and the Pod only
+# passed queries along. Delete it without regret.
 kubectl delete pod ch-workbench
 ```
 

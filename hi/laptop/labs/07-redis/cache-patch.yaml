@@ -1,48 +1,48 @@
 ---
-# लैब 7 · कैश को असल में चालू करना। यह पहले से डिप्लॉय किए गए passes-api के ऊपर लागू होता है
-# आपके `lab` क्लस्टर में (export KUBECONFIG=~/lab.kubeconfig):
+# Lab 7 · turning the cache on for real. Applied on top of the already-deployed passes-api
+# in your `lab` cluster (export KUBECONFIG=~/lab.kubeconfig):
 #   kubectl patch deployment passes-api --patch-file cache-patch.yaml
 #
-# यह एक पैच है, पूरा मैनिफ़ेस्ट नहीं: यहाँ केवल वही वर्णित है जो बदलता है। बाकी सब कुछ —
-# इमेज, लेबल, प्रोब, रिसोर्स — passes-api.yaml से अछूता रहता है। इसीलिए फ़ाइल
-# सीधे spec: से शुरू होती है: कंटेनर तक का रास्ता Deployment की संरचना को दोहराता है, ताकि
-# क्लस्टर समझ सके कि संपादन ठीक कहाँ लागू करना है।
+# This is a patch, not a full manifest: it describes only what changes. Everything else —
+# the image, labels, probes, resources — stays untouched from passes-api.yaml. That is why the
+# file starts straight from spec: the path down to the container mirrors the Deployment
+# structure so the cluster understands exactly where to apply the edit.
 #
-# कंटेनर का नाम `api` सजावट नहीं बल्कि एक पता है: क्लस्टर इसका उपयोग सूची में सही कंटेनर
-# ढूँढने के लिए करता है। नाम गलत करेंगे तो संपादन के बजाय एक दूसरा कंटेनर मिलेगा।
+# The container name `api` is not decoration but an address: the cluster uses it to find the
+# right container in the list. Get the name wrong and instead of an edit you get a second container.
 #
-# REDIS-ADDR के स्थान पर अपने Redis का पता डालें — यह एक प्लेसहोल्डर है, होस्टनेम नहीं।
-# पता आप डैशबोर्ड में, अपने managed Redis एप्लिकेशन के कार्ड में से लेते हैं।
+# Substitute the address of your own Redis in place of REDIS-ADDR — it is a placeholder, not a hostname.
+# You take the address from the dashboard, in the card of your managed Redis application.
 spec:
   template:
     spec:
       containers:
         - name: api
-          # Kubernetes में env सूचियाँ name फ़ील्ड के आधार पर मर्ज होती हैं, इसलिए नीचे की तीन प्रविष्टियाँ
-          # Deployment में पहले से मौजूद प्रविष्टियों को बदलने के बजाय उनमें जुड़ जाती हैं।
+          # env lists in Kubernetes are merged by the name field, so the three entries below
+          # are added to those already in the Deployment rather than replacing them.
           env:
-            # इस वेरिएबल का प्रकट होना ही «कैश चालू करना» है: एप्लिकेशन इसे स्टार्ट पर जाँचता है
-            # और, यदि यह सेट है, तो पहले Redis में जाता है। खाली या
-            # अनुपस्थित — तो पहले की तरह काम करता है, हर अनुरोध पर डायरेक्टरी में जाकर।
+            # The appearance of this variable is what "turn the cache on" means: the application checks
+            # it at startup and, if it is set, goes to Redis first. Empty or
+            # missing — it works as before, hitting the directory on every request.
             - name: REDIS_ADDR
               value: "REDIS-ADDR:6379"
-            # पासवर्ड को टेक्स्ट के रूप में नहीं लिखते: यह एक सीक्रेट से आता है, जिसे आप
-            # एक अलग कमांड से बनाएँगे। Git में पड़े मैनिफ़ेस्ट में
-            # पासवर्ड की कोई जगह नहीं।
+            # We do not write the password as text: it arrives from a secret that you
+            # will create with a separate command. In a manifest that lives in Git,
+            # a password has no place.
             #
-            # secretKeyRef एक संदर्भ है: name — उसी क्लस्टर में सीक्रेट ऑब्जेक्ट का नाम,
-            # key — उसके अंदर से कौन-सा फ़ील्ड लेना है। मान पॉड के शुरू होने पर प्रतिस्थापित
-            # होता है और फ़ाइल में कभी प्रकट नहीं होता।
+            # secretKeyRef is a reference: name — the name of the secret object in the same cluster,
+            # key — which field inside it to take. The value is substituted when the
+            # pod starts and never appears in the file.
             - name: REDIS_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: redis-password
                   key: password
-            # कोई रिकॉर्ड कैश में कितने सेकंड जीवित रहता है। साठ — क्योंकि
-            # कर्मचारी डायरेक्टरी दिन में एक बार बदलती है, हर सेकंड नहीं।
+            # How many seconds a record lives in the cache. Sixty — because the
+            # employee directory changes once a day, not once a second.
             #
-            # अवधि जितनी लंबी — डायरेक्टरी में उतना कम जाते हैं, पर बासी उपनाम उतनी
-            # देर तक देते हैं। जितनी छोटी — डेटा उतना ताज़ा, लाभ उतना कम। यह एक समझौता है,
-            # सही मान वाली कोई सेटिंग नहीं।
+            # A longer term — we hit the directory less often, but serve a stale
+            # surname for longer. A shorter one — the data is fresher, the gain is smaller. This is a trade-off,
+            # not a setting with a correct value.
             - name: CACHE_TTL
               value: "60"

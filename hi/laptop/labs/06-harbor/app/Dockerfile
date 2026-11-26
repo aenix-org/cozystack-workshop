@@ -1,76 +1,76 @@
-# लैब 6 · आपका अपना निजी इमेज रजिस्ट्री। «गेस्ट पास» सेवा की इमेज बनाने की विधि।
+# Lab 6 · Your own private image registry. Build recipe for the «Guest Pass» service image.
 #
-# Dockerfile क्या है: एक चरण-दर-चरण विधि, जिससे स्रोतों से एक इमेज बनती है —
-# फ़ाइल सिस्टम का चलने-को-तैयार स्नैपशॉट, साथ में यह निर्देश कि उसमें क्या चलाना है।
-# vSphere में सबसे निकटतम — गोल्डन VM टेम्पलेट बनाना, बस टेक्स्ट में वर्णित और
-# दोहराने योग्य: एक ही विधि किसी भी मशीन पर एक ही परिणाम देती है।
+# What a Dockerfile is: a step-by-step recipe that turns sources into an image —
+# a ready-to-run snapshot of the filesystem together with instructions on what to run inside it.
+# The closest analogy in vSphere is building a golden VM template, only described as text and
+# repeatable: the same recipe yields the same result on any machine.
 #
-# आपके लैपटॉप पर, लैब फ़ोल्डर से बनती है (आख़िरी तर्क — इस फ़ाइल और
-# स्रोतों वाला फ़ोल्डर):
+# Built on your laptop, from the lab folder (the last argument is the folder with this
+# file and the sources):
 #     docker build --platform linux/amd64 -t HARBOR-HOST/passes/passes-api:v1 app/
 #     docker push HARBOR-HOST/passes/passes-api:v1
-# HARBOR-HOST को अपने Harbor के पते से बदलें: इमेज नाम का पहला भाग — यह रजिस्ट्री
-# का पता है, इसी से docker push समझता है कि कहाँ भेजना है।
+# Replace HARBOR-HOST with the address of your own Harbor: the first part of the image name is
+# the registry address, and that is how docker push knows where to send it.
 #
-# ध्यान दें: --platform linux/amd64 Apple Silicon प्रोसेसर वाले Mac पर और किसी भी
-# ARM-लैपटॉप पर अनिवार्य है। इसके बिना ARM के लिए इमेज बनेगी: बिना त्रुटि के बनेगी, बिना त्रुटि के
-# रजिस्ट्री में भेजी जाएगी, पर क्लस्टर में (वहाँ नोड x86 पर हैं) «exec format error» के साथ गिर जाएगी।
+# ATTENTION: --platform linux/amd64 is mandatory on a Mac with an Apple Silicon processor and on any
+# ARM laptop. Without it you get an ARM image: it builds without errors, pushes to the
+# registry without errors, and then in the cluster (whose nodes are x86) crashes with «exec format error».
 #
-# विधि की हर पंक्ति एक लेयर बनाती है — फ़ाइल सिस्टम का अपरिवर्तनीय टुकड़ा। लेयर
-# कैश होती हैं और पुनः उपयोग होती हैं: इसीलिए फ़ाइलें एक-एक करके कॉपी होती हैं, पूरे फ़ोल्डर
-# के रूप में नहीं, — main.go में बदलाव निर्भरताओं को फिर से डाउनलोड करने पर मजबूर नहीं करता।
+# Each line of the recipe creates a layer — an immutable slice of the filesystem. Layers are
+# cached and reused: that is why files are copied one by one rather than the whole folder
+# at once — editing main.go does not force re-downloading the dependencies.
 #
-# दो चरण। पहला — बिल्ड चरण: यहाँ पूरा Go कंपाइलर चाहिए, और यह लगभग 350 MB है।
-# दूसरा — वह जो क्लस्टर में जाएगा: वहाँ केवल तैयार बाइनरी स्थानांतरित होती है।
-# अंतिम इमेज 350 के बजाय लगभग 10 MB बनती है, और उसके अंदर न कंपाइलर है,
-# न स्रोत, न पैकेज मैनेजर — यानी उसके पास इस्तेमाल करने को कुछ नहीं जो
-# कंटेनर में फिर भी घुस आया।
+# TWO STAGES. The first is the build stage: it needs the whole Go compiler, which is about 350 MB.
+# The second is what ships to the cluster: only the finished binary is carried over there.
+# The resulting image ends up around 10 MB instead of 350, and inside it there is no compiler,
+# no sources and no package manager — that is, nothing to use for anyone who
+# does end up inside the container.
 
-# --- चरण 1: बिल्ड -----------------------------------------------------------------
-# FROM — किस तैयार इमेज से शुरू करते हैं। यहाँ Go कंपाइलर वाली आधिकारिक इमेज
-# Alpine के ऊपर (न्यूनतम Linux, कुछ मेगाबाइट)। संस्करण तय किया गया है: latest टैग के साथ
-# वही विधि आधे साल बाद कुछ और बना देती।
-# AS build — चरण का नाम, इसी से दूसरा चरण परिणाम लेगा।
+# --- Stage 1: build -----------------------------------------------------------------
+# FROM — which ready-made image we start from. Here it is the official image with the Go compiler
+# on top of Alpine (a minimal Linux, a few megabytes). The version is pinned: with the
+# latest tag the same recipe would build something different half a year later.
+# AS build — the name of the stage; the second stage will pull the result by it.
 FROM golang:1.23-alpine AS build
-# इमेज के अंदर कार्यशील फ़ोल्डर: आगे की कमांड इसी के सापेक्ष चलती हैं।
-# अगर फ़ोल्डर नहीं है, तो वह बना दिया जाता है।
+# Working folder inside the image: subsequent commands run relative to it.
+# If the folder does not exist, it is created.
 WORKDIR /src
-# go.mod — मॉड्यूल का विवरण: नाम और Go संस्करण। एप्लिकेशन की कोई बाहरी निर्भरता नहीं है,
-# इसलिए इंटरनेट से डाउनलोड करने को कुछ नहीं, और बिल्ड वहाँ भी होती है जहाँ बाहर पहुँच नहीं है।
+# go.mod — the module description: its name and Go version. The application has no external
+# dependencies, so there is nothing to download from the internet, and the build works where there is no outbound access.
 COPY go.mod ./
-# स्रोत स्वयं। अलग पंक्ति में कॉपी होता है, ताकि कोड में बदलाव पिछली लेयर का
-# कैश न मिटाए।
+# The source itself. Copied on a separate line so that editing the code does not invalidate the cache
+# of the previous layer.
 COPY main.go ./
-# RUN कमांड को बिल्ड के समय चलाता है (रन के समय नहीं) और परिणाम को लेयर के रूप में सहेजता है।
-#   CGO_ENABLED=0  स्टैटिक रूप से बनाएँ, सिस्टम लाइब्रेरियों से बिना जुड़े। इसके बिना
-#                  बाइनरी को glibc चाहिए होगी, जो अंतिम इमेज में नहीं होगी,
-#                  और कंटेनर बिल्ड के समय नहीं, बल्कि स्टार्ट के समय गिरेगा
-#   -trimpath      बाइनरी से बिल्ड मशीन के पथ हटाएँ: बिल्ड
-#                  दोहराने योग्य बनती है, और बाहर आपके होम फ़ोल्डर का नाम नहीं जाता
-#   -ldflags="-s -w"  डिबग टेबल हटा दें — फ़ाइल काफ़ी छोटी हो जाती है
-#   -o /out/...    परिणाम कहाँ रखना है; यहीं से इसे दूसरा चरण उठाएगा
+# RUN executes a command at build time (not at run time) and saves the result as a layer.
+#   CGO_ENABLED=0  build statically, without tying to system libraries. Without this
+#                  the binary would need glibc, which will not be present in the final image,
+#                  and the container would crash at startup rather than at build time
+#   -trimpath      strip the build machine's paths from the binary: the build becomes
+#                  reproducible, and the name of your home folder does not leak outward
+#   -ldflags="-s -w"  drop the debug tables — the file becomes noticeably smaller
+#   -o /out/...    where to put the result; the second stage picks it up from here
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/passes-api .
 
-# --- चरण 2: वह जो क्लस्टर में जाएगा -----------------------------------------------
-# दूसरा FROM इमेज को नए सिरे से, साफ़ स्लेट से शुरू करता है: पहले चरण में जो कुछ भी बना
-# वह वहीं रहता है और अंतिम इमेज में नहीं जाता।
+# --- Stage 2: what ships to the cluster -----------------------------------------------
+# The second FROM starts the image anew, from a clean slate: everything acquired in the first stage
+# stays there and does not make it into the final image.
 FROM alpine:3.21
-# वह उपयोगकर्ता बनाते हैं, जिसके अंतर्गत एप्लिकेशन चलेगा: उसे root के रूप में नहीं
-# चलना चाहिए। सही ढंग से कॉन्फ़िगर किए गए क्लस्टर में root वाले पॉड को बिल्कुल नहीं आने देंगे, और यह
-# नुक्ताचीनी नहीं, बल्कि सुरक्षा की एक मानक आवश्यकता है।
-#   -D          बिना पासवर्ड बनाएँ, कोई सवाल पूछे बिना
-#   -u 10001    संख्यात्मक पहचानकर्ता; क्लस्टर नाम नहीं, बल्कि संख्या ही जाँचता है
+# Create the user the application will run as: it must not run as root.
+# In a properly configured cluster a pod running as root will not be admitted at all, and this is not
+# nitpicking but a standard security requirement.
+#   -D          create without a password, asking no questions
+#   -u 10001    numeric identifier; the cluster checks the number itself, not the name
 RUN adduser -D -u 10001 app
-# पहले चरण से केवल एक ही चीज़ स्थानांतरित होती है — तैयार बाइनरी। --from=build
-# चरण के नाम की ओर इशारा करता है। /usr/local/bin — वह फ़ोल्डर जो किसी भी Linux के PATH में है।
+# The only thing carried over from the first stage is the finished binary. --from=build
+# points to the stage name. /usr/local/bin is a folder that exists in the PATH of any Linux.
 COPY --from=build /out/passes-api /usr/local/bin/passes-api
-# इस जगह से कंटेनर में प्रक्रिया उपयोगकर्ता 10001 के अंतर्गत चलती है, root के अंतर्गत नहीं।
-# क्रम महत्वपूर्ण है: ऊपर की पंक्तियाँ root के रूप में चलीं, वरना adduser काम न करता।
+# From this point on the process in the container runs as user 10001, not as root.
+# Order matters: the lines above ran as root, otherwise adduser would not have worked.
 USER 10001
-# पोर्ट की घोषणा — मनुष्य और उपकरणों के लिए एक सूचनात्मक प्रविष्टि। यह पोर्ट न तो
-# खोलती है और न कुछ कॉन्फ़िगर करती है: उस तक पहुँच मैनिफ़ेस्ट (passes.yaml) में वर्णित है।
+# Declaring the port — an informational note for humans and tools. It does not open the port
+# and configures nothing: access to it is described in the manifest (passes.yaml).
 EXPOSE 8080
-# कंटेनर के स्टार्ट पर क्या चलाना है। सूची के रूप में, स्ट्रिंग के रूप में नहीं: इस तरह कमांड
-# सीधे चलती है, बिना किसी मध्यवर्ती शेल के, और क्लस्टर से रुकने का संकेत
-# उसी एप्लिकेशन तक पहुँचता है, न कि उस shell तक जिसने उसे जन्म दिया।
+# What to run when the container starts. As a list rather than a string: this way the command
+# runs directly, without an intermediate shell, and the stop signal from the cluster
+# reaches the application itself rather than the shell that spawned it.
 ENTRYPOINT ["/usr/local/bin/passes-api"]

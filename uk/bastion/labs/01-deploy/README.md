@@ -32,10 +32,10 @@
 ## Що лежить у папці лаби
 
 Усі файли вже у вас — ви забрали їх разом із репозиторієм. Створювати й друкувати заново
-нічого не потрібно: там, де нижче написано `kubectl apply -f ім'я.yaml`, файл береться звідси.
+нічого не потрібно: там, де нижче написано `kubectl apply -f name.yaml`, файл береться звідси.
 
 ```bash
-# шлях відлічується від кореня репозиторію, який ви забрали в лабі 0
+# the path is relative to the root of the repository you pulled in lab 0
 cd labs/01-deploy
 ```
 
@@ -65,10 +65,10 @@ cd labs/01-deploy
 Підключаємося:
 
 ```bash
-# KUBECONFIG — змінна, з якої kubectl дізнається, який файл доступу брати.
-# Тут це доступ до кластера lab, а не до тенанта: файли різні, кластери різні.
+# KUBECONFIG — the variable kubectl reads to learn which access file to use.
+# Here that's access to the lab cluster, not to the tenant: different files, different clusters.
 export KUBECONFIG=~/lab.kubeconfig
-# get nodes = «покажи вузли». Відповідь підтверджує, що kubectl звертається туди, куди треба.
+# get nodes = "show the nodes". The answer confirms kubectl is talking to the right place.
 kubectl get nodes
 ```
 
@@ -247,9 +247,9 @@ spec:
 Тепер застосовуємо:
 
 ```bash
-# apply = «приведи кластер до того, що описано у файлі». Усі чотири об'єкти створюються
-# однією командою, порядок усередині файлу кластер розбере сам.
-#   -f   взяти опис із файлу
+# apply = "bring the cluster to what's described in the file". All four objects are created
+# with a single command; the cluster works out the order within the file on its own.
+#   -f   take the description from a file
 kubectl apply -f rickroll.yaml
 ```
 
@@ -265,8 +265,8 @@ service/rickroll created
 Дочекайтеся, поки копія запуститься:
 
 ```bash
-# rollout status чекає, поки Deployment доведе справу до кінця: потрібне число копій
-# запущено й готово приймати запити. Команда завершиться сама, коли це станеться.
+# rollout status waits until the Deployment sees the job through: the required number of copies
+# is running and ready to accept requests. The command finishes on its own when that happens.
 kubectl rollout status deployment/rickroll
 ```
 
@@ -282,8 +282,8 @@ kubectl rollout status deployment/rickroll
 тепер те, що ми застосували:
 
 ```bash
-# get deployment rickroll = показати один об'єкт за типом та іменем.
-#   -o yaml   вивести його цілком у тому ж вигляді, у якому його можна написати руками
+# get deployment rickroll = show a single object by type and name.
+#   -o yaml   print it in full, in the same form you could write it by hand
 kubectl get deployment rickroll -o yaml
 ```
 
@@ -318,10 +318,10 @@ spec:
 нижче прокине тунель із бастіона всередину.
 
 ```bash
-# port-forward = тунель із бастіона всередину кластера, живе, поки команда працює.
-#   svc/rickroll   вести тунель до Service з іменем rickroll, а той уже направить
-#                  запит на живу копію застосунку
-#   8080:80        ліве число — порт на бастіоні, праве — порт Service у кластері
+# port-forward = a tunnel from the bastion into the cluster, alive as long as the command runs.
+#   svc/rickroll   run the tunnel to the Service named rickroll, which in turn routes
+#                  the request to a live copy of the application
+#   8080:80        the left number is the port on the bastion, the right is the Service port in the cluster
 kubectl port-forward svc/rickroll 8080:80
 ```
 
@@ -340,9 +340,9 @@ export KUBECONFIG=~/lab.kubeconfig
 ```
 
 ```bash
-# get pods = «покажи запущені копії».
-#   -l app=rickroll   показати не всі Pod, а тільки з міткою app=rickroll —
-#                     ту саму, за якою їх знаходить Service
+# get pods = "show the running copies".
+#   -l app=rickroll   show not all Pods, but only those with the label app=rickroll —
+#                     the very one the Service uses to find them
 kubectl get pods -l app=rickroll
 ```
 
@@ -355,8 +355,8 @@ kubectl get pods -l app=rickroll
 📍 **Де:** на бастіоні, у тому ж вікні термінала, де ви працювали з `kubectl`.
 
 ```bash
-# запускати з папки лаби: файли скрипт шукає поруч із собою.
-# ./ перед іменем означає «запусти файл ось звідси», а не шукай його в системних папках
+# run it from the lab folder: the script looks for its files next to itself.
+# the ./ before the name means "run the file from right here", not look for it in system folders
 ./check.sh
 ```
 

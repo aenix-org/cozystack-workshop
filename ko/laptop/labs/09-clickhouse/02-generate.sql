@@ -1,73 +1,74 @@
--- 랩 9 · 데이터 생성기: ClickHouse가 스스로 만들어 내는 100만 건의 개찰구 통과 기록.
+-- Lab 9 · data generator: a million turnstile entries, invented by ClickHouse itself.
 --
--- 실행 위치: 노트북에서, 랩 클러스터에서, README에 있는 짧은 명령 `ch`로 실행합니다:
+-- Where it runs: on the laptop, in the lab cluster, with the short command `ch`
+-- from the README:
 --     cd labs/09-clickhouse && ch < 02-generate.sql
--- 그 전에 테이블이 먼저 만들어져 있어야 합니다 — 01-schema.sql.
+-- Before this, the table must already be created — 01-schema.sql.
 --
--- 대기 시간: 100만 행은 전부 서버 내부에서 몇 초 만에 계산되고 기록됩니다.
--- 데이터는 네트워크를 통해 오가지 않으며 여러분의 노트북을 거치지도 않습니다.
--- INSERT의 응답이 비어 있으면 — 성공입니다. 확인하려면: echo 'SELECT count() FROM passes' | ch
+-- How long to wait: a million rows are computed and written in a few seconds,
+-- entirely inside the server. The data does not travel over the network and does not pass through your laptop.
+-- The INSERT reply is empty — that means success. To check: echo 'SELECT count() FROM passes' | ch
 --
--- 파일을 두 번 실행하면 행이 200만 개가 됩니다: INSERT는 추가만 할 뿐
--- 아무것도 대체하지 않습니다. 처음부터 다시 하려면: TRUNCATE TABLE passes 후 이 파일을 다시 실행합니다.
+-- Run the file twice and there will be two million rows: INSERT only appends and
+-- replaces nothing. To start over: TRUNCATE TABLE passes, then run this file again.
 --
--- 아래는 하나의 INSERT ... SELECT 명령입니다: 행은 외부에서 오는 것이 아니라
--- 뒤따르는 쿼리로 계산됩니다.
+-- Below is a single INSERT ... SELECT command: the rows do not come from outside, they are computed
+-- by the query that follows.
 INSERT INTO passes
 SELECT
-    -- 통과증 번호. number는 생성기 내에서 고유하므로 pass_id도
-    -- 고유합니다.
+    -- Pass number. number is unique within the generator — so pass_id
+    -- is unique too.
     number AS pass_id,
-    -- 통과 시각은 세 부분으로 조립됩니다: 일, 시, 분. 각 부분은
-    -- cityHash64(number, '솔트')로 얻은 자체 의사 난수입니다.
-    -- cityHash64는 빠른 해시 함수입니다: 같은 입력에 대해 항상 같은
-    -- 결과를 내므로 데이터는 재현 가능하고, 서로 다른 «솔트»
-    -- ('day', 'hour', 'minute', ...)는 하나의 number에서 원하는 만큼
-    -- 서로 독립적인 난수 값을 만들어 냅니다.
+    -- The entry time is assembled from three parts: day, hour, and minute. Each part is
+    -- its own pseudo-random number, obtained as cityHash64(number, 'salt').
+    -- cityHash64 is a fast hash function: for the same input it always gives
+    -- the same result, so the data is reproducible, while a different 'salt'
+    -- ('day', 'hour', 'minute', ...) turns a single number into as many
+    -- mutually independent random values as you like.
     addMinutes(
         addHours(
             addDays(
-                -- 기준점은 1월 1일. 57600으로 나눈 나머지는 최대 57599까지의 수를 주고,
-                -- 그 제곱근은 0부터 239까지의 일수, 즉 여덟 달을 줍니다.
-                -- 여기서 제곱근은 멋으로 쓴 것이 아닙니다: 통과 기록을
-                -- 기간의 끝쪽으로 몰아 줍니다. 시간이 갈수록 방문객이 많아지는데 — 실제
-                -- 삶처럼, 바로 이 증가세를 경영진이 보고서에서 보고 싶어 합니다.
+                -- The reference point is January 1st. The remainder modulo 57600 gives a number up to 57599,
+                -- its square root is a day from 0 to 239, that is, eight months.
+                -- The square root here is not for looks: it clusters entries
+                -- toward the end of the period. Over time there are more guests — as
+                -- in real life, and it is exactly this growth that management wants to see in the report.
                 toDateTime('2026-01-01 00:00:00'),
                 toUInt16(sqrt(cityHash64(number, 'day') % 57600))
             ),
-            -- 도착 시각은 «8시부터 18시까지» 균등하게가 아니라, 시각이 서로 다른
-            -- 빈도로 반복되는 배열에서 취합니다: 10은 세 번, 15는 세 번,
-            -- 8은 한 번 나옵니다. 그 결과 점심 전과 후, 두 개의 뚜렷한 봉우리가 생기고,
-            -- 보고서가 바로 이것을 찾아야 합니다. 우리가 찾으려는 것이 테스트
-            -- 데이터에 들어 있으면 좋은 일입니다.
-            -- ClickHouse에서 배열 인덱싱은 1부터 시작하므로 1 + …
+            -- The arrival hour is taken not uniformly "from 8 to 18", but from an array where
+            -- hours repeat with different frequency: 10 appears three times, 15 three times,
+            -- 8 once. The result is two pronounced peaks, before lunch and after;
+            -- the report should find them. It is good when the test data contains what
+            -- we intend to look for in it.
+            -- Array indexing in ClickHouse starts at one, hence 1 + …
             [8, 9, 9, 10, 10, 10, 11, 11, 12,
              13, 14, 14, 15, 15, 15, 16, 17, 18][1 + cityHash64(number, 'hour') % 18]
         ),
-        -- 시간 내의 분 — 같은 number에서 나온 또 하나의 독립적인 값.
+        -- The minutes within the hour are yet another independent value from the same number.
         cityHash64(number, 'minute') % 60
     ) AS created_at,
-    -- 방문객 이름은 행마다 고유합니다: 한 컬럼 안에 100만 개의 서로 다른 값.
-    -- 랩을 조금 더 진행하면 디스크상에서 이것이 가장 무거운 컬럼임을 알게 됩니다.
-    concat('방문객 번호 ', toString(number)) AS guest_name,
-    -- 맞이하는 직원의 부서: 다섯 개 값, 균등하게 분포.
-    ['영업팀', '개발팀', '회계팀',
-     '인사팀', '물류팀'][1 + cityHash64(number, 'dept') % 5] AS host_dept,
-    -- 출입구. 같은 기법이지만 분포는 불균등합니다: «북문»가 여섯 칸 중
-    -- 세 칸을 차지해 흐름의 절반을 가져가고, «남문»는 3분의 1, «서문»는
-    -- 나머지를 가져갑니다. 균등한 데이터는 보고서에서 그럴듯해 보이지 않고 아무것도
-    -- 보여 주지 않습니다.
-    ['북문', '북문', '북문',
-     '남문', '남문', '서문'][1 + cityHash64(number, 'entrance') % 6] AS entrance,
-    -- 통과증 유형: 열 칸 중 여섯 칸은 일회용, 두 칸씩은 주간권,
-    -- 한 칸씩은 차량용과 단체용에 배정됩니다 — 출입구에서 실제로 보이는 모습이 그렇습니다.
-    ['1회용', '1회용', '1회용', '1회용', '1회용', '1회용',
-     '주간', '주간',
-     '차량', '단체'][1 + cityHash64(number, 'type') % 10] AS pass_type,
-    -- 방문 지속 시간 30분부터 329분까지. toUInt16이 필요한 이유는 컬럼이
-    -- UInt16으로 선언되어 있는데, 산술 결과는 더 넓고 스스로 좁혀지지 않기 때문입니다.
+    -- The guest name is unique to each row: a million different values in a single column.
+    -- A bit further into the lab it will be clear that on disk this is the heaviest column.
+    concat('Guest No. ', toString(number)) AS guest_name,
+    -- The host employee's department: five values, distributed equally.
+    ['Sales', 'Engineering', 'Accounting',
+     'HR', 'Logistics'][1 + cityHash64(number, 'dept') % 5] AS host_dept,
+    -- The entrance. The same trick, but the distribution is uneven: "North" takes
+    -- three cells out of six and gets half the flow, "South" a third, "West"
+    -- the rest. Uniform data looks implausible in a report and shows
+    -- nothing.
+    ['North', 'North', 'North',
+     'South', 'South', 'West'][1 + cityHash64(number, 'entrance') % 6] AS entrance,
+    -- Pass type: six cells out of ten go to single-use, two each to weekly,
+    -- one each to vehicle and group — that is how it looks at the entrance.
+    ['single-use', 'single-use', 'single-use', 'single-use', 'single-use', 'single-use',
+     'weekly', 'weekly',
+     'vehicle', 'group'][1 + cityHash64(number, 'type') % 10] AS pass_type,
+    -- Visit duration from 30 to 329 minutes. toUInt16 is needed because the column
+    -- is declared as UInt16, while the result of the arithmetic is wider and will not narrow itself.
     toUInt16(30 + cityHash64(number, 'duration') % 300) AS duration_min
--- numbers(1000000) — 내장 생성기 테이블: 0부터 999999까지의 값을 담은 단일
--- 컬럼 number를 가진 100만 행. 디스크에는 없고 즉석에서 계산됩니다.
--- 데이터가 더 많거나 적게 필요하면 이 숫자만 바꾸면 됩니다.
+-- numbers(1000000) is a built-in generator table: a million rows with a single
+-- column number holding values from 0 to 999999. It is not on disk, it is computed
+-- on the fly. If you need more or less data, only this number changes.
 FROM numbers(1000000)

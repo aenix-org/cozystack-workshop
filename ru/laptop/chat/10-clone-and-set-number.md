@@ -69,9 +69,9 @@ Get-ChildItem -Recurse manifests,scripts -File | ForEach-Object {
 
 **Проверяем, что не осталось ни одной заглушки:**
 ```bash
-grep -rn tenant-workshopXX manifests scripts || echo "чисто, можно продолжать"
+grep -rn tenant-workshopXX manifests scripts || echo "clean, you can continue"
 ```
 
 Одно место команда не тронет: в `manifests/03-app-vm.yaml` строка
-`url: "ВСТАВЬТЕ_PRESIGNED_URL"`. Эту ссылку вы получите позже, когда сконвертируете образ.
+`url: "PASTE_PRESIGNED_URL"`. Эту ссылку вы получите позже, когда сконвертируете образ.
 Пока — знайте, что она вас там ждёт.

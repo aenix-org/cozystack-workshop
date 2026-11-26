@@ -1,76 +1,76 @@
-# ラボ6 · 自分専用のプライベートイメージレジストリ。「ゲストパス」サービスのイメージのビルドレシピ。
+# Lab 6 · Your own private image registry. Build recipe for the «Guest Pass» service image.
 #
-# Dockerfileとは何か: ソースからイメージを作り出す手順書のようなもの——
-# ファイルシステムの起動可能なスナップショットと、その中で何を実行するかの指示をひとまとめにしたもの。
-# vSphere で最も近いのはゴールデン VM テンプレートの作成だが、それをテキストで記述し、
-# 再現可能にしたもの: 同じレシピはどのマシンでも同じ結果を生む。
+# What a Dockerfile is: a step-by-step recipe that turns sources into an image —
+# a ready-to-run snapshot of the filesystem together with instructions on what to run inside it.
+# The closest analogy in vSphere is building a golden VM template, only described as text and
+# repeatable: the same recipe yields the same result on any machine.
 #
-# ノートパソコン上で、ラボのフォルダから（最後の引数がこのファイルと
-# ソースの入ったフォルダ）ビルドする:
+# Built on your laptop, from the lab folder (the last argument is the folder with this
+# file and the sources):
 #     docker build --platform linux/amd64 -t HARBOR-HOST/passes/passes-api:v1 app/
 #     docker push HARBOR-HOST/passes/passes-api:v1
-# HARBOR-HOST は自分の Harbor のアドレスに置き換える: イメージ名の最初の部分がレジストリの
-# アドレスであり、それによって docker push はどこへ送ればよいかを判断する。
+# Replace HARBOR-HOST with the address of your own Harbor: the first part of the image name is
+# the registry address, and that is how docker push knows where to send it.
 #
-# 注意: --platform linux/amd64 は Apple Silicon プロセッサ搭載の Mac およびあらゆる
-# ARM ノートパソコンでは必須。これがないと ARM 向けイメージができあがる: エラーなくビルドされ、
-# エラーなくレジストリへプッシュされるが、クラスタ（そのノードは x86）では「exec format error」で落ちる。
+# ATTENTION: --platform linux/amd64 is mandatory on a Mac with an Apple Silicon processor and on any
+# ARM laptop. Without it you get an ARM image: it builds without errors, pushes to the
+# registry without errors, and then in the cluster (whose nodes are x86) crashes with «exec format error».
 #
-# レシピの各行はレイヤー——ファイルシステムの不変のスライス——を作る。レイヤーは
-# キャッシュされ再利用される: だからファイルはフォルダごとまとめてではなく1つずつコピーする——
-# main.go を編集しても依存関係を再ダウンロードさせずに済む。
+# Each line of the recipe creates a layer — an immutable slice of the filesystem. Layers are
+# cached and reused: that is why files are copied one by one rather than the whole folder
+# at once — editing main.go does not force re-downloading the dependencies.
 #
-# 2つのステージ。1つ目はビルド用: ここには Go コンパイラ一式、およそ 350 MB が必要。
-# 2つ目はクラスタへ送られるもの: そこには完成したバイナリだけが移される。
-# 最終的なイメージは 350 ではなく約 10 MB になり、その中にはコンパイラも
-# ソースもパッケージマネージャもない——つまり、コンテナ内に入り込んだ者が
-# 使えるものは何もない。
+# TWO STAGES. The first is the build stage: it needs the whole Go compiler, which is about 350 MB.
+# The second is what ships to the cluster: only the finished binary is carried over there.
+# The resulting image ends up around 10 MB instead of 350, and inside it there is no compiler,
+# no sources and no package manager — that is, nothing to use for anyone who
+# does end up inside the container.
 
-# --- ステージ1: ビルド -----------------------------------------------------------------
-# FROM——どの既製イメージから始めるか。ここでは Alpine（最小構成の Linux、数メガバイト）の上に
-# Go コンパイラを載せた公式イメージ。バージョンは固定してある: latest タグでは
-# 同じレシピが半年後には別のものをビルドしてしまう。
-# AS build——ステージの名前。2つ目のステージがこれで結果を取り出す。
+# --- Stage 1: build -----------------------------------------------------------------
+# FROM — which ready-made image we start from. Here it is the official image with the Go compiler
+# on top of Alpine (a minimal Linux, a few megabytes). The version is pinned: with the
+# latest tag the same recipe would build something different half a year later.
+# AS build — the name of the stage; the second stage will pull the result by it.
 FROM golang:1.23-alpine AS build
-# イメージ内の作業フォルダ: 以降のコマンドはこれを基準に実行される。
-# フォルダが存在しない場合は作成される。
+# Working folder inside the image: subsequent commands run relative to it.
+# If the folder does not exist, it is created.
 WORKDIR /src
-# go.mod——モジュールの記述: その名前と Go のバージョン。アプリケーションに外部依存は
-# ないので、インターネットからダウンロードするものはなく、外部への出口がない場所でもビルドが通る。
+# go.mod — the module description: its name and Go version. The application has no external
+# dependencies, so there is nothing to download from the internet, and the build works where there is no outbound access.
 COPY go.mod ./
-# ソースそのもの。コードを編集しても前のレイヤーのキャッシュを無効化しないよう、
-# 別の行でコピーする。
+# The source itself. Copied on a separate line so that editing the code does not invalidate the cache
+# of the previous layer.
 COPY main.go ./
-# RUN はビルド時（実行時ではない）にコマンドを実行し、結果をレイヤーとして保存する。
-#   CGO_ENABLED=0  静的にビルドし、システムライブラリに縛られないようにする。これがないと
-#                  バイナリは glibc を必要とするが、それは最終イメージに存在せず、
-#                  コンテナはビルド時ではなく起動時に落ちる
-#   -trimpath      バイナリからビルドマシンのパスを取り除く: ビルドが
-#                  再現可能になり、自分のホームフォルダの名前が外に漏れない
-#   -ldflags="-s -w"  デバッグテーブルを捨てる——ファイルが目に見えて小さくなる
-#   -o /out/...    結果をどこに置くか。ここから2つ目のステージが取り出す
+# RUN executes a command at build time (not at run time) and saves the result as a layer.
+#   CGO_ENABLED=0  build statically, without tying to system libraries. Without this
+#                  the binary would need glibc, which will not be present in the final image,
+#                  and the container would crash at startup rather than at build time
+#   -trimpath      strip the build machine's paths from the binary: the build becomes
+#                  reproducible, and the name of your home folder does not leak outward
+#   -ldflags="-s -w"  drop the debug tables — the file becomes noticeably smaller
+#   -o /out/...    where to put the result; the second stage picks it up from here
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/passes-api .
 
-# --- ステージ2: クラスタへ送られるもの -----------------------------------------------
-# 2つ目の FROM はイメージを白紙から作り直す: 1つ目のステージで得たものはすべて
-# そちらに残り、最終イメージには含まれない。
+# --- Stage 2: what ships to the cluster -----------------------------------------------
+# The second FROM starts the image anew, from a clean slate: everything acquired in the first stage
+# stays there and does not make it into the final image.
 FROM alpine:3.21
-# アプリケーションが動作するユーザーを作る: root で動かしてはならない。
-# 正しく設定されたクラスタでは root で動く Pod はそもそも受け入れられず、これは
-# 些細なこだわりではなく標準的なセキュリティ要件である。
-#   -D          パスワードなしで、何も尋ねずに作成する
-#   -u 10001    数値の識別子。クラスタは名前ではなく数値そのものをチェックする
+# Create the user the application will run as: it must not run as root.
+# In a properly configured cluster a pod running as root will not be admitted at all, and this is not
+# nitpicking but a standard security requirement.
+#   -D          create without a password, asking no questions
+#   -u 10001    numeric identifier; the cluster checks the number itself, not the name
 RUN adduser -D -u 10001 app
-# 1つ目のステージから移されるのは完成したバイナリだけ。--from=build は
-# ステージ名を指す。/usr/local/bin はどの Linux の PATH にも含まれるフォルダ。
+# The only thing carried over from the first stage is the finished binary. --from=build
+# points to the stage name. /usr/local/bin is a folder that exists in the PATH of any Linux.
 COPY --from=build /out/passes-api /usr/local/bin/passes-api
-# ここから先、コンテナ内のプロセスは root ではなくユーザー 10001 として動く。
-# 順序が重要: 上の行は root で実行された。そうでなければ adduser は動かなかった。
+# From this point on the process in the container runs as user 10001, not as root.
+# Order matters: the lines above ran as root, otherwise adduser would not have worked.
 USER 10001
-# ポートの宣言——人間やツール向けの参考情報。ポートを開くわけでも
-# 何かを設定するわけでもない: それへのアクセスはマニフェスト（passes.yaml）に記述される。
+# Declaring the port — an informational note for humans and tools. It does not open the port
+# and configures nothing: access to it is described in the manifest (passes.yaml).
 EXPOSE 8080
-# コンテナ起動時に何を実行するか。文字列ではなくリスト形式: こうするとコマンドが
-# 中間シェルを介さず直接起動され、クラスタからの停止シグナルが、それを生み出した
-# シェルではなくアプリケーション自身に届く。
+# What to run when the container starts. As a list rather than a string: this way the command
+# runs directly, without an intermediate shell, and the stop signal from the cluster
+# reaches the application itself rather than the shell that spawned it.
 ENTRYPOINT ["/usr/local/bin/passes-api"]

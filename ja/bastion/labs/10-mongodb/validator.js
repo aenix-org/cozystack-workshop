@@ -1,66 +1,66 @@
-// ラボ10 · passes コレクション向けのドキュメント検証ルール（スキーマバリデータ）。
+// Lab 10 · a document validation rule (schema validator) for the passes collection.
 //
-// mongosh — MongoDB のシェル — 向けのプログラム。仮想マシン上、
-// ラボクラスタ内で、README にある短いコマンド `mo` で実行します。
+// A program for mongosh — the MongoDB shell. It runs on the VM,
+// in the lab cluster, with the short command `mo` from the README:
 //     cd labs/10-mongodb && mo < validator.js
-// 応答として «ルールを設定しました» という行が表示されます。
+// In response you will see the line «rule installed».
 //
-// 検証スキーマとは。既定ではコレクションにスキーマはありません。データベースは
-// あらゆる形のドキュメントを受け付け、フィールド名のタイプミス（«type» の代わりに «tipe»）も黙って保存します —
-// 検問所の警備員が見つけられない見落としです。バリデータとは、ドキュメントが
-// どうあるべきかを記述したものです。適用された時点から、データベースはすべての挿入とすべての
-// 変更を自分で検査します。
+// What a validation schema is. By default a collection has no schema: the database accepts
+// a document of any shape and silently stores a typo in a field name («tipe» instead of «type») —
+// a gap the guard at the checkpoint will not catch. A validator is a description of what
+// a document must look like. From the moment it is applied, the database checks every insert and every
+// change itself.
 //
-// ルールに一致しないドキュメントはどうなるか。書き込まれず、
-// 操作は MongoServerError: Document failed validation というエラーを返します。すでに
-// コレクションに存在するドキュメントは、ルールの設定時に検査も
-// 書き換えもされません — ただし、それらを後で編集すると拒否され始めます。だからこそゴミ
-// （type フィールドのないドキュメント）は、このファイルを適用する後ではなく前に取り除きます。
+// What happens to a document that does not match the rule: it is not written,
+// and the operation returns an error MongoServerError: Document failed validation. Documents
+// that are already in the collection are not checked and not
+// rewritten when the rule is installed — but a later edit of them will start being rejected. That is why the junk
+// (documents without a type field) is removed before applying this file, not after.
 
-// runCommand — 通常の db.<コレクション>.<...> を経由せず、データベースに直接コマンドを送る。
-// collMod — «既存コレクションの設定を変更する»。ルールは稼働中の
-// コレクションに後付けで取り付けられます。データベースを止めてデータを移し替える必要はありません。
+// runCommand — send a command to the database directly, bypassing the usual db.<collection>.<...>.
+// collMod — «change the settings of an existing collection». The rule is attached to a live
+// collection after the fact: there is no need to stop the database and reload the data.
 db.runCommand({
   collMod: "passes",
-  // validator — ルールそのもの。$jsonSchema — ドキュメントの形を記述する方法：
-  // どのフィールドが必須か、どの型か、どの値が許されるか。
+  // validator — the rule itself. $jsonSchema — a way to describe the shape of a document:
+  // which fields are required, what type they are and which values are allowed.
   validator: {
     $jsonSchema: {
-      // 最上位のドキュメント自体 — オブジェクト。
+      // The top-level document itself — an object.
       bsonType: "object",
-      // それがなければドキュメントが受け付けられないフィールド。リストに何が「無い」かに注意：
-      // guest です。グループ用のパスにはゲストの代わりに組織があり、ルールは正当な
-      // ドキュメントの形がそこを通れるだけの
-      // 広さを持たねばなりません。制約はすぐに感じられます：ドキュメントが多様であるほど、
-      // すべてに一度に要求できることは少なくなります。
+      // The fields without which a document is not accepted. Notice what is NOT in the list:
+      // guest. A group pass has an organization instead of a guest, and the rule must
+      // be broad enough for the legitimate form of the document to
+      // pass through it. The constraint is felt immediately: the more varied the documents,
+      // the less can be required of all of them at once.
       required: ["type", "host"],
-      // 個々のフィールドへの要件。ここに載っていないフィールドは
-      // 一切検査されません — 未知のフィールドはドキュメントに通ってしまいます。これを禁じることもできますが
-      // （additionalProperties: false）、その場合は新しいフィールドが増えるたびに
-      // ルールの修正が必要になり、些細なことごとにスキーマ移行へ逆戻りします。どこに線を引くかは
-      // あなたの判断であり、それは常に妥協です。
+      // Requirements for individual fields. A field not listed here is not checked
+      // in any way — an unknown field will pass into the document. This can be forbidden
+      // (additionalProperties: false), but then every new field will require editing
+      // the rule, and you are back to a schema migration for every little thing. Where to draw the line —
+      // is your decision, and it is always a compromise.
       properties: {
-        // パスの種類 — 列挙された4つの値のうちひとつだけ。5番目の種類は
-        // このルールの変更を必要とし、それは良いことです：変更が意識的なものになります。
+        // The pass type — only one of the four listed values. A fifth type
+        // will require changing this rule, and that is good: the change will become deliberate.
         type: {
-          enum: ["一回券", "週間券", "車両券", "団体券"],
-          description: "パスの種類、リストの中からのみ"
+          enum: ["single-use", "weekly", "vehicle", "group"],
+          description: "pass type, only from the list"
         },
-        // どの従業員がパスを注文したか。必須フィールドであり、
-        // 文字列でなければなりません。
+        // Which employee ordered the pass. The field is required, and it must be
+        // a string.
         host: {
           bsonType: "string",
-          description: "どの従業員が注文したか"
+          description: "which employee placed the order"
         },
-        // guest は properties にはあるが required にはない：フィールドがドキュメントに存在するなら
-        // 文字列でなければならず、存在しなければ — ドキュメントはそれでも正当です。
+        // guest is in properties, but not in required: if the field is present in the document,
+        // it must be a string; if it is absent — the document is still valid.
         guest: {
           bsonType: "string"
         },
-        // ルールは入れ子のオブジェクトの中でも働きます。car フィールドが無ければ — 何の
-        // 要件もありません。あれば — それはオブジェクトでなければならず、その中の車のナンバーは
-        // 必須で、トレーラーは、指定されるなら、文字列 «いいえ» ではなく
-        // ブール値です。
+        // Rules work inside nested objects too. There is no car field — no
+        // requirements. If there is one — it must be an object, and the car plate in it
+        // is required, while the trailer, if specified, — is a boolean value, not the string
+        // «no».
         car: {
           bsonType: "object",
           required: ["plate"],
@@ -71,8 +71,8 @@ db.runCommand({
             weight_kg: { bsonType: ["int", "long", "double"] }
           }
         },
-        // そしてリストの中でも。items は参加者リストの各要素が
-        // どうあるべきかを記述します：name は必須、age は — 指定されるなら — 整数。
+        // And inside lists. items describes what each element of the
+        // members list must be: name is required, age — if specified — an integer.
         members: {
           bsonType: "array",
           items: {
@@ -87,18 +87,18 @@ db.runCommand({
       }
     }
   },
-  // strict — すべての挿入とすべての変更を検査する。より緩やかな moderate は
-  // 新しいドキュメントと、すでにルールに一致するものの編集を検査し、古い
-  // 混在はそのままにします。すでにゴミが溜まったコレクションで検査を有効にするときは、
-  // まさにこの moderate から始めます：まず先へ悪化させるのを止め、次に古いものを直し、
-  // それから strict へ移ります。
+  // strict — check all inserts and all changes. The softer variant moderate
+  // checks new documents and edits of those that already match the rule, and leaves the old
+  // mishmash alone. It is precisely with moderate that you turn on validation on a collection
+  // that has already accumulated junk: first stop making it worse, then fix
+  // the old, then switch to strict.
   validationLevel: "strict",
-  // error — 不適合なドキュメントを拒否する。warn の場合はログに書き込みつつそれでも
-  // 受け付けます：拒否を有効にして誰かの動いているコードを壊す前に、何が飛んでくるかを
-  // 一週間眺めるのに向いています。
+  // error — reject an unsuitable document. The warn variant writes to the log and still
+  // accepts it: good for spending a week watching what comes in, before turning on
+  // rejection and breaking someone's working code.
   validationAction: "error"
 });
 
-// runCommand はオブジェクトで応答し、成功は { ok: 1 } のように見えます。ファイル適用の
-// 結果が一目で読めるよう、独自の行を出力します。
-print("ルールを設定しました");
+// runCommand replies with an object in which success looks like { ok: 1 }. We print
+// our own line so that the result of applying the file reads at a glance.
+print("rule installed");

@@ -28,7 +28,7 @@ No cierres la ventana con este comando: el túnel vive mientras siga corriendo.
 
 ⚠️ **Aquí `vmi/` es obligatorio, mientras que en `virtctl console` es al revés — estorba.** Esto
 no es una errata ni un capricho nuestro: los dos comandos tienen una sintaxis de destino distinta.
-`port-forward` exige `tipo/nombre` y sin el prefijo responde `target must contain type and name
+`port-forward` exige `type/name` y sin el prefijo responde `target must contain type and name
 separated by '/'`. `console` espera solo el nombre y con el prefijo responde `forbidden`, porque
 toma la palabra `vmi` por el nombre de la máquina.
 
@@ -38,19 +38,19 @@ advertencia, no un error, y no estorba.
 Si el reenvío aun así no se levanta, el mismo túnel se puede hacer a través del Pod de la máquina:
 ```bash
 kubectl get pod -n tenant-workshopXX -l vm.kubevirt.io/name=vm-instance-app-1
-kubectl port-forward -n tenant-workshopXX <nombre-del-pod-del-resultado> 8080:8080
+kubectl port-forward -n tenant-workshopXX <pod-name-from-output> 8080:8080
 ```
 
 En otra ventana de terminal:
 ```bash
-# salud
+# health
 curl -s http://localhost:8080/actuator/health
 
-# creamos un pedido
+# create an order
 curl -s -X POST http://localhost:8080/api/orders \
   -H 'Content-Type: application/json' -d '{"item":"test"}'
 
-# vemos que quedó registrado
+# see that it was recorded
 curl -s http://localhost:8080/api/orders
 ```
 

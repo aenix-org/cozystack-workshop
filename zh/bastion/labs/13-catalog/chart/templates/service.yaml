@@ -1,10 +1,11 @@
-# 实验 13。Service 模板：为应用提供稳定的地址。
+# Lab 13. Service template: a stable address for the application.
 #
-# 应用的副本来来去去，它们的地址每次都不同。Service 提供一个不会变化的名字，
-# 并把请求分摊到存活的副本上。相邻的 Pod 通过发布名称访问应用。
+# Copies of the application come and go, their addresses new each time. A Service gives a name
+# that does not change, and spreads requests across the live copies. From a neighboring pod
+# the application is reached by the release name.
 #
-# 关于双大括号中的替换以及对象名称的来源，
-# 在 templates/deployment.yaml 中有说明——这里的工作方式完全相同。
+# Substitution in double curly braces and where object names come from is
+# described in templates/deployment.yaml — here everything works the same way.
 apiVersion: v1
 kind: Service
 metadata:
@@ -13,20 +14,20 @@ metadata:
     app.kubernetes.io/name: guest-pass
     app.kubernetes.io/instance: {{ .Release.Name }}
 spec:
-  # values 中的一个标志决定应用是否获得集群外部的地址。
-  # Cozystack 的内置应用也是这样工作的：external 字段。
-  # if/else 结构在渲染时从两个值中选择一个——最终生成的清单
-  # 只会得到 LoadBalancer 或 ClusterIP，其中不再保留任何分支。
+  # A single flag in values decides whether the application gets an address outside the cluster or not.
+  # Cozystack's built-in applications work the same way: the external field.
+  # The if/else construct picks one of two values at render time — the finished manifest
+  # gets either LoadBalancer or ClusterIP, and no branching remains in it.
   type: {{ if .Values.external }}LoadBalancer{{ else }}ClusterIP{{ end }}
-  # 把流量发给谁。Service 按标签而不是按名称来挑选 Pod，因此
-  # 它并不在意有多少个副本、它们叫什么名字。这些标签与 Deployment
-  # 分配给其副本的标签相同。
+  # Whom to send traffic to. The Service selects pods by labels, not by names, so
+  # it does not care how many copies there are or what they are called. The labels are the same as those
+  # the Deployment assigns to its copies.
   selector:
     app.kubernetes.io/name: guest-pass
     app.kubernetes.io/instance: {{ .Release.Name }}
-  # port——Service 自身监听哪个端口，targetPort——它向 Pod 内部的哪里连接。
-  # targetPort 用名称书写：名为 http 的端口在 Deployment 模板中声明。
-  # 如果那里的端口号变了，这里无需修改。
+  # port — which port the Service itself listens on, targetPort — where it knocks inside the pod.
+  # targetPort is written by name: the port named http is declared in the Deployment template.
+  # If the number changes there, no edit is needed here.
   ports:
     - name: http
       port: 80

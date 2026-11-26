@@ -1,5 +1,5 @@
-# 적용하기 전에 tenant-workshopXX를 자신의 namespace로 교체하세요.
-# 모든 파일에서 한 번에 처리하는 것이 더 간편합니다: 번호 치환에 관한 README 섹션을 참고하세요.
+# Before applying, replace tenant-workshopXX with your own namespace.
+# Easier to do it across all files at once: see the README section on substituting the number.
 #
 apiVersion: apps.cozystack.io/v1alpha1
 kind: VMDisk
@@ -32,4 +32,4 @@ spec:
     package_update: true
     packages: [ libguestfs-tools, virt-v2v, qemu-utils ]
     runcmd:
-      - [ bash, -c, "wget -q -O /usr/local/bin/mc https://dl.min.io/client/mc/release/linux-amd64/mc && chmod +x /usr/local/bin/mc" ]
+      - [ bash, -c, "curl -fsSL https://github.com/pgsty/mc/releases/download/RELEASE.2026-09-13T00-00-00Z/mcli_20260913000000.0.0_linux_amd64.tar.gz | tar -xz -C /usr/local/bin mcli && mv /usr/local/bin/mcli /usr/local/bin/mc && chmod +x /usr/local/bin/mc" ]

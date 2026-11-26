@@ -23,12 +23,12 @@
 `ApplicationDefinition` 对象——就是把应用注册进目录的那个——是 **cluster-scoped** 的：整个集群只有一个，它没有 namespace，而且它一次就改变了所有租户的目录。租户创建不了这样的对象。你现在就可以自己验证：向集群询问自己的权限，无需创建任何东西。
 
 ```bash
-# KUBECONFIG —— kubectl 从中读取集群地址和你的登录凭据的变量。
-# 这里它指向租户访问，和其它每个实验里用的是同一个文件。
+# KUBECONFIG — the variable kubectl reads to find the cluster's address and your credentials.
+# Here it is the tenant access, the same file as in every other lab.
 export KUBECONFIG=~/.kube/workshop
-# auth can-i = “我可以做这个吗？”。集群回答 yes 或 no，什么都不改变：
-#   create                   我们要检查的动作
-#   applicationdefinitions   针对哪种类型的对象
+# auth can-i = "am I allowed to?". The cluster answers yes or no and changes nothing:
+#   create                   which action we are checking
+#   applicationdefinitions   on which type of object
 kubectl auth can-i create applicationdefinitions
 ```
 
@@ -78,13 +78,13 @@ cd labs/13-catalog
 
 ```
 chart/
-├── Chart.yaml            名称、版本、描述
-├── values.yaml           参数和默认值
-├── values.schema.json    把哪些值视为合法
+├── Chart.yaml            name, version, description
+├── values.yaml           parameters and default values
+├── values.schema.json    which values to consider valid
 └── templates/
-    ├── configmap.yaml    页面和 nginx 配置
-    ├── deployment.yaml   应用本身
-    └── service.yaml      地址
+    ├── configmap.yaml    the page and the nginx config
+    ├── deployment.yaml   the application itself
+    └── service.yaml      the address
 ```
 
 <details>
@@ -121,7 +121,7 @@ external: false
 
 `## @param` 注释不是装饰，也不是给人看的文档。Cozystack 的生成器（`cozyvalues-gen`）根据它们构建 `values.schema.json` 以及 chart README 里的参数表。单一事实来源：改了注释，重新生成 schema，控制台里的表单就随之改变。
 
-格式是严格的：`## @param {类型} 名称=默认值 - 描述。`
+格式是严格的：`## @param {type} name=default-value - Description.`
 
 参数故意很少。每多一个参数，就是表单里多一个字段、多一种把应用部署错的方式、多一个要你维护的分支。一个好的 chart 让你配置各次安装之间真正有差异的东西，仅此而已。
 
@@ -130,10 +130,10 @@ external: false
 这个 schema 由 Helm 在任何东西发往集群**之前**检查。就地验证一下：往一个数值参数里塞一个字符串。
 
 ```bash
-# template = “把 chart 里的清单组装出来并打印”，集群不受触碰：
-#   gp                    chart 名义上部署所用的 release 名称
-#   chart                 放 chart 的文件夹
-#   --set replicas=abc    直接在命令行上覆盖单个参数
+# template = "assemble the manifests from the chart and print them", the cluster is not touched:
+#   gp                    the release name the chart is notionally deployed under
+#   chart                 the folder with the chart
+#   --set replicas=abc    override a single parameter right on the command line
 helm template gp chart --set replicas=abc
 ```
 
@@ -191,9 +191,9 @@ Kubernetes **在 ConfigMap 变化时不会重启 Pod**。你改了文本，做�
 
 ```bash
 cd labs/13-catalog
-# lint = “检查这个包的格式错误和必填字段”
-#   chart   chart 文件夹的路径；Helm 期望它里面有 Chart.yaml、values.yaml
-#           以及 templates/ 文件夹
+# lint = "check the package for formatting errors and required fields"
+#   chart   path to the chart folder; inside it Helm expects Chart.yaml, values.yaml
+#           and the templates/ folder
 helm lint chart
 ```
 
@@ -211,8 +211,8 @@ helm lint chart
 现在是渲染。模板就是一份清单，其中一部分值被形如 `{{ .Values.replicas }}` 的占位替换。渲染就是把模板变成成品清单：Helm 从 `values.yaml` 取值，代入文本，把结果打印出来。
 
 ```bash
-# main —— release 名称，也就是这次具体部署 chart 的名字。它会进到所创建对象的
-# 名字里，所以两次并排的安装不会在名字上冲突。
+# main — the release name, that is, of this specific deployment of the chart. It goes
+# into the names of the objects created, so two installations side by side will not clash.
 helm template main chart
 ```
 
@@ -221,10 +221,10 @@ helm template main chart
 验证一下参数是否真的到达了清单。我们用不同的值渲染两次，只在输出里保留本该变化的那一行。
 
 ```bash
-# --set replicas=5 在一次运行期间覆盖 values.yaml 里的值。
-# | grep 'replicas:' —— 从全部输出里只保留含这个词的行。
+# --set replicas=5 overrides the value from values.yaml for the duration of one run.
+# | grep 'replicas:' — from the whole output keep only the lines with this word.
 helm template main chart --set replicas=5 | grep 'replicas:'
-# 对布尔参数同理：external 决定清单里最终是哪种 Service 类型
+# the same for the boolean parameter: external decides which Service type ends up in the manifest
 helm template main chart --set external=true | grep 'type:'
 ```
 
@@ -268,11 +268,11 @@ metadata:
 这个文件被 apply 之后，集群里就出现了一种新的对象类型。不是「集成」，也不是「插件」——而是一个完整的类型，你用普通的 `kubectl` 就能操作它。管理员一旦 apply 了这个定义，下面这两条命令对任何租户都能用：
 
 ```bash
-# get = “给我看看有什么”。guestpasses 就是下面 plural 字段里的那个名字：
-#   -n tenant-workshopXX   在哪个 namespace 里看；把 XX 换成你自己的编号
+# get = "show me what's there". guestpasses is that very name from the plural field below:
+#   -n tenant-workshopXX   which namespace to look in; replace XX with your own number
 kubectl get guestpasses -n tenant-workshopXX
-# describe = “给我看看某一个对象的一切”：参数、状态、最近的事件。
-# 这里的 main 是某个具体下单的应用的名字，不是类型的名字。
+# describe = "show me everything about one object": parameters, state, recent events.
+# main here is the name of a specific ordered application, not the name of the type.
 kubectl describe guestpass main -n tenant-workshopXX
 ```
 
@@ -340,9 +340,9 @@ release 名称由前缀和对象名拼成：一个名为 `main` 的 `GuestPass` 
 源文件就在旁边，在 `icon.svg` 里，做好的字符串在 `icon.b64` 里。如果你改了源文件，字符串就得重新生成。编码器默认会把输出拆成多行，而 `icon` 字段需要一整条连续的字符串——所以换行符要在单独一步里去掉。
 
 ```bash
-# base64 = 把一个二进制文件转成由字母、数字和 + / = 符号组成的字符串
-#   -i icon.svg   要编码什么（macOS 和 BSD 的选项写法）
-# tr -d '\n' = 把输出里的每一个换行符都丢掉，粘成一整条
+# base64 = turn a binary file into a string of letters, digits and the signs + / =
+#   -i icon.svg   what to encode (the flag spelling for macOS and BSD)
+# tr -d '\n' = drop every line break from the output, gluing it into one
 base64 -i icon.svg | tr -d '\n'
 ```
 
@@ -365,9 +365,9 @@ base64 -i icon.svg | tr -d '\n'
 文件做好了、语法也没问题——我们就当权限够用，试着去 apply 它。拒绝会来自集群，而不是来自 `kubectl`，而拒绝的文字会准确说出到底缺了什么。
 
 ```bash
-# 租户访问 —— 就是你整个工作坊里一直用的那个
+# tenant access — the same one you have worked with throughout the workshop
 export KUBECONFIG=~/.kube/workshop
-# apply = “让集群与文件里写的内容一致”；-f —— 从文件读取
+# apply = "bring the cluster into line with what's written in the file"; -f — read from a file
 kubectl apply -f applicationdefinition.yaml
 ```
 
@@ -405,10 +405,10 @@ resource "applicationdefinitions" in API group "cozystack.io" at the cluster sco
 拒绝也可能来自文件本身的错误。我们把两者分开：先问权限，再让 `kubectl` 把整个文件解析一遍，却不把它发到任何地方。
 
 ```bash
-# auth can-i = “我可以做这个吗？”。回答是 yes 或 no，集群不受改动。
+# auth can-i = "am I allowed to?". The answer is yes or no, and the cluster is not changed.
 kubectl auth can-i create applicationdefinitions
-# --dry-run=client = “解析文件、展示会得出什么，但不要去集群”。
-# client 意味着整个检查都在笔记本电脑上进行，集群甚至不会听说这件事。
+# --dry-run=client = "parse the file and show what would come out, but do not go to the cluster".
+# client means the whole check runs on the laptop and the cluster never even hears about it.
 kubectl apply -f applicationdefinition.yaml --dry-run=client
 ```
 
@@ -462,7 +462,7 @@ spec:
 这个脚本在**本地**运行，不触碰集群：它检查 chart 能过 linter、能渲染、参数真的到达清单、`ApplicationDefinition` 能被解析并含有所有必填字段、图标能解码成 SVG——而且，最要紧的是，定义里的 schema 和 chart 里的 schema 一致。
 
 ```bash
-# 名字前面的 ./ 意思是“当前文件夹里的文件”，也就是来自 labs/13-catalog
+# ./ before the name means "the file from the current folder", that is, from labs/13-catalog
 ./check.sh
 ```
 

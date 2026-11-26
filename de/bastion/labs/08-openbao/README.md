@@ -462,7 +462,7 @@ bedeutet der Exit-Code den Zustand des Speichers, nicht den Erfolg des Befehls: 
 ⚠️ **Wenn der Befehl mit `connection refused`, `no such host` oder `i/o timeout` fehlschlägt —**
 hat es keinen Sinn weiterzumachen; zuerst die Verbindung. Häufige Ursachen, in abnehmender Wahrscheinlichkeit:
 Sie haben `workshopXX` nicht durch Ihre eigene Nummer ersetzt; die Anwendung im Dashboard ist noch nicht
-bereit; ein Tippfehler im Namen. Der Name wird nach der Regel `openbao-<Anwendungsname>` gebildet: Sie haben
+bereit; ein Tippfehler im Namen. Der Name wird nach der Regel `openbao-<application name>` gebildet: Sie haben
 die Anwendung `secrets` genannt, also enthält die Adresse `openbao-secrets`, nicht `secrets`.
 
 ## Ein vorhersehbarer Fehlschlag · Der Speicher verweigert den Dienst
@@ -604,7 +604,7 @@ den Initial Root Token aus der Ausgabe von `init` ein.
 
 ⚠️ **Wenn sich `bao login` beschwert, dass es die Token-Datei nicht schreiben kann**, übergeben Sie den Token
 in jedem Befehl als Umgebungsvariable:
-`kubectl exec bao-workbench -- env BAO_TOKEN='Ihr-Token' bao status`.
+`kubectl exec bao-workbench -- env BAO_TOKEN='your-token' bao status`.
 Das funktioniert, aber der Token landet in Ihrer Befehlshistorie — im Lab hinnehmbar, in Produktion nicht.
 
 ## Schritt 6. Die Engine aktivieren und das Passwort ablegen

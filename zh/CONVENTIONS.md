@@ -64,9 +64,9 @@
 
 ```markdown
 <details>
-<summary><b>逐行讲解这份清单</b></summary>
+<summary><b>Walking through the manifest line by line</b></summary>
 
-……逐行地，用散文……
+...line by line, in prose...
 
 </details>
 ```
@@ -89,9 +89,9 @@
 叫停始终是一个块引用式的提示框，不带 ⚠️（那个标记留给陷阱用）：
 
 ```markdown
-> **在继续读下去之前，停下来想一想。**
+> **Stop and think before you read on.**
 >
-> 一个问题。第二个问题，如果有的话。
+> A question. A second question, if there is one.
 ```
 
 折叠块的标题始终是 `答案，以及一个比这个错误更宽泛的教训`。

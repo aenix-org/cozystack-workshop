@@ -1,46 +1,46 @@
-# 实验 9 · 订购一个 ClickHouse 数据库，用于对通行记录日志进行分析。
-# 描述你想要得到什么；由平台负责组装和配置服务。
-# 与你在仪表盘里用鼠标下单的效果相同 —— 只不过这里是文本形式。
-# 它不是应用到实验集群，而是应用到管理集群上的一个租户：
+# Lab 9 · order a ClickHouse database for analytics over the access-pass log.
+# A description of what you want to get; the platform assembles and configures the service.
+# The same thing you would order with the mouse in the dashboard — just as text.
+# Applied NOT to the lab cluster, but to a tenant on the management cluster:
 #   kubectl --kubeconfig="$HOME/.kube/config" apply -f clickhouse.yaml
 #
-# 应用之前：把 tenant-workshopXX 替换成你自己的 namespace，
-# 把 ЗдесьВашПароль 替换成你自己想好的密码。
+# BEFORE APPLYING: replace tenant-workshopXX with your namespace,
+# and YourPasswordHere with a password you come up with.
 apiVersion: apps.cozystack.io/v1alpha1
 kind: ClickHouse
 metadata:
   name: analytics
   namespace: tenant-workshopXX
 spec:
-  # 一个副本、一个分片。生产环境中至少保留两个副本，否则丢失一个节点
-  # 就意味着数据不可用 —— 但我们要的是一百万行数据，而不是容错
-  # 能力，多一个副本只会白白吃掉环境的资源。
+  # One copy and one shard. In production you keep at least two copies, otherwise losing a node
+  # means the data becomes unavailable — but we need a million rows, not fault
+  # tolerance, and an extra copy would just eat up the stand's resources.
   replicas: 1
   shards: 1
-  # 存放表数据的磁盘。本实验的一百万行数据只会占用几十兆字节：
-  # 带字典的列式存储对这样的日志压缩得非常厉害。
+  # Disk for the table data. A million rows from this lab will take up tens of megabytes:
+  # columnar storage with dictionaries compresses such a log very heavily.
   size: 5Gi
-  # 单独一块磁盘，用于服务器的系统日志，包括查询日志。
+  # A separate disk for the server's system logs, including the query log.
   logStorageSize: 2Gi
-  # 查询日志保留多少天后丢弃。我们后面要查看它。
+  # After how many days to discard the query log. We are going to look into it.
   logTTL: 15
-  # replicated —— 在集群另一节点上有副本的卷：节点掉线，
-  # 数据仍在。
+  # replicated — volumes that have a copy on another cluster node: the node dropped out,
+  # the data stayed.
   storageClass: replicated
-  # 1 个 CPU，4 GB。ClickHouse 在内存中计算，在对
-  # 一百万行做分组时这一点很明显。
+  # 1 CPU, 4 GB. ClickHouse computes in memory, and on groupings over
+  # a million rows this is noticeable.
   resourcesPreset: u1.small
-  # 数据库用户及其密码。密码请自己想一个并记住：工作 pod
-  # （CH_AUTH 变量）和检查脚本（CH_PASSWORD 变量）都需要它。
-  # 创建之后可以在仪表盘的 clickhouse-analytics-credentials secret 中看到它。
+  # The database user and its password. Come up with your own password and remember it: it is needed
+  # by the worker pod (the CH_AUTH variable) and the check script (the CH_PASSWORD variable).
+  # After creation it is visible in the dashboard, in the clickhouse-analytics-credentials secret.
   users:
     analyst:
-      password: ЗдесьВашПароль
-  # 备份到对象存储。这里的数据是生成的，
-  # 没有什么需要恢复的 —— 在教学环境中已关闭。
+      password: YourPasswordHere
+  # Backups to object storage. The data here is generated,
+  # there is nothing to restore — disabled on the training stand.
   backup:
     enabled: false
-  # Keeper 用于在多个副本之间进行协调。副本只有一个 —— 没有对象
-  # 需要协调，而三个 Keeper pod 会白白占用资源。
+  # Keeper is needed to reconcile between copies. There is one copy — there is no one
+  # to reconcile with, and three Keeper pods would take up resources for nothing.
   clickhouseKeeper:
     enabled: false

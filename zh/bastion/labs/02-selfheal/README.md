@@ -28,7 +28,7 @@
 所有文件你都已经有了——它们是随仓库一起拿到的。没有什么要创建或重新敲一遍的：下面凡是写着 `kubectl apply -f name.yaml` 的地方，文件都取自这里。
 
 ```bash
-# 实验的所有命令都从这个目录里运行——否则命令里的相对路径就对不上了。
+# All the lab's commands are run from this folder — otherwise the relative paths in them won't line up.
 cd labs/02-selfheal
 ```
 
@@ -44,13 +44,13 @@ cd labs/02-selfheal
 `rickroll` 应用已经在运行了。在动手破坏任何东西之前，先看看它由哪些对象组成：用一条命令一次性向集群询问三种实体。
 
 ```bash
-# KUBECONFIG — 指向那个文件的路径，文件里有集群的地址和你的登录凭据。
-# 在这个变量设置好之前，kubectl 会在 bastion 本机上找集群，然后找不到。
+# KUBECONFIG — the path to the file with the cluster's address and your login credentials.
+# Until the variable is set, kubectl looks for a cluster on the bastion itself and doesn't find one.
 export KUBECONFIG=~/lab.kubeconfig
 
-# get = 「把有什么给我看看」。用逗号一次列出三种对象。
-#   -l app=rickroll   只显示带 app=rickroll 标签的那些——也就是我们的
-#                     应用，而不是集群的全部内容
+# get = "show me what's there". Three kinds of object are listed at once, separated by commas.
+#   -l app=rickroll   show only those labelled app=rickroll — that is, our
+#                     application, not the entire contents of the cluster
 kubectl get deployment,replicaset,pods -l app=rickroll
 ```
 
@@ -85,10 +85,10 @@ pod/rickroll-6f4b9c8d57-xk2mp    1/1     Running   14m
 要确认这不是瞎猜，可以这样：
 
 ```bash
-# kubectl 默认的表格不显示 ownerReferences 字段——你得显式地把它要出来。
-#   -o jsonpath=...   「从服务器的响应里把这几个字段抽出来，按这样打印」
-# 表达式内部：range .items[*] — 遍历找到的每一个 Pod，.metadata.name —
-# Pod 的名字，ownerReferences[0].kind 和 .name — 创建它的那个东西的类型和名字。
+# The default kubectl table doesn't show the ownerReferences field — you have to ask for it explicitly.
+#   -o jsonpath=...   "pull these fields out of the server's response and print them like this"
+# Inside the expression: range .items[*] — walk through every Pod found, .metadata.name —
+# the Pod's name, ownerReferences[0].kind and .name — the kind and name of whatever created it.
 kubectl get pods -l app=rickroll -o jsonpath='{range .items[*]}{.metadata.name}{"  <- "}{.metadata.ownerReferences[0].kind}{"/"}{.metadata.ownerReferences[0].name}{"\n"}{end}'
 ```
 
@@ -113,41 +113,41 @@ rickroll-6f4b9c8d57-xk2mp  <- ReplicaSet/rickroll-6f4b9c8d57
 **接下来会发生什么：** 下面这条命令会记住当前副本的名字，删掉它，然后每秒一次地询问集群，是否出现了一个**不同**名字、处于 Running 状态的副本。一旦出现，它就打印出这花了多长时间。
 
 ```bash
-# items[0].metadata.name — 列表里第一个 Pod 的名字。我们把它存进 POD 变量：
-# 没有它，后面就没法把旧副本和新副本区分开。
+# items[0].metadata.name — the name of the first Pod in the list. We save it in the POD variable:
+# without that we won't be able to tell the old copy from the new one later.
 POD=$(kubectl get pods -l app=rickroll -o jsonpath='{.items[0].metadata.name}')
-echo "正在杀掉 $POD"
+echo "killing: $POD"
 
-# date +%s — 当前时间，以秒计。这是我们的秒表：删除前记下它，
-# 最后再从新的读数里减去它。
+# date +%s — the current time in seconds. This is our stopwatch: we note it before the delete,
+# and subtract it from a fresh reading right at the end.
 START=$(date +%s)
 
-# delete pod — 把副本彻底删掉。
-#   --wait=false   不等 Pod 完全消失，立刻交还控制权：
-#                  我们要从这一刻开始数秒，而不是从之后
+# delete pod — delete the copy for good.
+#   --wait=false   don't wait for the Pod to fully disappear, return control immediately:
+#                  we need to start counting seconds from this moment, not afterwards
 kubectl delete pod "$POD" --wait=false
 
-# 每秒一次重新读取 Pod 列表，找出一行同时满足以下所有条件的：
-#   $1!=old        名字和旧的不一样——所以这是另一个副本
-#   $2=="1/1"      一个容器里有一个就绪
-#   $3=="Running"  pod 正在运行
-#   --no-headers   不打印表头，好让 awk 只看到数据
-#   2>/dev/null    在完全没有 Pod 的那几秒里，隐藏错误消息
+# Once a second we re-read the Pod list and look for a line where all of these hold at once:
+#   $1!=old        the name doesn't match the old one — so this is a different copy
+#   $2=="1/1"      one container out of one is ready
+#   $3=="Running"  the pod is running
+#   --no-headers   don't print the table header, so awk sees only data
+#   2>/dev/null    hide error messages during the seconds when there are no Pods at all
 while true; do
   NEW=$(kubectl get pods -l app=rickroll --no-headers 2>/dev/null \
         | awk -v old="$POD" '$1!=old && $2=="1/1" && $3=="Running" {print $1; exit}')
   [ -n "$NEW" ] && break
   sleep 1
 done
-echo "新副本 $NEW 已就绪，用时 $(( $(date +%s) - START ))s"
+echo "new copy $NEW ready in $(( $(date +%s) - START ))s"
 ```
 
 **你应该看到：**
 
 ```
-正在杀掉 rickroll-6f4b9c8d57-xk2mp
+killing: rickroll-6f4b9c8d57-xk2mp
 pod "rickroll-6f4b9c8d57-xk2mp" deleted
-新副本 rickroll-6f4b9c8d57-p9wqt 已就绪，用时 4s
+new copy rickroll-6f4b9c8d57-p9wqt ready in 4s
 ```
 
 四秒。在测试环境上，波动范围是二到十五秒，取决于节点有多忙。镜像已经在节点上了，没什么要下载的，所以一切都归结于启动进程和就绪检查。
@@ -167,16 +167,16 @@ pod "rickroll-6f4b9c8d57-xk2mp" deleted
 ```bash
 export KUBECONFIG=~/lab.kubeconfig
 
-# run = 直接从命令行创建一个单独的 Pod，不用清单。
-#   --rm             一旦你中断命令，就删掉这个 Pod
-#   -it              Pod 的输出直接送到你的屏幕，Ctrl+C 停止它
-#   --restart=Never  只有一个副本，也不需要重建它：这是个工具，不是服务
-#   --image          busybox — 一个几兆大小、自带 wget 的镜像
-# -- 之后的一切都在 Pod 内部执行。地址 http://rickroll 是 Service 的名字；
-# 在集群内部它会自己变成应用的地址。
-#   -q               不打印下载统计
-#   -T 2             等待应答不超过两秒，否则就算作一次失败
-#   -O /dev/null     把响应体扔掉，我们只在乎有没有应答这个事实
+# run = create a single Pod straight from the command line, without a manifest.
+#   --rm             delete the Pod as soon as you interrupt the command
+#   -it              the Pod's output comes to your screen, Ctrl+C stops it
+#   --restart=Never  there's a single copy and no need to recreate it: this is a tool, not a service
+#   --image          busybox — an image a few megabytes in size that has wget
+# Everything after -- runs inside the Pod. The address http://rickroll is the name of the Service;
+# inside the cluster it turns into the application's address on its own.
+#   -q               don't print download statistics
+#   -T 2             wait no longer than two seconds for a reply, otherwise we count it as a failure
+#   -O /dev/null     throw the response body away, all we care about is the fact of a reply
 kubectl run pinger --rm -it --restart=Never --image=busybox:1.36 -- \
   sh -c 'while true; do wget -q -T 2 -O /dev/null http://rickroll/healthz \
          && echo "$(date +%T) ." || echo "$(date +%T) X"; sleep 1; done'
@@ -195,8 +195,8 @@ kubectl run pinger --rm -it --restart=Never --image=busybox:1.36 -- \
 ```bash
 export KUBECONFIG=~/lab.kubeconfig
 
-# 没有给 pod 名字，而是给了一个标签：删除所有带 app=rickroll 标签的副本。
-# 现在只有一个，所以离开的正是 pinger 正在轮询的那一个。
+# No pod name is given, a label instead: delete every copy with the label app=rickroll.
+# Right now there's only one, so the one the pinger is polling is exactly the one that goes.
 kubectl delete pod -l app=rickroll
 ```
 
@@ -217,11 +217,11 @@ kubectl delete pod -l app=rickroll
 📍 **窗口 2。** 我们下达三个副本而不是一个，并等到三个全部就绪。
 
 ```bash
-# scale 只改应用记录里的一个字段——副本数。
+# scale changes exactly one field in the application's record — the number of copies.
 kubectl scale deployment rickroll --replicas=3
 
-# rollout status 会占住终端并打印进度，直到你要求的所有副本
-# 都就绪。命令会自己结束——不用手动去轮询 get pods。
+# rollout status holds the terminal and prints progress until all the copies you asked for
+# are ready. The command finishes on its own — no need to poll get pods by hand.
 kubectl rollout status deployment/rickroll
 ```
 
@@ -230,10 +230,10 @@ kubectl rollout status deployment/rickroll
 确认现在有三个副本，而且它们全都落到了 Service 后面：
 
 ```bash
-# EndpointSlice — 就是 Service 替你维护的那份存活地址清单。
-#   -l kubernetes.io/service-name=rickroll   取属于 Service rickroll 的那份清单
-#   -o jsonpath=...                          从每条记录里只打印地址本身，
-#                                            一行一个
+# EndpointSlice — that very list of live addresses the Service keeps for you.
+#   -l kubernetes.io/service-name=rickroll   take the list belonging to the Service rickroll
+#   -o jsonpath=...                          from each entry print only the address itself,
+#                                            one per line
 kubectl get endpointslices -l kubernetes.io/service-name=rickroll \
   -o jsonpath='{range .items[*].endpoints[*]}{.addresses[0]}{"\n"}{end}'
 ```
@@ -243,10 +243,10 @@ kubectl get endpointslices -l kubernetes.io/service-name=rickroll \
 现在我们杀掉三个副本中的一个：
 
 ```bash
-# 取三个副本里第一个的名字——具体是哪一个无所谓。
+# We take the name of the first of the three copies — which one exactly doesn't matter.
 POD=$(kubectl get pods -l app=rickroll -o jsonpath='{.items[0].metadata.name}')
 
-# 然后删掉它。这里不用 --wait=false：命令会在 Pod 已经消失后才返回。
+# And delete it. No --wait=false here: the command returns once the Pod is already gone.
 kubectl delete pod "$POD"
 ```
 
@@ -267,15 +267,15 @@ kubectl delete pod "$POD"
 机制很清楚：删掉一个副本，它就回来。我们再测一次，但这次删的不是副本，而是应用本身：
 
 ```bash
-# 我们删的不是副本，而是应用记录本身。不会有确认提示，
-# 对象不会进任何回收站——除了那个文件，没别的地方能恢复它。
+# We delete not a copy but the application's record itself. There will be no confirmation,
+# the object won't go to any recycle bin — there'll be nowhere to restore it from but the file.
 kubectl delete deployment rickroll
 ```
 
 我们等几秒，看看副本有没有回来：
 
 ```bash
-# 我们按应用的标签找 pod。这里的空应答本身也是一种回答。
+# We look for pods by the application's label. An empty response here is an answer too.
 kubectl get pods -l app=rickroll
 ```
 
@@ -313,11 +313,11 @@ No resources found in default namespace.
 顺便说一句，中间那个环节值得单独测一测，它的表现有所不同。恢复应用（下一步），然后试着删掉 ReplicaSet 而不是 Deployment：
 
 ```bash
-# rs — replicaset 的简写；kubectl 两种写法都认。
-# 我们删掉中间环节，把 Deployment 留在原地。
+# rs — short for replicaset; kubectl understands both spellings.
+# We delete the middle link, leaving the Deployment in place.
 kubectl delete rs -l app=rickroll
 
-# 然后立刻看看剩下什么：把这个集合的名字和删除前的名字比一比。
+# And immediately look at what's left: compare the set's name with what it was before the delete.
 kubectl get rs -l app=rickroll
 ```
 
@@ -330,11 +330,11 @@ kubectl get rs -l app=rickroll
 你有意图，它就在一个文件里。恢复就是一条命令：
 
 ```bash
-# apply = 「把集群拉齐到文件里描述的样子」。对象不存在——它会被创建。
-#   -f ../01-deploy/rickroll.yaml   文件在实验 1 的目录里，所以路径要经过 ../
+# apply = "bring the cluster to what's described in the file". The object doesn't exist — it will be created.
+#   -f ../01-deploy/rickroll.yaml   the file lives in the lab 1 folder, hence the path via ../
 kubectl apply -f ../01-deploy/rickroll.yaml
 
-# 我们等副本起来并准备好接收请求。
+# We wait for the copy to come up and become ready to take requests.
 kubectl rollout status deployment/rickroll
 ```
 
@@ -349,8 +349,8 @@ kubectl rollout status deployment/rickroll
 ⚠️ **在 Windows 上，脚本从 WSL 运行**，而不是从 PowerShell——怎么安装它，实验 0 的开头写了。没有 WSL 也能完成本实验，但就不会有产物报告。
 
 ```bash
-# ./ 意思是「当前目录里的一个文件」，而不是系统 PATH 里的一条命令。
-# 这个脚本不改变集群里的任何东西：它只读取并打印一份报告。
+# ./ means "a file from the current folder", not a command from the system PATH.
+# The script changes nothing in the cluster: it only reads and prints a report.
 ./check.sh
 ```
 
@@ -361,7 +361,7 @@ kubectl rollout status deployment/rickroll
 这里没什么可清理的，而这件事本身就值得注意。你从文件里恢复了应用，而文件下达的是一个副本——多出来的两个，集群早在上一步就自己关掉了，没问也没等你的命令。要确认：
 
 ```bash
-# READY 那一列应该是 1/1。
+# The READY column should read 1/1.
 kubectl get deployment rickroll
 ```
 

@@ -1,24 +1,24 @@
-# Lab 3. Fortio-Lastgenerator: der Generator selbst und eine stabile Adresse für seine
-# Weboberfläche. Zwei Objekte, getrennt durch `---`.
+# Lab 3. Fortio load generator: the generator itself and a stable address for its
+# web interface. Two objects, separated by `---`.
 #
-# Wird auf deinem Trainingscluster `lab` angewendet, nicht auf einem Tenant im Management-Cluster:
+# Applied to your `lab` training cluster, not to a tenant on the management cluster:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl apply -f fortio.yaml
-# Platzhalter wie tenant-workshopXX gibt es hier nicht — du musst nirgends deine Nummer einsetzen.
-# Dieselbe Datei wird in Lab 4 benötigt: `kubectl apply -f ../03-scale/fortio.yaml`.
+# There are no placeholders like tenant-workshopXX here — you don't need to substitute your number anywhere.
+# This same file will be needed in lab 4: `kubectl apply -f ../03-scale/fortio.yaml`.
 #
-# Die gemeinsamen Felder des Manifests (apiVersion, kind, metadata.name, selector, template,
-# securityContext) werden in ../01-deploy/rickroll.yaml Zeile für Zeile seziert und hier
-# nicht wiederholt. Wir kommentieren nur das, was speziell für den Lastgenerator ist.
+# The manifest's common fields (apiVersion, kind, metadata.name, selector, template,
+# securityContext) are dissected line by line in ../01-deploy/rickroll.yaml and are not
+# repeated here. We comment only on what is specific to the load generator.
 ---
-# Lastgenerator mit Weboberfläche.
-# Bewusst statt hey/ab gewählt: die Last startet man per Knopf im Browser,
-# und das Latenz-Histogramm sieht man direkt dort. Bei früheren Workshops haben wir
-# Leute genau an Konsolen-Werkzeugen verloren.
+# Load generator with a web interface.
+# Chosen over hey/ab on purpose: you start the load with a button in the browser,
+# and you see the latency histogram right there. At past workshops we lost
+# people precisely on console tools.
 #
-# Fortio lebt im Cluster als gewöhnliche Anwendung und trifft die rickroll-Adresse von innen.
-# Von außen, vom Laptop aus, zu belasten wäre verkehrstechnisch ehrlicher, würde aber am Kanal
-# zum Cluster hängen, und du würdest dein WLAN messen statt der Anwendung.
+# Fortio lives in the cluster as an ordinary application and hits the rickroll address from inside.
+# Loading it from outside, from a laptop, would be more honest in terms of traffic, but it would run into the channel
+# to the cluster, and you would be measuring your Wi-Fi rather than the application.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -26,9 +26,9 @@ metadata:
   labels:
     app: fortio
 spec:
-  # Eine Kopie des Generators reicht: sie erzeugt die Last selbst in vielen Threads.
-  # Eine zweite Kopie würde das Bild hier nur verwischen — die Zähler in der Weboberfläche
-  # sind pro Kopie, und du würdest die Hälfte der Anfragen sehen.
+  # One copy of the generator is enough: it produces load in many threads by itself.
+  # A second copy here would only blur the picture — the counters in the web interface
+  # are per-copy, and you would see half the requests.
   replicas: 1
   selector:
     matchLabels:
@@ -38,9 +38,9 @@ spec:
       labels:
         app: fortio
     spec:
-      # Dasselbe Sicherheitsprofil wie bei rickroll: läuft nicht als root, eine konkrete
-      # UID, Standard-seccomp. Bewusst beibehalten — damit die Datei auch in einem Cluster
-      # mit aktiviertem Profil `restricted` angewendet werden kann, wo der Pod sonst nicht startet.
+      # The same security profile as rickroll: runs not as root, a specific
+      # UID, standard seccomp. Left in on purpose — so the file can also be applied
+      # in a cluster with the `restricted` profile enabled, where otherwise the pod would not start.
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
@@ -52,32 +52,32 @@ spec:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # Das Tag latest ist eine bewusste Vereinfachung für den Workshop, um Versionen nicht abgleichen zu müssen.
-          # In einem Produktionscluster macht man das nicht: das Image unter diesem Tag kann sich unbemerkt
-          # zwischen zwei Applies ändern, und du kannst das Ergebnis von gestern nicht reproduzieren.
+          # The latest tag is a deliberate simplification for the workshop, to avoid matching versions.
+          # In a production cluster you don't do this: the image under this tag may silently
+          # change between two applies, and you won't be able to reproduce yesterday's result.
           image: fortio/fortio:latest
-          # Der Modus `server` bringt die Weboberfläche hoch und hält sie am Laufen. Ohne dieses Argument
-          # würde Fortio einen einzelnen Durchlauf von der Kommandozeile ausführen und beenden, und der Cluster
-          # würde den Container in einer Schleife neu starten.
+          # The `server` mode brings up the web interface and keeps it running. Without this argument
+          # Fortio would run a single pass from the command line and exit, and the cluster
+          # would restart the container in a loop.
           args: ["server"]
           ports:
             - containerPort: 8080
               name: http
           resources:
-            # Der Request ist höher als der von rickroll selbst (20m): der Generator braucht vorab Platz auf dem Knoten,
-            # sonst packt der Scheduler ihn eng, und der Hochlauf wird ungleichmäßig.
+            # The request is higher than rickroll's own (20m): the generator needs room on the node
+            # in advance, otherwise the scheduler will pack it in tightly and the ramp-up will be uneven.
             requests:
               cpu: 100m
               memory: 64Mi
             limits:
-              # Der Generator braucht CPU-Reserve, sonst stößt er
-              # an sein eigenes Limit, und du belastest Fortio statt der Anwendung.
+              # The generator needs CPU headroom, otherwise it will hit
+              # its own limit and you will be loading Fortio, not the application.
               cpu: "1"
               memory: 256Mi
 ---
-# Eine stabile Adresse für den Generator innerhalb des Clusters. Nötig, um die Weboberfläche
-# vom Laptop aus über `kubectl port-forward svc/fortio 8081:8080` zu öffnen — von außen veröffentlicht der Cluster
-# nichts, und es gibt keine anderen Türen zu Fortio.
+# A stable address for the generator inside the cluster. Needed to open the web interface
+# from a laptop via `kubectl port-forward svc/fortio 8081:8080` — from the outside the cluster
+# publishes nothing, and there are no other doors to Fortio.
 apiVersion: v1
 kind: Service
 metadata:
@@ -86,7 +86,7 @@ spec:
   selector:
     app: fortio
   ports:
-    # 8080 auf beiden Seiten: sowohl der Service als auch der Container. Die Nummer ist dieselbe wie bei rickroll
-    # innerhalb des Pods, aber es gibt keine Kollision — jeder Pod hat seinen eigenen Netzwerkstack.
+    # 8080 on both sides: both the service and the container. The number is the same as rickroll's
+    # inside the pod, but there is no collision — each pod has its own network stack.
     - port: 8080
       targetPort: http

@@ -1,21 +1,21 @@
 ---
-# Lab 7 · DIESER PATCH IST ABSICHTLICH UNVOLLSTÄNDIG. Er dient dazu, dass Sie sehen, wie
-# «wir haben den Cache scheinbar eingeschaltet, aber schneller wurde es nicht» aussieht. Die funktionierende Variante liegt in cache-patch.yaml.
+# Lab 7 · THIS PATCH IS INTENTIONALLY INCOMPLETE. It exists so that you can see what
+# "we sort of turned the cache on, but it didn't get any faster" looks like. The working version is in cache-patch.yaml.
 #
-# Wird in Ihrem Cluster `lab` angewendet (export KUBECONFIG=~/lab.kubeconfig):
+# Applied in your `lab` cluster (export KUBECONFIG=~/lab.kubeconfig):
 #   kubectl patch deployment passes-api --patch-file cache-patch-broken.yaml
 #
-# Sie müssen die Antwort nicht vorher ansehen. Wenden Sie ihn an, senden Sie ein paar Anfragen und sehen Sie sich die Logs
-# der Anwendung an: kubectl logs -l app=passes-api. Die Anwendung sagt Ihnen, was mit ihr nicht stimmt,
-# — es geht darum, die Meldung zu lesen und zu verstehen, was in dieser Datei fehlt.
+# No need to peek at the answer. Apply it, make a couple of requests, and look at the
+# application logs: kubectl logs -l app=passes-api. The application tells you what's wrong with it
+# — the point is to read the message and figure out what this file is missing.
 #
-# Setzen Sie die Adresse Ihres eigenen Redis anstelle von REDIS-ADDR ein (siehe Schritt zum Finden der Adresse).
-# Der Platzhalter darf nicht stehen bleiben: dann erhalten Sie einen anderen Fehler, nicht den, für den das Ganze eingerichtet wurde.
+# Substitute your own Redis address in place of REDIS-ADDR (see the step about finding the address).
+# You must not leave the placeholder: then you'll get a different error, not the one this whole thing was set up for.
 spec:
   template:
     spec:
       containers:
-        # Der Container-Name ist die Adresse, über die der Cluster die zu bearbeitende Stelle findet.
+        # The container name is the address by which the cluster finds the place to patch.
         - name: api
           env:
             - name: REDIS_ADDR

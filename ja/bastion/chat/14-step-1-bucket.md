@@ -34,9 +34,9 @@ kubectl get buckets.apps.cozystack.io -n tenant-workshopXX
 **これらの値をどこに入れるか。** ステップ3で、変換用マシン上のファイル `convert.sh` を開きます。その中に「PASTE YOUR VALUES」という3行のブロックがあります:
 
 ```
-BUCKET="ВСТАВЬТЕ_bucketName"
-ACCESS_KEY="ВСТАВЬТЕ_accessKey"
-SECRET_KEY="ВСТАВЬТЕ_secretKey"
+BUCKET="PASTE_bucketName"
+ACCESS_KEY="PASTE_accessKey"
+SECRET_KEY="PASTE_secretKey"
 ```
 
 まさにこの3つの値を、それぞれの引用符の中に貼り付けます。これら以外の場所では必要ありません。スクリプトが自分で、できあがったイメージをあなたのバケットにアップロードし、自分でそれへのリンクを作成します。

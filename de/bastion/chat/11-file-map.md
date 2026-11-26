@@ -8,7 +8,7 @@ letzteren werden innerhalb des Clusters erstellt. Im Repository gibt es zwei Art
 und sie laufen an unterschiedlichen Orten.
 
 **Manifeste — `manifests/*.yaml`. Werden vom Bastion aus angewendet.**
-Sie beschreiben, was im Cluster erstellt werden soll. Der Befehl ist immer derselbe: `kubectl apply -f <datei>`.
+Sie beschreiben, was im Cluster erstellt werden soll. Der Befehl ist immer derselbe: `kubectl apply -f <file>`.
 
 • `01-bucket.yaml` — Speicher für das Image · Schritt 1
 • `02-conversion-vm.yaml` — die Konverter-Maschine · Schritt 2
@@ -29,7 +29,7 @@ Auf dem Bastion selbst führen Sie sie nicht aus — Sie wenden dort nur die Man
 Die **Konverter-Maschine** hat ein Netzwerk, also lädt sie die Datei selbst herunter. Das Repository
 ist öffentlich, es werden keine Schlüssel benötigt:
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/bastion/scripts/convert.sh
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/bastion/scripts/convert.sh
 ```
 
 **Ihre app-VM hat anfangs überhaupt kein Netzwerk** — genau dieser kaputte Zustand ist es, den wir
@@ -43,5 +43,5 @@ wiederholen.
 ⚠️ **Die Tenant-Nummer in den Manifesten ist bereits eingetragen** — bei der Vorbereitung des Bastion
 wurden die Platzhalter `tenant-workshopXX` durch Ihre Nummer ersetzt. Sie müssen nichts von Hand
 eingeben. Das Einzige, was Sie selbst ausfüllen, sind `bucketName`, `accessKey` und `secretKey` in
-`convert.sh` (es wird frisch in den Konverter heruntergeladen, mit den Platzhaltern `ВСТАВЬТЕ_...`),
+`convert.sh` (es wird frisch in den Konverter heruntergeladen, mit den Platzhaltern `PASTE_...`),
 sowie der presigned-Link in `manifests/03-app-vm.yaml` im vierten Schritt.

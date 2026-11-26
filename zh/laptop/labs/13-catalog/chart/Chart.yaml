@@ -1,25 +1,25 @@
-# 实验 13。「通行证」chart 的护照。
+# Lab 13. Passport of the "Passes" chart.
 #
-# chart 就是一个文件夹：清单模板放在 templates/，默认值放在 values.yaml，
-# 参数 schema 放在 values.schema.json。它通过命令
-# `helm install <发布名> chart` 从实验文件夹部署，而在 Cozystack 目录中——则由平台
-# 本身部署，当有人通过仪表盘订购某个应用时。
+# A chart is a folder: manifest templates in templates/, default values in values.yaml
+# and the parameter schema in values.schema.json. It is deployed with the command
+# `helm install <release-name> chart` from the lab folder, and in the Cozystack catalog — by the
+# platform itself, when someone orders an application through the dashboard.
 #
-# Chart.yaml 是软件包的封面：Helm 从中得知这个包叫什么名字、是什么版本。
+# Chart.yaml is the package cover: from it Helm learns what the package is called and what version it is.
 apiVersion: v2
 name: guest-pass
 description: Internal guest pass service — order a pass for a visitor
 type: application
 
-# 接下来是两个版本，它们在 Helm 中比其他任何东西都更常被混淆。这是两码事。
+# Next come two versions, and they are confused more often than anything else in Helm. These are different things.
 #
-# version — 打包版本。当你修改模板、值或 schema 时它就要变，
-# 即使里面的应用保持不变。这正是 Helm 在升级发布时所比较的，
-# 上传到仓库中的包也靠它来区分。不提升它，
-# 平台就认为包没有变化，新版本可能被忽略而察觉不到。
+# version — the packaging version. It changes when you edit the templates, values or schema,
+# even if the application inside stayed the same. This is exactly what Helm compares when upgrading a
+# release, and it is what distinguishes packages uploaded to the repository. Without bumping it the
+# platform considers that the package has not changed, and the new version may go unnoticed.
 version: 0.1.0
-# appVersion — 包内应用本身的版本，这里是 nginx。它有自己独立的
-# 生命周期：应用可以更新十次而完全不动一处模板，反之亦然——
-# 你重写了模板,但应用还是原来那个。它不会出现在对象名称里,而是显示
-# 在 `helm list` 的输出中以及目录卡片上。
+# appVersion — the version of the application itself inside the package, here it is nginx. It lives its own
+# life: the application may be updated ten times without a single edit to the templates, and vice versa —
+# you rewrote the templates, but the application is the same. It does not appear in object names, it is shown
+# in the output of `helm list` and in the catalog card.
 appVersion: "1.0"

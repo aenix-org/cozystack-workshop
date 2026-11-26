@@ -27,7 +27,7 @@
 **कन्वर्टर मशीन** में नेटवर्क होता है, इसलिए वह फ़ाइल खुद डाउनलोड कर लेती है। रिपॉज़िटरी
 पब्लिक है, कोई key नहीं चाहिए:
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/laptop/scripts/convert.sh
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/laptop/scripts/convert.sh
 ```
 
 **आपकी app-VM में शुरुआत में कोई नेटवर्क होता ही नहीं** — यही टूटी हुई हालत ठीक वह है जिसे हम

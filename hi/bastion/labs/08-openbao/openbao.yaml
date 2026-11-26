@@ -1,41 +1,41 @@
-# लैब 8 · OpenBao सीक्रेट्स स्टोर का ऑर्डर देना।
-# वही चीज़ जो आप डैशबोर्ड में माउस से ऑर्डर करेंगे — बस टेक्स्ट के रूप में।
-# यह लैब क्लस्टर में नहीं, बल्कि प्रबंधन क्लस्टर पर एक टेनेंट में लागू होता है:
+# Lab 8 · ordering an OpenBao secrets store.
+# The same thing you would order with the mouse in the dashboard — only as text.
+# It is applied NOT to the lab cluster, but to a tenant on the management cluster:
 #   kubectl --kubeconfig="$HOME/.kube/config" apply -f openbao.yaml
 #
-# लागू करने से पहले: tenant-workshopXX को अपने namespace से बदलें। XX एक प्लेसहोल्डर है,
-# नाम का हिस्सा नहीं; अपना नंबर आपको पासवर्ड के साथ मिला था। यदि यह किसी और के टेनेंट में
-# चला गया — तो आपको एक्सेस अस्वीकृति मिलेगी, और यह सबसे अच्छा संभावित परिणाम है।
+# BEFORE APPLYING: replace tenant-workshopXX with your own namespace. XX is a placeholder,
+# not part of the name; you received your own number together with the password. If it goes
+# into someone else's tenant — you get an access denial, and that is the best possible outcome.
 #
-# kind: OpenBAO — यह Kubernetes का कोई बिल्ट-इन ऑब्जेक्ट नहीं है, बल्कि एक टाइप है जिसे
-# Cozystack जोड़ता है। आप बताते हैं कि आपको क्या चाहिए, और प्लेटफ़ॉर्म खुद ही पॉड, डिस्क
-# और सर्विसेज तैनात करता है और फिर खुद ही उन्हें अपडेट करता है। यह किसी कैटलॉग से सेवा
-# ऑर्डर करने के सबसे करीब है, न कि दी गई वर्चुअल मशीन पर सॉफ़्टवेयर इंस्टॉल करने के।
+# kind: OpenBAO — this is not a built-in Kubernetes object, but a type that Cozystack
+# adds. You describe what you need, and the platform itself deploys the pods, disks
+# and services, and then updates them itself. It is closest to ordering a service from a catalog,
+# not to installing software on a handed-out virtual machine.
 apiVersion: apps.cozystack.io/v1alpha1
 kind: OpenBAO
 metadata:
-  # नाम सिर्फ़ डैशबोर्ड के कार्ड को ही प्रभावित नहीं करता: स्टोर का आंतरिक पता
-  # इसी से बनता है — openbao-secrets.<namespace>.svc.cozy.local. यदि आप इसका नाम बदलते हैं —
-  # तो secrets-demo.yaml में और check.sh के लिए BAO_APP वेरिएबल में पता ठीक करें।
+  # The name affects not only the card in the dashboard: the store's internal address
+  # is assembled from it — openbao-secrets.<namespace>.svc.cozy.local. If you rename it —
+  # fix the address in secrets-demo.yaml and in the BAO_APP variable for check.sh.
   name: secrets
   namespace: tenant-workshopXX
 spec:
-  # एक ही कॉपी। प्रोडक्शन में तीन तैनात करते हैं और Raft रेप्लिकेशन मिलता है: चार्ट इसे
-  # खुद ही चालू कर देता है जैसे ही replicas > 1 होता है। आगे-पीछे स्विच करने के लिए
-  # डेटा को स्थानांतरित करना पड़ता है, इसलिए फ़ैसला पहले लिया जाता है, बाद में नहीं।
+  # A single copy. In production three are deployed and you get Raft replication: the chart enables
+  # it itself as soon as replicas > 1. Switching back and forth requires
+  # moving data, so the decision is made before, not after.
   replicas: 1
-  # स्टोर के डेटा के लिए डिस्क। दो गीगाबाइट रिज़र्व के साथ है: सीक्रेट्स बाइट्स में तौले जाते हैं,
-  # जगह वर्शन हिस्ट्री और ऑडिट लॉग में जाती है। बनाने के बाद वॉल्यूम को घटाया नहीं जा सकता,
-  # पर आमतौर पर बढ़ाया जा सकता है, इसलिए यहाँ कंजूसी करने का कोई मतलब नहीं।
+  # Disk for the store's data. Two gigabytes is with a reserve: secrets weigh bytes,
+  # space goes to version history and the audit log. You cannot shrink a volume after creation,
+  # but you can usually grow it, so there is no point being stingy here.
   size: 2Gi
-  # replicated स्टोरेज क्लास का मतलब है कि डेटा कई कॉपियों में अलग-अलग नोड्स पर रहता है।
-  # किसी नोड के विफल होने से आपके सारे पासवर्ड साथ नहीं चले जाते — और सीक्रेट्स स्टोर को
-  # बैकअप से पुनर्स्थापित करना अपने आप में एक अलग ही अप्रिय काम है।
+  # The replicated storage class means the data lies in several copies on
+  # different nodes. A node failure does not take all your passwords with it — and restoring
+  # a secrets store from a backup is a separately unpleasant affair.
   storageClass: replicated
-  # तैयार "कितना CPU और मेमोरी" सेट। प्लेटफ़ॉर्म इन्हें एक सूची के रूप में पेश करता है,
-  # ताकि हर किसी को requests और limits हाथ से गिनने के लिए मजबूर न होना पड़े।
+  # A ready-made "how much CPU and memory" set. The platform offers them as a list,
+  # so as not to force everyone to compute requests and limits by hand.
   resourcesPreset: t1.small
-  # वेब इंटरफ़ेस क्लस्टर के अंदर उठता है। हम इसे बाहर एक्सपोज़ नहीं करते:
-  # external: true एक LoadBalancer लगा देता, और लैब में हमें उसकी ज़रूरत नहीं।
+  # The web interface comes up inside the cluster. We do not expose it outside:
+  # external: true would attach a LoadBalancer, and we do not need it in the lab.
   ui: true
   external: false

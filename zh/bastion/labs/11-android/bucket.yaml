@@ -1,41 +1,41 @@
 ---
-# 实验 11。用于存放构建好的 APK 的 Bucket。
+# Lab 11. Bucket for built APKs.
 #
-# Bucket 是对象存储中的一块命名区域：文件以整体形式通过 HTTP 存入和取出，
-# 不会挂载到任何地方。内部没有目录，对象名中的斜杠只在界面上被画成
-# 树形结构。
+# A bucket is a named area in object storage: files are put and fetched as whole
+# objects, over HTTP, and are never mounted anywhere. There are no directories inside;
+# a slash in an object name is drawn as a tree only in the interface.
 #
-# 这是一个租户对象：它并不存在于 `lab` 集群中，而是存在于管理集群上
-# 你的 namespace 里。因此这里需要的 kubeconfig 是租户的那个，
-# 而不是你用来操作 `lab` 集群的那个。这是有意为之：构建产物
-# 应该比构建它们的集群活得更久。
+# This is a tenant object: it lives NOT in the `lab` cluster, but in your namespace
+# on the management cluster. That is why the kubeconfig here must be the tenant one,
+# not the one you use to work with the `lab` cluster. This is by design: build artifacts
+# must outlive the cluster they were built in.
 #
-# 应用之前，请将 tenant-workshopXX 替换为你自己的 namespace，否则订单会跑到
-# 错误的租户，而且很可能通不过权限检查。
+# Before applying, replace tenant-workshopXX with your own namespace, otherwise the order
+# will go to the wrong tenant and most likely will not pass the permission checks.
 #
 #     export KUBECONFIG=~/.kube/config
 #     kubectl apply -f bucket.yaml
 #
-# 同样的事情也可以在租户仪表盘里用鼠标完成（创建应用 -> Bucket）。
-# 结果是一样的；区别在于文本可以被评审并放入 Git。
+# The same thing can be done with the mouse in the tenant dashboard (Create application -> Bucket).
+# The result is identical; the difference is that text can be reviewed and put into Git.
 #
-# 应用之后会发生什么：平台会在几秒内启动 bucket
-# 并签发访问密钥，将它们存放到同一 namespace 下的 bucket-builds-ci-credentials 密钥中。
-# 其中的四个值（endpoint、bucketName、accessKey、secretKey）
-# 需要手动搬到 `lab` 集群里——集群是不同的，什么都不会自己迁移过去。
+# What happens after applying: the platform will bring up the bucket in a few seconds
+# and issue access keys, storing them in the secret bucket-builds-ci-credentials in the same
+# namespace. Four values from there (endpoint, bucketName, accessKey, secretKey)
+# are transferred into the `lab` cluster by hand — the clusters are different, nothing moves on its own.
 apiVersion: apps.cozystack.io/v1alpha1
 kind: Bucket
 metadata:
-  # 这是 Cozystack 对象的名字，仅此而已。存储中真正的 bucket 名字由平台
-  # 自行签发——很长，形如 bucket-a9209f83-...。它会出现在
-  # 已签发密钥的 bucketName 字段里，构建中要填入的正是它，而不是 `builds`。
+  # The name of the Cozystack object, and only that. The real bucket name in storage is
+  # issued by the platform itself — long, of the form bucket-a9209f83-... It will end up in the
+  # bucketName field of the issued secret, and that is exactly what must be plugged into the build, not `builds`.
   name: builds
   namespace: tenant-workshopXX
 spec:
   users:
-    # 这个映射的每个键都是一个独立的 S3 用户，拥有自己的一对密钥。
-    # 空对象表示「完全的读写访问权限」。
-    # 这样就可以给构建者授予写权限，而给移动团队只授予只读权限：
+    # Each key of this map is a separate S3 user with its own key pair.
+    # An empty object means "full read and write access".
+    # This way you can grant the builder write access, and the mobile team — read-only:
     #   ci: {}
     #   mobile:
     #     readonly: true

@@ -1,63 +1,64 @@
-// Лаба 10 · чотири перепустки чотирьох різних форм у колекції passes.
+// Lab 10 · four passes of four different shapes in the passes collection.
 //
-// Це не файл налаштувань, а програма для mongosh — оболонки MongoDB, яка
-// розуміє JavaScript. Виконується на віртуалці, у лабораторному кластері, короткою
-// командою `mo` з README (вона запускає mongosh усередині робочого Pod):
+// This is not a config file but a program for mongosh — the MongoDB shell, which
+// understands JavaScript. It runs on the VM, in the lab cluster, via the short
+// command `mo` from the README (it launches mongosh inside the working pod):
 //     cd labs/10-mongodb && mo < passes.js
-// У відповідь ви побачите рядок «документів у колекції: 4».
+// In response you will see the line «documents in collection: 4».
 //
-// Запустіть файл двічі — документів стане вісім: insertMany лише додає.
+// Run the file twice and there will be eight documents: insertMany only appends.
 
-// db — база, до якої ви підключені; passes — колекція в ній (найближчий аналог
-// таблиці); insertMany — «додай ці документи». Жодної таблиці заздалегідь створювати
-// не потрібно й описувати поля ніде: колекція з'являється в момент першої вставки,
-// а думки про те, які поля бувають у документа, у бази за замовчуванням немає.
-// Тому чотири документи нижче мають різний набір полів і при цьому лежать поруч,
-// в одній колекції. Заради цього документна модель і існує: ні порожніх колонок,
-// ні чотирьох таблиць під чотири типи перепустки, ні п'ятої, яка їх пов'язує.
+// db is the database you are connected to; passes is a collection in it (the closest
+// analog of a table); insertMany means «add these documents». No table needs to be
+// created in advance and there is nowhere to describe fields: the collection appears
+// at the moment of the first insert, and by default the database has no opinion about
+// which fields a document may have.
+// That is why the four documents below have different sets of fields yet lie side by
+// side, in one collection. This is exactly what the document model exists for: no empty
+// columns, no four tables for four pass types, no fifth one to link them.
 db.passes.insertMany([
   {
-    // Разова перепустка — найкоротша форма: шість полів, усі прості значення.
-    // У звичайній таблиці це був би звичайний рядок.
-    // ISODate(...) — не рядок, а саме дата. MongoDB зберігає документи у двійковому
-    // форматі BSON, де у значення є тип: дата, ціле, дробове, логічне.
-    // За датою можна порівнювати й сортувати, за рядком «2026-09-01» — лише якщо
-    // пощастило з форматом запису.
-    type: "разовий",
-    guest: "Коваленко Іван Іванович",
+    // A single-entry pass — the shortest shape: six fields, all simple values.
+    // In an ordinary table this would be an ordinary row.
+    // ISODate(...) is not a string but exactly a date. MongoDB stores documents in the
+    // binary BSON format, where a value has a type: date, integer, float, boolean.
+    // By date you can compare and sort; by the string «2026-09-01» only if you got
+    // lucky with the recording format.
+    type: "single-use",
+    guest: "James P. Whitfield",
     host: "petrov@corp.example",
-    entrance: "Північна",
+    entrance: "North",
     valid_on: ISODate("2026-09-01T09:00:00Z"),
-    purpose: "співбесіда"
+    purpose: "job interview"
   },
   {
-    // Тижнева перепустка. Замість valid_on — пара valid_from і valid_to, замість
-    // одного входу список entrances прямо в полі. У таблиці для такого списку
-    // знадобилася б або окрема таблиця «перепустка — вхід», або рядок
-    // з комами, за яким потім нормально не пошукати.
-    // З'явилося поле badge_returned, якого у разової перепустки немає зовсім:
-    // не NULL і не порожньо, а саме немає такого поля в тому документі. Це різні
-    // речі, і шукаються вони по-різному.
-    type: "тижневий",
-    guest: "Ткаченко Анна Петрівна",
+    // A weekly pass. Instead of valid_on there is a pair valid_from and valid_to,
+    // instead of a single entrance a list of entrances right in the field. In a table
+    // such a list would need either a separate «pass — entrance» table, or a
+    // comma-separated string that you then cannot search properly.
+    // A badge_returned field has appeared, which the single-entry pass does not have at
+    // all: not NULL and not empty, but literally no such field in that document. These
+    // are different things, and they are searched for differently.
+    type: "weekly",
+    guest: "Emma L. Prescott",
     host: "petrov@corp.example",
-    entrances: ["Північна", "Південна"],
+    entrances: ["North", "South"],
     valid_from: ISODate("2026-09-01T00:00:00Z"),
     valid_to: ISODate("2026-09-07T23:59:59Z"),
-    purpose: "зовнішній аудит",
+    purpose: "external audit",
     badge_returned: false
   },
   {
-    // Автомобільна перепустка. Усе, що стосується машини, лежить усередині одного поля
-    // car. Це не рядок з JSON усередині, а повноцінна вкладена структура:
-    // за car.plate можна шукати й будувати за ним індекс.
-    type: "автомобільний",
-    guest: "Бондаренко Віктор Сергійович",
+    // A vehicle pass. Everything related to the car lies inside a single field
+    // car. This is not a string with JSON inside but a full-fledged nested structure:
+    // by car.plate you can search and build an index on it.
+    type: "vehicle",
+    guest: "Victor S. Marsh",
     host: "logistics@corp.example",
-    entrance: "Західна",
+    entrance: "West",
     valid_on: ISODate("2026-09-02T07:30:00Z"),
     car: {
-      plate: "587 ABC 02",
+      plate: "AB-1174-CD",
       model: "Ford Transit",
       trailer: false,
       weight_kg: 3500
@@ -65,29 +66,30 @@ db.passes.insertMany([
     parking: "P2"
   },
   {
-    // Групова перепустка. Тут список об'єктів: у кожного учасника свої поля,
-    // довжина списку довільна.
-    // І головне — поля guest у цього документа немає зовсім: замість гостя
-    // організація й контактна особа. Форма відрізняється від решти не одним полем,
-    // а по суті. Далі по лабі це відгукнеться: правило перевірки документів не
-    // зможе вимагати guest від усіх, інакше законна групова перепустка не пройде.
-    type: "груповий",
-    organization: "Гімназія № 1",
-    contact: "Мельник Ольга Володимирівна",
+    // A group pass. Here there is a list of objects: each member has its own fields,
+    // the length of the list is arbitrary.
+    // And most importantly — this document has no guest field at all: instead of a
+    // guest, an organization and a contact person. The shape differs from the others
+    // not by one field but in essence. This will echo further in the lab: the document
+    // validation rule will not be able to require guest from everyone, otherwise a
+    // legitimate group pass would not pass.
+    type: "group",
+    organization: "City High School No. 1",
+    contact: "Olivia W. Grant",
     host: "hr@corp.example",
-    entrance: "Північна",
+    entrance: "North",
     valid_on: ISODate("2026-09-03T10:00:00Z"),
-    escort: "Шевченко Олексій Олексійович",
+    escort: "Alan A. Foster",
     members: [
-      { name: "Орлик Петро", age: 16 },
-      { name: "Вовк Марія", age: 15 },
-      { name: "Заєць Ілля", age: 17 }
+      { name: "Peter Hale", age: 16 },
+      { name: "Mary Fenwick", age: 15 },
+      { name: "Isaac Hart", age: 17 }
     ]
   }
 ]);
 
-// countDocuments({}) — порахувати документи, які підходять під умову; порожня умова
-// означає «всі». Друк потрібен, щоб у файлу був видимий результат: сам insertMany
-// відповідає списком виданих ідентифікаторів, і в ньому легко не розгледіти, скільки
-// документів реально лягло.
-print("документів у колекції: " + db.passes.countDocuments({}));
+// countDocuments({}) counts documents matching a condition; an empty condition means
+// «all». The print is needed so the file has a visible result: insertMany itself
+// responds with a list of issued identifiers, and in it it is easy to miss how many
+// documents actually landed.
+print("documents in collection: " + db.passes.countDocuments({}));

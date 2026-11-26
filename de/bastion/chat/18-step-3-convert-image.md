@@ -9,7 +9,7 @@ Datei selbst herunter — Sie müssen nichts über die Zwischenablage kopieren.
 
 Holen Sie das Skript direkt von GitHub auf den Rechner:
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/bastion/scripts/convert.sh
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/bastion/scripts/convert.sh
 ```
 
 Öffnen Sie es:
@@ -18,13 +18,13 @@ nano convert.sh
 ```
 
 **Jetzt kommen die drei Werte ins Spiel, die Sie sich in Schritt 1 notiert haben.** Am Anfang der
-Datei gibt es einen Block mit der Bezeichnung «FÜGEN SIE IHRE WERTE EIN» — ersetzen Sie die dortigen
+Datei gibt es einen Block mit der Bezeichnung „PASTE YOUR VALUES“ — ersetzen Sie die dortigen
 Platzhalter durch Ihre eigenen und lassen Sie die Anführungszeichen stehen:
 
 ```
-BUCKET="ihr-bucket-name"
-ACCESS_KEY="ihr-accessKey"
-SECRET_KEY="ihr-secretKey"
+BUCKET="your-bucket-name"
+ACCESS_KEY="your-accessKey"
+SECRET_KEY="your-secretKey"
 ```
 
 Die Zeile `S3_ENDPOINT` und den Link zum Quell-Image lassen Sie unangetastet — sie sind bereits
@@ -33,7 +33,7 @@ korrekt und für alle gleich.
 Speichern in nano: `Ctrl+O`, dann `Enter`, dann `Ctrl+X` zum Beenden. Prüfen Sie, dass keine
 Platzhalter übrig sind:
 ```bash
-grep ВСТАВЬТЕ convert.sh || echo "alles ausgefüllt, bereit zum Ausführen"
+grep PASTE_ convert.sh || echo "all filled in, ready to run"
 ```
 
 Führen Sie es aus — immer über `sudo`, das Skript braucht root-Rechte. Und führen Sie es **in `screen`** aus:
@@ -42,9 +42,9 @@ zum Bastion → Konsole des Konvertierungsrechners). Fällt irgendein Glied der 
 Lauf auf halbem Weg ab. `screen` hält den Prozess am Leben, selbst wenn die Verbindung wegfällt:
 
 ```bash
-screen -S convert          # eine separate Sitzung starten
-sudo bash convert.sh       # innerhalb dieser Sitzung ausführen
-#  Verbindung abgebrochen? Melden Sie sich erneut an genau diesem Rechner an, dann:  screen -r convert
+screen -S convert          # start a separate session
+sudo bash convert.sh       # run it inside that session
+#  connection dropped? log back in to this same machine, then:  screen -r convert
 ```
 
 Was dabei intern passiert: Das Skript lädt das Quell-Image herunter, führt `virt-v2v` aus,
@@ -61,7 +61,7 @@ Am Ende gibt das Skript einen **presigned Link** zu Ihrem Image aus — suchen S
 die mit dem Wort `Share:` beginnt, der Link steht direkt dahinter.
 
 **Was Sie damit tun:** Kopieren Sie ihn in denselben Notizzettel. Im nächsten Schritt kehren Sie zum Bastion zurück, öffnen `manifests/03-app-vm.yaml` und fügen ihn in das Feld `url` ein — dorthin, wo
-aktuell der Platzhalter `ВСТАВЬТЕ_PRESIGNED_URL` steht. Genau der, vor dem ich Sie gewarnt habe,
+aktuell der Platzhalter `PASTE_PRESIGNED_URL` steht. Genau der, vor dem ich Sie gewarnt habe,
 als wir die Nummern eingetragen haben.
 
 Das ist ein temporärer signierter Link: Der Speicher ist nach außen nicht offen, und den Link haben Sie

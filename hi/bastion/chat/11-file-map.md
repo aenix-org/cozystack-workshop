@@ -28,7 +28,7 @@ bastion पर खुद आप इन्हें नहीं चलाते 
 **कन्वर्टर मशीन** में नेटवर्क होता है, इसलिए वह फ़ाइल खुद डाउनलोड कर लेती है। रिपॉज़िटरी
 पब्लिक है, कोई key नहीं चाहिए:
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/bastion/scripts/convert.sh
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/bastion/scripts/convert.sh
 ```
 
 **आपकी app-VM में शुरुआत में कोई नेटवर्क होता ही नहीं** — यही टूटी हुई हालत ठीक वह है जिसे हम
@@ -41,5 +41,5 @@ curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-work
 ⚠️ **मैनिफ़ेस्ट में टेनेंट नंबर पहले से भरा हुआ है** — bastion तैयार करते समय `tenant-workshopXX`
 प्लेसहोल्डर आपके नंबर से बदल दिए गए थे। आपको हाथ से कुछ भी दर्ज करने की ज़रूरत नहीं। बस इतनी ही
 चीज़ें आप खुद भरते हैं — `convert.sh` में `bucketName`, `accessKey` और `secretKey` (यह कन्वर्टर
-में ताज़ा डाउनलोड होती है, `ВСТАВЬТЕ_...` प्लेसहोल्डरों के साथ), और चौथे स्टेप पर
+में ताज़ा डाउनलोड होती है, `PASTE_...` प्लेसहोल्डरों के साथ), और चौथे स्टेप पर
 `manifests/03-app-vm.yaml` में presigned लिंक।

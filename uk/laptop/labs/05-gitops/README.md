@@ -47,10 +47,10 @@
 
 ## Що лежить у папці лаби
 
-Усі файли вже у вас — ви забрали їх разом із репозиторієм. Створювати і друкувати заново нічого не потрібно: там, де нижче написано `kubectl apply -f ім'я.yaml`, файл береться звідси.
+Усі файли вже у вас — ви забрали їх разом із репозиторієм. Створювати і друкувати заново нічого не потрібно: там, де нижче написано `kubectl apply -f name.yaml`, файл береться звідси.
 
 ```bash
-# Далі всі команди виконуються звідси: шляхи в `kubectl apply -f` відлічуються від цієї папки.
+# From here on, all commands run from this folder: the paths in `kubectl apply -f` are relative to it.
 cd labs/05-gitops
 ```
 
@@ -79,11 +79,11 @@ cd labs/05-gitops
 Заберіть репозиторій до себе:
 
 ```bash
-# clone = завантажити репозиторій цілком, разом з усією історією правок. Ви отримуєте
-# не доступ до спільної папки, а свою повну копію на диску: працювати з нею можна й без мережі.
-# `ВАШ-ЛОГІН` замініть на свій логін на GitHub, інакше команда піде в чужий репозиторій.
-git clone https://github.com/ВАШ-ЛОГІН/passes-gitops.git
-# clone створює папку з ім'ям репозиторію. Далі працюємо зсередини неї.
+# clone = download the repository in full, together with its entire edit history. You get
+# not access to a shared folder but your own full copy on disk: you can work with it offline.
+# Replace `YOUR-LOGIN` with your own GitHub login, or the command will go to someone else's repository.
+git clone https://github.com/YOUR-LOGIN/passes-gitops.git
+# clone creates a folder named after the repository. From here on we work inside it.
 cd passes-gitops
 ```
 
@@ -94,13 +94,13 @@ cd passes-gitops
 У папці цієї лаби лежать два файли: `app/namespace.yaml` і `app/passes.yaml`. Скопіюйте їх у свій репозиторій, у папку `apps`:
 
 ```bash
-# apps — папка, з якої Flux забиратиме описи. Ім'я вибране нами, і саме воно ж
-# вказане в налаштуванні Flux, тому міняти його без потреби не варто.
-#   -p  не вважати помилкою, якщо папка вже існує
+# apps — the folder Flux will pull descriptions from. We chose the name, and it's the exact
+# same one named in the Flux configuration, so there's no reason to change it without cause.
+#   -p  don't treat it as an error if the folder already exists
 mkdir -p apps
-# Копіюємо обидва файли до себе в репозиторій. `/шлях/до/` замініть на те місце, куди ви
-# склонували репозиторій з лабами; `*.yaml` візьме обидва файли разом.
-cp /шлях/до/labs/05-gitops/app/*.yaml apps/
+# Copy both files into your own repository. Replace `/path/to/` with the place where you
+# cloned the labs repository; `*.yaml` will take both files at once.
+cp /path/to/labs/05-gitops/app/*.yaml apps/
 ```
 
 Перш ніж відправляти — розберемо, що ви кладете.
@@ -163,13 +163,13 @@ spec:
 Відправляємо в GitHub. Git запам'ятовує не все підряд, а те, що йому явно показали, — тому команд три, і кожна робить своє:
 
 ```bash
-# add = відмітити файли, які увійдуть у наступний запис історії.
+# add = mark the files that will go into the next history entry.
 git add apps
-# commit = зберегти відмічене одним записом: вміст, автор, час і причина.
-#   -m "..."  та сама причина. Вона залишиться в історії назавжди, і її читатимуть.
-# Коміт поки лежить лише у вас на ноутбуці — у GitHub його ще немає.
+# commit = save what's marked as one entry: contents, author, time, and reason.
+#   -m "..."  that very reason. It stays in the history forever, and people will read it.
+# The commit lives only on your laptop for now — it's not yet in GitHub.
 git commit -m "add passes service v1"
-# push = відправити накопичені коміти в GitHub. До цієї команди там нічого не зміниться.
+# push = send the accumulated commits to GitHub. Until this command, nothing there changes.
 git push
 ```
 
@@ -188,36 +188,36 @@ Flux — це кілька служб усередині вашого класт
 macOS:
 
 ```bash
-# Homebrew візьме формулу з репозиторію проєкту Flux і покладе один виконуваний файл.
+# Homebrew takes the formula from the Flux project's repository and drops one executable file.
 brew install fluxcd/tap/flux
 ```
 
 Linux:
 
 ```bash
-# Скрипт із сайту Flux визначає вашу архітектуру і кладе файл у /usr/local/bin.
-#   -s          curl працює мовчки, без індикатора завантаження
-#   | sudo bash завантажений текст одразу виконується з правами адміністратора — через
-#               запис у системну папку вони й потрібні
+# The script from the Flux site detects your architecture and drops the file into /usr/local/bin.
+#   -s          curl works silently, without a download indicator
+#   | sudo bash the downloaded text is executed straight away with administrator rights — they're
+#               needed because of the write into a system folder
 curl -s https://fluxcd.io/install.sh | sudo bash
 ```
 
 Windows (PowerShell, якщо встановлений Chocolatey):
 
 ```powershell
-# choco — сторонній менеджер пакетів для Windows; ставить той самий один файл flux.exe.
+# choco — a third-party package manager for Windows; it installs the same single flux.exe file.
 choco install flux
 ```
 
 Тепер ставимо самі служби в кластер:
 
 ```bash
-# Задаємо файл доступу: команда нижче створює об'єкти в кластері, і важливо, в якому саме.
+# Set the access file: the command below creates objects in the cluster, and it matters in which one.
 export KUBECONFIG=~/lab.kubeconfig
-# flux install заводить у кластері namespace `flux-system` і розгортає в ньому служби.
-#   --components=...  які саме ставити:
-#     source-controller     ходить у Git і тримає в себе свіжу копію репозиторію
-#     kustomize-controller  застосовує завантажене в кластер і стежить за розбіжностями
+# flux install sets up a `flux-system` namespace in the cluster and deploys the services into it.
+#   --components=...  which ones exactly to install:
+#     source-controller     reaches into Git and keeps a fresh copy of the repository
+#     kustomize-controller  applies what was downloaded to the cluster and watches for divergences
 flux install --components=source-controller,kustomize-controller
 ```
 
@@ -234,8 +234,8 @@ flux install --components=source-controller,kustomize-controller
 Переконайтеся, що служби піднялися:
 
 ```bash
-# -n flux-system — namespace, у якому оселився Flux. Без цього ключа kubectl дивиться в
-# namespace за замовчуванням і покаже порожнечу.
+# -n flux-system — the namespace Flux settled into. Without this flag kubectl looks in the
+# default namespace and shows nothing.
 kubectl get pods -n flux-system
 ```
 
@@ -247,8 +247,8 @@ kubectl get pods -n flux-system
 Усе те саме ставиться звичайним маніфестом, без інструмента:
 
 ```bash
-# Той самий набір служб, але готовим описом: -f приймає не лише шлях на диску,
-# але й посилання. kubectl завантажить файл і застосує його вміст.
+# The same set of services, but as a ready-made description: -f accepts not only a path on disk
+# but also a link. kubectl will download the file and apply its contents.
 kubectl apply -f https://github.com/fluxcd/flux2/releases/latest/download/install.yaml
 ```
 
@@ -262,10 +262,10 @@ kubectl apply -f https://github.com/fluxcd/flux2/releases/latest/download/instal
 
 Flux встановлений, але він поки не знає, куди ходити. Скажемо йому це двома об'єктами.
 
-Відкрийте `flux/gitrepository.yaml` з папки цієї лаби і підставте адресу **свого** репозиторію замість заглушки `ЗАМІНІТЬ-МЕНЕ`:
+Відкрийте `flux/gitrepository.yaml` з папки цієї лаби і підставте адресу **свого** репозиторію замість заглушки `REPLACE-ME`:
 
 ```yaml
-  url: https://github.com/ЗАМІНІТЬ-МЕНЕ/passes-gitops
+  url: https://github.com/REPLACE-ME/passes-gitops
 ```
 
 <details>
@@ -277,7 +277,7 @@ Flux встановлений, але він поки не знає, куди х
 kind: GitRepository
 spec:
   interval: 1m
-  url: https://github.com/ЗАМІНІТЬ-МЕНЕ/passes-gitops
+  url: https://github.com/REPLACE-ME/passes-gitops
   ref:
     branch: main
 ```
@@ -315,18 +315,18 @@ spec:
 Застосовуємо обидва:
 
 ```bash
-# -f вказує на папку, а не на файл: застосуються всі маніфести, які в ній лежать, —
-# і GitRepository, і Kustomization. Обидва створюються в namespace flux-system.
+# -f points at a folder, not a file: all the manifests in it will be applied —
+# both GitRepository and Kustomization. Both are created in the flux-system namespace.
 kubectl apply -f flux/
 ```
 
 Дивимося, що вийшло:
 
 ```bash
-# Питаємо у Flux стан узгодження.
-#   --watch  тримати вікно зайнятим і оновлювати рядок у міру змін
-# READY: True означає, що вміст репозиторію доїхав до кластера і застосувався.
-# REVISION — гілка і короткий ідентифікатор коміта, який зараз застосований.
+# We ask Flux about the reconciliation state.
+#   --watch  keep the window busy and refresh the line as things change
+# READY: True means the repository's contents reached the cluster and were applied.
+# REVISION — the branch and the short identifier of the commit currently applied.
 flux get kustomizations --watch
 ```
 
@@ -340,8 +340,8 @@ passes   main@sha1:a1b2c3d   False      True   Applied revision: main@sha1:a1b2c
 Перервіть спостереження через `Ctrl+C` і подивіться, що з'явилося в кластері:
 
 ```bash
-# all — скорочення для основних типів об'єктів разом: Pod, Deployment, Service та інше.
-# Namespace `passes` ви не створювали руками: він приїхав із репозиторію разом із застосунком.
+# all — a shorthand for the main object types at once: Pods, Deployment, Service, and the rest.
+# You didn't create the `passes` namespace by hand: it arrived from the repository along with the application.
 kubectl get all -n passes
 ```
 
@@ -365,7 +365,7 @@ spec:
 Відправляйте:
 
 ```bash
-# Ті самі три кроки, що й при першій відправці: відмітити файл, зберегти з причиною, відправити.
+# The same three steps as in the first send: mark the file, save with a reason, send.
 git add apps/passes.yaml
 git commit -m "passes: two replicas so the gate does not go dark during rollout"
 git push
@@ -374,8 +374,8 @@ git push
 Тепер дивіться на кластер і чекайте:
 
 ```bash
-# -w = «стеж і дописуй»: вікно залишається зайнятим, новий рядок з'являється щоразу,
-# коли міняється стан копій. Вихід — Ctrl+C.
+# -w = "watch and keep appending": the window stays busy, a new line appears every time
+# the state of the copies changes. Exit with Ctrl+C.
 kubectl get pods -n passes -w
 ```
 
@@ -384,19 +384,19 @@ kubectl get pods -n passes -w
 Не хочеться чекати хвилину — можна попросити Flux звірити прямо зараз:
 
 ```bash
-# reconcile = «звірся прямо зараз, не чекаючи чергової хвилини».
-#   kustomization passes  який об'єкт звіряти
-#   --with-source         спершу сходити в Git по свіжий коміт і тільки потім застосовувати;
-#                         без цього прапорця звірка піде по копії, завантаженій раніше
+# reconcile = "reconcile right now, without waiting for the next minute."
+#   kustomization passes  which object to reconcile
+#   --with-source         first go to Git for the fresh commit and only then apply;
+#                         without this flag the reconciliation goes off the copy downloaded earlier
 flux reconcile kustomization passes --with-source
 ```
 
 Зверніть увагу на текст коміта. `two replicas so the gate does not go dark during rollout` — це причина. Через півроку, коли хтось спитає «а чому тут дві, а не одна», відповідь знайдеться за п'ять секунд:
 
 ```bash
-# log = історія комітів, свіжі згори.
-#   --oneline         по одному рядку на коміт: короткий ідентифікатор і текст причини
-#   apps/passes.yaml  показати лише коміти, які чіпали саме цей файл
+# log = the history of commits, freshest on top.
+#   --oneline         one line per commit: a short identifier and the reason text
+#   apps/passes.yaml  show only the commits that touched this exact file
 git log --oneline apps/passes.yaml
 ```
 
@@ -409,8 +409,8 @@ git log --oneline apps/passes.yaml
 Ніч, інцидент, сервісу не вистачає копій. Ви робите те, що робили завжди:
 
 ```bash
-# Міняємо кількість копій прямо в кластері, минаючи Git, — як робили до сьогоднішнього дня.
-#   -n passes  застосунок живе в цьому namespace, без ключа команда його не знайде
+# Change the number of copies right in the cluster, bypassing Git — as you did until today.
+#   -n passes  the application lives in this namespace; without the flag the command won't find it
 kubectl scale deployment passes -n passes --replicas=5
 ```
 
@@ -421,14 +421,14 @@ deployment.apps/passes scaled
 Спрацювало. Перевіряємо:
 
 ```bash
-# Колонка READY читається як «готово/замовлено»: скільки копій відповідає і скільки їх має бути.
+# The READY column reads as "ready/ordered": how many copies respond and how many there should be.
 kubectl get deployment passes -n passes
 ```
 
 П'ять копій. Зачекайте хвилину і подивіться ще раз:
 
 ```bash
-# Та сама команда. Різниця лише в тому, що між двома запусками пройшла хвилина.
+# The same command. The only difference is that a minute passed between the two runs.
 kubectl get deployment passes -n passes
 ```
 
@@ -468,15 +468,15 @@ passes   2/2     2            2           8m
 **Коли це заважає.** Заважає під час інциденту, якщо вам справді треба змінити щось негайно і обговорювати ніколи. Для таких випадків Flux уміє призупинятися:
 
 ```bash
-# suspend = призупинити звірку для цього об'єкта. Flux перестає приводити кластер до
-# опису, і ручні зміни починають жити. Вміст Git при цьому не міняється.
+# suspend = pause reconciliation for this object. Flux stops bringing the cluster to the
+# description, and manual changes start to live. The contents of Git don't change meanwhile.
 flux suspend kustomization passes
 ```
 
 Після цього звірка не йде, і руками можна все. Назад:
 
 ```bash
-# resume = знову ввімкнути звірку. Найближча ж звірка прибере все, що зроблено руками.
+# resume = turn reconciliation back on. The very next reconciliation removes everything done by hand.
 flux resume kustomization passes
 ```
 
@@ -505,8 +505,8 @@ flux resume kustomization passes
 Відправляємо. Свідомо погана зміна їде тим самим шляхом, що й хороша: жодної перевірки між вашим `push` і кластером зараз немає — у цьому й суть кроку.
 
 ```bash
-# Ті самі add, commit, push. Причина в коміті написана чесно — вона знадобиться через
-# п'ять хвилин, коли зміну доведеться скасовувати.
+# The same add, commit, push. The reason in the commit is written honestly — it'll come in handy
+# in five minutes, when the change has to be undone.
 git add apps/passes.yaml
 git commit -m "passes: trim memory limit"
 git push
@@ -515,14 +515,14 @@ git push
 Чекаємо і дивимося:
 
 ```bash
-# Стежимо за копіями, поки звірка не принесе новий опис.
+# Watch the copies until the reconciliation brings the new description.
 kubectl get pods -n passes -w
 ```
 
 **Що ви маєте побачити** — нові копії не піднімаються. Стан `OOMKilled` означає, що процес убитий за перевищення ліміту пам'яті, `CrashLoopBackOff` — що кластер уже кілька разів перезапускав копію поспіль і тепер вичікує перед наступною спробою все довше. Nginx не влазить у чотири мегабайти і вмирає одразу після старту.
 
 ```bash
-# Той самий список, але одним знімком, без стеження.
+# The same list, but as a single snapshot, without watching.
 kubectl get pods -n passes
 ```
 
@@ -537,7 +537,7 @@ passes-7f8a1b2c3-qq7lp    0/1     CrashLoopBackOff   3          90s
 **Як ви відкочувалися б раніше:**
 
 ```bash
-# undo повернув би Deployment до попередньої ревізії — до налаштувань, що були до правки.
+# undo would return the Deployment to the previous revision — to the settings from before the edit.
 kubectl rollout undo deployment/passes -n passes
 ```
 
@@ -546,20 +546,20 @@ kubectl rollout undo deployment/passes -n passes
 **Не робіть `rollout undo`. Відкочуйте там, де живе істина** — у Git:
 
 ```bash
-# revert = додати новий коміт, який скасовує зміни вказаного.
-#   HEAD       «останній коміт поточної гілки» — той самий, з поганим лімітом
-#   --no-edit  не відкривати редактор для тексту коміта, Git напише заголовок сам
+# revert = add a new commit that undoes the changes of the specified one.
+#   HEAD       "the last commit of the current branch" — the very one with the bad limit
+#   --no-edit  don't open an editor for the commit message; Git writes the header itself
 git revert --no-edit HEAD
-# Поки скасовуючий коміт не відправлений у GitHub, Flux про нього не знає.
+# Until the reverting commit is sent to GitHub, Flux knows nothing about it.
 git push
 ```
 
 **Що ви маєте побачити** — новий коміт із заголовком `Revert "passes: trim memory limit"`, а за хвилину в кластері знову дві працюючі копії.
 
 ```bash
-# Копії знову піднімаються: робочий ліміт пам'яті повернувся.
+# The copies come up again: the working memory limit is back.
 kubectl get pods -n passes
-# А тут видно, який коміт зараз застосований, — він має збігтися зі скасовуючим.
+# And here you can see which commit is applied now — it should match the reverting one.
 flux get kustomizations
 ```
 
@@ -569,7 +569,7 @@ flux get kustomizations
 `git revert` не стирає поганий коміт. Він додає **новий** коміт, який скасовує зміни поганого. В історії залишається все: і що зламали, і коли помітили, і що відкотили.
 
 ```bash
-# -4 — показати чотири останні коміти; верхній найсвіжіший.
+# -4 — show the four most recent commits; the top one is the freshest.
 git log --oneline -4
 ```
 
@@ -597,9 +597,9 @@ c71a4f9 passes: two replicas so the gate does not go dark during rollout
 Заведіть гілку під зміну:
 
 ```bash
-# checkout -b = завести нову гілку і одразу перейти в неї. Гілка — окрема лінія
-# змін: коміти, зроблені в ній, у `main` не потрапляють, а отже і в кластер теж.
-#   passes/version-line  ім'я гілки; коса риска в імені дозволена і служить для групування
+# checkout -b = start a new branch and switch to it right away. A branch is a separate line
+# of changes: commits made in it don't reach `main`, and therefore don't reach the cluster either.
+#   passes/version-line  the branch name; a slash in the name is allowed and serves for grouping
 git checkout -b passes/version-line
 ```
 
@@ -608,9 +608,9 @@ git checkout -b passes/version-line
 ```bash
 git add apps/passes.yaml
 git commit -m "passes: bump the version shown on the page"
-# origin — ім'я, під яким Git пам'ятає адресу, звідки ви клонували репозиторій.
-#   -u origin passes/version-line  створити гілку з таким самим ім'ям у GitHub і запам'ятати
-#                                  зв'язок із нею, щоб далі вистачало голого `git push`
+# origin — the name under which Git remembers the address you cloned the repository from.
+#   -u origin passes/version-line  create a branch of the same name in GitHub and remember
+#                                  the link with it, so that a bare `git push` is enough later
 git push -u origin passes/version-line
 ```
 
@@ -623,10 +623,10 @@ git push -u origin passes/version-line
 Натисніть **Merge pull request** — зміна потрапляє в `main`, і найближча звірка привезе її в кластер. За хвилину відкриваємо тунель і дивимося, що віддає сервіс:
 
 ```bash
-# port-forward = тимчасовий тунель з ноутбука всередину кластера.
-#   -n passes     namespace, у якому живе сервіс
-#   svc/passes    куди ведемо: у Service, а не в конкретну копію
-#   8080:80       ліворуч порт на ноутбуці, праворуч порт сервісу всередині кластера
+# port-forward = a temporary tunnel from your laptop into the cluster.
+#   -n passes     the namespace the service lives in
+#   svc/passes    where we lead: to the Service, not a specific copy
+#   8080:80       on the left the port on your laptop, on the right the service's port inside the cluster
 kubectl port-forward -n passes svc/passes 8080:80
 ```
 
@@ -654,10 +654,10 @@ kubectl port-forward -n passes svc/passes 8080:80
 📍 **Де:** на ноутбуці, у тому самому вікні термінала, де ви працювали з `kubectl`.
 
 ```bash
-# Повертаємося в папку лаби: скрипт лежить там, а ви працювали в папці свого репозиторію.
+# Return to the lab folder: the script lives there, and you worked in your own repository's folder.
 cd labs/05-gitops
 export KUBECONFIG=~/lab.kubeconfig
-# Скрипт нічого не міняє в кластері: тільки читає стан і друкує звіт.
+# The script changes nothing in the cluster: it only reads the state and prints a report.
 ./check.sh
 ```
 
@@ -668,8 +668,8 @@ export KUBECONFIG=~/lab.kubeconfig
 Якщо ви хочете, щоб скрипт заодно подивився на історію вашого репозиторію — покажіть йому, де лежить клон:
 
 ```bash
-# LAB_REPO — змінна, з якої скрипт дізнається, де лежить клон вашого репозиторію.
-# Шлях підставте свій, якщо клонували не в домашню папку.
+# LAB_REPO — the variable from which the script learns where the clone of your repository lives.
+# Put in your own path if you cloned it somewhere other than the home folder.
 export LAB_REPO=~/passes-gitops
 ./check.sh
 ```
@@ -683,8 +683,8 @@ export LAB_REPO=~/passes-gitops
 Коли закінчите з усіма лабами, прибрати все разом можна так:
 
 ```bash
-# delete kustomization = прибрати об'єкт звірки з кластера.
-#   --silent  не перепитувати підтвердження
+# delete kustomization = remove the reconciliation object from the cluster.
+#   --silent  don't ask for confirmation again
 flux delete kustomization passes --silent
 ```
 

@@ -30,4 +30,4 @@ cd ~/workshop
 `nano manifests/03-app-vm.yaml`(保存: `Ctrl+O`、`Enter`、終了: `Ctrl+X`)。
 
 意図的に残された唯一のプレースホルダーは、`manifests/03-app-vm.yaml` の
-`url: "ВСТАВЬТЕ_PRESIGNED_URL"` という行です。この URL は、イメージを変換したときに得られます。今のところは、そこであなたを待っているとだけ覚えておいてください。
+`url: "PASTE_PRESIGNED_URL"` という行です。この URL は、イメージを変換したときに得られます。今のところは、そこであなたを待っているとだけ覚えておいてください。

@@ -9,7 +9,7 @@ archivo por su cuenta — no hace falta copiar nada por el portapapeles.
 
 Trae el script desde GitHub directamente a la máquina:
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/laptop/scripts/convert.sh
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/laptop/scripts/convert.sh
 ```
 
 Ábrelo:
@@ -18,7 +18,7 @@ nano convert.sh
 ```
 
 **Aquí es donde te sirven los tres valores que anotaste en el paso 1.** Cerca del inicio del
-archivo hay un bloque titulado «PEGA TUS VALORES» — reemplaza en él los marcadores por los
+archivo hay un bloque titulado «PASTE YOUR VALUES» — reemplaza en él los marcadores por los
 tuyos, dejando las comillas en su lugar:
 
 ```
@@ -33,7 +33,7 @@ y son iguales para todos.
 Para guardar en nano: `Ctrl+O`, luego `Enter`, y después `Ctrl+X` para salir. Comprueba que no
 queden marcadores:
 ```bash
-grep ВСТАВЬТЕ convert.sh || echo "all filled in, ready to run"
+grep PASTE_ convert.sh || echo "all filled in, ready to run"
 ```
 
 Ejecútalo — siempre a través de `sudo`, el script necesita privilegios de root:
@@ -55,7 +55,7 @@ Al final el script imprimirá un **enlace prefirmado** a tu imagen — busca en 
 que empiece con la palabra `Share:`, el enlace va justo después.
 
 **Qué hacer con él:** cópialo en ese mismo bloc de notas. En el siguiente paso volverás a tu laptop, abrirás `manifests/03-app-vm.yaml` y lo pegarás en el campo `url` — donde
-ahora está el marcador `ВСТАВЬТЕ_PRESIGNED_URL`. El mismo del que te avisé
+ahora está el marcador `PASTE_PRESIGNED_URL`. El mismo del que te avisé
 cuando estábamos rellenando los números.
 
 Es un enlace firmado temporal: el almacenamiento no está expuesto al exterior, y el enlace lo generaste

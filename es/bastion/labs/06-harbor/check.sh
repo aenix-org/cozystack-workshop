@@ -1,159 +1,159 @@
 #!/usr/bin/env bash
-# Comprobación del lab 6: la aplicación llega al clúster desde SU PROPIO registro privado.
+# Check for lab 6: the application arrives in the cluster from ITS OWN private registry.
 #
-# No comprobamos «Harbor está creado», sino toda la cadena: el registro responde en su propia API,
-# la imagen del manifiesto está justamente en él, el clúster tiene credenciales para esa misma dirección,
-# y un pod con esta imagen realmente funciona y responde.
+# We check not "Harbor is created", but the whole chain: the registry answers on its own API,
+# the image in the manifest lives exactly there, the cluster has credentials for that same address,
+# and a pod with this image actually runs and responds.
 #
-# Dos clústeres, y esta es la razón principal por la que el script parece más complejo que sus vecinos:
-# KUBECONFIG es tu clúster lab, donde funciona la aplicación; COZY_KUBECONFIG es el
-# clúster de gestión de Cozystack, donde vive el servicio gestionado Harbor en tu tenant.
-# No se pueden consultar con un solo comando, por eso abajo hay dos formas distintas de llamar a kubectl.
+# Two clusters, and this is the main reason the script looks more complex than its neighbors:
+# KUBECONFIG is your lab cluster, where the application runs; COZY_KUBECONFIG is the
+# Cozystack management cluster, where the managed Harbor service lives in your tenant.
+# You can't query them with a single command, so below are two different ways to call kubectl.
 #
-# Lo ejecutas tú, desde la carpeta del lab; no cambia nada, solo mira e imprime un informe:
+# Run by you, from the lab folder; changes nothing, only looks and prints a report:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     export COZY_KUBECONFIG=~/.kube/config
 #     ./check.sh
 
 LAB_NAME="06-harbor"
-LAB_TITLE="Lab 6 · Tu propio registro privado de imágenes"
-# Envoltura común de todos los labs: ok / fail / warn / evidence / finish y comprobaciones del entorno.
+LAB_TITLE="Lab 6 · Your own private image registry"
+# Common wrapper for all labs: ok / fail / warn / evidence / finish and environment checks.
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
-# Sin el archivo de acceso al clúster y sin el número de tenant no hay nada que comprobar — salimos enseguida.
+# Without a cluster access file and without a tenant number there is nothing to check — exit right away.
 need_kubeconfig
 need_tenant
 
 APP="passes-api"
-# El namespace del tenant en el clúster de gestión: el nombre se construye a partir del prefijo
-# tenant- y tu número, es decir tenant-workshopXX. El número se toma del entorno,
-# no hace falta sustituirlo a mano en el texto del script.
+# The tenant namespace on the management cluster: the name is built from the prefix
+# tenant- and your number, that is tenant-workshopXX. The number is taken from the environment,
+# you don't need to substitute it into the script text by hand.
 TENANT_NS="tenant-${COZY_TENANT}"
 COZY_KUBECONFIG="${COZY_KUBECONFIG:-$HOME/.kube/config}"
 
-# Dos formas de llamar a kubectl: kget va a tu clúster lab, cozy — al clúster de gestión.
-# Los errores se silencian a propósito: la ausencia de un objeto aquí no es un fallo sino uno de los
-# resultados esperados, y se maneja abajo con una rama aparte y un consejo claro.
+# Two ways to call kubectl: kget goes to your lab cluster, cozy — to the management cluster.
+# Errors are silenced on purpose: a missing object here is not a failure but one of the expected
+# outcomes, and it is handled below by a separate branch with clear advice.
 kget() { kubectl get "$@" 2>/dev/null; }
 cozy() { kubectl --kubeconfig "$COZY_KUBECONFIG" "$@" 2>/dev/null; }
 
-# --- servicio gestionado Harbor en el clúster de gestión ---------------------
-# Parte opcional: sin el kubeconfig del tenant el lab sigue siendo comprobable,
-# pero no veremos el servicio desde el lado de la plataforma.
+# --- managed Harbor service on the management cluster -------------------------
+# Optional part: without the tenant kubeconfig the lab is still checkable,
+# but we won't see the service from the platform side.
 #
-# Capturamos aparte el caso «el comando no funcionó»: el rol en el tenant puede no permitir
-# ver las aplicaciones. Esto no es un error del participante ni motivo para tumbar la comprobación, por eso
-# aquí es warn — «no miramos», no fail — «hecho mal». Distinguimos a propósito el error del comando y
-# la respuesta vacía: una lista vacía significa que Harbor no se creó en absoluto.
+# We separately catch the "command didn't work" case: the role in the tenant may not allow
+# viewing applications. This is not the participant's error and not a reason to fail the check, so
+# here it's warn — "didn't look", not fail — "done wrong". We deliberately distinguish a command
+# error from an empty response: an empty list means Harbor was not created at all.
 if [ ! -r "$COZY_KUBECONFIG" ]; then
-  warn "no se encontró el kubeconfig del tenant ${COZY_KUBECONFIG} — el estado de Harbor no se comprobó" \
-       "indica la ruta: export COZY_KUBECONFIG=~/.kube/config"
+  warn "tenant kubeconfig ${COZY_KUBECONFIG} not found — Harbor state was not checked" \
+       "specify the path: export COZY_KUBECONFIG=~/.kube/config"
 else
   HARBOR_ERR="$(kubectl --kubeconfig "$COZY_KUBECONFIG" get harbors.apps.cozystack.io \
     -n "$TENANT_NS" --no-headers 2>&1 >/dev/null)"
   HARBOR_LIST="$(cozy get harbors.apps.cozystack.io -n "$TENANT_NS" --no-headers)"
   if [ -n "$HARBOR_ERR" ]; then
-    warn "no se pudieron ver las aplicaciones Harbor en el tenant ${TENANT_NS}" \
-         "el rol en el tenant puede no permitir este comando — esto no es un error del lab; todo lo demás se comprueba abajo"
+    warn "could not view Harbor applications in tenant ${TENANT_NS}" \
+         "the role in the tenant may not allow this command — this is not a lab error; everything else is checked below"
   elif [ -z "$HARBOR_LIST" ]; then
-    fail "en el tenant ${TENANT_NS} no hay ninguna aplicación Harbor" \
-         "créala en el dashboard: Crear aplicación -> Harbor"
+    fail "there is no Harbor application in tenant ${TENANT_NS}" \
+         "create it in the dashboard: Create application -> Harbor"
   else
     HARBOR_NAME="$(printf '%s' "$HARBOR_LIST" | awk 'NR==1{print $1}')"
     HARBOR_READY="$(cozy get harbors.apps.cozystack.io "$HARBOR_NAME" -n "$TENANT_NS" \
       -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')"
     if [ "$HARBOR_READY" = "True" ]; then
-      ok "el servicio gestionado Harbor «${HARBOR_NAME}» está listo"
+      ok "managed Harbor service «${HARBOR_NAME}» is ready"
     else
-      warn "Harbor «${HARBOR_NAME}» existe, pero no informa de que esté listo" \
-           "mira su estado en el dashboard; Harbor tarda 5-10 minutos en arrancar, y sin almacenamiento de objetos en el tenant no arrancará en absoluto"
+      warn "Harbor «${HARBOR_NAME}» exists, but does not report readiness" \
+           "check its state in the dashboard; Harbor takes 5-10 minutes to come up, and without object storage in the tenant it won't come up at all"
     fi
-    evidence "Aplicaciones Harbor en el tenant" "$HARBOR_LIST"
-    # No intentamos leer el secreto con las credenciales: el tenant puede leer este secreto
-    # (la plataforma crea una regla aparte para las credenciales de cada aplicación),
-    # pero de todos modos no necesitamos la contraseña en el informe.
+    evidence "Harbor applications in the tenant" "$HARBOR_LIST"
+    # We don't try to read the credentials secret: the tenant can read this secret
+    # (the platform creates a separate rule for each application's credentials),
+    # but we don't need the password in the report anyway.
   fi
 fi
 
-# --- de dónde toma la aplicación la imagen ----------------------------------
-# El sentido del lab es que la imagen vino de tu registro, no de internet. Esto se comprueba
-# por el nombre de la imagen en el manifiesto: la primera parte del nombre hasta la barra es la dirección del registro.
-# Si no tiene ni punto ni dos puntos, ahí no hay dirección alguna, y el clúster iría en silencio
-# a por la imagen a Docker Hub — es decir, exactamente a donde el equipo de seguridad lo prohibió.
-# El marcador HARBOR-HOST y los registros públicos conocidos los capturamos en ramas aparte:
-# formalmente la dirección está puesta, pero el requisito del lab no se cumple, y el consejo es distinto en cada caso.
+# --- where the application takes the image from ------------------------------
+# The point of the lab is that the image came from your registry, not from the internet. This is checked
+# by the image name in the manifest: the first part of the name up to the slash is the registry address.
+# If it has neither a dot nor a colon, there is no address there at all, and the cluster would silently go
+# for the image to Docker Hub — that is, exactly where the security team forbade.
+# We catch the HARBOR-HOST placeholder and known public registries in separate branches:
+# formally the address is in place, but the lab requirement is not met, and the advice differs in each case.
 IMAGE="$(kget deployment "$APP" -o jsonpath='{.spec.template.spec.containers[0].image}')"
 REGISTRY=""
 if [ -z "$IMAGE" ]; then
-  fail "en el clúster lab no existe la aplicación ${APP}" \
-       "aplica passes.yaml, sustituyendo en él la dirección de tu propio Harbor"
+  fail "there is no application ${APP} in the lab cluster" \
+       "apply passes.yaml, substituting the address of your own Harbor into it"
 else
   REGISTRY="${IMAGE%%/*}"
   case "$REGISTRY" in
-    *.*|*:*) : ;;              # parece una dirección de registro
-    *) REGISTRY="" ;;          # no hay dirección — significa que la imagen se tira de Docker Hub
+    *.*|*:*) : ;;              # looks like a registry address
+    *) REGISTRY="" ;;          # no address — means the image is pulled from Docker Hub
   esac
 
   if [ -z "$REGISTRY" ]; then
-    fail "la imagen ${IMAGE} se tira de un registro público, no del tuyo" \
-         "la primera parte del nombre de la imagen debe ser la dirección de tu Harbor"
+    fail "image ${IMAGE} is pulled from a public registry, not from yours" \
+         "the first part of the image name must be the address of your Harbor"
   elif printf '%s' "$REGISTRY" | grep -qi 'HARBOR-HOST'; then
-    fail "en el manifiesto quedó la dirección-marcador HARBOR-HOST" \
-         "sustituye la dirección de tu propio Harbor: sed -i 's|HARBOR-HOST|harbor.tudominio|g' passes.yaml"
+    fail "the placeholder address HARBOR-HOST is still in the manifest" \
+         "substitute the address of your own Harbor: sed -i 's|HARBOR-HOST|harbor.yourdomain|g' passes.yaml"
   elif printf '%s' "$REGISTRY" | grep -qiE '^(docker\.io|registry-1\.docker\.io|quay\.io|ghcr\.io|gcr\.io|registry\.k8s\.io)$'; then
-    fail "la imagen se tira del registro público ${REGISTRY}" \
-         "el equipo de seguridad pidió un registro privado — construye y sube la imagen a tu propio Harbor"
+    fail "the image is pulled from public registry ${REGISTRY}" \
+         "the security team asked for a private registry — build and push the image to your own Harbor"
   else
-    ok "la aplicación arranca desde tu registro: ${REGISTRY}"
-    evidence "Imagen de la aplicación" "$IMAGE"
+    ok "the application starts from your registry: ${REGISTRY}"
+    evidence "Application image" "$IMAGE"
   fi
 fi
 
-# --- el registro realmente funciona -----------------------------------------
-# La dirección en el manifiesto puede estar escrita correctamente, pero puede no haber registro en ella: Harbor
-# no arranca al instante, y una errata en el dominio se ve exactamente igual. Por eso
-# llamamos a su API y esperamos la respuesta «pong» — esto confirma que ahí hay justamente Harbor,
-# y no el sitio de otra persona ni un stub del balanceador.
+# --- the registry actually works --------------------------------------------
+# The address in the manifest may be written correctly, but there may be no registry at it: Harbor
+# does not come up instantly, and a typo in the domain looks exactly the same. So we
+# knock on its API and wait for the "pong" answer — this confirms that it is indeed Harbor
+# there, and not someone else's site or a load balancer stub.
 if [ -z "$REGISTRY" ]; then
-  : # ya se informó arriba
+  : # already reported above
 elif ! command -v curl >/dev/null 2>&1; then
-  warn "no hay utilidad curl — la disponibilidad del registro no se comprobó" \
-       "abre https://${REGISTRY} en el navegador, ahí debería estar la interfaz de Harbor"
+  warn "no curl utility — registry availability was not checked" \
+       "open https://${REGISTRY} in a browser, there should be a Harbor interface"
 else
   PING="$(curl -fsS --max-time 20 "https://${REGISTRY}/api/v2.0/ping" 2>/dev/null)"
   if printf '%s' "$PING" | grep -qi 'pong'; then
     VER="$(curl -fsS --max-time 20 "https://${REGISTRY}/api/v2.0/systeminfo" 2>/dev/null \
-      | python3 -c 'import sys,json;print(json.load(sys.stdin).get("harbor_version","desconocida"))' 2>/dev/null)"
-    ok "el registro responde por la API: https://${REGISTRY} (Harbor ${VER:-versión desconocida})"
-    evidence "Registro" "https://${REGISTRY}
+      | python3 -c 'import sys,json;print(json.load(sys.stdin).get("harbor_version","unknown"))' 2>/dev/null)"
+    ok "the registry answers on the API: https://${REGISTRY} (Harbor ${VER:-version unknown})"
+    evidence "Registry" "https://${REGISTRY}
 API ping: ${PING}
-versión de Harbor: ${VER:-desconocida}"
+Harbor version: ${VER:-unknown}"
   else
-    fail "el registro https://${REGISTRY} no responde a la petición /api/v2.0/ping" \
-         "comprueba la dirección y el estado de la aplicación Harbor en el dashboard"
+    fail "registry https://${REGISTRY} does not answer the /api/v2.0/ping request" \
+         "check the address and the state of the Harbor application in the dashboard"
   fi
 fi
 
-# --- el clúster tiene credenciales de acceso --------------------------------
-# No basta con que el secreto esté referenciado en el manifiesto — lo importante es que tenga credenciales
-# justamente para el registro del que se tira la imagen. El error más frecuente del lab parece
-# correcto: el secreto está creado, nombrado en el manifiesto, pero la dirección dentro de él no es la buena
-# (un https:// de más, un puerto, otro nombre de host), y kubelet no lo aplicará.
-# Por eso desempaquetamos el contenido del secreto y comparamos direcciones, no nombres.
+# --- the cluster has access credentials -------------------------------------
+# It's not enough that the secret is referenced in the manifest — what matters is that it has credentials
+# for exactly the registry the image is pulled from. The most common lab mistake looks
+# correct: the secret is created, named in the manifest, but the address inside it is wrong
+# (an extra https://, a port, a different host name), and kubelet won't apply it.
+# So we unpack the secret contents and compare addresses, not names.
 PULL_SECRETS="$(kget deployment "$APP" \
   -o jsonpath='{range .spec.template.spec.imagePullSecrets[*]}{.name}{"\n"}{end}')"
 if [ -z "$IMAGE" ]; then
-  : # no hay aplicación, se informó arriba
+  : # no application, reported above
 elif [ -z "$PULL_SECRETS" ]; then
-  fail "en el manifiesto ${APP} no se indica ningún imagePullSecret" \
-       "una imagen de un registro privado no se descargará sin credenciales: añade imagePullSecrets, ver passes.yaml"
+  fail "no imagePullSecret is specified in the ${APP} manifest" \
+       "an image from a private registry won't be pulled without credentials: add imagePullSecrets, see passes.yaml"
 else
   SECRET_OK=""
   for s in $PULL_SECRETS; do
     STYPE="$(kget secret "$s" -o jsonpath='{.type}')"
     [ "$STYPE" = "kubernetes.io/dockerconfigjson" ] || continue
-    # Analizamos el config con python: base64 -d se comporta de forma distinta en macOS y Linux,
-    # y no se puede imprimir la contraseña en el informe — tomamos solo la lista de direcciones.
+    # We parse the config with python: base64 -d behaves differently on macOS and Linux,
+    # and we must not print the password into the report — we take only the list of addresses.
     SERVERS="$(kget secret "$s" -o jsonpath='{.data.\.dockerconfigjson}' \
       | python3 -c 'import sys,json,base64
 raw = sys.stdin.read().strip()
@@ -169,55 +169,55 @@ except Exception:
   done
 
   if [ -n "$SECRET_OK" ]; then
-    ok "el clúster tiene credenciales para ${REGISTRY} en el secreto ${SECRET_OK} (contraseña: <oculta>)"
+    ok "the cluster has credentials for ${REGISTRY} in secret ${SECRET_OK} (password: <hidden>)"
   else
-    fail "ninguno de los secretos indicados (${PULL_SECRETS}) contiene credenciales para ${REGISTRY:-tu registro}" \
-         "créalo así: kubectl create secret docker-registry harbor --docker-server=${REGISTRY:-DIRECCIÓN} --docker-username=admin --docker-password=..."
+    fail "none of the specified secrets (${PULL_SECRETS}) contains credentials for ${REGISTRY:-your registry}" \
+         "create it like this: kubectl create secret docker-registry harbor --docker-server=${REGISTRY:-ADDRESS} --docker-username=admin --docker-password=..."
   fi
 fi
 
-# --- los pods realmente arrancaron ------------------------------------------
-# Manejamos aparte los estados ImagePullBackOff y ErrImagePull: este es justamente el fallo
-# que el lab muestra a propósito, y es importante que el participante lo reconozca de vista, y no
-# reciba un genérico «los pods no funcionan». La causa real la imprimimos como evidencia —
-# en un fallo del registro y en una errata en el nombre de la imagen el estado del pod es el mismo.
+# --- the pods actually started ----------------------------------------------
+# We separately handle the ImagePullBackOff and ErrImagePull states: this is exactly the failure
+# the lab shows on purpose, and it's important for the participant to recognize it by sight, not to
+# get a generic "pods don't work". We print the real cause as evidence —
+# in a registry failure and in a typo in the image name the pod state is the same.
 PODS="$(kget pods -l app=passes-api --no-headers)"
 RUNNING="$(printf '%s' "$PODS" | awk '$3=="Running"' | grep -c .)"
 BADSTATE="$(printf '%s' "$PODS" | awk '$3!="Running"{print $3}' | sort -u | tr '\n' ' ')"
 
 if [ "$RUNNING" -ge 1 ]; then
-  ok "copias en ejecución de la aplicación: ${RUNNING}"
-  evidence "Pods de la aplicación" "$(kget pods -l app=passes-api -o wide)"
+  ok "running copies of the application: ${RUNNING}"
+  evidence "Application pods" "$(kget pods -l app=passes-api -o wide)"
 elif printf '%s' "$BADSTATE" | grep -q 'ImagePullBackOff\|ErrImagePull'; then
-  fail "la imagen no se descarga: ${BADSTATE}" \
-       "esto es una denegación de acceso al registro o una errata en el nombre de la imagen; la causa real la mostrará kubectl describe pod -l app=passes-api"
-  evidence "Causa del fallo" "$(kubectl describe pod -l app=passes-api 2>/dev/null \
+  fail "the image is not being pulled: ${BADSTATE}" \
+       "this is a registry access denial or a typo in the image name; the real cause will be shown by kubectl describe pod -l app=passes-api"
+  evidence "Failure cause" "$(kubectl describe pod -l app=passes-api 2>/dev/null \
     | grep -A2 'Failed to pull\|Warning' | head -20)"
 else
-  fail "no hay ni una sola copia en ejecución de la aplicación (estados: ${BADSTATE:-no hay pods})" \
-       "mira kubectl describe pod -l app=passes-api"
+  fail "there is not a single running copy of the application (states: ${BADSTATE:-no pods})" \
+       "see kubectl describe pod -l app=passes-api"
 fi
 
-# Una comprobación aparte para el error del lab más difícil de diagnosticar: la imagen está construida
-# para ARM, y los nodos del clúster son x86. Todo parece correcto — la imagen se construyó, se fue
-# al registro, se descargó en el nodo — pero el proceso no arranca. Nada alrededor sugiere
-# la arquitectura del procesador, y la única pista está en los logs del pod, por eso
-# los miramos con una comprobación aparte y nombramos la causa directamente.
+# A separate check for the hardest-to-diagnose lab error: the image is built
+# for ARM, and the cluster nodes are on x86. Everything looks correct — the image built, went
+# to the registry, was pulled onto the node — but the process doesn't start. Nothing around hints
+# at the processor architecture, and the only clue lies in the pod logs, so
+# we look at them with a separate check and name the cause directly.
 LOGS="$(kubectl logs -l app=passes-api --tail=20 --all-containers 2>&1)"
 if printf '%s' "$LOGS" | grep -q 'exec format error'; then
-  fail "la imagen está construida para otra arquitectura de procesador" \
-       "reconstruye con el flag: docker build --platform linux/amd64 -t ${IMAGE} app/ y súbela de nuevo"
+  fail "the image is built for a different processor architecture" \
+       "rebuild with the flag: docker build --platform linux/amd64 -t ${IMAGE} app/ and push again"
 fi
 
-# --- la aplicación responde de verdad ---------------------------------------
-# Un pod arrancado no significa todavía un servicio en funcionamiento. Entramos dentro del clúster, pedimos
-# la aplicación por su nombre interno y leemos de la respuesta el nombre del pod. Si coincide con un pod
-# realmente en ejecución — entonces responde justamente la aplicación que desplegamos, y no
-# otra cosa que ocupó por casualidad esta dirección. Una discrepancia es warn, no fail:
-# la copia pudo recrearse entre las dos peticiones, y la culpa no es del participante.
+# --- the application responds meaningfully -----------------------------------
+# A started pod does not yet mean a working service. We go inside the cluster, request
+# the application by its internal name and read the pod name from the response. If it matches a really
+# running pod — then the answer comes from exactly the application we deployed, and not
+# something else that accidentally took this address. A mismatch is warn, not fail:
+# a copy could have been recreated between the two requests, and it's not the participant's fault.
 if [ -z "$(kget svc "$APP" -o name)" ]; then
-  fail "no hay Service con el nombre ${APP}" \
-       "está descrito en passes.yaml — aplica el archivo entero, no solo el Deployment"
+  fail "there is no Service named ${APP}" \
+       "it is described in passes.yaml — apply the whole file, not just the Deployment"
 else
   BODY="$(in_cluster_curl "http://${APP}.default.svc.cluster.local/")"
   SERVED_POD="$(printf '%s' "$BODY" \
@@ -226,14 +226,14 @@ try: print(json.load(sys.stdin).get("pod",""))
 except Exception: pass' 2>/dev/null)"
 
   if [ -z "$SERVED_POD" ]; then
-    fail "el servicio ${APP} no devolvió el JSON esperado" \
-         "mira kubectl logs -l app=passes-api y asegúrate de que el puerto del Service coincide con el puerto de la aplicación"
+    fail "service ${APP} did not return the expected JSON" \
+         "see kubectl logs -l app=passes-api and make sure the port in the Service matches the application port"
   elif printf '%s' "$PODS" | grep -q "$SERVED_POD"; then
-    ok "el servicio responde con JSON, la respuesta vino de un pod realmente en ejecución ${SERVED_POD}"
-    evidence "Respuesta del servicio" "$BODY"
+    ok "the service responds with JSON, the response came from a really running pod ${SERVED_POD}"
+    evidence "Service response" "$BODY"
   else
-    warn "el servicio respondió en nombre del pod ${SERVED_POD}, que no está entre los que están en ejecución" \
-         "lo más probable es que la copia se recreara entre peticiones — ejecuta la comprobación otra vez"
+    warn "the service responded on behalf of pod ${SERVED_POD}, which is not among the running ones" \
+         "most likely the copy was recreated between requests — run the check again"
   fi
 fi
 

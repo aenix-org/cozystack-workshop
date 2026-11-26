@@ -1,46 +1,46 @@
-# ラボ9 · 入退場ログの分析用に ClickHouse データベースを注文する。
-# 何を得たいかの記述であり、サービスの組み立てと設定はプラットフォームが行う。
-# ダッシュボードでマウスを使って注文するのと同じもの — ただしテキストで。
-# ラボクラスタではなく、管理クラスタ上のテナントに適用する:
+# Lab 9 · order a ClickHouse database for analytics over the access-pass log.
+# A description of what you want to get; the platform assembles and configures the service.
+# The same thing you would order with the mouse in the dashboard — just as text.
+# Applied NOT to the lab cluster, but to a tenant on the management cluster:
 #   kubectl --kubeconfig="$HOME/.kube/config" apply -f clickhouse.yaml
 #
-# 適用する前に: tenant-workshopXX を自分の namespace に、
-# ЗдесьВашПароль を自分で考えたパスワードに置き換えること。
+# BEFORE APPLYING: replace tenant-workshopXX with your namespace,
+# and YourPasswordHere with a password you come up with.
 apiVersion: apps.cozystack.io/v1alpha1
 kind: ClickHouse
 metadata:
   name: analytics
   namespace: tenant-workshopXX
 spec:
-  # コピー1つ、シャード1つ。本番では最低でも2つのコピーを保持する。そうしないとノードの喪失が
-  # データの利用不能を意味するからだ。しかし我々に必要なのは100万行であって耐障害
-  # 性ではなく、余分なコピーはスタンドのリソースをただ食い潰すだけだろう。
+  # One copy and one shard. In production you keep at least two copies, otherwise losing a node
+  # means the data becomes unavailable — but we need a million rows, not fault
+  # tolerance, and an extra copy would just eat up the stand's resources.
   replicas: 1
   shards: 1
-  # テーブルデータ用のディスク。このラボの100万行は数十メガバイトを占める:
-  # 辞書を用いた列指向ストレージはこうしたログを非常に強く圧縮する。
+  # Disk for the table data. A million rows from this lab will take up tens of megabytes:
+  # columnar storage with dictionaries compresses such a log very heavily.
   size: 5Gi
-  # クエリログを含む、サーバのシステムログ用の別ディスク。
+  # A separate disk for the server's system logs, including the query log.
   logStorageSize: 2Gi
-  # クエリログを何日後に破棄するか。我々はこれを見ることになる。
+  # After how many days to discard the query log. We are going to look into it.
   logTTL: 15
-  # replicated — クラスタの別ノードにコピーを持つボリューム: ノードが脱落しても
-  # データは残る。
+  # replicated — volumes that have a copy on another cluster node: the node dropped out,
+  # the data stayed.
   storageClass: replicated
-  # CPU 1つ、4 GB。ClickHouse はメモリ上で計算するので、100万行を超える
-  # グルーピングではこれが顕著になる。
+  # 1 CPU, 4 GB. ClickHouse computes in memory, and on groupings over
+  # a million rows this is noticeable.
   resourcesPreset: u1.small
-  # データベースのユーザとそのパスワード。パスワードは自分で考えて覚えておくこと: それは
-  # ワーカーポッド(CH_AUTH 変数)とチェックスクリプト(CH_PASSWORD 変数)に必要になる。
-  # 作成後はダッシュボードの clickhouse-analytics-credentials シークレットで見える。
+  # The database user and its password. Come up with your own password and remember it: it is needed
+  # by the worker pod (the CH_AUTH variable) and the check script (the CH_PASSWORD variable).
+  # After creation it is visible in the dashboard, in the clickhouse-analytics-credentials secret.
   users:
     analyst:
-      password: ЗдесьВашПароль
-  # オブジェクトストレージへのバックアップ。ここのデータは生成されたもので、
-  # 復元するものは何もない — 学習用スタンドでは無効にしている。
+      password: YourPasswordHere
+  # Backups to object storage. The data here is generated,
+  # there is nothing to restore — disabled on the training stand.
   backup:
     enabled: false
-  # Keeper はコピー間の整合を取るために必要。コピーは1つ — 整合を取る
-  # 相手がいないし、Keeper ポッド3つはリソースを無駄に占有するだろう。
+  # Keeper is needed to reconcile between copies. There is one copy — there is no one
+  # to reconcile with, and three Keeper pods would take up resources for nothing.
   clickhouseKeeper:
     enabled: false

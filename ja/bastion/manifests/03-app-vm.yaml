@@ -1,6 +1,6 @@
-# 適用する前に、tenant-workshopXX を自分の namespace に置き換えてください。
-# すべてのファイルをまとめて置き換える方が簡単です。README の番号置換に関するセクションを参照してください。
-# さらに: 下の url フィールドに、convert.sh（ステップ 2）で得た presigned リンクを挿入してください。
+# Before applying, replace tenant-workshopXX with your own namespace.
+# Easier to do it across all files at once: see README, the section on substituting the number.
+# Also: in the url field below, insert the presigned link from convert.sh (step 2).
 #
 apiVersion: apps.cozystack.io/v1alpha1
 kind: VMDisk
@@ -10,7 +10,7 @@ metadata:
 spec:
   source:
     http:
-      url: "ВСТАВЬТЕ_PRESIGNED_URL"  # convert.sh より（Share: の行）
+      url: "PASTE_PRESIGNED_URL"  # from convert.sh (the Share: line)
   storage: 10Gi
   storageClass: replicated
 ---
@@ -25,7 +25,7 @@ spec:
   runStrategy: Always
   disks:
     - name: app-1
-# アプリケーションへの外部アクセスは、ドメイン名 app.<tenant>.workshop.aenix.io で行います
-# （Ingress はオペレーターが作成します。このパスでは port-forward は不要です。README を参照）。
-# このスタンド（Cilium + robotlb）では external LoadBalancer は VM に対して動作しません。
-# そのため、ここでは external を有効に「しません」。
+# External access to the application is by the domain name app.<tenant>.workshop.aenix.io
+# (the Ingress is created by the operator; port-forward is not needed on this path, see README).
+# external LoadBalancer on this stand (Cilium + robotlb) does not work for VMs,
+# so we do NOT enable external here.

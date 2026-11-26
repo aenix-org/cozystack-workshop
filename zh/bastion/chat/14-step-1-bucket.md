@@ -34,9 +34,9 @@ bucket 是封闭的，要往里面放任何东西，都需要它自己的访问�
 **它们会用在哪里。** 在第 3 步，你会在转换机上打开 `convert.sh` 文件，其中有一个由三行组成、标着「PASTE YOUR VALUES（粘贴你的值）」的代码块：
 
 ```
-BUCKET="ВСТАВЬТЕ_bucketName"
-ACCESS_KEY="ВСТАВЬТЕ_accessKey"
-SECRET_KEY="ВСТАВЬТЕ_secretKey"
+BUCKET="PASTE_bucketName"
+ACCESS_KEY="PASTE_accessKey"
+SECRET_KEY="PASTE_secretKey"
 ```
 
 你要粘贴进去的正是这三个值，每个都放进各自的引号里。它们在别的地方都用不到：脚本会自己把做好的镜像上传到你的 bucket，并自己生成指向它的链接。

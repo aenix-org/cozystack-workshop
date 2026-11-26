@@ -1,43 +1,42 @@
-# ラボ 13。「入館証」チャートのデフォルト値。
+# Lab 13. Default values for the "Passes" chart.
 #
-# これらは、チャートがデプロイ時に尋ねる質問への回答です。レプリカをいくつにするか、
-# ページにどんなテキストを載せるか、外部アドレスが必要か。ここには「何も選ばなかった」
-# 場合に備えて記録されています。アプリケーションを注文する人がこれらを上書きします。
-# ダッシュボードではフォームのフィールドで、ターミナルでは `--set replicas=5` キーや
-# 自分のファイル `helm install ... -f my.yaml` で。このファイルを編集すると、今後の注文の
-# デフォルトが変わり、すでにデプロイ済みのものは変わりません。
+# These are the answers to the questions the chart asks at deployment time: how many replicas,
+# what text goes on the page, whether an external address is needed. They are recorded here for the
+# "nothing was selected" case. Whoever orders the application overrides them: in the dashboard with
+# form fields, in the terminal with the `--set replicas=5` flag or their own file `helm install ... -f my.yaml`.
+# Editing this file changes the defaults for future orders, not for already deployed ones.
 #
-# ここの値がどのようにダッシュボードの注文フォームになるか：
-#   型         — どのフィールドを表示するか：{int} 数値、{bool} トグル、
-#                {string} 入力欄、{struct} 入れ子のフィールドグループ；
-#   説明       — フィールドのラベルとその下のヒント；
-#   =値        — フォームを開いたときにフィールドにすでに入っている値；
-#   必須性     — スキーマの required リストで指定します。ここにはありません：どのパラメータ
-#                にもデフォルト値があるので、どのフィールドも省略できます。
-# だからこそ説明は英語で書かれています：チャートの作者だけでなく、ダッシュボードで
-# アプリケーションを注文する誰もがそれを読むからです。
+# How values from here turn into the order form in the dashboard:
+#   type       — which field to show: {int} a number, {bool} a toggle,
+#                {string} a text input, {struct} a nested group of fields;
+#   Description — the field label and the hint beneath it;
+#   =value     — what is already in the field when the form is opened;
+#   requiredness — set by the required list in the schema. There is none here: every
+#                parameter has a default value, so any field can be skipped.
+# That is why descriptions are written in English: they are read not only by the chart author, but by anyone
+# who orders the application in the dashboard.
 
-## `## @param` のようなコメントは飾りではありません。これらをもとに Cozystack のジェネレータ
-## (cozyvalues-gen) が values.schema.json と README のパラメータ表を生成します。
-## 書式：## @param {型} 名前=デフォルト値 - 説明。
+## Comments like `## @param` are not decoration. The Cozystack generator
+## (cozyvalues-gen) uses them to assemble values.schema.json and the parameter table in the README.
+## Format: ## @param {type} name=default-value - Description.
 
-# アプリケーションのレプリカをいくつ起動したままにするか。レプリカが 1 つだと、
-# ノードの再起動中はダウンタイムになります。2 つならどちらか一方を失っても生き残ります。
+# How many application replicas to keep running. One replica means downtime while
+# a node restarts; two survive the loss of either one.
 ## @param {int} replicas=2 - Number of application replicas.
 replicas: 2
 
-# メインページのテキスト。パラメータとして公開しています。子会社ごとに独自の文言があり、
-# そのためだけに別のイメージをビルドする人はいないからです。
+# Text on the main page. Exposed as a parameter because each subsidiary has its own,
+# and no one will build a separate image just for that.
 ## @param {string} greeting=Order a pass for your guest - Text shown on the main page.
 greeting: "Order a pass for your guest"
 
-# アプリケーションにクラスタ外のアドレスが必要かどうか。Cozystack カタログの慣例：
-# external という名前のフィールドは、すべてのアプリケーションで同じ意味 — 外部アクセス — を表します。
+# Whether the application needs an address outside the cluster. Cozystack catalog convention:
+# a field named external means the same thing for all applications — external access.
 ## @param {bool} external=false - Enable external access from outside the cluster.
 external: false
 
-# 1 レプリカのサイズ。別のフィールドグループとして公開しています。注文フォームで、
-# 関連のない 2 つのフィールドではなく、1 つの「リソース」ブロックとして見えるようにするためです。
+# Size of a single replica. Exposed as a separate group of fields so that in the order form it
+# looks like one "resources" block rather than two unrelated fields.
 ## @typedef {struct} Resources - CPU and memory for each replica.
 ## @field {quantity} cpu - CPU available to each replica.
 ## @field {quantity} memory - Memory (RAM) available to each replica.

@@ -30,10 +30,10 @@
 ## Що лежить у папці лаби
 
 Усі файли вже у вас — ви забрали їх разом з репозиторієм. Створювати й друкувати заново
-нічого не потрібно: там, де нижче написано `kubectl apply -f ім'я.yaml`, файл береться звідси.
+нічого не потрібно: там, де нижче написано `kubectl apply -f name.yaml`, файл береться звідси.
 
 ```bash
-# Усі команди лаби виконуються з цієї папки — інакше відносні шляхи в них не зійдуться.
+# All the lab's commands are run from this folder — otherwise the relative paths in them won't line up.
 cd labs/02-selfheal
 ```
 
@@ -50,13 +50,13 @@ cd labs/02-selfheal
 він складається: однією командою запитуємо кластер одразу про три типи сутностей.
 
 ```bash
-# KUBECONFIG — шлях до файлу з адресою кластера й даними для входу.
-# Поки змінна не задана, kubectl шукає кластер на самому ноутбуці й не знаходить його.
+# KUBECONFIG — the path to the file with the cluster's address and your login credentials.
+# Until the variable is set, kubectl looks for a cluster on the laptop itself and doesn't find one.
 export KUBECONFIG=~/lab.kubeconfig
 
-# get = «покажи, що є». Через кому перелічено три типи об'єктів одразу.
-#   -l app=rickroll   показати лише позначені міткою app=rickroll, тобто наш
-#                     застосунок, а не весь вміст кластера
+# get = "show me what's there". Three kinds of object are listed at once, separated by commas.
+#   -l app=rickroll   show only those labelled app=rickroll — that is, our
+#                     application, not the entire contents of the cluster
 kubectl get deployment,replicaset,pods -l app=rickroll
 ```
 
@@ -97,10 +97,10 @@ ReplicaSet — ім'я Deployment плюс хеш. Так і влаштован�
 Переконатися, що це не здогади, можна так:
 
 ```bash
-# Звичайна таблиця kubectl поле ownerReferences не показує — його треба спитати явно.
-#   -o jsonpath=...   «дістань з відповіді сервера ось ці поля і надрукуй їх так»
-# Всередині виразу: range .items[*] — пройти по всіх знайдених Pod, .metadata.name —
-# ім'я Pod, ownerReferences[0].kind і .name — тип та ім'я того, хто його створив.
+# The default kubectl table doesn't show the ownerReferences field — you have to ask for it explicitly.
+#   -o jsonpath=...   "pull these fields out of the server's response and print them like this"
+# Inside the expression: range .items[*] — walk through every Pod found, .metadata.name —
+# the Pod's name, ownerReferences[0].kind and .name — the kind and name of whatever created it.
 kubectl get pods -l app=rickroll -o jsonpath='{range .items[*]}{.metadata.name}{"  <- "}{.metadata.ownerReferences[0].kind}{"/"}{.metadata.ownerReferences[0].name}{"\n"}{end}'
 ```
 
@@ -134,26 +134,26 @@ rickroll-6f4b9c8d57-xk2mp  <- ReplicaSet/rickroll-6f4b9c8d57
 стані Running. Щойно з'явиться — надрукує, скільки це зайняло.
 
 ```bash
-# items[0].metadata.name — ім'я першого Pod зі списку. Запам'ятовуємо його у змінну POD:
-# без цього потім не відрізнити стару копію від нової.
+# items[0].metadata.name — the name of the first Pod in the list. We save it in the POD variable:
+# without that we won't be able to tell the old copy from the new one later.
 POD=$(kubectl get pods -l app=rickroll -o jsonpath='{.items[0].metadata.name}')
 echo "killing: $POD"
 
-# date +%s — поточний час у секундах. Це наш секундомір: засікли до видалення,
-# в самому кінці віднімемо від нового заміру.
+# date +%s — the current time in seconds. This is our stopwatch: we note it before the delete,
+# and subtract it from a fresh reading right at the end.
 START=$(date +%s)
 
-# delete pod — видалити копію назавжди.
-#   --wait=false   не чекати, поки Pod остаточно зникне, а одразу повернути керування:
-#                  рахувати секунди треба з цього моменту, а не після
+# delete pod — delete the copy for good.
+#   --wait=false   don't wait for the Pod to fully disappear, return control immediately:
+#                  we need to start counting seconds from this moment, not afterwards
 kubectl delete pod "$POD" --wait=false
 
-# Раз на секунду перечитуємо список Pod і шукаємо в ньому рядок, де одночасно:
-#   $1!=old        ім'я не збігається зі старим — отже це вже інша копія
-#   $2=="1/1"      готовий один контейнер з одного
-#   $3=="Running"  Pod запущений
-#   --no-headers   не друкувати шапку таблиці, щоб awk бачив лише дані
-#   2>/dev/null    сховати повідомлення про помилки на ті секунди, поки Pod немає взагалі
+# Once a second we re-read the Pod list and look for a line where all of these hold at once:
+#   $1!=old        the name doesn't match the old one — so this is a different copy
+#   $2=="1/1"      one container out of one is ready
+#   $3=="Running"  the pod is running
+#   --no-headers   don't print the table header, so awk sees only data
+#   2>/dev/null    hide error messages during the seconds when there are no Pods at all
 while true; do
   NEW=$(kubectl get pods -l app=rickroll --no-headers 2>/dev/null \
         | awk -v old="$POD" '$1!=old && $2=="1/1" && $3=="Running" {print $1; exit}')
@@ -196,16 +196,16 @@ new copy rickroll-6f4b9c8d57-p9wqt ready in 4s
 ```bash
 export KUBECONFIG=~/lab.kubeconfig
 
-# run = створити одиночний Pod прямо з командного рядка, без маніфесту.
-#   --rm             видалити Pod, щойно ви перервете команду
-#   -it              вивід Pod іде до вас на екран, Ctrl+C зупиняє його
-#   --restart=Never  копія одна і перестворювати її не треба: це інструмент, а не сервіс
-#   --image          busybox — образ у кілька мегабайтів, у якому є wget
-# Усе, що після --, виконується всередині Pod. Адреса http://rickroll — це ім'я Service,
-# всередині кластера вона сама перетворюється на адресу застосунку.
-#   -q               не друкувати статистику завантаження
-#   -T 2             чекати відповіді не довше двох секунд, інакше вважаємо це відмовою
-#   -O /dev/null     тіло відповіді викинути, нам важливий лише сам факт відповіді
+# run = create a single Pod straight from the command line, without a manifest.
+#   --rm             delete the Pod as soon as you interrupt the command
+#   -it              the Pod's output comes to your screen, Ctrl+C stops it
+#   --restart=Never  there's a single copy and no need to recreate it: this is a tool, not a service
+#   --image          busybox — an image a few megabytes in size that has wget
+# Everything after -- runs inside the Pod. The address http://rickroll is the name of the Service;
+# inside the cluster it turns into the application's address on its own.
+#   -q               don't print download statistics
+#   -T 2             wait no longer than two seconds for a reply, otherwise we count it as a failure
+#   -O /dev/null     throw the response body away, all we care about is the fact of a reply
 kubectl run pinger --rm -it --restart=Never --image=busybox:1.36 -- \
   sh -c 'while true; do wget -q -T 2 -O /dev/null http://rickroll/healthz \
          && echo "$(date +%T) ." || echo "$(date +%T) X"; sleep 1; done'
@@ -231,8 +231,8 @@ kubectl run pinger --rm -it --restart=Never --image=busybox:1.36 -- \
 ```bash
 export KUBECONFIG=~/lab.kubeconfig
 
-# Ім'я Pod не вказано, замість нього мітка: видалити всі копії з міткою app=rickroll.
-# Зараз вона одна, тож піде саме та, яку опитує pinger.
+# No pod name is given, a label instead: delete every copy with the label app=rickroll.
+# Right now there's only one, so the one the pinger is polling is exactly the one that goes.
 kubectl delete pod -l app=rickroll
 ```
 
@@ -256,11 +256,11 @@ kubectl delete pod -l app=rickroll
 📍 **Вікно 2.** Замовляємо три копії замість однієї і дочікуємося, поки всі три будуть готові.
 
 ```bash
-# scale змінює рівно одне поле в записі про застосунок — кількість копій.
+# scale changes exactly one field in the application's record — the number of copies.
 kubectl scale deployment rickroll --replicas=3
 
-# rollout status тримає термінал і друкує хід справи, поки всі замовлені копії
-# не стануть готові. Команда завершиться сама — вручну опитувати get pods не потрібно.
+# rollout status holds the terminal and prints progress until all the copies you asked for
+# are ready. The command finishes on its own — no need to poll get pods by hand.
 kubectl rollout status deployment/rickroll
 ```
 
@@ -270,10 +270,10 @@ kubectl rollout status deployment/rickroll
 Переконайтеся, що копій стало три і всі вони потрапили за Service:
 
 ```bash
-# EndpointSlice — той самий список живих адрес, який Service веде за вас.
-#   -l kubernetes.io/service-name=rickroll   взяти список, що належить Service rickroll
-#   -o jsonpath=...                          з кожного запису вивести лише саму адресу,
-#                                            по одній у рядку
+# EndpointSlice — that very list of live addresses the Service keeps for you.
+#   -l kubernetes.io/service-name=rickroll   take the list belonging to the Service rickroll
+#   -o jsonpath=...                          from each entry print only the address itself,
+#                                            one per line
 kubectl get endpointslices -l kubernetes.io/service-name=rickroll \
   -o jsonpath='{range .items[*].endpoints[*]}{.addresses[0]}{"\n"}{end}'
 ```
@@ -285,10 +285,10 @@ kubectl get endpointslices -l kubernetes.io/service-name=rickroll \
 Тепер убиваємо одну копію з трьох:
 
 ```bash
-# Беремо ім'я першої копії з трьох — яка саме, ролі не грає.
+# We take the name of the first of the three copies — which one exactly doesn't matter.
 POD=$(kubectl get pods -l app=rickroll -o jsonpath='{.items[0].metadata.name}')
 
-# І видаляємо її. Тут без --wait=false: команда повернеться, коли Pod уже зник.
+# And delete it. No --wait=false here: the command returns once the Pod is already gone.
 kubectl delete pod "$POD"
 ```
 
@@ -313,15 +313,15 @@ Kubernetes немає галочки «увімкнути HA»: вмикати �
 не копію, а сам застосунок:
 
 ```bash
-# Видаляємо не копію, а сам запис про застосунок. Підтвердження не буде,
-# у кошик об'єкт не потрапить — відновлювати його буде нізвідки, крім файлу.
+# We delete not a copy but the application's record itself. There will be no confirmation,
+# the object won't go to any recycle bin — there'll be nowhere to restore it from but the file.
 kubectl delete deployment rickroll
 ```
 
 Чекаємо кілька секунд і дивимося, чи повернулися копії:
 
 ```bash
-# Шукаємо Pod за міткою застосунку. Порожня відповідь тут — теж відповідь.
+# We look for pods by the application's label. An empty response here is an answer too.
 kubectl get pods -l app=rickroll
 ```
 
@@ -373,11 +373,11 @@ No resources found in default namespace.
 (наступний крок), а потім спробуйте видалити не Deployment, а ReplicaSet:
 
 ```bash
-# rs — скорочення для replicaset, kubectl розуміє обидва написання.
-# Видаляємо проміжну ланку, залишаючи Deployment на місці.
+# rs — short for replicaset; kubectl understands both spellings.
+# We delete the middle link, leaving the Deployment in place.
 kubectl delete rs -l app=rickroll
 
-# І одразу дивимося, що залишилося: порівняйте ім'я набору з тим, що було до видалення.
+# And immediately look at what's left: compare the set's name with what it was before the delete.
 kubectl get rs -l app=rickroll
 ```
 
@@ -393,11 +393,11 @@ Pod, а шаблон ми не чіпали: те саме ім'я означа�
 Намір у вас є, він лежить у файлі. Відновлення — одна команда:
 
 ```bash
-# apply = «приведи кластер до того, що описано у файлі». Об'єкта немає — він буде створений.
-#   -f ../01-deploy/rickroll.yaml   файл лежить у папці лаби 1, звідси шлях через ../
+# apply = "bring the cluster to what's described in the file". The object doesn't exist — it will be created.
+#   -f ../01-deploy/rickroll.yaml   the file lives in the lab 1 folder, hence the path via ../
 kubectl apply -f ../01-deploy/rickroll.yaml
 
-# Чекаємо, поки копія підніметься і стане готова приймати запити.
+# We wait for the copy to come up and become ready to take requests.
 kubectl rollout status deployment/rickroll
 ```
 
@@ -419,8 +419,8 @@ kubectl rollout status deployment/rickroll
 написано на початку лаби 0. Без WSL лабу можна пройти, але звіту-артефакту не буде.
 
 ```bash
-# ./ означає «файл із поточної папки», а не команду із системного PATH.
-# Скрипт нічого в кластері не змінює: він лише читає і друкує звіт.
+# ./ means "a file from the current folder", not a command from the system PATH.
+# The script changes nothing in the cluster: it only reads and prints a report.
 ./check.sh
 ```
 
@@ -433,7 +433,7 @@ kubectl rollout status deployment/rickroll
 питаючи і не дочікуючись вашої команди. Переконатися:
 
 ```bash
-# У колонці READY має бути 1/1.
+# The READY column should read 1/1.
 kubectl get deployment rickroll
 ```
 

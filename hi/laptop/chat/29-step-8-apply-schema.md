@@ -17,14 +17,14 @@ SCRAM ऑथेंटिकेशन चाहिए, जिसे यह है
 एक के बाद एक तीन कमांड, हर एक की एक वजह:
 
 ```bash
-# 1. PGDG रिपॉज़िटरी जोड़ें — PostgreSQL पैकेजों का स्रोत।
+# 1. Wire up the PGDG repository — the source of PostgreSQL packages.
 yum install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm
 
-# 2. libzstd लाइब्रेरी, जिसके बिना क्लाइंट इंस्टॉल नहीं होगा। यह CentOS 7 के
-#    रिपॉज़िटरी में नहीं है, इसलिए हम इसे EPEL आर्काइव से लेते हैं।
+# 2. The libzstd library, without which the client won't install. It's not in the CentOS 7
+#    repositories, so we take it from the EPEL archive.
 yum install -y https://archives.fedoraproject.org/pub/archive/epel/7/x86_64/Packages/l/libzstd-1.5.5-1.el7.x86_64.rpm
 
-# 3. क्लाइंट खुद — केवल सक्रिय pgdg15 रिपॉज़िटरी से।
+# 3. The client itself — only from the live pgdg15 repository.
 yum install -y --disablerepo='pgdg*' --enablerepo=pgdg15 postgresql15
 ```
 
@@ -55,7 +55,7 @@ psql --version
 **स्कीमा फ़ाइल ले लें** — मशीन के पास नेटवर्क पहले से है:
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/laptop/scripts/orders-schema.sql
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/laptop/scripts/orders-schema.sql
 ```
 
 **इसे लागू करें।** आइए कमांड को हिस्सा-दर-हिस्सा समझें, ताकि आप आँख मूँदकर टाइप न करें:

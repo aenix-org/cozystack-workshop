@@ -1,36 +1,36 @@
-// ラボ 6 · 自分専用のプライベートイメージレジストリ。「パス」サービス、学習用バージョン。
+// Lab 6 · Your own private image registry. The "Pass" service, training version.
 //
-// このプログラムが何をするか。Web サーバを起動し、2 つのアドレスに応答します。
-// /healthz アドレスは短い「ok」を返します。これによりクラスタは、レプリカが生きていて
-// トラフィックを受け入れる準備ができていることを理解します。/ アドレスは JSON 形式の小さな応答
-//（「フィールド: 値」の形式のテキスト）を返し、どのレプリカがどのノードでリクエストを
-// 処理したかを列挙します。それ以上は何もありません。データベースも、ディスクも、状態もありません。
-// これは意図的なものです — このラボで面白いのはコードではなく、それがクラスタに入っていく道筋です:
-// ソース -> イメージ -> 自分専用のレジストリ -> クラスタ。
+// WHAT THIS PROGRAM DOES. It starts a web server and answers on two addresses.
+// The /healthz address returns a short "ok": from it the cluster understands that the
+// replica is alive and ready to accept traffic. The / address returns a small response in
+// JSON format (text of the form "field: value"), where it lists which replica and on which
+// node served the request. Nothing more: no database, no disk, no state. That is by design — in
+// this lab the interesting part is not the code, but the path by which it gets into the cluster:
+// source -> image -> your own registry -> cluster.
 //
-// この Go ファイルを読める必要はなく、ここで何が起きているかを理解できれば十分です。
-// 以下のコメントは、あなたが Go を初めて見ることを想定して書かれています。
+// You do not need to be able to read this Go file, it is enough to understand what happens here;
+// the comments below are written on the assumption that you are seeing Go for the first time.
 //
-// 外部依存はありません: コンパイラと一緒に来る標準ライブラリだけを使います。
-// そのためビルドはライブラリを取りに来るためにインターネットへ行かず、外向きのアクセスが
-// 閉じられている場所でもイメージをビルドできます — まさにそこからこのラボ全体が
-// 始まります。
+// There are no external dependencies: only the standard library is used, which
+// comes together with the compiler. Therefore the build does not go to the internet for
+// libraries, and you can build the image where outbound access is closed off, — and that
+// is exactly where the whole lab begins.
 //
-// 直接ではなく、隣接する Dockerfile を通じて、次のコマンドでビルドされます
+// It is built not directly, but through the neighboring Dockerfile, with the command
 // docker build --platform linux/amd64 -t HARBOR-HOST/passes/passes-api:v1 app/
 //
-// package main — Go では、これは（ライブラリとは対照的に）実行できるプログラムを示す方法です。
-// 実行時のエントリポイントは、ファイルの一番下にある main 関数です。
+// package main — this is how in Go you mark a program that can be run (as opposed
+// to a library). The entry point when running is the main function at the very bottom of the file.
 package main
 
-// 標準ライブラリから何を取るか:
-//   encoding/json — 応答を JSON 形式で組み立てる
-//   log           — メッセージを書く。コンテナ内ではそれらは標準出力へ行き、
-//                   そこから kubectl logs が拾い上げる。内部にログファイルはなく、
-//                   作る必要もない — これはコンテナにとって普通のこと
-//   net/http      — Web サーバそのもの
-//   os            — 環境変数を読む
-//   time          — 応答内のタイムスタンプとサーバのタイムアウト
+// What we take from the standard library:
+//   encoding/json — assemble the response in JSON format
+//   log           — write messages; in a container they go to standard output,
+//                   from where kubectl logs picks them up. There are no log files inside,
+//                   and there is no need to create them — this is normal for containers
+//   net/http      — the web server itself
+//   os            — read environment variables
+//   time          — timestamp in the response and server timeout
 import (
 	"encoding/json"
 	"log"
@@ -39,12 +39,12 @@ import (
 	"time"
 )
 
-// 応答の形: アプリケーションが自分自身について報告するフィールドの集合。ほぼすべてが —
-// アプリケーションがクラスタから知るものです: 私たちはそれらを計算も推測もせず、クラスタ
-// 自身がそれらを環境変数に入れます（passes.yaml、env ブロックと downward API を参照）。
+// The shape of the response: a set of fields that the application reports about itself. Almost all of them —
+// are what the application learns from the cluster: we do not compute or guess them, the cluster
+// itself puts them into environment variables (see passes.yaml, the env block and downward API).
 //
-// 右側のバッククォート内のテキストは、最終的な JSON でのフィールド名です。これがないとフィールドは
-// namespace ではなく Namespace として応答に入ってしまいます。check.sh のチェックは小文字の「pod」を探します。
+// The text in backticks on the right is the field name in the final JSON. Without it the field would go
+// into the response as Namespace, not as namespace; the check in check.sh looks for the lowercase "pod".
 type identity struct {
 	Service   string `json:"service"`
 	Version   string `json:"version"`
@@ -55,9 +55,9 @@ type identity struct {
 	Time      string `json:"time"`
 }
 
-// 環境変数を読み、それが存在しないか空の場合は — フォールバック値を返します。
-// これは、プログラムをクラスタの外でも、設定を一つもせずに実行できるようにするために必要です:
-// クラッシュせず、正直に応答へ「不明」と書きます。
+// Read an environment variable, and if it is missing or empty — return a fallback
+// value. It is needed so that the program can be run outside the cluster too, without a single
+// setting: it will not crash, but honestly write "unknown" in the response.
 func env(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
@@ -65,64 +65,64 @@ func env(key, fallback string) string {
 	return fallback
 }
 
-// エントリポイント: この関数からプログラムの動作が始まります。
+// Entry point: the program's work begins with this function.
 func main() {
-	// どのポートで待ち受けるか。ポートは PORT 変数で上書きでき、イメージを再ビルドする必要は
-	// ありませんが、デフォルトでは 8080 です — passes.yaml（containerPort）
-	// および Dockerfile（EXPOSE）と同じ数字です。食い違えば — Service は閉じたドアを叩くことになります。
+	// Which port to listen on. The port can be overridden with the PORT variable, without rebuilding
+	// the image, but by default it is 8080 — the same number as in passes.yaml (containerPort)
+	// and in the Dockerfile (EXPOSE). If they diverge — the Service will knock on a closed door.
 	port := env("PORT", "8080")
 
-	// ルーティングテーブル: どのアドレスをどのハンドラが処理するか。
+	// The routing table: which address which handler serves.
 	mux := http.NewServeMux()
 
-	// レディネスチェック。クラスタはここを叩き、応答を得るまで
-	// トラフィックをレプリカに通しません。常に、素早く、何もチェックせずに応答します:
-	// アプリケーションにはチェックするものが何もなく、データベースもディスクもありません。
+	// Readiness check. The cluster knocks here and does not let traffic onto the replica,
+	// until it gets a response. It answers always and fast, checking nothing:
+	// the application has nothing to check, it has neither a database nor a disk.
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		_, _ = w.Write([]byte("ok\n"))
 	})
 
-	// メインの応答。まさにそれらのフィールドを組み立てて、一つの JSON として渡します。値は
-	// リクエストごとに読まれるので、サービスの 2 番目のレプリカは自分自身の pod 名で応答します —
-	// その名前によって、ラボでは本当にレプリカが 2 つあることが見えます。
+	// The main response. We assemble those very fields and hand them out as a single JSON. The values are read
+	// on every request, so the second replica of the service will answer with its own pod name —
+	// by that name in the lab you can see that there really are two replicas.
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		body := identity{
 			Service:   "passes-api",
 			Version:   env("APP_VERSION", "v1"),
-			Pod:       env("POD_NAME", "不明"),
-			Node:      env("NODE_NAME", "不明"),
-			Namespace: env("POD_NAMESPACE", "不明"),
-			Registry:  env("IMAGE_REGISTRY", "未設定"),
+			Pod:       env("POD_NAME", "unknown"),
+			Node:      env("NODE_NAME", "unknown"),
+			Namespace: env("POD_NAMESPACE", "unknown"),
+			Registry:  env("IMAGE_REGISTRY", "not set"),
 			Time:      time.Now().UTC().Format(time.RFC3339),
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		enc := json.NewEncoder(w)
 		enc.SetIndent("", "  ")
-		// SetEscapeHTML(false)、そうしないとキリル文字や < のような記号が \uXXXX へ行ってしまい
-		// 応答がターミナルで読めなくなります。
+		// SetEscapeHTML(false), otherwise Cyrillic and symbols like < would go into \uXXXX
+		// and the response would become unreadable in the terminal.
 		enc.SetEscapeHTML(false)
 		if err := enc.Encode(body); err != nil {
-			log.Printf("応答を返せませんでした: %v", err)
+			log.Printf("failed to send response: %v", err)
 		}
 	})
 
-	// サーバの設定。ReadHeaderTimeout — 接続を切断する前に、リクエストのヘッダを
-	// どれだけ待つか。この 5 秒は速度のためではありません: このタイムアウトがないと
-	// 開かれたまま放置された接続が積み上がり、コンテナのメモリを食い尽くすまで続きます。
-	// そしてメモリはマニフェストの limit で制限されています。
+	// Server settings. ReadHeaderTimeout — how long to wait for the request headers, before
+	// cutting off the connection. The five seconds are there not for speed: without this timeout
+	// opened and abandoned connections pile up until they eat up the container's memory,
+	// and the memory is limited by the limit from the manifest.
 	srv := &http.Server{
 		Addr:              ":" + port,
 		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
-	// kubectl logs で最初に目にするもの。この行は「アプリケーションが起動しなかった」を
-	//「起動したが応答しない」と区別するために必要です — これらは異なる診断です。
-	log.Printf("passes-api %s はポート %s で待ち受け中、pod %s",
-		env("APP_VERSION", "v1"), port, env("POD_NAME", "不明"))
-	// サーバを起動し、止められるまで動作します。ポートが使用中か、サーバが
-	// クラッシュした場合 — 理由を書いてエラーで終了します。クラスタは終了したプロセスを見て
-	// レプリカを新たに立ち上げます。再起動をプログラム内部で直す必要はありません。
+	// The first thing you will see in kubectl logs. The line is needed to distinguish "the application
+	// did not start" from "started, but does not respond" — these are different diagnoses.
+	log.Printf("passes-api %s listening on port %s, pod %s",
+		env("APP_VERSION", "v1"), port, env("POD_NAME", "unknown"))
+	// We start the server and work until we are stopped. If the port is taken or the server
+	// crashed — we write the reason and exit with an error. The cluster will see the finished process
+	// and bring up the replica anew; there is no need to fix the restart inside the program.
 	log.Fatal(srv.ListenAndServe())
 }

@@ -1,36 +1,36 @@
 #!/usr/bin/env bash
-# 实验 2 的检查：自愈。
+# Check for lab 2: self-healing.
 #
-# 我们检查的不是「命令是否敲过」，而是实验之后的集群状态：应用重新
-# 通过 Service 提供请求服务，返回其副本的名字，并且这个名字属于
-# 一个真正在运行的 Pod。此外我们还查找副本被重建过的痕迹。
+# We check not "the commands were typed", but the cluster state after the lab: the app again
+# serves requests through the Service, returns the name of its replica, and that name belongs
+# to a really running pod. Plus we look for traces that replicas were recreated.
 #
-# 脚本不删除也不创建任何东西，除了一个一次性的 Pod 用于从集群内部
-# 检查服务可用性 —— 它会自行清除自己。
+# The script deletes and creates nothing, except a one-off pod to check
+# service availability from inside the cluster — it removes itself.
 
 LAB_NAME="02-selfheal"
-LAB_TITLE="实验 2 · 杀掉一个 Pod，看看会发生什么"
+LAB_TITLE="Lab 2 · Kill a pod and see what happens"
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
 need_kubeconfig
 
 APP=rickroll
 
-# 把 kubectl 的 RFC3339（始终是带 Z 的 UTC）转成 unix 秒。用 python3，因为
-# macOS 上的 BSD date 和 Linux 上的 GNU date 解析日期的方式不同，而只要 lib.sh
-# 能工作的地方，python 都在。
+# RFC3339 from kubectl (always UTC with Z) into unix seconds. Via python3, because
+# BSD date on macOS and GNU date on Linux parse dates differently, and python is everywhere
+# lib.sh works.
 _epoch() {
   python3 -c 'import sys,datetime as d;print(int(d.datetime.strptime(sys.argv[1],
 "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=d.timezone.utc).timestamp()))' "$1" 2>/dev/null
 }
 
-# --- 应用到底存不存在 ------------------------------------------------
+# --- the app exists at all -------------------------------------------------
 DEP_TS="$(kubectl get deployment "$APP" -o jsonpath='{.metadata.creationTimestamp}' 2>/dev/null)"
 
 if [ -z "$DEP_TS" ]; then
-  fail "应用 ${APP} 不在集群里" \
-       "在实验的最后本该把它恢复回来：kubectl apply -f ../01-deploy/rickroll.yaml"
-  evidence "namespace 里现有什么" "$(kubectl get deployment,rs,pods 2>/dev/null)"
+  fail "app ${APP} is not in the cluster" \
+       "at the end of the lab it had to be restored: kubectl apply -f ../01-deploy/rickroll.yaml"
+  evidence "What is in the namespace" "$(kubectl get deployment,rs,pods 2>/dev/null)"
   finish
   exit $?
 fi
@@ -40,21 +40,21 @@ HAVE="$(kubectl get deployment "$APP" -o jsonpath='{.status.readyReplicas}' 2>/d
 [ -z "$HAVE" ] && HAVE=0
 
 if [ "${HAVE:-0}" -ge 1 ] && [ "$HAVE" = "$WANT" ]; then
-  ok "应用 ${APP} 已恢复：就绪副本 ${HAVE} / ${WANT}"
+  ok "app ${APP} restored: ready replicas ${HAVE} of ${WANT}"
 else
-  fail "就绪副本 ${HAVE}，而请求的是 ${WANT}" \
-       "查看 kubectl describe deployment ${APP} 以及 kubectl get pods -l app=${APP}"
+  fail "replicas ready ${HAVE} of the requested ${WANT}" \
+       "see kubectl describe deployment ${APP} and kubectl get pods -l app=${APP}"
 fi
-evidence "应用状态" "$(kubectl get deployment,rs,pods -l app=${APP} 2>/dev/null)"
+evidence "App state" "$(kubectl get deployment,rs,pods -l app=${APP} 2>/dev/null)"
 
-# --- Deployment -> ReplicaSet -> Pod 链条 -------------------------------
-# 这个实验的要点在于：副本是由 ReplicaSet 恢复回来的，而不是「集群笼统地」恢复的。
-# 如果 Pod 的属主结果不是 ReplicaSet，说明参与者是手工拉起的 Pod，
-# 那他就看不到自愈。
-# 我们按名字逐个数 Pod，而不是去收集唯一的属主种类：没有
-# ownerReferences 的 Pod 会让 jsonpath 返回空字符串，`sort -u` 会把它折叠成一个不可见的
-# 元素，只要有哪怕一个 Pod 由 ReplicaSet 管理，`*ReplicaSet*` 就会匹配上。
-# 正因如此，一个手工拉起的外来 Pod 会不被察觉地通过检查。
+# --- the Deployment -> ReplicaSet -> Pod chain -----------------------------
+# The point of the lab is that the replica is brought back by the ReplicaSet, not "the cluster in general".
+# If the pod's owner turns out not to be a ReplicaSet, the participant created the pod by hand,
+# and won't see self-healing.
+# We count pods by name, rather than collecting unique owner kinds: a pod without
+# ownerReferences makes jsonpath return an empty string, `sort -u` collapses it into an invisible
+# element, and `*ReplicaSet*` matches as long as at least one pod is managed by a ReplicaSet.
+# Because of that a foreign pod, created by hand, passed the check unnoticed.
 PODS_TOTAL="$(kubectl get pods -l app=${APP} --no-headers 2>/dev/null | grep -c . )"
 PODS_BY_RS="$(kubectl get pods -l app=${APP} \
   -o jsonpath='{range .items[?(@.metadata.ownerReferences[0].kind=="ReplicaSet")]}{.metadata.name}{"\n"}{end}' 2>/dev/null \
@@ -65,30 +65,30 @@ OWNER_KINDS="$(kubectl get pods -l app=${APP} \
 
 case "${PODS_TOTAL}:${PODS_BY_RS}" in
   0:*)
-    fail "没有任何带标签 app=${APP} 的 Pod" \
-         "恢复应用：kubectl apply -f ../01-deploy/rickroll.yaml"
+    fail "there is no pod with the label app=${APP}" \
+         "restore the app: kubectl apply -f ../01-deploy/rickroll.yaml"
     ;;
   *:0)
-    fail "没有任何 ${APP} 的 Pod 由 ReplicaSet 管理 —— 不会有自愈" \
-         "看起来 Pod 是手工拉起的（kubectl run）。删掉它并应用 ../01-deploy/rickroll.yaml"
+    fail "no ${APP} pod is managed by a ReplicaSet — there will be no self-healing" \
+         "looks like the pod was created by hand (kubectl run). Delete it and apply ../01-deploy/rickroll.yaml"
     ;;
   *)
     if [ "$PODS_TOTAL" -ne "$PODS_BY_RS" ]; then
-      fail "标签 app=${APP} 被外来 Pod 占用：${PODS_TOTAL} 个里只有 ${PODS_BY_RS} 个由 ReplicaSet 管理" \
-           "其余的会进入负载均衡并返回别人的响应 —— 找出它们：kubectl get pods -l app=${APP} -o wide"
-      evidence "Pod 的属主" \
+      fail "the label app=${APP} is worn by foreign pods: ${PODS_BY_RS} of ${PODS_TOTAL} are managed by a ReplicaSet" \
+           "the rest will end up in load balancing and serve a foreign response — find them: kubectl get pods -l app=${APP} -o wide"
+      evidence "Pod owners" \
         "$(kubectl get pods -l app=${APP} -o jsonpath='{range .items[*]}{.metadata.name}{" <- "}{.metadata.ownerReferences[0].kind}{"\n"}{end}' 2>/dev/null)"
     else
-    ok "副本由 ReplicaSet 管理 —— Deployment → ReplicaSet → Pod 链条完整"
-    evidence "谁是谁的属主" \
+    ok "replicas are managed by a ReplicaSet — the Deployment → ReplicaSet → Pod chain is intact"
+    evidence "Who owns whom" \
       "$(kubectl get pods -l app=${APP} -o jsonpath='{range .items[*]}{.metadata.name}{" <- "}{.metadata.ownerReferences[0].kind}{"/"}{.metadata.ownerReferences[0].name}{"\n"}{end}' 2>/dev/null)"
     fi
     ;;
 esac
 
-# --- 副本被重建的痕迹 ----------------------------------------------
-# 集群不保存「Pod 被杀过」的直接证据。有两个间接的，而且各自都足够：
-# Pod 明显比它的 Deployment 年轻，以及 ReplicaSet 事件里创建次数不止一次。
+# --- traces of replica recreation ------------------------------------------
+# The cluster keeps no direct evidence that "the pod was killed". There are two indirect ones, both sufficient:
+# the pod is noticeably younger than its Deployment, and in the ReplicaSet events there is more than one creation.
 POD_TS="$(kubectl get pods -l app=${APP} \
   -o jsonpath='{.items[0].metadata.creationTimestamp}' 2>/dev/null)"
 
@@ -98,75 +98,75 @@ POD_E="$(_epoch "$POD_TS")"
 if [ -n "$DEP_E" ] && [ -n "$POD_E" ]; then
   DELTA=$(( POD_E - DEP_E ))
   if [ "$DELTA" -ge 45 ]; then
-    ok "副本比应用年轻 ${DELTA} 秒 —— 说明先前那个被清除了，这个是顶替它创建的"
+    ok "the replica is ${DELTA}s younger than the app — so the previous one was removed and this one created instead"
   else
-    warn "副本几乎和应用同龄（相差 ${DELTA} 秒）" \
-         "如果你是在最后把整个应用整体恢复的 —— 那是正常的；否则删除 Pod 的那一步没有做"
+    warn "the replica is almost the same age as the app (difference ${DELTA}s)" \
+         "if you restored the whole app at the very end — that's fine; otherwise the pod-deletion step wasn't done"
   fi
-  evidence "对象的年龄" "deployment 创建于：${DEP_TS}
-pod 创建于：        ${POD_TS}
-相差：              ${DELTA} 秒"
+  evidence "Object ages" "deployment created: ${DEP_TS}
+pod created:        ${POD_TS}
+difference:         ${DELTA}s"
 else
-  warn "无法比较 Pod 和应用的年龄" \
-       "需要 PATH 里有 python3；这不影响实验的通过"
+  warn "couldn't compare the pod and app ages" \
+       "python3 is needed in PATH; this doesn't affect passing the lab"
 fi
 
-# 事件只存活约一个小时，所以它们的缺失不是失败，而是一个提示。
+# Events live about an hour, so their absence is not a failure but a remark.
 CREATES="$(kubectl get events \
   --field-selector reason=SuccessfulCreate,involvedObject.kind=ReplicaSet \
   --no-headers 2>/dev/null | grep -c "$APP")"
 [ -z "$CREATES" ] && CREATES=0
 
 if [ "$CREATES" -ge 2 ]; then
-  ok "集群事件里有 ${CREATES} 次副本创建 —— 自愈确实触发过"
-  evidence "副本创建事件" \
+  ok "cluster events show ${CREATES} replica creations — self-healing really did fire"
+  evidence "Replica creation events" \
     "$(kubectl get events --field-selector reason=SuccessfulCreate,involvedObject.kind=ReplicaSet 2>/dev/null | grep "$APP" | tail -10)"
 else
-  warn "集群事件里只见到副本创建 ${CREATES} 次" \
-       "事件只保存约一个小时，可能已经过期了"
+  warn "cluster events show replica creation only ${CREATES} time(s)" \
+       "events are kept about an hour and may have expired"
 fi
 
-# 这两个迹象单独看都不是阻断性的：事件只存活约一个小时，
-# 而对于在实验最后合法地把整个应用整体恢复的人来说，年龄是吻合的。
-# 但如果两个都不成立 —— 副本根本没被删过，实验就没做。没有这个
-# 组合判断，脚本会在实验 1 之后立刻就打印「实验通过」，一次删除都不等。
+# Neither of the two signs is blocking on its own: events live about an hour,
+# and the age matches for someone who legitimately restored the whole app at the end of the lab.
+# But if NEITHER holds — the replica wasn't deleted at all, and the lab isn't done. Without this
+# pairing the script printed "LAB PASSED" right after lab 1, without waiting for a single deletion.
 if [ "${DELTA:-0}" -lt 45 ] && [ "$CREATES" -lt 2 ]; then
-  fail "没有找到自愈的痕迹：副本没有被删过" \
-       "删掉副本：kubectl delete pod -l app=${APP} —— 并在一小时内、趁事件还在时运行检查"
+  fail "no traces of self-healing found: the replica wasn't deleted" \
+       "delete the replica: kubectl delete pod -l app=${APP} — and run the check within an hour, while events are alive"
 fi
 
-# --- 服务是否真的在提供服务 --------------------------------------------
-# 最主要的实质检查：不是「对象存在」，而是「通过 Service 能拿到一个页面
-# 并且里面有一个活着的副本的名字」。
+# --- the service actually serves -------------------------------------------
+# The main substantive check: not "the object exists", but "through the Service a page arrives
+# and it contains the name of a live replica".
 BODY="$(in_cluster_curl "http://${APP}/")"
 
 if [ -z "$BODY" ]; then
-  fail "Service ${APP} 没有从集群内部返回页面" \
-       "检查端点：kubectl get endpointslices -l kubernetes.io/service-name=${APP}"
+  fail "Service ${APP} did not return a page from inside the cluster" \
+       "check the endpoints: kubectl get endpointslices -l kubernetes.io/service-name=${APP}"
 elif printf '%s' "$BODY" | grep -q '__POD__'; then
-  fail "页面返回了，但副本名字没有被替换进去" \
-       "ConfigMap rickroll-conf 丢失了：完整应用 ../01-deploy/rickroll.yaml"
+  fail "the page is served, but the replica name wasn't substituted into it" \
+       "the ConfigMap rickroll-conf is lost: apply ../01-deploy/rickroll.yaml in full"
 else
   SERVED="$(printf '%s' "$BODY" | grep -o "${APP}-[a-z0-9]*-[a-z0-9]*" | head -1)"
   if [ -z "$SERVED" ]; then
-    fail "Service 的响应里没有副本名字" \
-         "页面不是来自我们的应用 —— 检查 kubectl get svc ${APP} -o yaml"
+    fail "the Service response has no replica name" \
+         "the page came not from our app — check kubectl get svc ${APP} -o yaml"
   elif kubectl get pod "$SERVED" >/dev/null 2>&1; then
-    ok "Service 返回了页面，是活着的副本 ${SERVED} 提供的"
-    evidence "Service 的响应（片段）" \
-      "$(printf '%s' "$BODY" | grep -o "为您服务的 Pod<b>${APP}-[a-z0-9-]*</b>" | head -1)"
+    ok "the Service serves a page, it was served by the live replica ${SERVED}"
+    evidence "Service response (fragment)" \
+      "$(printf '%s' "$BODY" | grep -o "served by pod<b>${APP}-[a-z0-9-]*</b>" | head -1)"
   else
-    fail "页面由副本 ${SERVED} 提供，但集群里已经没有这个 Pod 了" \
-         "等十来秒再运行一次检查 —— 副本很可能正好在这会儿发生变化"
+    fail "the page was served by replica ${SERVED}, but there is no such pod in the cluster anymore" \
+         "wait ten seconds or so and run the check again — the replica was probably changing right now"
   fi
 fi
 
-# --- 为下一个实验做好准备 -------------------------------------------
+# --- readiness for the next lab --------------------------------------------
 if [ "$WANT" = "1" ]; then
-  ok "副本数已恢复为一个 —— 实验 3 将从一张白纸开始"
+  ok "the replica count is back to one — lab 3 will start from a clean slate"
 else
-  warn "现在请求的副本数：${WANT}" \
-       "在实验 3 之前恢复为一个：kubectl scale deployment ${APP} --replicas=1"
+  warn "currently requested replicas: ${WANT}" \
+       "before lab 3 restore one: kubectl scale deployment ${APP} --replicas=1"
 fi
 
 finish

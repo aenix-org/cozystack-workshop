@@ -1,60 +1,60 @@
 ---
-# Lab 5 · Infraestructura en Git. El propio servicio «Pase»: cuatro objetos en un archivo.
+# Lab 5 · Infrastructure in Git. The "Pass" service itself: four objects in one file.
 #
-# No se aplica al clúster a mano. El archivo se coloca en su propio repositorio en GitHub, en la carpeta
-# apps/, junto a namespace.yaml, y al clúster `lab` lo traslada Flux — por sí solo:
+# Not applied to the cluster by hand. The file is placed into its own repository on GitHub, in the
+# apps/ folder, next to namespace.yaml, and Flux carries it into the `lab` cluster — on its own:
 #     cp app/*.yaml ~/passes-gitops/apps/
 #     cd ~/passes-gitops && git add apps && git commit -m "add passes service v1" && git push
 #
-# La línea --- separa los objetos: un archivo, cuatro objetos independientes. El orden en el archivo
-# no influye en el orden de creación — el clúster lo resolverá por sí solo.
+# The --- line separates objects: one file, four independent objects. The order in the file
+# does not affect the creation order — the cluster will sort it out on its own.
 #
-# En cada objeto: apiVersion — la versión del esquema de descripción, kind — qué creamos,
-# metadata.name — el nombre del objeto, metadata.namespace — en qué compartimento del clúster
-# vive. Más adelante estos campos no se explican por separado.
+# In each object: apiVersion — the version of the description schema, kind — what we are creating,
+# metadata.name — the object's name, metadata.namespace — which partition of the cluster it
+# lives in. These fields are not explained separately further on.
 #
-# En ninguno de los cuatro objetos hay contraseña, ni clave, ni token, y esto no es
-# casualidad: lo que llega a Git se queda allí para siempre — la historia puede reescribirse, pero
-# todos los que alcanzaron a clonarlo conservan la copia antigua. Los secretos no tienen lugar aquí.
+# None of the four objects contains a password, a key, or a token, and this is not
+# by chance: whatever gets into Git stays there forever — history can be rewritten, but
+# everyone who already cloned it keeps the old copy. Secrets have no place here.
 
-# --- 1 de 4. Configuración del servidor web ----------------------------------------
-# Un ConfigMap coloca en el clúster un archivo de texto aparte de la aplicación, y más abajo (en la
-# sección volumes) ese archivo se monta dentro del contenedor. La idea es cambiar la configuración sin
-# reconstruir la imagen: editas aquí, haces commit, y un minuto después el clúster tiene la nueva versión.
+# --- 1 of 4. Web server settings ----------------------------------------------------
+# A ConfigMap puts a text file into the cluster separately from the application, and below (in the
+# volumes section) this file is mounted inside the container. The point is to change settings without
+# rebuilding the image: you edit here, commit, and a minute later the cluster has the new version.
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: passes-conf
   namespace: passes
-# La clave dentro de data se convierte en el nombre del archivo en el contenedor: default.conf caerá en la carpeta
-# que nginx lee al arrancar. La barra vertical después del nombre es la forma de escribir
-# texto de varias líneas tal cual en YAML, conservando los saltos de línea.
+# The key inside data becomes the file name in the container: default.conf will land in the folder
+# that nginx reads at startup. The vertical bar after the name is the way to write
+# multi-line text as-is in YAML, preserving line breaks.
 data:
   default.conf: |
     server {
       listen 8080;
       root /usr/share/nginx/html;
 
-      # La dirección para la comprobación de disponibilidad. El clúster llama aquí y no envía
-      # tráfico a una copia hasta recibir respuesta.
+      # The address for the readiness check. The cluster knocks here and does not send
+      # traffic to a copy until it gets a response.
       location /healthz {
         access_log off;
         return 200 "ok\n";
       }
 
       location / {
-        # En la página servida sustituimos __POD__ por el nombre de la máquina donde funciona
-        # nginx. Dentro del pod el nombre de la máquina es el nombre del propio pod.
+        # In the served page we replace __POD__ with the name of the machine where
+        # nginx runs. Inside the pod the machine name is the pod's own name.
         sub_filter '__POD__' '$hostname';
         sub_filter_once off;
       }
     }
 ---
-# --- 2 de 4. La página que sirve el servicio ---------------------------------------
-# En esta lab la página es un marcador de posición: la aplicación real aparecerá más tarde. Ahora importa
-# no qué muestra el servicio, sino de dónde salió en el clúster. El texto __POD__ en el marcado es
-# una marca de sustitución: nginx la reemplazará por el nombre del pod que sirvió la página, y por ese
-# nombre verás más adelante que las copias pasaron a ser más de una.
+# --- 2 of 4. The page the service serves --------------------------------------------
+# In this lab the page is a stub: the real application will appear later. Right now what matters
+# is not what the service shows, but where it came from in the cluster. The __POD__ text in the markup
+# is a substitution marker: nginx will replace it with the name of the pod that served the page, and by
+# that name you will later see that there is now more than one copy.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -66,7 +66,7 @@ data:
     <html lang="ru">
     <head>
       <meta charset="utf-8">
-      <title>Pase de invitado</title>
+      <title>Guest Pass</title>
       <style>
         body { font-family: system-ui, sans-serif; margin: 4rem auto; max-width: 40rem;
                color: #222; }
@@ -78,18 +78,18 @@ data:
       </style>
     </head>
     <body>
-      <h1>Servicio «Pase de invitado»</h1>
-      <p>Solicitud de pase de invitado. Versión <span class="v">v1</span></p>
-      <p>Desplegado desde Git. Nadie tocó esto a mano.</p>
-      <div class="pod">te atendió el Pod <b>__POD__</b></div>
+      <h1>Guest Pass service</h1>
+      <p>Requesting a guest pass. Version <span class="v">v1</span></p>
+      <p>Deployed from Git. No one touched this by hand.</p>
+      <div class="pod">served by pod <b>__POD__</b></div>
     </body>
     </html>
 ---
-# --- 3 de 4. La descripción de la propia aplicación --------------------------------
-# Un Deployment no es «ejecuta un contenedor», sino «mantén ejecutándose tantas copias de tal
-# contenedor». La diferencia se ve cuando una copia muere: el clúster crea una nueva sin
-# preguntar y sin avisar. En vSphere lo más parecido es HA, pero allí se reinicia una máquina,
-# mientras que aquí se recrea una copia de la aplicación, y esto se hace constantemente, no solo ante un fallo.
+# --- 3 of 4. The application description itself -------------------------------------
+# A Deployment is not "run a container" but "keep so many copies of such a container
+# running". The difference shows when a copy dies: the cluster creates a new one without
+# asking and without notifying. In vSphere the closest thing is HA, but there a machine restarts,
+# while here a copy of the application is recreated, and this is done constantly, not only on failure.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -98,31 +98,31 @@ metadata:
   labels:
     app: passes
 spec:
-  # Cuántas copias mantener ejecutándose. La formulación importa: no «ejecuta una», sino
-  # «mantén una». Este número lo cambiarás a través de Git y verás qué ocurre.
+  # How many copies to keep running. The wording matters: not "run one", but
+  # "keep one". You will change this number through Git and watch what happens.
   replicas: 1
-  # Por qué señal el Deployment reconoce sus copias. No es una lista de nombres de pods —
-  # los nombres cambian en cada recreación — sino la condición «todos los pods con la etiqueta app: passes».
-  # La etiqueta de abajo, en template.metadata.labels, debe coincidir con esta condición: si divergen
-  # el clúster se negará a aceptar el manifiesto, porque las copias no serían de nadie.
+  # By what sign the Deployment recognizes its copies. This is not a list of pod names —
+  # names change on every recreation — but the condition "all pods with the label app: passes".
+  # The label below, in template.metadata.labels, must match this condition: if they diverge
+  # the cluster will refuse to accept the manifest, because the copies would belong to no one.
   selector:
     matchLabels:
       app: passes
-  # template — el patrón a partir del cual se estampan las copias. Todo lo que hay dentro describe un
-  # pod. Editar el patrón significa desplegar una nueva versión: las copias antiguas se reemplazan por nuevas.
+  # template — the pattern from which copies are stamped out. Everything inside describes one
+  # pod. Editing the pattern means rolling out a new version: old copies are replaced with new ones.
   template:
     metadata:
       labels:
         app: passes
     spec:
-      # Restricciones de seguridad a nivel de todo el pod. En vSphere no hay análogo: allí la
-      # aislación la da el hipervisor, mientras que los contenedores comparten el núcleo con el nodo, por eso
-      # los permisos hay que recortarlos de forma explícita.
-      #   runAsNonRoot   no arrancar si la imagen quiere funcionar como root
-      #   runAsUser      bajo qué usuario numérico funcionar; 65532 — el identificador
-      #                  «no privilegiado» aceptado en las imágenes mínimas
-      #   seccompProfile qué llamadas al sistema están permitidas; RuntimeDefault — un conjunto
-      #                  que corta lo evidentemente peligroso y no rompe nada
+      # Security restrictions at the level of the whole pod. In vSphere there is no analog: there
+      # isolation is provided by the hypervisor, while containers share the kernel with the node, so
+      # permissions have to be cut back explicitly.
+      #   runAsNonRoot   do not start if the image wants to run as root
+      #   runAsUser      which numeric user to run as; 65532 — the accepted
+      #                  "unprivileged" identifier in minimal images
+      #   seccompProfile which system calls are allowed; RuntimeDefault — a set
+      #                  that cuts off the obviously dangerous and breaks nothing
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
@@ -130,34 +130,34 @@ spec:
           type: RuntimeDefault
       containers:
         - name: web
-          # Las mismas restricciones, pero ya sobre un contenedor concreto.
-          #   allowPrivilegeEscalation: false  el proceso no podrá conseguir más permisos
-          #   capabilities.drop: ["ALL"]       quitar todas las facultades especiales del núcleo
-          #                                    (cambiar la red, montar, cambiar la hora);
-          #                                    el servidor web no necesita ninguna
+          # The same restrictions, but now on a specific container.
+          #   allowPrivilegeEscalation: false  the process will not be able to gain more permissions
+          #   capabilities.drop: ["ALL"]       take away all special kernel privileges
+          #                                    (change the network, mount, change the time);
+          #                                    the web server needs none of them
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # La imagen se toma de un registro público — en la siguiente lab seguridad lo prohibirá, y
-          # la dirección cambiará a nuestro propio Harbor. La variante unprivileged se eligió no por estética:
-          # la imagen nginx normal escucha en el puerto 80 y quiere para eso permisos de root, y con
-          # runAsNonRoot arriba no arrancaría en absoluto.
-          # La versión está fijada (1.27-alpine), no latest: de lo contrario el mismo
-          # manifiesto mañana desplegaría una aplicación distinta, y no te enterarías.
+          # The image is taken from a public registry — in the next lab security will forbid this, and
+          # the address will change to our own Harbor. The unprivileged variant was chosen not for looks:
+          # the regular nginx image listens on port 80 and wants root permissions for that, and with
+          # runAsNonRoot above it would not start at all.
+          # The version is pinned (1.27-alpine), not latest: otherwise the same
+          # manifest would deploy a different application tomorrow, and you would not know about it.
           image: nginxinc/nginx-unprivileged:1.27-alpine
-          # El puerto que escucha la aplicación. El nombre `http` no es un adorno: a él se
-          # refieren la comprobación de disponibilidad de abajo y el Service al final del archivo. Si cambias
-          # el número del puerto, tendrás que cambiarlo en un solo lugar, no en tres.
+          # The port the application listens on. The name `http` is not decoration: it is
+          # referenced by the readiness check below and the Service at the end of the file. If you change
+          # the port number, you will have to change it in one place, not three.
           ports:
             - containerPort: 8080
               name: http
-          # requests — cuántos recursos se reservan de forma garantizada; por este número
-          # el planificador elige el nodo. limits — el techo por encima del cual no se permite.
-          # Subestimar requests significa que en el nodo cabrá más de lo que puede aguantar;
-          # superar limits de memoria — el contenedor se mata, de procesador — se ralentiza.
-          # 20m = veinte milésimas de núcleo, Mi = megabytes. Los valores aquí son pequeños,
-          # porque el nodo en la lab es uno solo y no es grande.
+          # requests — how many resources are guaranteed to be reserved; by this number
+          # the scheduler picks a node. limits — the ceiling above which it will not be allowed.
+          # Understating requests means more will fit on the node than it can handle;
+          # exceeding the memory limit — the container is killed, exceeding CPU — it is throttled.
+          # 20m = twenty thousandths of a core, Mi = megabytes. The values here are small
+          # because there is a single, small node in the lab.
           resources:
             requests:
               cpu: 20m
@@ -165,30 +165,30 @@ spec:
             limits:
               cpu: 300m
               memory: 64Mi
-          # Comprobación de disponibilidad: el clúster llama a esta dirección y no envía tráfico
-          # a una copia hasta recibir respuesta. Sin ella el Service enviaría solicitudes a un
-          # nginx que aún no ha arrancado, y el usuario vería un error en cada despliegue.
-          # También la espera Flux — en kustomization.yaml pedimos wait: true.
-          #   initialDelaySeconds  esperar antes de la primera llamada, dar al proceso tiempo de arrancar
-          #   periodSeconds        con qué frecuencia llamar después
+          # The readiness check: the cluster knocks at this address and does not send traffic
+          # to a copy until it gets a response. Without it the Service would send requests to
+          # an nginx that has not yet come up, and the user would see an error on every rollout.
+          # Flux also waits for it — in kustomization.yaml we asked for wait: true.
+          #   initialDelaySeconds  wait before the first knock, give the process time to start
+          #   periodSeconds        how often to knock afterwards
           readinessProbe:
             httpGet:
               path: /healthz
               port: http
             initialDelaySeconds: 2
             periodSeconds: 5
-          # Dónde dentro del contenedor colocar el contenido de los dos ConfigMap del inicio del archivo.
-          # /etc/nginx/conf.d — la carpeta de la que nginx lee la configuración al arrancar,
-          # /usr/share/nginx/html — la carpeta desde la que sirve los archivos.
-          # La imagen no cambia por ello: los archivos aparecen en ella en el momento del arranque.
+          # Where inside the container to place the contents of the two ConfigMaps from the start of the file.
+          # /etc/nginx/conf.d — the folder from which nginx reads settings at startup,
+          # /usr/share/nginx/html — the folder from which it serves files.
+          # The image itself does not change: the files appear in it at the moment of launch.
           volumeMounts:
             - name: conf
               mountPath: /etc/nginx/conf.d
             - name: page
               mountPath: /usr/share/nginx/html
-      # Qué exactamente montar. Los nombres conf y page son internos, enlazan este
-      # bloque con los volumeMounts de arriba; name dentro de configMap es ya el nombre de un objeto real
-      # en el clúster. Equivócate en él y el pod quedará colgado esperando un ConfigMap inexistente.
+      # What exactly to mount. The names conf and page are internal, they link this
+      # block to the volumeMounts above; name inside configMap is already the name of a real object
+      # in the cluster. Get it wrong and the pod will hang waiting for a nonexistent ConfigMap.
       volumes:
         - name: conf
           configMap:
@@ -197,24 +197,24 @@ spec:
           configMap:
             name: passes-page
 ---
-# --- 4 de 4. Un nombre permanente detrás del cual están todas las copias ------------
-# Los pods se recrean, y sus direcciones son nuevas cada vez. El Service da un nombre invariable —
-# passes.passes.svc.cluster.local — por el que dentro del clúster siempre se puede alcanzar
-# las copias vivas. Es un balanceo interno; desde fuera del clúster aquí aún no se llega.
+# --- 4 of 4. A permanent name that all copies stand behind --------------------------
+# Pods are recreated, and their addresses are new each time. The Service gives a stable name —
+# passes.passes.svc.cluster.local — by which inside the cluster you can always reach
+# the live copies. This is internal load balancing; from outside the cluster you cannot get here yet.
 apiVersion: v1
 kind: Service
 metadata:
   name: passes
   namespace: passes
 spec:
-  # El enlace del Service con los pods no es una lista de direcciones, sino la condición «todos los pods con la etiqueta app: passes».
-  # Apareció una copia nueva con esa etiqueta — entró en el balanceo por sí misma, no hay nada
-  # que registrar. Desapareció — la quitaron del reparto.
+  # The Service's link to pods is not a list of addresses, but the condition "all pods with the label app: passes".
+  # A new copy with such a label appeared — it came under load balancing on its own, nothing
+  # needs to be registered. It disappeared — it was removed from the pool.
   selector:
     app: passes
-  # port — en qué puerto responde el propio Service, targetPort — a dónde reenvía
-  # dentro del contenedor. Aquí targetPort se refiere al nombre `http` del bloque ports de arriba,
-  # no al número: el número se puede cambiar en un solo lugar, y el enlace no se romperá.
+  # port — on which port the Service itself answers, targetPort — where it forwards
+  # inside the container. Here targetPort refers to the name `http` from the ports block above,
+  # not to a number: the number can be changed in one place, and the link will not break.
   ports:
     - port: 80
       targetPort: http

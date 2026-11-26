@@ -63,7 +63,7 @@ clúster: es lo que se le indicó.
 ## Qué hay en la carpeta del lab
 
 Todos los archivos ya son tuyos — los recibiste con el repositorio. No hay nada que crear ni
-volver a escribir: allí donde más abajo diga `kubectl apply -f nombre.yaml`, el archivo viene de aquí.
+volver a escribir: allí donde más abajo diga `kubectl apply -f name.yaml`, el archivo viene de aquí.
 
 ```bash
 cd labs/11-android
@@ -106,14 +106,14 @@ clúster; tu tenant es un namespace aparte) aquí es el del tenant, y necesitas 
 acceso del tenant, no el del clúster `lab`.
 
 ```bash
-# KUBECONFIG — qué archivo de acceso usa kubectl. Aquí es el del tenant: el bucket
-# se pide en el clúster de gestión, no en el clúster lab
+# KUBECONFIG — which access file kubectl uses. Here it's the tenant's: the bucket
+# is ordered on the management cluster, not in the lab cluster
 export KUBECONFIG=~/.kube/workshop
 
-# apply = «lleva el clúster a lo que está descrito en el archivo». El comando no crea el
-# almacenamiento en sí — le pasa el pedido a la plataforma.
-#   -f bucket.yaml   qué archivo aplicar. Antes de esto, reemplaza
-#                    tenant-workshopXX en él por tu namespace, o el pedido se irá a otra parte
+# apply = "bring the cluster to what's described in the file." The command doesn't create
+# the storage itself — it hands the order to the platform.
+#   -f bucket.yaml   which file to apply. Before this, replace
+#                    tenant-workshopXX in it with your namespace, or the order goes elsewhere
 kubectl apply -f bucket.yaml
 ```
 
@@ -180,15 +180,15 @@ acceso a las credenciales de cada aplicación que has creado. El comando de abaj
 los cuatro valores, `accessKey`; el resto se obtienen igual, solo cambia el nombre del campo.
 
 ```bash
-# Trabajamos con el mismo acceso al tenant que en el paso anterior: el secret vive en el tenant.
-# get secret = «muestra el objeto con contraseñas y claves». Los valores dentro del secret están
-# codificados en base64 — esto no es cifrado, solo una forma de escribir datos binarios como texto.
-#   -n tenant-workshopXX   en qué namespace buscar
-#   -o jsonpath='...'      devolver no el objeto entero, sino un único campo de él:
-#                          .data.accessKey — el campo accessKey dentro de la sección data
-#   base64 -d              decodificarlo de vuelta a una forma legible (d = decode)
-#   ; echo                 añadir un salto de línea: sin él el valor se pegaría
-#                          al siguiente prompt de la terminal
+# We work with the same tenant access as in the previous step: the secret lives in the tenant.
+# get secret = "show the object with passwords and keys." The values inside the secret are
+# base64-encoded — this isn't encryption, just a way of writing binary data as text.
+#   -n tenant-workshopXX   which namespace to look in
+#   -o jsonpath='...'      return not the whole object, but a single field from it:
+#                          .data.accessKey — the accessKey field inside the data section
+#   base64 -d              decode it back into readable form (d = decode)
+#   ; echo                 add a line break: without it the value would run into
+#                          the next terminal prompt
 kubectl -n tenant-workshopXX get secret bucket-builds-ci-credentials \
   -o jsonpath='{.data.accessKey}' | base64 -d; echo
 ```
@@ -209,20 +209,20 @@ No cambies los nombres de los campos: el script de compilación busca variables 
 estos nombres.
 
 ```bash
-# De aquí al final del lab trabajamos con el clúster lab, no con el tenant
+# From here to the end of the lab we work with the lab cluster, not the tenant
 export KUBECONFIG=~/lab.kubeconfig
 
-# create secret generic = «crea un secret a partir de los valores que voy a enumerar».
-# generic significa «un conjunto arbitrario de pares nombre-valor», no un tipo ya hecho
-# para una contraseña de registro de imágenes o un certificado TLS.
-#   bucket-creds        el nombre del secret. El Job lo referenciará por este nombre
-#   --from-literal=nombre='valor'   un par. En lugar de ВСТАВЬТЕ_..., sustituye
-#                       los valores de la tarjeta del bucket en el panel
+# create secret generic = "create a secret from the values I'm about to list."
+# generic means "an arbitrary set of name-value pairs," not a ready-made type
+# for an image-registry password or a TLS certificate.
+#   bucket-creds        the secret's name. The Job will reference it by this name
+#   --from-literal=name='value'   one pair. In place of PASTE_..., substitute
+#                       the values from the bucket's card in the dashboard
 kubectl create secret generic bucket-creds \
-  --from-literal=endpoint='ВСТАВЬТЕ_endpoint' \
-  --from-literal=bucketName='ВСТАВЬТЕ_bucketName' \
-  --from-literal=accessKey='ВСТАВЬТЕ_accessKey' \
-  --from-literal=secretKey='ВСТАВЬТЕ_secretKey'
+  --from-literal=endpoint='PASTE_endpoint' \
+  --from-literal=bucketName='PASTE_bucketName' \
+  --from-literal=accessKey='PASTE_accessKey' \
+  --from-literal=secretKey='PASTE_secretKey'
 ```
 
 **Lo que deberías ver:**
@@ -253,7 +253,7 @@ junto con la descripción de la tarea.
 El código fuente vive ahí por la misma razón: la compilación necesita archivos, y no tiene
 sentido montar un disco de red para seis archivos de texto.
 
-La app hace una sola cosa: muestra la línea «Solicitar un pase de invitado». Con eso basta, porque
+La app hace una sola cosa: muestra la línea «Request a guest pass». Con eso basta, porque
 el lab no va sobre Android sino sobre dónde se compila.
 
 **Un APK** es lo que sale al final. Es un archivo comprimido que contiene la aplicación
@@ -347,7 +347,7 @@ Ponemos el código fuente en el clúster. Todavía no corre nada: son solo archi
 compilación necesitará en el siguiente paso.
 
 ```bash
-# Crea un ConfigMap con seis archivos dentro. Para comprobar que está en su sitio:
+# Creates a ConfigMap with six files inside. To check it's in place:
 # kubectl get configmap propusk-src
 kubectl apply -f propusk-src.yaml
 ```
@@ -385,10 +385,10 @@ código fuente lo aporta el ConfigMap montado en el contenedor.
 Tres líneas merecen una mirada más de cerca.
 
 ```bash
-# yes — un comando que imprime «y» sin fin: así una tanda de preguntas «¿aceptar la
-# licencia? [y/n]» se responde sin un humano.
-#   >/dev/null 2>&1   descarta tanto la salida normal como la de errores: aquí no hace falta
-#   || true           «aunque el comando devuelva un error, trátalo como correcto»
+# yes — a command that prints "y" endlessly: this way a batch of "accept the
+# license? [y/n]" questions gets answered without a human.
+#   >/dev/null 2>&1   discard both normal output and error output: it's not needed here
+#   || true           "even if the command returned an error, treat it as fine"
 yes | sdkmanager --sdk_root="$ANDROID_SDK_ROOT" --licenses >/dev/null 2>&1 || true
 ```
 
@@ -398,11 +398,11 @@ compilación sin motivo. Si las licencias de verdad no se aceptaron, el comando 
 negará a instalar el SDK, así que no estamos ocultando el error.
 
 ```bash
-# alias set = «recuerda la dirección del almacenamiento y las claves bajo el nombre corto builds»,
-# para no repetirlas en cada comando de copia que sigue.
-#   "https://${endpoint}"   la dirección: el prefijo https:// lo añadimos nosotros, no está en el secret
-#   ${accessKey} ${secretKey}   el login y la contraseña en términos de S3, vienen del secret
-#   >/dev/null              silenciar la salida
+# alias set = "remember the storage address and keys under the short name builds," so
+# we don't repeat them in every copy command that follows.
+#   "https://${endpoint}"   the address: we add the https:// prefix ourselves, it's not in the secret
+#   ${accessKey} ${secretKey}   the login and password in S3 terms, they come from the secret
+#   >/dev/null              suppress the output
 mc alias set builds "https://${endpoint}" "${accessKey}" "${secretKey}" >/dev/null
 ```
 
@@ -410,8 +410,8 @@ La salida se silencia a propósito, y por la misma razón el script no tiene `se
 del Job son visibles para todo el que tenga acceso al clúster, y las claves no deben acabar ahí.
 
 ```bash
-# echo imprime una línea en el registro de la tarea. No hace ningún trabajo — es una marca
-# de que el comando de copia anterior llegó hasta el final
+# echo prints a line to the task's log. It does no work — it's a marker
+# that the previous copy command ran to completion
 echo "APK-UPLOADED ${bucketName}/propusk/propusk-${STAMP}.apk"
 ```
 
@@ -516,14 +516,14 @@ mapa plano de seis claves se despliega en el árbol de directorios que Gradle es
 Aplicamos el job e inmediatamente miramos el Pod que creó.
 
 ```bash
-# Crea dos objetos a partir del archivo: un ConfigMap con el script y el Job en sí.
-# Desde este momento el clúster está obligado a encontrar un nodo para la compilación y arrancarla
+# Creates two objects from the file: a ConfigMap with the script and the Job itself.
+# From this moment the cluster is obliged to find a node for the build and start it
 kubectl apply -f android-build.yaml
 
-# get pods = «muestra los Pods». El Pod de la tarea no tiene nombre propio — el Job se lo inventa
-# él mismo, añadiendo una cola aleatoria a su propio nombre. Así que buscamos no por nombre sino por etiqueta:
-#   -l job-name=propusk-build   selecciona los Pods con la etiqueta job-name igual al nombre del job.
-#                               El Job pone esta etiqueta en sus Pods él mismo
+# get pods = "show the Pods." The task's Pod has no name of its own — the Job invents it
+# itself, appending a random tail to its own name. So we search not by name but by label:
+#   -l job-name=propusk-build   select Pods with the job-name label equal to the job's name.
+#                               The Job attaches this label to its Pods itself
 kubectl get pods -l job-name=propusk-build
 ```
 
@@ -538,10 +538,10 @@ propusk-build-x7k2p    0/1     Pending   0          40s
 motivo en los eventos del Pod — su registro de quién intentó hacer qué con él.
 
 ```bash
-# describe = «muestra todo lo que se sabe sobre el objeto»: configuración, estado, eventos.
-# La salida es larga, así que nos quedamos solo con su cola:
-#   sed -n '/Events:/,$p'   imprime las líneas desde aquella donde aparece «Events:»,
-#                           hasta el final de la salida ($ — el final)
+# describe = "show everything known about the object": settings, state, events.
+# The output is long, so we keep only its tail:
+#   sed -n '/Events:/,$p'   print lines from the one where "Events:" appears,
+#                           through the end of the output ($ — end)
 kubectl describe pod -l job-name=propusk-build | sed -n '/Events:/,$p'
 ```
 
@@ -611,11 +611,11 @@ planifica.
 Espera al nodo nuevo. El clúster `lab` no tiene consola gráfica, así que observamos con un comando:
 
 ```bash
-# get nodes = «muestra los nodos del clúster» — esas mismas máquinas virtuales en las que
-# corren los Pods.
-#   -w   watch, «no salgas; añade líneas en cada cambio». El nodo viejo
-#        desaparecerá de la lista, uno nuevo aparecerá y llegará a STATUS=Ready.
-#        Para salir del seguimiento — Ctrl+C, que no afecta en nada al clúster
+# get nodes = "show the cluster's nodes" — those very virtual machines on which
+# the Pods run.
+#   -w   watch, "don't exit; append lines on every change." The old node
+#        will drop from the list, a new one will appear and reach STATUS=Ready.
+#        To leave the watch — Ctrl+C, which has no effect on the cluster
 kubectl get nodes -w
 ```
 
@@ -624,8 +624,8 @@ scheduler revisa los Pods en `Pending` constantemente, no hay que pedírselo. Co
 está moviendo:
 
 ```bash
-# La misma consulta que antes de editar el nodo. Ahora la columna STATUS debería mostrar
-# ContainerCreating, y en un minuto o dos Running
+# The same query as before the node edit. Now the STATUS column should show
+# ContainerCreating, and in a minute or two Running
 kubectl get pods -l job-name=propusk-build
 ```
 
@@ -637,10 +637,10 @@ Observaremos la compilación en su registro — es decir, en lo que el script im
 del contenedor.
 
 ```bash
-# logs = «muestra lo que imprimió la tarea».
-#   -f                  follow: no salgas, sino añade líneas a medida que aparecen.
-#                       Salir — Ctrl+C, la compilación sigue igualmente
-#   job/propusk-build   puedes apuntar al Job en sí, no al Pod: kubectl encontrará su Pod por su cuenta
+# logs = "show what the task printed."
+#   -f                  follow: don't exit, but append lines as they appear.
+#                       Exit — Ctrl+C, the build keeps going regardless
+#   job/propusk-build   you can point at the Job itself, not the Pod: kubectl will find its Pod on its own
 kubectl logs -f job/propusk-build
 ```
 
@@ -648,9 +648,9 @@ kubectl logs -f job/propusk-build
 
 | Marca en el registro | Cuándo aproximadamente |
 |---|---|
-| `== 1/5 instalando las herramientas de línea de comandos de Android ==` | de inmediato |
-| `== 2/5 aceptando las licencias y descargando el SDK (el paso más largo) ==` | +1–2 minutos, y se queda colgado lo que más |
-| `== 3/5 compilando el APK ==` | +5–15 minutos desde el inicio |
+| `== 1/5 installing Android command-line tools ==` | de inmediato |
+| `== 2/5 accepting licenses and downloading the SDK (the longest step) ==` | +1–2 minutos, y se queda colgado lo que más |
+| `== 3/5 building the APK ==` | +5–15 minutos desde el inicio |
 | `BUILD SUCCESSFUL in ...` | +10–25 minutos desde el inicio |
 | `APK-UPLOADED bucket-.../propusk/propusk-...apk` | justo después |
 
@@ -660,8 +660,8 @@ Puedes confirmar que el proceso está vivo en otra ventana de terminal — compr
 consumiendo CPU y memoria:
 
 ```bash
-# top = «cuánto está consumiendo ahora mismo». No la reserva de requests, sino el uso real
-# en este preciso segundo. Una CPU distinta de cero significa que dentro se está trabajando
+# top = "how much it's consuming right now." Not the requests claim, but actual usage
+# this very second. Non-zero CPU means work is happening inside
 kubectl top pod -l job-name=propusk-build
 ```
 
@@ -669,7 +669,7 @@ El Job se considera completado cuando el Pod terminó con código 0 (un código 
 el ampliamente aceptado «se ejecutó sin errores»):
 
 ```bash
-# Miramos no el Pod sino el job en sí: tiene columnas que el Pod no tiene
+# We look not at the Pod but at the job itself: it has columns the Pod doesn't
 kubectl get job propusk-build
 ```
 
@@ -723,8 +723,8 @@ poner una base de datos en S3 es tan doloroso como repartir APK por SMB a travé
 📍 **Dónde:** en la laptop, en la misma ventana de terminal donde trabajaste con `kubectl`.
 
 ```bash
-# El script llega al clúster lab con el mismo archivo de acceso que tú. Las credenciales del bucket
-# las toma del secret bucket-creds — no necesitas introducir nada por separado
+# The script reaches the lab cluster with the same access file as you. The bucket
+# credentials it takes from the bucket-creds secret — you don't need to enter anything separately
 export KUBECONFIG=~/lab.kubeconfig
 ./check.sh
 ```
@@ -746,11 +746,11 @@ lo que queda es una entrada en el clúster y los registros — unos pocos kiloby
 No hace falta borrarlo enseguida; los registros todavía serán útiles. Cuando termines:
 
 ```bash
-# delete -f = «quita del clúster lo que está descrito en este archivo». Junto con el Job
-# desaparecerán también sus registros, así que este comando va el último en el tiempo, no el primero
+# delete -f = "remove from the cluster what's described in this file." Along with the Job
+# its logs will disappear too, so this command comes last in time, not first
 kubectl delete -f android-build.yaml
 kubectl delete -f propusk-src.yaml
-# El secret lo borramos por separado: no hay archivo para él, lo creaste con un comando
+# We delete the secret separately: there's no file for it, you created it with a command
 kubectl delete secret bucket-creds
 ```
 

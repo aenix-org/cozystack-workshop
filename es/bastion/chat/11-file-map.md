@@ -28,7 +28,7 @@ En el bastion mismo no los ejecutas — solo aplicas los manifiestos con `kubect
 La **máquina conversora** tiene red, así que descarga el archivo ella misma. El repositorio es
 público, no hacen falta claves:
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/bastion/scripts/convert.sh
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/bastion/scripts/convert.sh
 ```
 
 **Tu app-VM al principio no tiene red en absoluto** — ese estado roto es justo lo que arreglamos
@@ -42,4 +42,4 @@ prácticos para releer después, cuando repitas esto por tu cuenta.
 los marcadores `tenant-workshopXX` fueron reemplazados por tu número. No necesitas
 introducir nada a mano. Lo único que rellenas tú mismo son `bucketName`, `accessKey`
 y `secretKey` en `convert.sh` (que se descarga fresco en el conversor, con marcadores
-`ВСТАВЬТЕ_...`), y el enlace presignado en `manifests/03-app-vm.yaml` en el cuarto paso.
+`PASTE_...`), y el enlace presignado en `manifests/03-app-vm.yaml` en el cuarto paso.

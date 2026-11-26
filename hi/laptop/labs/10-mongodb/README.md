@@ -76,7 +76,7 @@ $lookup — आगे बढ़ते हुए उसी स्टेप मे
 ## लैब फ़ोल्डर में क्या है
 
 सारी फ़ाइलें आपके पास पहले से हैं — आपने उन्हें रिपॉज़िटरी के साथ ले लिया था। कुछ बनाने या दोबारा
-टाइप करने की ज़रूरत नहीं: नीचे जहाँ भी `kubectl apply -f नाम.yaml` लिखा है, फ़ाइल यहीं से ली
+टाइप करने की ज़रूरत नहीं: नीचे जहाँ भी `kubectl apply -f name.yaml` लिखा है, फ़ाइल यहीं से ली
 जाती है।
 
 ```bash
@@ -149,7 +149,7 @@ spec:
   sharding: false
   users:
     passapp:
-      password: आपका-पासवर्ड-यहाँ
+      password: YourPasswordHere
   databases:
     passes:
       roles:
@@ -181,10 +181,10 @@ Secrets टैब → `kubeconfig-tenant-workshopXX`**। इसे `~/.kube/wor
 प्लेटफ़ॉर्म को सौंप देती है, और प्लेटफ़ॉर्म अपनी ओर से सब ज़रूरी चीज़ें खड़ी कर देता है।
 
 ```bash
-# apply = «क्लस्टर को उस स्थिति में ले आओ जो फ़ाइल में वर्णित है»।
-#   --kubeconfig ~/.kube/workshop  कौन-सी एक्सेस फ़ाइल इस्तेमाल करनी है। इसके बिना kubectl
-#                                  डिफ़ॉल्ट एक्सेस ले लेगा और ग़लत क्लस्टर की ओर भटक जाएगा
-#   -f mongodb.yaml                कौन-सी फ़ाइल लागू करनी है (-f = file)
+# apply = "bring the cluster to what's described in the file".
+#   --kubeconfig ~/.kube/workshop  which access file to use. Without it kubectl
+#                                  will take the default access and wander off to the wrong cluster
+#   -f mongodb.yaml                which file to apply (-f = file)
 kubectl --kubeconfig ~/.kube/workshop apply -f mongodb.yaml
 ```
 
@@ -195,9 +195,9 @@ kubectl --kubeconfig ~/.kube/workshop apply -f mongodb.yaml
 हैं। चीज़ें कैसे चल रही हैं, यह ऐसे देख सकते हैं:
 
 ```bash
-# get = «दिखाओ, क्या है»। READY कॉलम बताएगा कि ऑर्डर कामकाजी स्थिति तक पहुँचा या नहीं।
-#   -n tenant-workshopXX  किस namespace में देखना है (namespace क्लस्टर के भीतर एक
-#                         विभाजन है; आपका टेनेंट ठीक ऐसा ही एक अलग namespace है)
+# get = "show me what's there". The READY column will tell you whether the order reached a working state.
+#   -n tenant-workshopXX  which namespace to look in (a namespace is a partition inside
+#                         the cluster; your tenant is exactly such a separate namespace)
 kubectl --kubeconfig ~/.kube/workshop get mongodb passes -n tenant-workshopXX
 ```
 
@@ -245,7 +245,7 @@ mongodb-passes-rs0.tenant-workshopXX.svc.cozy.local:27017
 <summary><b>कनेक्शन स्ट्रिंग को खंगालना</b></summary>
 
 ```
-mongodb://passapp:पासवर्ड@होस्ट:27017/passes?authSource=admin&directConnection=true
+mongodb://passapp:password@host:27017/passes?authSource=admin&directConnection=true
 ```
 
 `mongodb://` — स्कीम। फिर उपयोगकर्ता-नाम, पासवर्ड, पता, पोर्ट।
@@ -277,32 +277,32 @@ mongodb://passapp:पासवर्ड@होस्ट:27017/passes?authSource=
 
 </details>
 
-Pod खड़ा करें। `workshopXX` की जगह अपना टेनेंट नंबर और `आपका-पासवर्ड-यहाँ` की जगह अपना पासवर्ड
+Pod खड़ा करें। `workshopXX` की जगह अपना टेनेंट नंबर और `YourPasswordHere` की जगह अपना पासवर्ड
 डालें:
 
 ```bash
-# KUBECONFIG — kubectl कौन-सी एक्सेस फ़ाइल इस्तेमाल करता है। यहाँ यह लैब 0 वाला
-# लैब क्लस्टर है: अपने Pod आप केवल इसी में चलाते हैं, इससे टेनेंट में आपको नहीं घुसने देंगे।
+# KUBECONFIG — which access file kubectl uses. Here it's the lab cluster
+# from lab 0: you launch your own Pods only in it, the tenant won't let you in with this.
 export KUBECONFIG=~/lab.kubeconfig
 
-# run = «एक अकेला Pod बनाओ और उसमें यह इमेज चलाओ»। जो फ़्लैग मायने रखते हैं:
-#   --image=mongo:8.0        क्या चलाना है। इमेज में mongosh शेल है
-#   --restart=Never          ठीक एक अकेला Pod बनाओ, कोई Deployment नहीं। वरना
-#                            जैसे ही यह पूरा होता, क्लस्टर इसे हर बार दोबारा खड़ा कर देता
-#   --env=MONGO_URI=...      Pod के भीतर एक एनवायरनमेंट वैरिएबल। पासवर्ड इसी में रहता है,
-#                            हर अगली कमांड में दोहराया नहीं जाता
-#   --command -- sleep 86400 कंटेनर को किससे व्यस्त रखना है। mongo इमेज डिफ़ॉल्ट रूप से
-#                            डेटाबेस सर्वर शुरू कर देती — वह हमें नहीं चाहिए, हमें एक जीवित कंटेनर
-#                            चाहिए जिसमें घुसा जा सके। 86400 सेकंड यानी एक दिन
+# run = "create a single Pod and run this image in it". The flags that matter:
+#   --image=mongo:8.0        what to run. The image contains the mongosh shell
+#   --restart=Never          create exactly a single Pod, not a Deployment. Otherwise
+#                            the cluster would bring it back up every time it finished
+#   --env=MONGO_URI=...      an environment variable inside the Pod. The password stays in it,
+#                            rather than being repeated in every following command
+#   --command -- sleep 86400 what to keep the container busy with. The mongo image would by default start
+#                            the database server — we don't need it, we need a live container
+#                            you can step into. 86400 seconds is a day
 kubectl run mongo-workbench \
   --image=mongo:8.0 \
   --restart=Never \
-  --env=MONGO_URI="mongodb://passapp:आपका-पासवर्ड-यहाँ@mongodb-passes-rs0.tenant-workshopXX.svc.cozy.local:27017/passes?authSource=admin&directConnection=true" \
+  --env=MONGO_URI="mongodb://passapp:YourPasswordHere@mongodb-passes-rs0.tenant-workshopXX.svc.cozy.local:27017/passes?authSource=admin&directConnection=true" \
   --command -- sleep 86400
 
-# wait = «शर्त पूरी होने तक नियंत्रण मत लौटाओ»
-#   --for=condition=Ready  तब तक रुकते हैं जब तक Pod ख़ुद तैयारी की सूचना न दे
-#   --timeout=180s         कितनी देर रुकना है, इससे पहले कि त्रुटि लौटाई जाए और हमेशा के लिए न लटका रहे
+# wait = "don't return control until the condition is met"
+#   --for=condition=Ready  we wait until the Pod reports readiness itself
+#   --timeout=180s         how long to wait before returning an error rather than hanging forever
 kubectl wait --for=condition=Ready pod/mongo-workbench --timeout=180s
 ```
 
@@ -313,18 +313,18 @@ kubectl wait --for=condition=Ready pod/mongo-workbench --timeout=180s
 हैं:
 
 ```bash
-# mo — एक शॉर्टकट जो टर्मिनल विंडो बंद करने तक जीवित रहता है: शेल में अपनी
-# ख़ुद की कमांड ऐसे घोषित की जाती है।
-#   exec        पहले से चल रहे Pod के भीतर कुछ चलाना
-#   -i          भीतर स्टैंडर्ड इनपुट भेजना: इसके बिना कोई प्रोग्राम नहीं दिया जा सकता
-#   sh -c '...' Pod में एक शेल चलाते हैं ताकि वह ख़ुद $MONGO_URI प्रतिस्थापित करे।
-#               कोट जानबूझकर सिंगल हैं: वैरिएबल Pod को प्रतिस्थापित करना चाहिए, आपके
-#               टर्मिनल को नहीं — वरना पासवर्ड कमांड-इतिहास में पहुँच जाएगा
-#   --quiet     mongosh का अभिवादन मत छापो, केवल उत्तर छोड़ो
+# mo — a shortcut that lives until you close the terminal window: this is how you
+# declare your own command in the shell.
+#   exec        run something inside an already-running Pod
+#   -i          forward standard input inside: without it you can't feed in a program
+#   sh -c '...' we run a shell in the Pod so that it substitutes $MONGO_URI itself.
+#               The quotes are single on purpose: the Pod should substitute the variable, not
+#               your terminal — otherwise the password ends up in the command history
+#   --quiet     don't print the mongosh greeting, leave only the answer
 mo() { kubectl exec -i mongo-workbench -- sh -c 'mongosh --quiet "$MONGO_URI"'; }
 
-# ping — एक सेवा-अनुरोध, «तू ज़िंदा है?»। यह कुछ नहीं पढ़ता-लिखता, यह कनेक्शन जाँचता है
-# और यह कि प्रमाण-पत्र स्वीकार हुए। | चिह्न इस पंक्ति को mongosh के इनपुट में भेजता है
+# ping — a service request, "are you alive?". It reads and writes nothing, it checks the connection
+# and that the credentials were accepted. The | sign sends this line to mongosh's input
 echo 'db.runCommand({ ping: 1 })' | mo
 ```
 
@@ -345,8 +345,8 @@ echo 'db.runCommand({ ping: 1 })' | mo
 और आप उसमें एक के बाद एक क्वेरी टाइप करते हैं:
 
 ```bash
-# -i की जगह -it: एक t जुड़ता है — «मुझे एक टर्मिनल दो»। इसीलिए इनपुट का प्रॉम्प्ट,
-# ऊपर वाले तीर पर कमांड-इतिहास, और हाइलाइटिंग। t के बिना शेल चुपचाप इनपुट का इंतज़ार करती।
+# -it instead of -i: a t is added — "give me a terminal". Hence the input prompt,
+# command history on the up arrow, and highlighting. Without t the shell would silently wait for input.
 kubectl exec -it mongo-workbench -- sh -c 'mongosh "$MONGO_URI"'
 ```
 
@@ -365,12 +365,12 @@ kubectl exec -it mongo-workbench -- sh -c 'mongosh "$MONGO_URI"'
 
 ```bash
 cd labs/10-mongodb
-# < चिह्न फ़ाइल की सामग्री को कमांड के इनपुट में भेजता है — वही जैसे आपने पूरी
-# फ़ाइल का टेक्स्ट mongosh शेल में हाथ से टाइप किया हो।
+# The < sign feeds the file's contents into the command's input — the same thing as if you
+# typed the whole text of the file by hand in the mongosh shell.
 mo < passes.js
 ```
 
-**आपको क्या दिखना चाहिए** — `संग्रह में दस्तावेज़: 4`।
+**आपको क्या दिखना चाहिए** — `documents in collection: 4`।
 
 <details>
 <summary><b>हमने जो डाला, उसे खंगालना</b></summary>
@@ -385,12 +385,12 @@ mo < passes.js
 
 ```js
   {
-    type: "एकल-उपयोग",
-    guest: "राजेश कुमार शर्मा",
+    type: "single-use",
+    guest: "James P. Whitfield",
     host: "petrov@corp.example",
-    entrance: "उत्तरी",
+    entrance: "North",
     valid_on: ISODate("2026-09-01T09:00:00Z"),
-    purpose: "नौकरी साक्षात्कार"
+    purpose: "job interview"
   }
 ```
 
@@ -405,7 +405,7 @@ mo < passes.js
 की जगह `entrances` अब **एक सूची** है:
 
 ```js
-    entrances: ["उत्तरी", "दक्षिणी"],
+    entrances: ["North", "South"],
     badge_returned: false
 ```
 
@@ -419,8 +419,8 @@ mo < passes.js
 
 ```js
     car: {
-      plate: "MH-12-AB-1174",
-      model: "Force Traveller",
+      plate: "AB-1174-CD",
+      model: "Ford Transit",
       trailer: false,
       weight_kg: 3500
     },
@@ -434,9 +434,9 @@ mo < passes.js
 
 ```js
     members: [
-      { name: "प्रदीप यादव", age: 16 },
-      { name: "मीना जोशी", age: 15 },
-      { name: "ईशान नायर", age: 17 }
+      { name: "Peter Hale", age: 16 },
+      { name: "Mary Fenwick", age: 15 },
+      { name: "Isaac Hart", age: 17 }
     ]
 ```
 
@@ -460,9 +460,9 @@ mo < passes.js
 **किसी निश्चित तारीख के सारे पास:**
 
 ```js
-// find = «शर्त पर खरे उतरने वाले डॉक्यूमेंट दिखाओ»
-// { valid_on: ISODate(...) } — डॉक्यूमेंट का valid_on फ़ील्ड ठीक इसी तारीख के बराबर
-// होना चाहिए। ISODate एक तारीख है, स्ट्रिंग नहीं: तुलना समय से होती है, वर्तनी से नहीं
+// find = "show the documents that match the condition"
+// { valid_on: ISODate(...) } — the document's valid_on field must equal exactly this
+// date. ISODate is a date, not a string: the comparison is by time, not by spelling
 db.passes.find({ valid_on: ISODate("2026-09-02T07:30:00Z") })
 ```
 
@@ -471,16 +471,16 @@ db.passes.find({ valid_on: ISODate("2026-09-02T07:30:00Z") })
 **केवल वाहन पास:**
 
 ```js
-// एक सामान्य स्ट्रिंग फ़ील्ड पर शर्त: पूरा मिलान, यहाँ अक्षर-आकार की अनदेखी नहीं होती
-db.passes.find({ type: "वाहन" })
+// A condition on an ordinary string field: a whole match, there's no case-insensitivity here
+db.passes.find({ type: "vehicle" })
 ```
 
 **नंबर प्लेट से खोज — बिंदु के ज़रिए नेस्टेड ऑब्जेक्ट के भीतर पहुँचना:**
 
 ```js
-// "car.plate" — डॉक्यूमेंट के भीतर एक पथ: car ऑब्जेक्ट के भीतर plate फ़ील्ड।
-// पथ के चारों ओर कोट अनिवार्य हैं, वरना JavaScript बिंदु को अपने ढंग से पढ़ लेगा
-db.passes.find({ "car.plate": "MH-12-AB-1174" })
+// "car.plate" — a path into the document: the plate field inside the car object.
+// The quotes around the path are mandatory, otherwise JavaScript will read the dot its own way
+db.passes.find({ "car.plate": "AB-1174-CD" })
 ```
 
 <details>
@@ -490,7 +490,7 @@ db.passes.find({ "car.plate": "MH-12-AB-1174" })
 पहुँच सकता है, न कि नेस्टेड ऑब्जेक्ट को टेक्स्ट के टुकड़े की तरह रखता है।
 
 अंतर व्यावहारिक है। अगर `car` किसी रिलेशनल टेबल में भीतर JSON वाले `TEXT` कॉलम के रूप में होता, तो
-नंबर से खोज का मतलब होता `LIKE '%MH-12-AB-1174%'` — बिना इंडेक्स पूरा स्कैन, झूठे मिलानों के साथ। यहाँ
+नंबर से खोज का मतलब होता `LIKE '%AB-1174-CD%'` — बिना इंडेक्स पूरा स्कैन, झूठे मिलानों के साथ। यहाँ
 यह एक सामान्य शर्त है जिस पर आप इंडेक्स बना सकते हैं, और हम बनाएँगे।
 
 ⚠️ `"car.plate"` के चारों ओर कोट अनिवार्य हैं: उनके बिना JavaScript बिंदु को किसी ऑब्जेक्ट की
@@ -501,21 +501,21 @@ db.passes.find({ "car.plate": "MH-12-AB-1174" })
 **कई प्रवेशद्वारों पर मान्य पास:**
 
 ```js
-// entrances कोई स्ट्रिंग नहीं बल्कि एक सूची है: ["उत्तरी", "दक्षिणी"]। शर्त फिर भी
-// एक सामान्य फ़ील्ड की तरह लिखी जाती है, MongoDB इसे ख़ुद सूची के हर तत्व पर जाँच लेगा
-db.passes.find({ entrances: "दक्षिणी" })
+// entrances is not a string but a list: ["North", "South"]. The condition is still written
+// as for an ordinary field, MongoDB will check it against each element of the list itself
+db.passes.find({ entrances: "South" })
 ```
 
-ध्यान दें: शर्त ऐसे लिखी गई है मानो `entrances` एक सामान्य फ़ील्ड हो जिसका मान `"दक्षिणी"` है, जबकि
+ध्यान दें: शर्त ऐसे लिखी गई है मानो `entrances` एक सामान्य फ़ील्ड हो जिसका मान `"South"` है, जबकि
 असल में यह एक सूची है। **MongoDB ख़ुद समझ लेता है कि अगर फ़ील्ड एक सूची है, तो शर्त हर तत्व पर
 जाँची जानी चाहिए।** «शामिल है» के लिए किसी अलग सिंटैक्स की ज़रूरत नहीं।
 
 **ऐसे समूह पास जिनमें नाबालिग शामिल हैं:**
 
 ```js
-// members.age पथ ऑब्जेक्टों की एक सूची के भीतर ले जाता है — हर प्रतिभागी के age फ़ील्ड तक।
-// $lt = less than, «से कम»। $ वाली शर्त कोई मान नहीं बल्कि तुलना का एक तरीक़ा है:
-// «फ़ील्ड 16 से कम होना चाहिए», न कि «फ़ील्ड 16 के बराबर होना चाहिए»
+// The path members.age leads inside a list of objects — to the age field of each participant.
+// $lt = less than. A condition with $ is not a value but a way of comparing:
+// "the field must be less than 16", not "the field must equal 16"
 db.passes.find({ "members.age": { $lt: 16 } })
 ```
 
@@ -526,8 +526,8 @@ db.passes.find({ "members.age": { $lt: 16 } })
 **ऐसे सारे पास जिनमें वाहन बिल्कुल भी दर्ज है:**
 
 ```js
-// $exists मान के बारे में नहीं, बल्कि डॉक्यूमेंट में फ़ील्ड की मौजूदगी के बारे में पूछता है:
-// «इस डॉक्यूमेंट में car फ़ील्ड बिल्कुल भी है?»
+// $exists asks not about the value but about the very presence of the field in the document:
+// "does this document have a car field at all?"
 db.passes.find({ car: { $exists: true } })
 ```
 
@@ -557,17 +557,17 @@ SQL में वही परिणाम — `SELECT type, count(*) FROM passe
 </details>
 
 ```js
-// aggregate = «डॉक्यूमेंटों को चरणों की एक शृंखला से गुज़ारो»। चरण क्रम से चलते हैं,
-// हर एक को वही मिलता है जो पिछले ने निकाला:
-//   $group — डॉक्यूमेंटों को type फ़ील्ड के मान से समूहों में बाँटो, और हर एक को गिनो
-//   $sort  — समूहों को गिनती से क्रमबद्ध करो, -1 यानी «घटता»
+// aggregate = "run the documents through a chain of stages". The stages go in order,
+// each receiving what the previous one produced:
+//   $group — sort the documents into groups by the value of the type field, and count each one
+//   $sort  — order the groups by count, -1 means "descending"
 db.passes.aggregate([
   { $group: { _id: "$type", count: { $sum: 1 } } },
   { $sort: { count: -1 } }
 ])
 ```
 
-**आपको क्या दिखना चाहिए** — `{ _id: 'एकल-उपयोग', count: 1 }` रूप की चार पंक्तियाँ।
+**आपको क्या दिखना चाहिए** — `{ _id: 'single-use', count: 1 }` रूप की चार पंक्तियाँ।
 
 ## स्टेप 5. उस फ़ील्ड पर इंडेक्स जो ज़्यादातर के पास नहीं
 
@@ -577,12 +577,12 @@ db.passes.aggregate([
 जैसी ही है, पर डॉक्यूमेंटों के बजाय हम इस बात की रिपोर्ट माँगते हैं कि डेटाबेस ने उन्हें कैसे खोजा।
 
 ```js
-// explain = «डॉक्यूमेंट मत दो, बताओ कि तुमने उन्हें कैसे खोजा»
-//   "executionStats"     रिपोर्ट का ढंग: केवल योजना नहीं, बल्कि असल में क्या हुआ
-//   .executionStats      उत्तर में से ठीक यही खंड लेते हैं, ताकि सब कुछ न पढ़ना पड़े
-// रिपोर्ट में हम totalDocsExamined देखते हैं — एक लौटाने के लिए डेटाबेस ने कितने
-// डॉक्यूमेंट पढ़े
-db.passes.find({ "car.plate": "MH-12-AB-1174" }).explain("executionStats").executionStats
+// explain = "don't give me the documents, tell me how you looked for them"
+//   "executionStats"     report mode: not only the plan, but what actually happened
+//   .executionStats      we take exactly this section from the answer, so as not to read all of it
+// In the report we look at totalDocsExamined — how many documents the database read,
+// to return one
+db.passes.find({ "car.plate": "AB-1174-CD" }).explain("executionStats").executionStats
 ```
 
 **आपको क्या दिखना चाहिए** — `totalDocsExamined` कलेक्शन में डॉक्यूमेंटों की संख्या के बराबर। एक को
@@ -593,14 +593,14 @@ db.passes.find({ "car.plate": "MH-12-AB-1174" }).explain("executionStats").execu
 पढ़े बिना पा लेता है:
 
 ```js
-// createIndex = «इस फ़ील्ड पर एक इंडेक्स बनाओ और आगे से इसे ख़ुद बनाए रखो»
-//   { "car.plate": 1 }   किस फ़ील्ड पर। 1 यानी «बढ़ते» क्रम में
-//   name: "car_plate"    इंडेक्स को क्या नाम देना है, ताकि बाद में इसे पहचान और मिटा सकें
-//   sparse: true         इंडेक्स में केवल वे डॉक्यूमेंट आते हैं जिनके पास फ़ील्ड है
+// createIndex = "build an index on this field and keep maintaining it yourself from now on"
+//   { "car.plate": 1 }   on which field. 1 is "ascending" order
+//   name: "car_plate"    what to name the index, so you can recognize and delete it later
+//   sparse: true         only documents that have the field get into the index
 db.passes.createIndex({ "car.plate": 1 }, { name: "car_plate", sparse: true })
 
-// वही रिपोर्ट दोहराते हैं और पिछली से तुलना करते हैं
-db.passes.find({ "car.plate": "MH-12-AB-1174" }).explain("executionStats").executionStats
+// We repeat the same report and compare it with the previous one
+db.passes.find({ "car.plate": "AB-1174-CD" }).explain("executionStats").executionStats
 ```
 
 **आपको क्या दिखना चाहिए** — `totalDocsExamined` एक के बराबर, और योजना में `COLLSCAN` की जगह
@@ -642,10 +642,10 @@ db.passes.find({ "car.plate": "MH-12-AB-1174" }).explain("executionStats").execu
 स्क्रिप्ट के ज़रिए:
 
 ```js
-// insertOne = «एक डॉक्यूमेंट जोड़ो»। उसमें कौन-से फ़ील्ड हैं, डेटाबेस नहीं पूछता
+// insertOne = "add one document". What fields are in it, the database doesn't ask
 db.passes.insertOne({
-  tipe: "एकल-उपयोग",
-  guest: "संजय कुमार चौहान",
+  tipe: "single-use",
+  guest: "Nathan S. Graham",
   host: "petrov@corp.example",
   data: ISODate("2026-09-04T09:00:00Z")
 })
@@ -655,17 +655,17 @@ db.passes.insertOne({
 कुंजी, जिसे डेटाबेस ने ख़ुद गढ़ा। जाँच लें कि अब पाँच डॉक्यूमेंट हैं:
 
 ```js
-// countDocuments = «शर्त पर खरे उतरने वाले डॉक्यूमेंट गिनो»।
-// ख़ाली कर्ली ब्रेस बिना किसी पाबंदी वाली शर्त है, यानी «सभी»
+// countDocuments = "count the documents that match the condition".
+// Empty curly braces are a condition with no restrictions, that is, "all"
 db.passes.countDocuments({})
 ```
 
 पाँच। अब वह जो सुरक्षा हर सुबह करती है — एकबारगी पासों की सूची खोलती है:
 
 ```js
-// खोज वाले स्टेप जैसा ही type से चयन: वे पास दिखाओ जिनका
-// type फ़ील्ड "एकल-उपयोग" के बराबर है
-db.passes.find({ type: "एकल-उपयोग" })
+// The same selection by type as in the search step: show the passes whose
+// type field equals "single-use"
+db.passes.find({ type: "single-use" })
 ```
 
 > **आगे पढ़ने से पहले रुककर सोचिए।**
@@ -687,8 +687,8 @@ db.passes.find({ type: "एकल-उपयोग" })
 आइए पीड़ितों को ढूँढ़ें — वे डॉक्यूमेंट जिनमें `type` फ़ील्ड है ही नहीं:
 
 ```js
-// $exists: false — पिछले स्टेप का उल्टा: «फ़ील्ड डॉक्यूमेंट में नहीं है»।
-// ऐसी क्वेरी हाथ में रखने लायक़ है: यह दिखाती है कि स्कीमा को दरकिनार कर क्या जमा हो गया
+// $exists: false — the opposite of the previous step: "the field is not in the document".
+// It's worth keeping such a query handy: it shows what has accumulated past the schema
 db.passes.find({ type: { $exists: false } })
 ```
 
@@ -708,8 +708,8 @@ db.passes.find({ type: { $exists: false } })
 बिना type वाले डॉक्यूमेंट हटाते हैं:
 
 ```js
-// deleteMany = «शर्त पर खरे उतरने वाले सारे डॉक्यूमेंट हटाओ»। शर्त वही है
-// जो ऊपर की खोज में थी — यानी ठीक वही हटेगा जो आपने अभी-अभी देखा
+// deleteMany = "delete all documents that match the condition". The condition is the same
+// as in the search above — which means exactly what you just saw will be deleted
 db.passes.deleteMany({ type: { $exists: false } })
 ```
 
@@ -744,7 +744,7 @@ db.runCommand({
 
 ```js
         type: {
-          enum: ["एकल-उपयोग", "साप्ताहिक", "वाहन", "समूह"],
+          enum: ["single-use", "weekly", "vehicle", "group"],
         },
 ```
 
@@ -781,19 +781,19 @@ db.runCommand({
 नियम लागू करते हैं:
 
 ```bash
-# passes.js जैसा ही तरीक़ा: फ़ाइल की सामग्री mongosh के इनपुट में भेजी जाती है।
-# नियम एक जीवित कलेक्शन पर टाँगा जाता है — डेटाबेस रोकने की ज़रूरत नहीं
+# The same trick as with passes.js: the file's contents are fed to mongosh's input.
+# The rule is hung on a live collection — no need to stop the database
 mo < validator.js
 ```
 
-**आपको क्या दिखना चाहिए** — `नियम स्थापित किया गया`।
+**आपको क्या दिखना चाहिए** — `rule installed`।
 
 वही टाइपो दोहराने की कोशिश करते हैं — अब नियम की निगरानी में:
 
 ```js
-// tipe फ़ील्ड नियम को अज्ञात है, और डॉक्यूमेंट में अनिवार्य type है ही नहीं।
-// पहले ऐसा डॉक्यूमेंट चुपचाप कलेक्शन में बैठ जाता
-db.passes.insertOne({ tipe: "एकल-उपयोग", guest: "जाँच", host: "x@corp.example" })
+// The tipe field is unknown to the rule, and there's no required type in the document.
+// Before, such a document would silently settle into the collection
+db.passes.insertOne({ tipe: "single-use", guest: "Check", host: "x@corp.example" })
 ```
 
 **आपको क्या दिखना चाहिए** — `MongoServerError: Document failed validation`। अब टाइपो पार नहीं होता।
@@ -823,15 +823,15 @@ SQL में यह एक पंक्ति है: `JOIN staff ON staff.emai
 
 ```js
 db.passes.aggregate([
-  // $lookup = «हर पास के लिए दूसरे कलेक्शन में जाओ और वहाँ से एक रिकॉर्ड ले आओ»
+  // $lookup = "for each pass, go to another collection and bring back a record from there"
   { $lookup: {
-      from: "staff",          // कहाँ जाना है — कर्मचारियों का कलेक्शन
-      localField: "host",     // पास का कौन-सा फ़ील्ड मिलाना है
-      foreignField: "email",  // कर्मचारी के किस फ़ील्ड से
-      as: "host_info"         // मिली चीज़ को किस नाम से डॉक्यूमेंट में रखना है
+      from: "staff",          // where to go — the employees collection
+      localField: "host",     // which pass field to compare
+      foreignField: "email",  // with which employee field
+      as: "host_info"         // under what name to put what's found into the document
   } },
-  // मिली चीज़ हमेशा एक सूची के रूप में रखी जाती है, भले ही मिलान एक ही हो।
-  // $unwind सूची को वापस एक अकेले मान में खोल देता है
+  // What's found is always put as a list, even if there's a single match.
+  // $unwind unrolls the list back into a single value
   { $unwind: "$host_info" }
 ])
 ```
@@ -869,10 +869,10 @@ db.passes.aggregate([
 आज़माएँ:
 
 ```js
-// host फ़ील्ड, अर्थ के हिसाब से, एक कर्मचारी की ओर संदर्भ करता है। ऐसा कोई कर्मचारी नहीं है —
-// क्या डेटाबेस इसे जाँचेगा? डॉक्यूमेंट पिछले स्टेप के नियम पर खरा है: type
-// अपनी जगह और सूची में से है, host एक स्ट्रिंग है
-db.passes.insertOne({ type: "एकल-उपयोग", host: "मौजूद-नहीं@corp.example", guest: "परीक्षण" })
+// The host field, by meaning, refers to an employee. No such employee exists —
+// will the database check this? The document satisfies the rule from the last step: type is
+// in place and from the list, host is a string
+db.passes.insertOne({ type: "single-use", host: "does-not-exist@corp.example", guest: "Test" })
 ```
 
 डॉक्यूमेंट इंसर्ट हो जाएगा। ऐसी ईमेल वाला कोई कर्मचारी नहीं है, और डेटाबेस इस पर नज़र नहीं डालेगा।
@@ -887,8 +887,8 @@ db.passes.insertOne({ type: "एकल-उपयोग", host: "मौजूद-
 टेस्ट डॉक्यूमेंट हटाना न भूलें:
 
 ```js
-// deleteOne = «शर्त पर खरे उतरने वाला एक डॉक्यूमेंट हटाओ», सब एक साथ नहीं
-db.passes.deleteOne({ host: "मौजूद-नहीं@corp.example" })
+// deleteOne = "delete one document that matches the condition", not all of them at once
+db.passes.deleteOne({ host: "does-not-exist@corp.example" })
 ```
 
 </details>
@@ -906,11 +906,11 @@ db.passes.deleteOne({ host: "मौजूद-नहीं@corp.example" })
 है। ज़्यादा चाहिए — तो एक सेशन खोलें और स्पष्ट रूप से एक ट्रांज़ैक्शन शुरू करें:
 
 ```js
-// सेशन डेटाबेस के साथ एक अलग «बातचीत» है, जिसके भीतर आप एक ट्रांज़ैक्शन घोषित कर सकते हैं
+// A session is a separate "conversation" with the database, within which you can declare a transaction
 const s = db.getMongo().startSession();
-s.startTransaction();          // इस बिंदु से बदलाव जमा होते हैं, पर किसी को दिखते नहीं
-// … s.getDatabase("passes") के ज़रिए संक्रियाएँ …
-s.commitTransaction();         // सब एक साथ लागू करो। सब एक साथ रद्द करने के लिए — abortTransaction()
+s.startTransaction();          // from this point changes accumulate, but are visible to no one
+// … operations through s.getDatabase("passes") …
+s.commitTransaction();         // apply it all at once. To cancel it all at once — abortTransaction()
 ```
 
 **और एक तीसरा सच, सबसे व्यावहारिक:** MongoDB में ट्रांज़ैक्शन रिलेशनल डेटाबेस से ज़्यादा महँगे हैं,
@@ -937,15 +937,15 @@ s.commitTransaction();         // सब एक साथ लागू करो
 
 ```js
 db.passes.aggregate([
-  // $$ROOT — पूरा डॉक्यूमेंट समूचा। $objectToArray इसे
-  // «फ़ील्ड का नाम — मान» जोड़ों में तोड़ता है, ताकि फिर फ़ील्डों के साथ डेटा की तरह काम किया जा सके
+  // $$ROOT — the whole document in full. $objectToArray breaks it into
+  // "field name — value" pairs, so you can then work with the fields as data
   { $project: { fields: { $objectToArray: "$$ROOT" } } },
-  // जोड़ों की सूची खोलते हैं: एक जोड़ा — अगले चरण के इनपुट पर एक पंक्ति
+  // We unroll the list of pairs: one pair — one row at the input of the next stage
   { $unwind: "$fields" },
-  // दो विशेषताओं से एक साथ समूहित करते हैं: फ़ील्ड का नाम (k) और उसके मान का टाइप (t),
-  // और गिनते हैं कि ऐसा संयोजन कितनी बार आया
+  // We group by two attributes at once: the field name (k) and its value type (t),
+  // and count how many times such a combination occurred
   { $group: { _id: { k: "$fields.k", t: { $type: "$fields.v" } }, n: { $sum: 1 } } },
-  { $sort: { "_id.k": 1 } }   // वर्णक्रम में, ताकि एक फ़ील्ड अपने ही टाइपों के पास रहे
+  { $sort: { "_id.k": 1 } }   // alphabetically, so one field sits next to its own types
 ])
 ```
 
@@ -982,13 +982,13 @@ db.passes.aggregate([
 
 ```bash
 cd labs/10-mongodb
-# वही एक्सेस फ़ाइल जो ऊपर के स्टेपों में थी: स्क्रिप्ट लैब क्लस्टर के भीतर से काम करती है
+# The same access file as in the steps above: the script works from inside the lab cluster
 export KUBECONFIG=~/lab.kubeconfig
-# टेनेंट नंबर: इससे स्क्रिप्ट डेटाबेस का पता जोड़ लेगी। अपना डालें
+# The tenant number: from it the script will assemble the database address. Substitute your own
 export COZY_TENANT=workshop03
-# पासवर्ड सिंगल कोट में: उनके भीतर शेल स्ट्रिंग के अंदर $, ! और & को नहीं छेड़ता।
-# पासवर्ड रिपोर्ट में नहीं पहुँचता
-export MONGO_PASSWORD='आपका-passapp-पासवर्ड'
+# The password in single quotes: inside them the shell doesn't touch $, ! and & within the string.
+# The password doesn't make it into the report
+export MONGO_PASSWORD='your-passapp-password'
 ./check.sh
 ```
 
@@ -1007,8 +1007,8 @@ export MONGO_PASSWORD='आपका-passapp-पासवर्ड'
 कार्यशील Pod की अब ज़रूरत नहीं — इतनी देर यह कंटेनर को `sleep` कमांड से व्यस्त रखे रहा:
 
 ```bash
-# delete = «क्लस्टर से हटाओ»। Pod अपने MONGO_URI वैरिएबल समेत ग़ायब हो जाता है,
-# ताकि पासवर्ड क्लस्टर में न रह जाए
+# delete = "remove from the cluster". The Pod disappears along with its MONGO_URI variable,
+# so the password doesn't remain in the cluster
 kubectl delete pod mongo-workbench
 ```
 

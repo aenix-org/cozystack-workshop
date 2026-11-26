@@ -30,4 +30,4 @@ cd ~/workshop
 `nano manifests/03-app-vm.yaml` (speichern: `Ctrl+O`, `Enter`, beenden: `Ctrl+X`).
 
 Der einzige Platzhalter, der absichtlich stehen geblieben ist, befindet sich in `manifests/03-app-vm.yaml`, in der Zeile
-`url: "ВСТАВЬТЕ_PRESIGNED_URL"`. Diese URL erhalten Sie, sobald Sie das Image konvertiert haben. Für den Moment sollten Sie nur wissen, dass sie dort auf Sie wartet.
+`url: "PASTE_PRESIGNED_URL"`. Diese URL erhalten Sie, sobald Sie das Image konvertiert haben. Für den Moment sollten Sie nur wissen, dass sie dort auf Sie wartet.

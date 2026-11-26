@@ -1,90 +1,90 @@
 #!/usr/bin/env bash
-# Prüfung für Lab 3: Autoscaling.
+# Check for lab 3: autoscaling.
 #
-# Wir prüfen nicht, ob „hpa.yaml angewendet ist", sondern ob der Mechanismus lebt und Entscheidungen treffen kann:
-#   - der Container hat requests.cpu, sonst gibt es nichts, wovon der Prozentsatz berechnet werden kann;
-#   - der HPA existiert und zielt genau auf unser Deployment;
-#   - der Bereich ist sinnvoll gesetzt (maxReplicas größer als eins, sonst gibt es keinen Platz zum Wachsen);
-#   - Metriken werden WIRKLICH erfasst: im Status steht eine Zahl, nicht <unknown>;
-#   - Skalierung hat bereits ausgelöst, das heißt, es wurde tatsächlich Last angelegt.
+# We verify not that "hpa.yaml is applied", but that the mechanism is alive and able to make decisions:
+#   - the container has requests.cpu, otherwise there is nothing to compute the percentage from;
+#   - the HPA exists and targets exactly our Deployment;
+#   - the range is set meaningfully (maxReplicas greater than one, otherwise there is nowhere to grow);
+#   - metrics are REALLY being collected: the status has a number, not <unknown>;
+#   - scaling has already fired, meaning load was actually applied.
 #
-# Das Skript ändert nichts. Ein Einweg-Pod wird nur gestartet, um zu prüfen,
-# dass Fortio von innerhalb des Clusters antwortet, und entfernt sich selbst.
+# The script changes nothing. A one-shot pod is spun up only to check
+# that Fortio responds from inside the cluster, and it removes itself.
 #
-# Läuft auf der VM, aus dem Ordner dieses Labs, mit Zugriff auf den Trainingscluster `lab`
-# (nicht auf einen Tenant auf dem Management-Cluster):
+# Runs on the VM, from this lab's folder, with access to the training cluster `lab`
+# (not to a tenant on the management cluster):
 #     export KUBECONFIG=~/lab.kubeconfig
 #     cd labs/03-scale && ./check.sh
-# Die Variable COZY_TENANT wird hier nicht benötigt: das gesamte Lab läuft innerhalb des Clusters `lab`.
+# The COZY_TENANT variable is not needed here: the whole lab runs inside the `lab` cluster.
 #
-# VOR dem Aufräumen ausführen. Ein Teil der Prüfungen stützt sich auf Spuren von bereits geschehenem Wachstum,
-# und die leben zusammen mit dem HPA-Objekt: löschen Sie es — und es gibt nichts mehr zu beweisen.
+# Run BEFORE cleanup. Some checks rely on traces of growth that already happened,
+# and those live together with the HPA object: delete it and there will be nothing left to prove.
 
-# Kommen in den Berichtskopf und in den Dateinamen report-<lab>-<datum>.md neben dem Skript.
+# These go into the report header and into the file name report-<lab>-<date>.md next to the script.
 LAB_NAME="03-scale"
-LAB_TITLE="Lab 3 · Last und Autoscaling"
-# Gemeinsame Bibliothek: ok / fail / warn / evidence / finish, Abfragen von innerhalb des Clusters,
-# Schreiben des Berichts. Der Pfad wird vom Ort des Skripts selbst aus berechnet, nicht vom aktuellen Verzeichnis.
+LAB_TITLE="Lab 3 · Load and autoscaling"
+# Shared library: ok / fail / warn / evidence / finish, in-cluster queries,
+# writing the report. The path is computed from the script's own location, not from the current directory.
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
-# Ohne KUBECONFIG sucht kubectl einen Cluster auf der VM und lässt alles mit einem einzigen Fehler scheitern,
-# in dem die wahre Ursache nicht zu erkennen ist. Wir halten sofort an.
+# Without KUBECONFIG, kubectl looks for a cluster on the VM and fails everything with a single error
+# in which the real cause is impossible to make out. We stop right away.
 need_kubeconfig
 
-# Namen sind in Variablen ausgelagert, damit die Übereinstimmung von Anwendungsname und HPA-Name
-# in diesem Lab nicht wie derselbe, versehentlich zweimal geschriebene Name aussieht.
+# Names are moved into variables so that the match between the app name and the HPA name
+# in this lab does not look like the same name accidentally written twice.
 APP=rickroll
 HPA=rickroll
 
-# --- Skalierungsziel vorhanden ---------------------------------------------
-# Die Anwendung aus Lab 1 — das, was der HPA verwaltet. Fehlt sie, würden alle weiteren
-# Prüfungen kaskadenartig scheitern und der Teilnehmer bekäme ein Dutzend Fehler statt eines
-# verständlichen, deshalb ist dies die einzige Stelle, an der das Skript vorzeitig beendet wird.
+# --- scaling target in place -----------------------------------------------
+# The app from lab 1 — the thing the HPA manages. If it is missing, all further
+# checks would cascade into failures and the participant would get a dozen errors instead of one
+# clear one, so this is the only place where the script exits early.
 if ! kubectl get deployment "$APP" >/dev/null 2>&1; then
-  fail "Anwendung ${APP} ist nicht im Cluster — es gibt nichts zu skalieren" \
-       "stellen Sie sie bereit: kubectl apply -f ../01-deploy/rickroll.yaml"
+  fail "application ${APP} is not in the cluster — nothing to scale" \
+       "deploy it: kubectl apply -f ../01-deploy/rickroll.yaml"
   finish
   exit $?
 fi
-ok "Anwendung ${APP} ist vorhanden"
+ok "application ${APP} is in place"
 
-# --- requests.cpu: ohne ihn berechnet der HPA keine Prozentsätze -----------
-# Die häufigste Ursache für „HPA funktioniert nicht", und am Manifest ist sie nicht zu sehen:
-# das Objekt wird erfolgreich erstellt, aber TARGETS bleibt für immer <unknown>.
+# --- requests.cpu: without it the HPA does not compute percentages ---------
+# The most common cause of "HPA does not work", and it is invisible in the manifest:
+# the object is created successfully, but TARGETS stays <unknown> forever.
 REQ_CPU="$(kubectl get deployment "$APP" \
   -o jsonpath='{.spec.template.spec.containers[0].resources.requests.cpu}' 2>/dev/null)"
 LIM_CPU="$(kubectl get deployment "$APP" \
   -o jsonpath='{.spec.template.spec.containers[0].resources.limits.cpu}' 2>/dev/null)"
 
 if [ -n "$REQ_CPU" ]; then
-  ok "der Container hat requests.cpu = ${REQ_CPU} gesetzt — es gibt etwas, wovon Prozentsätze berechnet werden können"
-  evidence "Container-Ressourcen" "requests.cpu: ${REQ_CPU}
-limits.cpu:   ${LIM_CPU:-nicht gesetzt}"
+  ok "the container has requests.cpu = ${REQ_CPU} set — there is something to compute percentages from"
+  evidence "Container resources" "requests.cpu: ${REQ_CPU}
+limits.cpu:   ${LIM_CPU:-not set}"
 else
-  fail "der Container ${APP} hat kein requests.cpu gesetzt" \
-       "HPA nach Utilization funktioniert ohne ihn nicht; wenden Sie ../01-deploy/rickroll.yaml erneut an"
+  fail "the container ${APP} has no requests.cpu set" \
+       "HPA by Utilization does not work without it; re-apply ../01-deploy/rickroll.yaml"
 fi
 
-# --- der HPA selbst --------------------------------------------------------
-# Wir prüfen nicht nur, ob das Objekt existiert, sondern auch, worauf es zielt. Ein HPA mit einem Tippfehler
-# in scaleTargetRef wird erfolgreich erstellt und sieht in der Liste wie ein funktionierender aus, aber das ganze Lab
-# verwaltet er eine nicht existierende Anwendung.
+# --- the HPA itself --------------------------------------------------------
+# We check not only that the object exists, but also what it targets. An HPA with a typo
+# in scaleTargetRef is created successfully and looks like a working one in the list, but for the whole lab
+# it manages a non-existent application.
 TARGET_KIND="$(kubectl get hpa "$HPA" -o jsonpath='{.spec.scaleTargetRef.kind}' 2>/dev/null)"
 TARGET_NAME="$(kubectl get hpa "$HPA" -o jsonpath='{.spec.scaleTargetRef.name}' 2>/dev/null)"
 
 if [ -z "$TARGET_NAME" ]; then
-  fail "es gibt keinen HorizontalPodAutoscaler mit dem Namen ${HPA} im Cluster" \
-       "wenden Sie ihn an: kubectl apply -f hpa.yaml (Prüfung vor dem Aufräumen ausführen)"
-  evidence "Was an Autoscaling vorhanden ist" "$(kubectl get hpa 2>&1)"
+  fail "there is no HorizontalPodAutoscaler named ${HPA} in the cluster" \
+       "apply it: kubectl apply -f hpa.yaml (run the check before cleanup)"
+  evidence "What autoscaling exists" "$(kubectl get hpa 2>&1)"
   finish
   exit $?
 fi
 
 if [ "$TARGET_KIND" = "Deployment" ] && [ "$TARGET_NAME" = "$APP" ]; then
-  ok "HPA ${HPA} zielt auf Deployment/${APP}"
+  ok "HPA ${HPA} targets Deployment/${APP}"
 else
-  fail "HPA ${HPA} verwaltet das Objekt ${TARGET_KIND}/${TARGET_NAME}, nicht Deployment/${APP}" \
-       "korrigieren Sie scaleTargetRef in hpa.yaml und wenden Sie es erneut an"
+  fail "HPA ${HPA} manages object ${TARGET_KIND}/${TARGET_NAME}, not Deployment/${APP}" \
+       "fix scaleTargetRef in hpa.yaml and re-apply"
 fi
 
 MINR="$(kubectl get hpa "$HPA" -o jsonpath='{.spec.minReplicas}' 2>/dev/null)"
@@ -92,110 +92,110 @@ MAXR="$(kubectl get hpa "$HPA" -o jsonpath='{.spec.maxReplicas}' 2>/dev/null)"
 [ -z "$MINR" ] && MINR=1
 
 if [ -n "$MAXR" ] && [ "$MAXR" -gt 1 ] 2>/dev/null; then
-  ok "Bereich ist gesetzt: von ${MINR} bis ${MAXR} Kopien — es gibt Platz zum Wachsen"
+  ok "range is set: from ${MINR} to ${MAXR} copies — there is room to grow"
 else
-  fail "die obere Grenze des Bereichs ist ${MAXR:-nicht gesetzt} — es gibt keinen Platz zum Wachsen" \
-       "in hpa.yaml muss maxReplicas größer als eins sein"
+  fail "the upper bound of the range is ${MAXR:-not set} — there is nowhere to grow" \
+       "hpa.yaml must have maxReplicas greater than one"
 fi
 
-# --- Metrikziel ------------------------------------------------------------
-# Hier warn, nicht fail: die Variante mit AverageValue (Schwelle in Millicores) funktioniert ebenfalls,
-# das Lab behandelt nur eine der beiden. Deswegen durchfallen zu lassen wäre unwahr.
+# --- metric target ---------------------------------------------------------
+# Here it is warn, not fail: the AverageValue variant (threshold in millicores) also works,
+# the lab only covers one of the two. Failing over it would be untrue.
 TGT_TYPE="$(kubectl get hpa "$HPA" \
   -o jsonpath='{.spec.metrics[0].resource.target.type}' 2>/dev/null)"
 TGT_VAL="$(kubectl get hpa "$HPA" \
   -o jsonpath='{.spec.metrics[0].resource.target.averageUtilization}' 2>/dev/null)"
 
 if [ "$TGT_TYPE" = "Utilization" ] && [ -n "$TGT_VAL" ]; then
-  ok "Schwelle ist gesetzt: ${TGT_VAL}% von requests.cpu (${REQ_CPU:-?})"
+  ok "threshold is set: ${TGT_VAL}% of requests.cpu (${REQ_CPU:-?})"
 else
-  warn "die Schwelle ist nicht als Prozentsatz von requests gesetzt (Typ: ${TGT_TYPE:-keiner})" \
-       "das Lab behandelt die Variante Utilization; auf die Funktionsfähigkeit hat das keinen Einfluss"
+  warn "the threshold is not set as a percentage of requests (type: ${TGT_TYPE:-none})" \
+       "the lab covers the Utilization variant; this does not affect functionality"
 fi
 
-# --- DAS WICHTIGSTE: Metriken werden wirklich erfasst ----------------------
-# Genau hier sieht man den Unterschied zwischen „Objekt erstellt" und „Mechanismus funktioniert".
+# --- THE KEY ONE: metrics are really being collected -----------------------
+# This is exactly where you see the difference between "object created" and "mechanism works".
 CUR_UTIL="$(kubectl get hpa "$HPA" \
   -o jsonpath='{.status.currentMetrics[0].resource.current.averageUtilization}' 2>/dev/null)"
 SCALING_ACTIVE="$(kubectl get hpa "$HPA" \
   -o jsonpath='{range .status.conditions[?(@.type=="ScalingActive")]}{.status}{end}' 2>/dev/null)"
 
 if [ -n "$CUR_UTIL" ] && [ "$SCALING_ACTIVE" = "True" ]; then
-  ok "Metriken werden erfasst: aktuelle Last ${CUR_UTIL}% von requests, HPA trifft Entscheidungen"
+  ok "metrics are being collected: current load ${CUR_UTIL}% of requests, HPA is making decisions"
 elif [ "$SCALING_ACTIVE" = "True" ]; then
-  ok "HPA trifft Entscheidungen (ScalingActive=True), der aktuelle Metrikwert wurde noch nicht geliefert"
+  ok "HPA is making decisions (ScalingActive=True), the current metric value has not been reported yet"
 else
   REASON="$(kubectl get hpa "$HPA" \
     -o jsonpath='{range .status.conditions[?(@.type=="ScalingActive")]}{.reason}: {.message}{end}' 2>/dev/null)"
-  fail "HPA erhält keine Metriken — in TARGETS wird <unknown> stehen, er hat nichts, worüber er entscheiden kann" \
-       "die ersten zwei Minuten nach apply ist das normal, warten Sie und wiederholen Sie; wenn es nicht verging — kubectl top pods und kubectl describe hpa ${HPA}"
-  evidence "Warum der HPA nicht aktiv ist" "${REASON:-Ursache im Status nicht angegeben}"
+  fail "HPA is not receiving metrics — TARGETS will show <unknown>, it has nothing to decide on" \
+       "the first two minutes after apply this is normal, wait and retry; if it did not clear — kubectl top pods and kubectl describe hpa ${HPA}"
+  evidence "Why the HPA is not active" "${REASON:-reason not specified in status}"
 fi
 
-evidence "Zustand des HPA" "$(kubectl get hpa "$HPA" 2>/dev/null)"
+evidence "HPA state" "$(kubectl get hpa "$HPA" 2>/dev/null)"
 
-# --- metrics-server antwortet direkt ---------------------------------------
-# Dupliziert die vorherige Prüfung von der anderen Seite und trennt zwei verschiedene Störungen:
-# „keine Metriken im ganzen Cluster" und „Metriken sind da, aber der HPA hat sie nicht erreicht".
-# Erstes behebt der Cluster-Administrator, zweites der Teilnehmer in seinem Manifest.
+# --- metrics-server responds directly --------------------------------------
+# Duplicates the previous check from the other side and separates two different failures:
+# "no metrics in the whole cluster" and "metrics exist, but the HPA did not reach them".
+# The first is fixed by the cluster administrator, the second by the participant in their manifest.
 TOP="$(kubectl top pods -l app=${APP} --no-headers 2>&1)"
-# `kubectl top` gibt bei fehlenden Pods „No resources found" aus und liefert 0 zurück —
-# ohne eine explizite Leerheitsprüfung gab das ein Grün dort, wo es überhaupt keine Metriken gibt.
+# `kubectl top` prints "No resources found" when there are no pods and returns 0 —
+# without an explicit emptiness check this gave a green where there are no metrics at all.
 if [ -z "$TOP" ] || printf '%s' "$TOP" | grep -qiE 'error|not available|No resources found'; then
-  fail "kubectl top liefert keinen Podverbrauch" \
-       "im Cluster gibt es keinen funktionierenden metrics-server — ohne ihn ist CPU-basiertes Autoscaling unmöglich"
-  evidence "Antwort von kubectl top" "$TOP"
+  fail "kubectl top does not report pod consumption" \
+       "there is no working metrics-server in the cluster — without it CPU-based autoscaling is impossible"
+  evidence "kubectl top response" "$TOP"
 else
-  ok "metrics-server liefert den Verbrauch der ${APP}-Pods"
-  evidence "Verbrauch der Kopien" "$TOP"
+  ok "metrics-server reports consumption of ${APP} pods"
+  evidence "Copy consumption" "$TOP"
 fi
 
-# --- Skalierung hat tatsächlich ausgelöst ----------------------------------
-# lastScaleTime lebt so lange wie der HPA selbst, deshalb hängt die Prüfung nicht davon ab,
-# ob die Cluster-Events abgelaufen sind oder nicht.
+# --- scaling actually fired ------------------------------------------------
+# lastScaleTime lives as long as the HPA itself, so the check does not depend
+# on whether cluster events have expired or not.
 LAST_SCALE="$(kubectl get hpa "$HPA" -o jsonpath='{.status.lastScaleTime}' 2>/dev/null)"
 CUR_REPL="$(kubectl get hpa "$HPA" -o jsonpath='{.status.currentReplicas}' 2>/dev/null)"
 
-# Ein einzelner Zeitstempel reicht nicht: er wird auch beim Verringern der Kopien gesetzt, das heißt,
-# er erscheint sogar bei jemandem, der die Replikas von Hand hochgesetzt und den HPA die überflüssigen entfernen ließ. Wir suchen
-# genau das Wachstum DURCH LAST — ein Event mit überschrittener Schwelle.
+# A single timestamp is not enough: it is set on scale-down too, that is,
+# it appears even for someone who raised replicas by hand and let the HPA remove the extras. We look for
+# exactly growth BY LOAD — an event with the threshold exceeded.
 #
-# Und umgekehrt: der Zeitstempel selbst überlebt nicht immer. Auf einem Cluster, wo die Last vor einer Stunde
-# angelegt wurde, kann lastScaleTime leer sein, während die Events noch leben — deshalb werden die Events
-# ZUERST geprüft, sonst fällt ein erledigtes Lab fälschlich durch.
+# And vice versa: the timestamp itself does not always survive. On a cluster where load was applied an hour
+# ago, lastScaleTime may be empty while events are still alive — so events
+# are checked FIRST, otherwise a completed lab falsely fails.
 SCALE_UP="$(kubectl get events --field-selector involvedObject.name="$HPA" \
   -o jsonpath='{range .items[*]}{.reason}{" "}{.message}{"\n"}{end}' 2>/dev/null \
   | grep -i 'SuccessfulRescale' | grep -ci 'above target')"
 
 if [ "${SCALE_UP:-0}" -ge 1 ]; then
-  ok "HPA hat die Anzahl der Kopien wegen Last erhöht — das Event mit überschrittener Schwelle ist vorhanden"
-  evidence "Skalierung" "Wachstums-Events: ${SCALE_UP}
-lastScaleTime: ${LAST_SCALE:-keiner}
-currentReplicas: ${CUR_REPL:-unbekannt}"
+  ok "HPA raised the number of copies because of load — the event with the threshold exceeded is in place"
+  evidence "Scaling" "scale-up events: ${SCALE_UP}
+lastScaleTime: ${LAST_SCALE:-none}
+currentReplicas: ${CUR_REPL:-unknown}"
 elif [ -n "$LAST_SCALE" ]; then
-  ok "HPA hat die Anzahl der Kopien geändert (zuletzt: ${LAST_SCALE})"
-  evidence "Skalierungs-Zeitstempel" "lastScaleTime: ${LAST_SCALE}
-currentReplicas: ${CUR_REPL:-unbekannt}"
+  ok "HPA changed the number of copies (last time: ${LAST_SCALE})"
+  evidence "Scaling timestamp" "lastScaleTime: ${LAST_SCALE}
+currentReplicas: ${CUR_REPL:-unknown}"
 else
-  fail "es gibt keine Spuren von Autoscaling-Aktivität" \
-       "geben Sie Last aus Fortio: URL http://${APP}/, QPS 1200, Connections 80, Duration 90s"
+  fail "there are no traces of autoscaling activity" \
+       "apply load from Fortio: URL http://${APP}/, QPS 1200, Connections 80, Duration 90s"
 fi
 
-# --- Fortio: wird in Lab 4 benötigt ----------------------------------------
-# Zum Lab 3 selbst hat es keinen Bezug mehr, deshalb warn, nicht fail. Der Sinn ist, dass der
-# Teilnehmer vom fehlenden Generator hier erfährt, nicht mitten im Rollout unter Last,
-# wenn Anhalten und Bereitstellen ungelegen käme.
+# --- Fortio: needed in lab 4 -----------------------------------------------
+# It is no longer relevant to lab 3 itself, so warn, not fail. The point is for the
+# participant to learn about the missing generator here, not in the middle of a rollout under load,
+# when stopping and deploying it would be inconvenient.
 if kubectl get deployment fortio >/dev/null 2>&1; then
   FBODY="$(in_cluster_curl "http://fortio:8080/fortio/")"
   if printf '%s' "$FBODY" | grep -qi 'fortio'; then
-    ok "der Fortio-Lastgenerator funktioniert und antwortet von innerhalb des Clusters"
+    ok "the Fortio load generator works and responds from inside the cluster"
   else
-    warn "Fortio ist bereitgestellt, aber seine Weboberfläche hat nicht geantwortet" \
-         "prüfen Sie: kubectl rollout status deployment/fortio und kubectl logs deploy/fortio"
+    warn "Fortio is deployed, but its web interface did not respond" \
+         "check: kubectl rollout status deployment/fortio and kubectl logs deploy/fortio"
   fi
 else
-  warn "Fortio ist nicht im Cluster" \
-       "wenn Sie Lab 4 machen wollen, wird es dort benötigt: kubectl apply -f fortio.yaml"
+  warn "Fortio is not in the cluster" \
+       "if you are going to do lab 4, you will need it there: kubectl apply -f fortio.yaml"
 fi
 
 finish

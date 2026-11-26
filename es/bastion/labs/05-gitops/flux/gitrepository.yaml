@@ -1,39 +1,39 @@
 ---
-# Lab 5 · Infraestructura en Git. Fuente: de dónde toma Flux el estado deseado.
+# Lab 5 · Infrastructure in Git. Source: where Flux pulls the desired state from.
 #
-# Se aplica en tu clúster `lab` junto con el kustomization.yaml vecino:
+# Applied on your `lab` cluster together with the neighboring kustomization.yaml:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl apply -f flux/
 #
-# ATENCIÓN: REEMPLAZA url por la dirección de TU repositorio antes de aplicar: la cadena
-# ЗАМЕНИТЕ-МЕНЯ es un marcador de posición; con ella Flux irá a una dirección inexistente y se detendrá
-# con un error. Comprueba también la rama: GitHub crea los nuevos repositorios con la rama main.
+# WARNING: REPLACE url with the address of YOUR repository before applying: the
+# REPLACE-ME string is a placeholder; with it Flux will go to a non-existent address and halt
+# with an error. Check the branch too: GitHub creates new repositories with a main branch.
 #
-# En cada objeto: apiVersion es la versión del esquema de la descripción, kind es lo que creamos,
-# metadata.name es el nombre por el que se referencia el objeto más adelante. No se repite abajo.
+# In every object: apiVersion is the schema version of the description, kind is what we create,
+# metadata.name is the name by which the object is referenced later. Not repeated below.
 #
-# La única tarea de este objeto es mantener en el clúster una copia fresca del repositorio.
-# No aplica nada: solo descarga. Lo aplica el Kustomization vecino,
-# y este lo referencia por el nombre `passes`, por eso el nombre no se puede cambiar por sí solo.
+# The only job of this object is to keep a fresh copy of the repository in the cluster.
+# It applies nothing: it only downloads. The neighboring Kustomization applies it,
+# and it references this by the name `passes`, so the name can't be changed alone.
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: GitRepository
 metadata:
   name: passes
-  # flux-system es el espacio de nombres que creó el comando flux install; en él viven
-  # los propios servicios de Flux. Los objetos de configuración van también allí, si no los servicios no los verán.
+  # flux-system is the namespace created by the flux install command; it hosts
+  # the Flux services themselves. Configuration objects go there too, otherwise the services won't see them.
   namespace: flux-system
 spec:
-  # Con qué frecuencia ir a Git a por el nuevo estado. Un minuto es para la lab;
-  # en producción suele ser 1–5 minutos, y la reacción instantánea se hace con un webhook desde GitHub.
+  # How often to go to Git for the new state. One minute is for the lab;
+  # in production it's usually 1–5 minutes, and instant reaction is done with a webhook from GitHub.
   interval: 1m
-  # La dirección del repositorio. Es público, por eso aquí no hay ni login ni clave —
-  # es una simplificación del banco de pruebas de aprendizaje. En producción el repositorio es privado, y junto a él aparece
-  # una referencia a un secreto con una clave de despliegue (el campo secretRef).
-  url: https://github.com/ЗАМЕНИТЕ-МЕНЯ/passes-gitops
-  # Qué rama tratar como fuente de la verdad. Al clúster irá lo que se fusiona en main;
-  # lo que está en otras ramas no irá. De ahí viene la revisión: un cambio
-  # primero vive en su propia rama, donde se puede ver, y solo la fusión en main
-  # lo hace efectivo. Si el repositorio se creó con la vieja rama master —
-  # corrígelo aquí, si no Flux no encontrará qué leer.
+  # The repository address. It's public, so there's neither a login nor a key here —
+  # this is a simplification of the training stand. In production the repository is private, and next to it appears
+  # a reference to a secret with a deploy key (the secretRef field).
+  url: https://github.com/REPLACE-ME/passes-gitops
+  # Which branch to treat as the source of truth. What is merged into main goes to the cluster;
+  # what lies in other branches does not. This is where review comes from: a change
+  # first lives in its own branch, where it can be reviewed, and only the merge into main
+  # makes it effective. If the repository was created with the old master branch —
+  # fix it here, otherwise Flux won't find what to read.
   ref:
     branch: main

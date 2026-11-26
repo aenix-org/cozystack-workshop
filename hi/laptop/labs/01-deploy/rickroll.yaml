@@ -1,27 +1,27 @@
-# लैब 1. पूरा rickroll प्रशिक्षण ऐप एक ही फ़ाइल में: nginx सेटिंग्स, पेज,
-# स्वयं डिप्लॉयमेंट, और उस तक पहुँचने का एक स्थायी पता। चार ऑब्जेक्ट, `---` से अलग किए गए।
+# Lab 1. The entire rickroll training app in a single file: nginx settings, the page,
+# the deployment itself, and a permanent address to reach it. Four objects, separated by `---`.
 #
-# आपके प्रशिक्षण क्लस्टर `lab` पर लागू किया जाता है, न कि प्रबंधन क्लस्टर के टेनेंट में:
+# Applied on your training cluster `lab`, not in a tenant on the management cluster:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl apply -f rickroll.yaml
-# यहाँ tenant-workshopXX जैसे कोई प्लेसहोल्डर नहीं हैं — आपको कहीं भी अपना नंबर डालने की ज़रूरत नहीं है।
+# There are no placeholders like tenant-workshopXX here — you don't need to substitute your number anywhere.
 #
-# जो फ़ील्ड चारों ऑब्जेक्ट में दोहराई जाती हैं, उन्हें यहाँ एक बार समझा दिया गया है:
-#   apiVersion — वह API समूह जिसमें यह ऑब्जेक्ट प्रकार रहता है;
-#   kind       — स्वयं ऑब्जेक्ट का प्रकार;
-#   metadata.name — वह नाम जिससे बाद में `kubectl get` के ज़रिए ऑब्जेक्ट को खोजा जाता है।
-# नाम अपने प्रकार के भीतर अद्वितीय होता है, इसलिए नीचे Deployment और Service दोनों
-# rickroll कहलाते हैं और टकराते नहीं।
+# The fields that repeat across all four objects are covered once here:
+#   apiVersion — the API group this object type lives in;
+#   kind       — the object type itself;
+#   metadata.name — the name by which the object is later looked up via `kubectl get`.
+# A name is unique within its own type, so the Deployment and Service below are both called
+# rickroll and don't conflict.
 ---
-# nginx सेटिंग्स। पेज के संस्करणों के बीच ये नहीं बदलतीं, इसलिए इन्हें अलग रखा गया है।
-# ConfigMap — एक सेटिंग्स फ़ाइल जो क्लस्टर में स्वयं अलग से रहती है और शुरू होने पर
-# कंटेनर के अंदर रख दी जाती है। मकसद यह है कि इमेज को दोबारा बनाए बिना सेटिंग्स बदली जा सकें।
-# `default.conf` कुंजी उस डायरेक्टरी में फ़ाइल का नाम बन जाएगी जहाँ वॉल्यूम माउंट किया गया है।
+# nginx settings. They don't change between page versions, so they're kept separately.
+# ConfigMap — a settings file that lives in the cluster on its own and is placed
+# inside the container at startup. The point is to change settings without rebuilding
+# the image. The `default.conf` key becomes the file name in the directory where the volume is mounted.
 #
-# `|` के बाद इंडेंट के नीचे जो कुछ भी है, वह YAML नहीं बल्कि फ़ाइल की शब्दशः सामग्री है। इस ब्लॉक
-# के अंदर हैश वाली पंक्तियाँ पार्सिंग के दौरान गायब होने के बजाय nginx कॉन्फ़िग में ज्यों-की-त्यों
-# पहुँच जाती हैं। इसी कारण नीचे पेज वाले ब्लॉक में कोई टिप्पणी नहीं जोड़ी गई:
-# वह HTML है, और वहाँ हैश उपयोगकर्ता को स्क्रीन पर दिखाई देता।
+# Everything below the indent after `|` is not YAML but the verbatim contents of the file. Lines
+# with a hash inside this block end up in the nginx config as-is, rather than disappearing during
+# parsing. For the same reason, no comments were added to the page block below:
+# it's HTML, and a hash there would be visible to the user on screen.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -33,8 +33,8 @@ data:
       root /usr/share/nginx/html;
 
       location / {
-        # लैब का पूरा मर्म: nginx अपने पॉड का नाम सीधे HTML में डाल देता है।
-        # पॉड के अंदर $hostname ठीक वही पॉड का नाम है।
+        # The whole point of the lab: nginx substitutes its own pod name right into the HTML.
+        # $hostname inside the pod is exactly the pod name.
         sub_filter '__POD__' '$hostname';
         sub_filter_once off;
       }
@@ -45,10 +45,10 @@ data:
       }
     }
 ---
-# पेज, संस्करण 1. सेटिंग्स से अलग एक ऑब्जेक्ट — ताकि लैब 4 में nginx कॉन्फ़िग को छुए बिना और
-# इमेज को दोबारा बनाए बिना ऐप को दूसरे संस्करण पर स्विच किया जा सके।
-# नाम में -v1 प्रत्यय सजावट नहीं है: उसके साथ rickroll-page-v2 आएगा, और उनके बीच
-# वॉल्यूम को स्विच करना ही नए संस्करण की रोलआउट है।
+# The page, version 1. A separate object from the settings — so that in lab 4 the app can be
+# switched to the second version without touching the nginx config or rebuilding the image.
+# The -v1 suffix in the name is not decoration: rickroll-page-v2 will appear alongside it, and switching
+# the volume between them is exactly what a new-version rollout is.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -76,13 +76,13 @@ data:
     </style>
     <h1>Never Gonna Give You Up</h1>
     <p class="lyr">Never gonna let you down &middot; Never gonna run around and desert you</p>
-    <div class="pod">सेवा प्रदान करने वाला Pod<b>__POD__</b></div>
-    <p class="hint">पेज को रिफ़्रेश करें। जब रेप्लिका ज़्यादा हो जाएँगी — नाम बदलने लगेगा।</p>
+    <div class="pod">served by pod<b>__POD__</b></div>
+    <p class="hint">Refresh the page. Once there are more replicas, the name will start changing.</p>
     </html>
 ---
-# स्वयं ऐप। Deployment वांछित स्थिति का वर्णन करता है — कौन-सी इमेज चलानी है,
-# कितनी प्रतियाँ रखनी हैं, अपडेट के समय उन्हें कैसे बदलना है। इसके आगे क्लस्टर स्वयं
-# वास्तविकता को इस वर्णन के अनुरूप लाता है और उसे लगातार देखता रहता है, केवल बनाते समय एक बार नहीं।
+# The app itself. Deployment describes the desired state — which image to run,
+# how many copies to keep, how to replace them on update. From there the cluster itself brings
+# reality to match this description and keeps watching it continuously, not just once at creation.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -90,28 +90,28 @@ metadata:
   labels:
     app: rickroll
 spec:
-  # कितनी प्रतियाँ चालू रखनी हैं। शब्द ठीक ऐसे हैं: "एक चालू करो" नहीं,
-  # बल्कि "एक बनाए रखो"। अगर कोई प्रति गायब हो जाए, तो क्लस्टर बिना पूछे नई बना देता है। लैब 3 में
-  # ऑटोस्केलिंग इसी फ़ील्ड को बदलने लगेगी, इसलिए इसे हाथ से और नहीं छूते।
+  # How many copies to keep running. The wording is exactly this: not "start one",
+  # but "keep one". If a copy disappears, the cluster creates a new one without asking. In lab 3
+  # autoscaling will start changing this same field, so you no longer touch it by hand.
   replicas: 1
-  # किस लेबल से Deployment पॉड्स को अपना मानता है। यहाँ का लेबल और नीचे टेम्पलेट में का लेबल
-  # मेल खाने ही चाहिए: बेमेल होने पर ऑब्जेक्ट बिल्कुल नहीं बनेगा।
+  # By which label the Deployment considers pods its own. The label here and the label in the template
+  # below must match: on a mismatch the object won't be created at all.
   selector:
     matchLabels:
       app: rickroll
-  # पॉड टेम्पलेट — हर प्रति इसी से ढाली जाती है। template के अंदर किसी भी फ़ील्ड में बदलाव
-  # का मतलब है ऐप का नया संस्करण और प्रतियों को एक-एक करके बदलना (यही ठीक लैब 4 है)।
-  # template के बाहर फ़ील्ड (उदाहरण के लिए, replicas) बदलने से संस्करण नहीं बनता।
+  # The pod template — every copy is stamped from it. Editing any field inside template
+  # means a new revision of the app and replacing copies one by one (that's exactly lab 4).
+  # Editing fields outside template (for example, replicas) does not create a revision.
   template:
     metadata:
       labels:
-        # वही लेबल स्वयं पॉड्स पर भी लगा है: फ़ाइल के अंत का Service इसी से उन्हें खोजता है।
+        # The same label hangs on the pods themselves: the Service at the end of the file finds them by it.
         app: rickroll
     spec:
-      # पूरे पॉड के स्तर पर `restricted` सुरक्षा प्रोफ़ाइल की आवश्यकताएँ: root के रूप में
-      # न चलना, एक विशिष्ट UID, और मानक seccomp प्रोफ़ाइल। `restricted` चालू किए गए कॉर्पोरेट
-      # क्लस्टर में इन फ़ील्ड के बिना पॉड को चलने की अनुमति नहीं मिलेगी,
-      # और अस्वीकृति पॉड बनाते समय आती है, न कि मैनिफ़ेस्ट apply पर।
+      # Requirements of the `restricted` security profile at the whole-pod level: running
+      # not as root, a specific UID, and the standard seccomp profile. In a corporate
+      # cluster with `restricted` enabled, a pod without these fields won't be admitted to run,
+      # and the rejection comes at pod creation time, not at manifest apply.
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
@@ -119,77 +119,77 @@ spec:
           type: RuntimeDefault
       containers:
         - name: nginx
-          # वही सख़्ती, पर कंटेनर के स्तर पर: अंदर की प्रक्रिया को अपने अधिकार बढ़ाने
-          # की मनाही है, और उससे सभी linux क्षमताएँ छीन ली गई हैं।
+          # The same strictness, but at the container level: the process inside is forbidden
+          # to escalate its privileges, and all linux capabilities are taken away from it.
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # अनप्रिविलेज्ड संस्करण: 8080 पर सुनता है और root के रूप में नहीं चलता।
-          # यह अकेला `baseline` प्रोफ़ाइल के लिए काफ़ी है, पर `restricted` के लिए नहीं — उसे
-          # पॉड और कंटेनर पर स्पष्ट securityContext चाहिए, जो ऊपर दिए गए हैं। कॉर्पोरेट
-          # क्लस्टर में आमतौर पर `restricted` ही चालू होता है।
+          # An unprivileged variant: listens on 8080 and runs not as root.
+          # This alone is enough for the `baseline` profile, but not `restricted` — that one needs
+          # explicit securityContext on the pod and the container, set above. In a
+          # corporate cluster it's usually `restricted` that's enabled.
           image: nginxinc/nginx-unprivileged:1.27-alpine
-          # डिफ़ॉल्ट रूप से nginx नोड के प्रति कोर एक वर्कर प्रक्रिया शुरू करता है। एक कोर वाली
-          # प्रशिक्षण मशीन पर यह एक प्रक्रिया है, पर 64 कोर वाले प्रोडक्शन नोड पर 64,
-          # और छोटी मेमोरी लिमिट वाला पॉड पहली रिक्वेस्ट से पहले ही OOMKilled से मर जाता है।
-          # ऑटोट्यून वर्कर्स को CPU लिमिट के हिसाब से गिनता है: 300m पर यह एक प्रक्रिया है।
-          # एक एन्वायरनमेंट वेरिएबल के ज़रिए, न कि -g के ज़रिए: यह डायरेक्टिव पहले से ही इमेज के बेस
-          # कॉन्फ़िग में है, और दूसरी घोषणा nginx को "duplicate" त्रुटि के साथ गिरा देती है।
+          # By default nginx spins up one worker process per node core. On a training
+          # machine with one core that's one process, but on a production node with 64 cores it's 64,
+          # and a pod with a small memory limit dies with OOMKilled before the first request.
+          # The autotune counts workers by the CPU limit: at 300m that's one process.
+          # Via an environment variable, not via -g: the directive is already in the image's base
+          # config, and a second declaration crashes nginx with a "duplicate" error.
           env:
             - name: NGINX_ENTRYPOINT_WORKER_PROCESSES_AUTOTUNE
               value: "1"
-          # पोर्ट को केवल नंबर नहीं, बल्कि नाम दिया गया है: `http` का संदर्भ नीचे readinessProbe
-          # और Service के targetPort में है। अगर नंबर बदले, तो एक ही जगह संपादित करना होगा।
+          # The port is given a name, not just a number: `http` is referenced by the readinessProbe
+          # below and by the Service's targetPort. If the number changes, you edit it in one place.
           ports:
             - containerPort: 8080
               name: http
-          # दो अलग-अलग चीज़ें जिन्हें लगातार गड्ड-मड्ड किया जाता है। requests — संसाधन का कितना हिस्सा
-          # गारंटी के साथ आरक्षित करना है; इसी से शेड्यूलर नोड चुनता है, और इसी से
-          # लैब 3 में ऑटोस्केलिंग प्रतिशत में लोड गिनती है।
-          # limits — वह छत जिससे ऊपर उठने नहीं दिया जाता: CPU पर सीमा पर पहुँचने पर
-          # धीमा किया जाता है, मेमोरी पर कंटेनर को मार दिया जाता है।
+          # Two different things that are constantly confused. requests — how much of a resource
+          # to reserve guaranteed; the scheduler picks a node by it, and autoscaling in lab 3
+          # also computes load in percent from it.
+          # limits — the ceiling above which it isn't allowed to rise: on CPU it's throttled
+          # when it hits the wall, on memory the container is killed.
           resources:
-            # जान-बूझकर मामूली: वर्कशॉप पर ऐसे ऐप बहुत होंगे।
-            # 20m एक कोर के दो सौवें हिस्से जितना है। मान जान-बूझकर कम है: requests जितना
-            # छोटा होगा, लोड उतनी तेज़ी से सीमा पार करेगा और लैब 3 में प्रतियों की बढ़त
-            # आधे घंटे में नहीं, बल्कि सेकंडों में दिखेगी।
+            # Deliberately tiny: there will be many such apps at the workshop.
+            # 20m is two hundredths of a core. The value is low on purpose: the smaller
+            # requests is, the faster load crosses the threshold and the copy growth in lab 3
+            # is visible in seconds, not half an hour.
             requests:
               cpu: 20m
               memory: 32Mi
             limits:
               cpu: 300m
               memory: 128Mi
-          # रेडीनेस जाँच। जब तक इस पते पर जवाब नहीं आता, क्लस्टर उस प्रति पर ट्रैफ़िक नहीं
-          # भेजता। इसी के लिए nginx कॉन्फ़िग में "ok" जवाब वाला एक अलग location /healthz
-          # बनाया गया है। इसी फ़ील्ड से लैब 4 में बिना डाउनटाइम रोलआउट का मोल चुकाया जाता है:
-          # पुरानी प्रति को तभी बंद किया जाता है जब नई जवाब दे चुकी होती है।
-          # इसे हटा दें — और अपडेट रिक्वेस्ट गिराने लगेगा।
+          # Readiness check. Until a response arrives at this address, the cluster does not
+          # route traffic to the copy. For its sake a separate location /healthz with an "ok"
+          # response is set up in the nginx config. This field is what pays for the zero-downtime rollout
+          # in lab 4: the old copy is shut down only after the new one has responded.
+          # Remove it — and the update will start dropping requests.
           readinessProbe:
             httpGet:
               path: /healthz
               port: http
-            # पहली दस्तक से पहले दो सेकंड — अनुभव से चुना गया। इससे कम का कोई मतलब
-            # नहीं, nginx को शुरू होने में इतना समय लगता ही है; ज़्यादा — हर रोलआउट को व्यर्थ खींचेगा।
+            # Two seconds before the first knock — arrived at by experience. Less makes no
+            # sense, nginx takes that long to start; more would stretch out every rollout for nothing.
             initialDelaySeconds: 2
-          # कंटेनर के अंदर ConfigMap की सामग्री कहाँ रखनी है। डायरेक्टरी मनमाने ढंग से नहीं
-          # चुनी गईं: पहली से nginx फ़ाइलें परोसता है, दूसरी से सेटिंग्स पढ़ता है।
-          # इन दो पंक्तियों के बिना दोनों ConfigMap यूँ ही क्लस्टर में पड़े रहते,
-          # और nginx अपना डिफ़ॉल्ट पेज दिखाता।
+          # Where to place the ConfigMap contents inside the container. The directories are chosen
+          # not arbitrarily: from the first nginx serves files, from the second it reads settings.
+          # Without these two lines both ConfigMaps would just sit in the cluster,
+          # and nginx would show its default page.
           volumeMounts:
             - name: page
               mountPath: /usr/share/nginx/html
             - name: conf
               mountPath: /etc/nginx/conf.d
-      # पॉड में कौन-से ConfigMap जोड़ने हैं। यहाँ वॉल्यूम का नाम इसे ऊपर volumeMounts की
-      # प्रविष्टि से जोड़ता है — मेल नामों को खाना चाहिए; बंधन के लिए क्रम मायने नहीं रखता।
-      # पर लैब 4 के लिए मायने रखता है, नीचे की चेतावनी देखें।
+      # Which ConfigMaps to attach to the pod. The volume name here ties it to the entry
+      # in volumeMounts above — the names are what must match; the order doesn't matter for the binding.
+      # But it does matter for lab 4, see the warning below.
       volumes:
-        # ध्यान दें: यह वॉल्यूम पहला होना चाहिए (volumes[0])।
-        # लैब 4 पेज संस्करण को इंडेक्स द्वारा पैच से स्विच करता है।
-        # JSON Patch सूची के तत्व को नाम से नहीं, बल्कि नंबर से संबोधित करता है। वॉल्यूम को
-        # आपस में बदल दें — और पैच चुपचाप पेज के बजाय nginx सेटिंग्स बदल देगा, ऐप
-        # टूट जाएगा, और त्रुटि संदेश बिल्कुल किसी और चीज़ की बात कर रहा होगा।
+        # ATTENTION: this volume must be first (volumes[0]).
+        # Lab 4 switches the page version with a patch by index.
+        # JSON Patch addresses a list element by number, not by name. Swap the volumes
+        # around — and the patch will silently replace the nginx settings instead of the page, the app
+        # will break, and the error message will be talking about something else entirely.
         - name: page
           configMap:
             name: rickroll-page-v1
@@ -197,23 +197,23 @@ spec:
           configMap:
             name: rickroll-conf
 ---
-# ऐप का स्थायी पता। प्रतियाँ जन्म लेती और मरती हैं, उनके पते बदलते हैं, पर क्लस्टर के भीतर
-# `rickroll` नाम वही रहता है — इसी से पड़ोसी ऐप को पुकारते हैं।
-# इस नाम के पीछे जीवित प्रतियों की सूची क्लस्टर स्वयं, लेबल के अनुसार, रखता है।
+# The app's permanent address. Copies are born and die, their addresses change, but the name
+# `rickroll` inside the cluster stays the same — that's how neighbors call the app.
+# The cluster keeps the list of live copies behind this name itself, by labels.
 apiVersion: v1
 kind: Service
 metadata:
   name: rickroll
 spec:
-  # इस पते के पीछे किसे रखना है: ऐसे लेबल वाले सभी पॉड, चाहे उन्हें किसी ने भी बनाया हो।
-  # इसी से एक सामान्य परेशानी — app: rickroll लेबल वाला कोई बाहरी पॉड
-  # चुपचाप लोड बैलेंसिंग में आ जाएगा और आपके उपयोगकर्ताओं को जवाब देने लगेगा। इस फ़ोल्डर की
-  # check.sh स्क्रिप्ट अलग से जाँचती है कि ऐसे कोई नकली मौजूद न हों।
+  # Who to put behind this address: all pods with such a label, whoever created them.
+  # Hence a typical nuisance — a stray pod with the label app: rickroll
+  # will silently end up in the load balancing and start answering your users. The check.sh
+  # script in this folder separately verifies that there are no such impostors.
   selector:
     app: rickroll
   ports:
-    # port — सर्विस स्वयं किस पोर्ट पर जवाब देती है, targetPort — वह पॉड के अंदर कहाँ दस्तक
-    # देती है। यहाँ targetPort नंबर से नहीं, बल्कि कंटेनर के पोर्ट के नाम से दिया गया है: अगर
-    # कंटेनर में नंबर बदले — इस फ़ाइल को संपादित नहीं करना पड़ेगा।
+    # port — which port the service itself answers on, targetPort — where it knocks inside
+    # the pod. Here targetPort is set by the container port's name, not a number: if the
+    # number in the container changes, you won't have to edit this file.
     - port: 80
       targetPort: http

@@ -1,41 +1,41 @@
-# ラボ8 · OpenBao シークレットストアの注文。
-# ダッシュボードでマウス操作して注文するのと同じもの — ただしテキストで。
-# ラボクラスタではなく、管理クラスタ上のテナントに適用します：
+# Lab 8 · ordering an OpenBao secrets store.
+# The same thing you would order with the mouse in the dashboard — only as text.
+# Applied NOT to the lab cluster, but to a tenant on the management cluster:
 #   kubectl --kubeconfig="$HOME/.kube/workshop" apply -f openbao.yaml
 #
-# 適用する前に：tenant-workshopXX を自分の namespace に置き換えてください。XX はプレースホルダーで
-# あって名前の一部ではありません。自分の番号はパスワードと一緒に受け取っています。他人のテナントに
-# 入ってしまうと、アクセス拒否になります — そしてそれが起こりうる最善の結果です。
+# BEFORE APPLYING: replace tenant-workshopXX with your own namespace. XX is a placeholder,
+# not part of the name; you received your own number together with the password. If it goes
+# into someone else's tenant, you get an access denied — and that is the best possible outcome.
 #
-# kind: OpenBAO は Kubernetes の組み込みオブジェクトではなく、Cozystack が追加する
-# タイプです。必要なものを記述すると、プラットフォーム自身がポッド、ディスク、
-# サービスを展開し、その後も自動で更新し続けます。手渡された仮想マシンにソフトを
-# インストールするというより、カタログからサービスを注文するのに近いものです。
+# kind: OpenBAO is not a built-in Kubernetes object, but a type added by
+# Cozystack. You describe what you need, and the platform itself deploys the pods, disks,
+# and services and then keeps them updated on its own. It is closer to ordering a service from
+# a catalog than to installing software on a VM you were handed.
 apiVersion: apps.cozystack.io/v1alpha1
 kind: OpenBAO
 metadata:
-  # 名前が影響するのはダッシュボードのカードだけではありません：ストアの内部アドレスも
-  # これから組み立てられます — openbao-secrets.<namespace>.svc.cozy.local。名前を変えたら、
-  # secrets-demo.yaml と check.sh 用の BAO_APP 変数のアドレスも直してください。
+  # The name affects more than just the card in the dashboard: the store's internal address
+  # is built from it — openbao-secrets.<namespace>.svc.cozy.local. If you rename it,
+  # fix the address in secrets-demo.yaml and in the BAO_APP variable for check.sh.
   name: secrets
   namespace: tenant-workshopXX
 spec:
-  # 1コピー。本番では3つ立てて Raft レプリケーションを得ます：チャートは
-  # replicas > 1 になるとそれを自動で有効にします。行き来の切り替えには
-  # データの移行が必要なので、判断は後ではなく前に行います。
+  # One copy. In production three are used, which gives Raft replication: the chart enables
+  # it itself as soon as replicas > 1. Switching back and forth requires
+  # migrating the data, so the decision is made before, not after.
   replicas: 1
-  # ストアのデータ用ディスク。2ギガバイトは十分すぎるほど：シークレットはバイト単位の重さで、
-  # 容量はバージョン履歴と監査ログに使われます。ボリュームは作成後に縮小
-  # できませんが、通常は拡大できるので、ここでケチる意味はありません。
+  # Disk for the store's data. Two gigabytes is plenty: secrets weigh bytes,
+  # the space goes to version history and the audit log. You cannot shrink the volume after
+  # creation, but you can usually grow it, so there is no point being stingy here.
   size: 2Gi
-  # ストレージクラス replicated は、データが複数のコピーとして
-  # 別々のノードに置かれることを意味します。ノード障害があなたのパスワードを全部持ち去ることは
-  # ありません — そしてシークレットストアをバックアップから復元するのは、それはそれで不快な作業です。
+  # The replicated storage class means the data is kept in several copies on
+  # different nodes. A node failure does not carry away all your passwords — and restoring
+  # a secrets store from a backup is a separately unpleasant affair.
   storageClass: replicated
-  # 「CPU とメモリをどれだけ」という出来合いのセット。プラットフォームがリストで提示するのは、
-  # 誰もが requests と limits を手計算しなくて済むようにするためです。
+  # A ready-made "how much CPU and memory" set. The platform offers them as a list,
+  # so as not to force everyone to compute requests and limits by hand.
   resourcesPreset: t1.small
-  # Web インターフェースはクラスタ内部で立ち上がります。外部には公開しません：
-  # external: true なら LoadBalancer を付けますが、ラボでは不要です。
+  # The web interface comes up inside the cluster. We do not expose it outward:
+  # external: true would attach a LoadBalancer, and we don't need it in the lab.
   ui: true
   external: false

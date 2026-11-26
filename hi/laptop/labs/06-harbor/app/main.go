@@ -1,36 +1,36 @@
-// लैब 6 · अपनी निजी इमेज रजिस्ट्री। «पास» सेवा, प्रशिक्षण संस्करण।
+// Lab 6 · Your own private image registry. The "Pass" service, training version.
 //
-// यह प्रोग्राम क्या करता है। यह एक वेब सर्वर शुरू करता है और दो पतों पर जवाब देता है।
-// /healthz पता एक छोटा «ok» लौटाता है: इससे क्लस्टर समझ जाता है कि प्रतिलिपि जीवित है
-// और ट्रैफ़िक स्वीकार करने को तैयार है। / पता JSON प्रारूप में एक छोटा जवाब देता है (पाठ
-// «फ़ील्ड: मान» के रूप में), जिसमें बताया जाता है कि किस प्रतिलिपि ने और किस नोड पर अनुरोध
-// संभाला। इससे ज़्यादा कुछ नहीं: न डेटाबेस, न डिस्क, न स्थिति। यह जानबूझकर ऐसा है — इस लैब में
-// दिलचस्प बात कोड नहीं, बल्कि वह रास्ता है जिससे वह क्लस्टर में पहुँचता है:
-// स्रोत -> इमेज -> अपनी रजिस्ट्री -> क्लस्टर।
+// WHAT THIS PROGRAM DOES. It starts a web server and answers on two addresses.
+// The /healthz address returns a short "ok": from it the cluster understands that the
+// replica is alive and ready to accept traffic. The / address returns a small response in
+// JSON format (text of the form "field: value"), where it lists which replica and on which
+// node served the request. Nothing more: no database, no disk, no state. That is by design — in
+// this lab the interesting part is not the code, but the path by which it gets into the cluster:
+// source -> image -> your own registry -> cluster.
 //
-// इस Go फ़ाइल को पढ़ना आना ज़रूरी नहीं, यह समझना काफ़ी है कि यहाँ क्या हो रहा है;
-// नीचे दी गई टिप्पणियाँ इस मान से लिखी गई हैं कि आप Go को पहली बार देख रहे हैं।
+// You do not need to be able to read this Go file, it is enough to understand what happens here;
+// the comments below are written on the assumption that you are seeing Go for the first time.
 //
-// कोई बाहरी निर्भरता नहीं है: केवल मानक लाइब्रेरी का उपयोग होता है, जो
-// कंपाइलर के साथ ही आती है। इसलिए बिल्ड लाइब्रेरियों के लिए इंटरनेट पर नहीं जाता,
-// और इमेज को वहाँ भी बनाया जा सकता है जहाँ बाहर की ओर पहुँच बंद है, — और ठीक
-// यहीं से पूरी लैब शुरू होती है।
+// There are no external dependencies: only the standard library is used, which
+// comes together with the compiler. Therefore the build does not go to the internet for
+// libraries, and you can build the image where outbound access is closed off, — and that
+// is exactly where the whole lab begins.
 //
-// यह सीधे नहीं, बल्कि पड़ोसी Dockerfile के ज़रिए बनाई जाती है, इस कमांड से
+// It is built not directly, but through the neighboring Dockerfile, with the command
 // docker build --platform linux/amd64 -t HARBOR-HOST/passes/passes-api:v1 app/
 //
-// package main — Go में इस तरह उस प्रोग्राम को चिह्नित किया जाता है जिसे चलाया जा सके (लाइब्रेरी
-// के विपरीत)। चलाते समय प्रवेश बिंदु फ़ाइल के बिलकुल नीचे मौजूद main फ़ंक्शन है।
+// package main — this is how in Go you mark a program that can be run (as opposed
+// to a library). The entry point when running is the main function at the very bottom of the file.
 package main
 
-// मानक लाइब्रेरी से हम क्या लेते हैं:
-//   encoding/json — जवाब को JSON प्रारूप में इकट्ठा करना
-//   log           — संदेश लिखना; कंटेनर में वे मानक आउटपुट में जाते हैं,
-//                   जहाँ से kubectl logs उन्हें उठाता है। अंदर कोई लॉग फ़ाइलें नहीं हैं,
-//                   और उन्हें बनाने की ज़रूरत नहीं — कंटेनरों के लिए यह सामान्य है
-//   net/http      — वेब सर्वर स्वयं
-//   os            — पर्यावरण चर पढ़ना
-//   time          — जवाब में समय-चिह्न और सर्वर टाइमआउट
+// What we take from the standard library:
+//   encoding/json — assemble the response in JSON format
+//   log           — write messages; in a container they go to standard output,
+//                   from where kubectl logs picks them up. There are no log files inside,
+//                   and there is no need to create them — this is normal for containers
+//   net/http      — the web server itself
+//   os            — read environment variables
+//   time          — timestamp in the response and server timeout
 import (
 	"encoding/json"
 	"log"
@@ -39,12 +39,12 @@ import (
 	"time"
 )
 
-// जवाब का आकार: फ़ील्डों का समूह जो एप्लिकेशन अपने बारे में बताता है। इनमें से लगभग सभी —
-// वह हैं जो एप्लिकेशन क्लस्टर से जानता है: हम उन्हें गणना या अनुमान नहीं करते, क्लस्टर
-// स्वयं उन्हें पर्यावरण चरों में रखता है (देखें passes.yaml, env ब्लॉक और downward API)।
+// The shape of the response: a set of fields that the application reports about itself. Almost all of them —
+// are what the application learns from the cluster: we do not compute or guess them, the cluster
+// itself puts them into environment variables (see passes.yaml, the env block and downward API).
 //
-// दाईं ओर बैकटिक में लिखा पाठ तैयार JSON में फ़ील्ड का नाम है। इसके बिना फ़ील्ड जवाब में
-// Namespace के रूप में जाता, न कि namespace के रूप में; check.sh की जाँच छोटे अक्षरों वाले «pod» को ढूँढती है।
+// The text in backticks on the right is the field name in the final JSON. Without it the field would go
+// into the response as Namespace, not as namespace; the check in check.sh looks for the lowercase "pod".
 type identity struct {
 	Service   string `json:"service"`
 	Version   string `json:"version"`
@@ -55,9 +55,9 @@ type identity struct {
 	Time      string `json:"time"`
 }
 
-// पर्यावरण चर पढ़ें, और यदि वह मौजूद नहीं या खाली है — तो एक बैकअप
-// मान लौटाएँ। यह इसलिए ज़रूरी है ताकि प्रोग्राम को क्लस्टर के बाहर भी, बिना एक भी
-// सेटिंग के चलाया जा सके: यह क्रैश नहीं होगा, बल्कि ईमानदारी से जवाब में «अज्ञात» लिखेगा।
+// Read an environment variable, and if it is missing or empty — return a fallback
+// value. It is needed so that the program can be run outside the cluster too, without a single
+// setting: it will not crash, but honestly write "unknown" in the response.
 func env(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
@@ -65,64 +65,64 @@ func env(key, fallback string) string {
 	return fallback
 }
 
-// प्रवेश बिंदु: प्रोग्राम का काम इसी फ़ंक्शन से शुरू होता है।
+// Entry point: the program's work begins with this function.
 func main() {
-	// किस पोर्ट पर सुनना है। पोर्ट को PORT चर से बदला जा सकता है, इमेज को दोबारा बनाए
-	// बिना, लेकिन डिफ़ॉल्ट रूप से यह 8080 है — वही संख्या जो passes.yaml (containerPort)
-	// और Dockerfile (EXPOSE) में है। यदि वे अलग हो गए — तो Service एक बंद दरवाज़े पर दस्तक देगी।
+	// Which port to listen on. The port can be overridden with the PORT variable, without rebuilding
+	// the image, but by default it is 8080 — the same number as in passes.yaml (containerPort)
+	// and in the Dockerfile (EXPOSE). If they diverge — the Service will knock on a closed door.
 	port := env("PORT", "8080")
 
-	// रूटिंग तालिका: कौन सा पता किस हैंडलर द्वारा संभाला जाता है।
+	// The routing table: which address which handler serves.
 	mux := http.NewServeMux()
 
-	// तैयारी की जाँच। क्लस्टर यहाँ दस्तक देता है और प्रतिलिपि पर ट्रैफ़िक तब तक नहीं
-	// आने देता, जब तक जवाब न मिले। यह हमेशा और तेज़ी से जवाब देता है, कुछ भी जाँचे बिना:
-	// एप्लिकेशन के पास जाँचने को कुछ नहीं, उसके पास न डेटाबेस है न डिस्क।
+	// Readiness check. The cluster knocks here and does not let traffic onto the replica,
+	// until it gets a response. It answers always and fast, checking nothing:
+	// the application has nothing to check, it has neither a database nor a disk.
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		_, _ = w.Write([]byte("ok\n"))
 	})
 
-	// मुख्य जवाब। हम वही फ़ील्ड इकट्ठा करते हैं और उन्हें एक ही JSON के रूप में देते हैं। मान हर
-	// अनुरोध पर पढ़े जाते हैं, इसलिए सेवा की दूसरी प्रतिलिपि अपने ही पॉड नाम से जवाब देगी —
-	// इसी नाम से लैब में दिखता है कि प्रतिलिपियाँ वाकई दो हैं।
+	// The main response. We assemble those very fields and hand them out as a single JSON. The values are read
+	// on every request, so the second replica of the service will answer with its own pod name —
+	// by that name in the lab you can see that there really are two replicas.
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		body := identity{
 			Service:   "passes-api",
 			Version:   env("APP_VERSION", "v1"),
-			Pod:       env("POD_NAME", "अज्ञात"),
-			Node:      env("NODE_NAME", "अज्ञात"),
-			Namespace: env("POD_NAMESPACE", "अज्ञात"),
-			Registry:  env("IMAGE_REGISTRY", "निर्दिष्ट नहीं"),
+			Pod:       env("POD_NAME", "unknown"),
+			Node:      env("NODE_NAME", "unknown"),
+			Namespace: env("POD_NAMESPACE", "unknown"),
+			Registry:  env("IMAGE_REGISTRY", "not set"),
 			Time:      time.Now().UTC().Format(time.RFC3339),
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		enc := json.NewEncoder(w)
 		enc.SetIndent("", "  ")
-		// SetEscapeHTML(false), वरना सिरिलिक और < जैसे प्रतीक \uXXXX में बदल जाते
-		// और जवाब टर्मिनल में अपठनीय हो जाता।
+		// SetEscapeHTML(false), otherwise Cyrillic and symbols like < would go into \uXXXX
+		// and the response would become unreadable in the terminal.
 		enc.SetEscapeHTML(false)
 		if err := enc.Encode(body); err != nil {
-			log.Printf("जवाब भेजने में विफल: %v", err)
+			log.Printf("failed to send response: %v", err)
 		}
 	})
 
-	// सर्वर सेटिंग्स। ReadHeaderTimeout — अनुरोध के हेडर के लिए कितनी देर प्रतीक्षा करनी है, इससे
-	// पहले कि कनेक्शन काट दिया जाए। पाँच सेकंड गति के लिए नहीं हैं: इस टाइमआउट के बिना
-	// खुले और छोड़ दिए गए कनेक्शन तब तक जमा होते हैं जब तक वे कंटेनर की मेमोरी न खा लें,
-	// और मेमोरी मैनिफ़ेस्ट की सीमा से सीमित है।
+	// Server settings. ReadHeaderTimeout — how long to wait for the request headers, before
+	// cutting off the connection. The five seconds are there not for speed: without this timeout
+	// opened and abandoned connections pile up until they eat up the container's memory,
+	// and the memory is limited by the limit from the manifest.
 	srv := &http.Server{
 		Addr:              ":" + port,
 		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
-	// पहली चीज़ जो आप kubectl logs में देखेंगे। यह पंक्ति «एप्लिकेशन शुरू नहीं हुआ» को
-	// «शुरू हुआ, पर जवाब नहीं देता» से अलग करने के लिए ज़रूरी है — ये अलग-अलग निदान हैं।
-	log.Printf("passes-api %s पोर्ट %s पर सुन रहा है, पॉड %s",
-		env("APP_VERSION", "v1"), port, env("POD_NAME", "अज्ञात"))
-	// हम सर्वर शुरू करते हैं और तब तक काम करते हैं जब तक हमें रोका न जाए। यदि पोर्ट व्यस्त हो या सर्वर
-	// क्रैश हो गया — तो हम कारण लिखते हैं और त्रुटि के साथ बाहर निकलते हैं। क्लस्टर समाप्त हुई प्रक्रिया
-	// देखेगा और प्रतिलिपि को फिर से उठाएगा; प्रोग्राम के भीतर पुनरारंभ ठीक करने की ज़रूरत नहीं।
+	// The first thing you will see in kubectl logs. The line is needed to distinguish "the application
+	// did not start" from "started, but does not respond" — these are different diagnoses.
+	log.Printf("passes-api %s listening on port %s, pod %s",
+		env("APP_VERSION", "v1"), port, env("POD_NAME", "unknown"))
+	// We start the server and work until we are stopped. If the port is taken or the server
+	// crashed — we write the reason and exit with an error. The cluster will see the finished process
+	// and bring up the replica anew; there is no need to fix the restart inside the program.
 	log.Fatal(srv.ListenAndServe())
 }

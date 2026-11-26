@@ -54,7 +54,7 @@
 
 ## 实验目录里有什么
 
-你已经有了所有文件——它们随仓库一起给到你了。不需要创建或重新输入任何东西：下文凡是写着 `kubectl apply -f 名称.yaml` 的地方，文件都来自这里。
+你已经有了所有文件——它们随仓库一起给到你了。不需要创建或重新输入任何东西：下文凡是写着 `kubectl apply -f name.yaml` 的地方，文件都来自这里。
 
 ```bash
 cd labs/09-clickhouse
@@ -122,7 +122,7 @@ spec:
   resourcesPreset: u1.small
   users:
     analyst:
-      password: 你的密码
+      password: YourPasswordHere
   backup:
     enabled: false
   clickhouseKeeper:
@@ -146,8 +146,8 @@ spec:
 这个文件应用的对象**不是实验集群**，而是租户：
 
 ```bash
-# --kubeconfig 明确指定访问文件，并覆盖 KUBECONFIG 变量。
-# 于是订单发往管理集群上的租户，而不是实验集群。
+# --kubeconfig names the access file explicitly and overrides the KUBECONFIG variable.
+# So the order goes to the tenant on the management cluster, not to the lab cluster.
 kubectl --kubeconfig ~/.kube/workshop apply -f clickhouse.yaml
 ```
 
@@ -185,22 +185,22 @@ chendpoint-clickhouse-analytics.tenant-workshopXX.svc.cozy.local:8123
 拉起工作用的 Pod。替换成你的租户编号和你的密码：
 
 ```bash
-# 从这里开始一切都在实验集群里发生，所以把 kubectl 切换到它。
+# Everything from here happens in the lab cluster, so we switch kubectl to it.
 export KUBECONFIG=~/lab.kubeconfig
-# run 用给定的镜像创建一个 Pod——集群内一台一次性的小机器。
-# 镜像里带了 curl，这就够了：不需要单独的 ClickHouse 客户端。
-#   --restart=Never  当里面的命令结束时不要再次拉起它
-#   --env=CH_URL     存储的 HTTP 接口地址；结尾的斜杠是必需的
-#   --env=CH_AUTH    用于普通 HTTP 认证的「用户:密码」对
-#   --command --     两个短横线之后的一切，都是 Pod 要执行的命令
-# sleep 86400 =「一整天什么都不做」：这个 Pod 只是作为工作场地。
+# run creates a single Pod from the given image — a disposable little machine inside the cluster.
+# The image ships curl, and that's enough: a separate ClickHouse client won't be needed.
+#   --restart=Never  don't bring it up again when the command inside finishes
+#   --env=CH_URL     the address of the storage's HTTP interface; the trailing slash is required
+#   --env=CH_AUTH    the "user:password" pair for ordinary HTTP authentication
+#   --command --     everything after the two dashes is the command the Pod will run
+# sleep 86400 = "do nothing for a day": the Pod is needed only as a workspace.
 kubectl run ch-workbench \
   --image=curlimages/curl:8.11.1 \
   --restart=Never \
   --env=CH_URL="http://chendpoint-clickhouse-analytics.tenant-workshopXX.svc.cozy.local:8123/" \
-  --env=CH_AUTH="analyst:你的密码" \
+  --env=CH_AUTH="analyst:YourPasswordHere" \
   --command -- sleep 86400
-# wait 会占住终端直到 Pod 启动，但最多不超过两分钟。
+# wait holds the terminal until the Pod starts, but no longer than two minutes.
 kubectl wait --for=condition=Ready pod/ch-workbench --timeout=120s
 ```
 
@@ -228,9 +228,9 @@ kubectl wait --for=condition=Ready pod/ch-workbench --timeout=120s
 </details>
 
 ```bash
-# 我们定义 ch——一条长命令的简称。从这里起，「ch」的意思是：把标准输入传来的
-# SQL 发给 ClickHouse，并以表格形式显示答案。
-# 这个名字在你关闭这个终端窗口前一直有效；在新窗口里要重新定义它。
+# We define ch — a short name for a long command. From here "ch" means: send to
+# ClickHouse the SQL that arrives on standard input, and show the answer as a table.
+# The name lives until you close this terminal window; in a new window define it again.
 ch() {
   kubectl exec -i ch-workbench -- sh -c \
     'curl -sS -u "$CH_AUTH" --data-binary @- "$CH_URL?default_format=PrettyCompact"'
@@ -240,8 +240,8 @@ ch() {
 检查一下连接：
 
 ```bash
-# echo 打印一个字符串，| 把它传给 ch 的输入。SELECT version() 是可能的最廉价
-# 查询：服务器不从磁盘读取任何东西，只报出自己的版本。
+# echo prints a string, | passes it to ch's input. SELECT version() is the cheapest
+# query possible: the server reads nothing from disk, it just names its version.
 echo 'SELECT version()' | ch
 ```
 
@@ -252,8 +252,8 @@ echo 'SELECT version()' | ch
 Windows PowerShell 用户，你们的版本：
 
 ```powershell
-# $input——通过左侧管道进入函数的内容。
-# 行尾的反引号把命令续接到下一行。
+# $input — what came into the function through the pipeline on the left.
+# The backtick at the end of a line continues the command onto the next line.
 function ch {
   $input | kubectl exec -i ch-workbench -- sh -c `
     'curl -sS -u "$CH_AUTH" --data-binary @- "$CH_URL?default_format=PrettyCompact"'
@@ -271,19 +271,19 @@ function ch {
 <summary><b>逐行走读表结构</b></summary>
 
 ```sql
--- IF NOT EXISTS——如果表已存在就不要报错。这个文件可以应用两次。
+-- IF NOT EXISTS — don't complain if the table already exists. The file can be applied twice.
 CREATE TABLE IF NOT EXISTS passes
 (
-    pass_id      UInt64,                 -- 通行证编号
-    created_at   DateTime,               -- 此人通过闸机的时间
-    guest_name   String,                 -- 访客姓名：各不相同
-    host_dept    LowCardinality(String), -- 接待方所在部门：取值不多
-    entrance     LowCardinality(String), -- 入口：一共三个
-    pass_type    LowCardinality(String), -- 一次性、按周、车辆
-    duration_min UInt16                  -- 访客在里面停留了多少分钟
+    pass_id      UInt64,                 -- the pass number
+    created_at   DateTime,               -- when the person went through the turnstile
+    guest_name   String,                 -- the guest's name: everyone's is their own
+    host_dept    LowCardinality(String), -- the host's department: few values
+    entrance     LowCardinality(String), -- the entrance: there are three
+    pass_type    LowCardinality(String), -- one-time, weekly, vehicle
+    duration_min UInt16                  -- how many minutes the guest stayed inside
 )
-ENGINE = MergeTree               -- 如何存储：磁盘上的 part，后台合并
-ORDER BY (created_at, entrance)  -- 按什么顺序存放数据；它也是索引
+ENGINE = MergeTree               -- how to store: parts on disk, merging in the background
+ORDER BY (created_at, entrance)  -- what order to put the data in; also the index
 ```
 
 `UInt64`、`UInt16`——8 字节和 2 字节的无符号整数。在 ClickHouse 里，类型的大小是有意选择的：十亿行乘以多出来的四个字节就是四个吉字节。对于以分钟计的时长，两个字节绰绰有余。
@@ -312,8 +312,8 @@ ORDER BY (created_at, entrance)
 
 ```bash
 cd labs/09-clickhouse
-# < 读取文件并把它喂给 ch 的输入，也就是把文件内容作为单条查询发给
-# ClickHouse。CREATE TABLE 返回空答案——这就是成功。
+# < reads the file and feeds it to ch's input, that is, sends the file's contents
+# to ClickHouse in a single query. CREATE TABLE returns an empty answer — that is success.
 ch < 01-schema.sql
 ```
 
@@ -361,8 +361,8 @@ FROM numbers(1000000)
 ⚠️ ClickHouse 里数组下标从一开始，而不是从零。所以有 `1 + …`。
 
 ```sql
-    ['北门', '北门', '北门',
-     '南门', '南门', '西门'][1 + cityHash64(number, 'entrance') % 6] AS entrance
+    ['North', 'North', 'North',
+     'South', 'South', 'West'][1 + cityHash64(number, 'entrance') % 6] AS entrance
 ```
 
 同样的技巧用于制造不均匀的分布：北入口获得一半的人流，南入口三分之一，西入口是剩下的。均匀的数据在报表里显得不真实，也什么都说明不了。
@@ -380,8 +380,8 @@ FROM numbers(1000000)
 **应用它。**
 
 ```bash
-# 文件里只有一条 INSERT … SELECT：ClickHouse 会自己造出一百万行并写入，
-# 全程不离开服务器。
+# The file holds a single INSERT … SELECT: ClickHouse will invent a million rows itself and write them,
+# without ever leaving the server.
 ch < 02-generate.sql
 ```
 
@@ -390,7 +390,7 @@ ch < 02-generate.sql
 检查一下结果：
 
 ```bash
-# 不带条件的 count() 回答「表里一共有多少行」这个问题。
+# count() with no conditions answers the question "how many rows are in the table in total."
 echo 'SELECT count() FROM passes' | ch
 ```
 
@@ -406,16 +406,16 @@ echo 'SELECT count() FROM passes' | ch
 <summary><b>逐行走读报表</b></summary>
 
 ```sql
--- 数据中出现的每个月，对应一行报表。
+-- One report row for each month that occurs in the data.
 SELECT
-    toStartOfMonth(created_at)          AS month,        -- 归到哪个月
-    count()                             AS guests,       -- 这个月里有多少次进出
-    round(avg(duration_min))            AS avg_minutes,  -- 平均访问时长
-    topK(1)(toHour(created_at))[1]      AS peak_hour,    -- 最频繁的到达小时
-    topK(1)(entrance)[1]                AS busiest_entrance  -- 最频繁的入口
+    toStartOfMonth(created_at)          AS month,        -- which month to assign it to
+    count()                             AS guests,       -- how many entries in it
+    round(avg(duration_min))            AS avg_minutes,  -- average visit duration
+    topK(1)(toHour(created_at))[1]      AS peak_hour,    -- the most frequent hour of arrival
+    topK(1)(entrance)[1]                AS busiest_entrance  -- the most frequent entrance
 FROM passes
-GROUP BY month   -- 把同一个月的所有行折叠成一行答案
-ORDER BY month   -- 按升序输出月份
+GROUP BY month   -- collapse all rows of one month into a single answer row
+ORDER BY month   -- output the months in ascending order
 ```
 
 `toStartOfMonth` 把精确时间变成当月的第一天。按周期分组的经典技巧：不用「按年和月分组」，而是用一个既能分组又能排序的单一值。
@@ -431,7 +431,8 @@ ORDER BY month   -- 按升序输出月份
 **应用它。**
 
 ```bash
-# 对整张表做一次分组。答案有多少行，取决于数据中出现了多少个月份。
+# One grouping over the whole table. The answer will have as many rows as there are months
+# that occur in the data.
 ch < 03-report.sql
 ```
 
@@ -440,16 +441,16 @@ ch < 03-report.sql
 现在是重点——**它算了多久**。查询末尾的 `JSON` 格式会给答案加上一个统计块：
 
 ```bash
-# <<'SQL' … SQL——一种把多行文本传给命令输入、又不用文件的方式。
-# SQL 两侧的引号意思是「内容原样别动」：否则 shell 会试图
-# 把查询里的字符当成它自己的来解释。
+# <<'SQL' … SQL — a way to pass multi-line text to a command's input, without a file.
+# The quotes around SQL mean "leave the contents alone": otherwise the shell would try
+# to interpret the characters inside the query as its own.
 ch <<'SQL'
--- 同一份报表，精简到两列：月份和访客数。
+-- The same report, trimmed to two columns: month and guest count.
 SELECT toStartOfMonth(created_at) AS month, count() AS guests
 FROM passes
 GROUP BY month
 ORDER BY month
-FORMAT JSON  -- 答案不以表格返回，而以 JSON 返回：里面含有一个统计块
+FORMAT JSON  -- return the answer not as a table but as JSON: it contains a statistics block
 SQL
 ```
 
@@ -498,15 +499,15 @@ SQL
 
 ```bash
 ch <<'SQL'
--- 我们直接问 ClickHouse，表的每一列占多少空间。
+-- We ask ClickHouse itself how much space each column of the table takes.
 SELECT
-    name,                                                    -- 列名
-    formatReadableSize(data_compressed_bytes)   AS on_disk,  -- 磁盘上占多少
-    formatReadableSize(data_uncompressed_bytes) AS raw,      -- 不压缩的话会是多少
-    round(data_uncompressed_bytes / data_compressed_bytes, 1) AS ratio  -- 压缩了多少倍
-FROM system.columns   -- 一张系统表：ClickHouse 在其中描述自己
-WHERE database = currentDatabase() AND table = 'passes'   -- 只看我们这张表
-ORDER BY data_compressed_bytes DESC   -- 最重的列排在最上面
+    name,                                                    -- the column's name
+    formatReadableSize(data_compressed_bytes)   AS on_disk,  -- how much sits on disk
+    formatReadableSize(data_uncompressed_bytes) AS raw,      -- how much it would be without compression
+    round(data_uncompressed_bytes / data_compressed_bytes, 1) AS ratio  -- how many times it compressed
+FROM system.columns   -- a system table: in it ClickHouse describes itself
+WHERE database = currentDatabase() AND table = 'passes'   -- only our table
+ORDER BY data_compressed_bytes DESC   -- the heaviest columns on top
 SQL
 ```
 
@@ -547,8 +548,8 @@ host_dept     52.3 KiB   1.10 MiB  21.4
 
 ```bash
 ch <<'SQL'
--- 我们统计超过一百分钟的访问。这条查询在七列里只点了一列——所以
--- 它应当只读表的一小部分。我们用 bytes_read 来验证。
+-- We count visits longer than a hundred minutes. The query names one column out of seven — so
+-- it should read only a small part of the table. We'll check that by bytes_read.
 SELECT count() FROM passes WHERE duration_min > 100 FORMAT JSON
 SQL
 ```
@@ -557,8 +558,8 @@ SQL
 
 ```bash
 ch <<'SQL'
--- 我们把所有列的未压缩体积加起来。这正是「一共有多少数据」——
--- 也就是上一段输出里的 bytes_read 应当拿来对比的那个数值。
+-- We sum the uncompressed volume of all columns. That's exactly "how much data there is in total" —
+-- the figure that bytes_read from the previous output should be compared against.
 SELECT formatReadableSize(sum(data_uncompressed_bytes)) AS total
 FROM system.columns
 WHERE database = currentDatabase() AND table = 'passes'
@@ -591,17 +592,17 @@ SQL
 ```bash
 ch <<'SQL'
 SELECT
-    hour,                                     -- 一天中的小时
-    guests,                                   -- 这个小时有多少次进出
-    bar(guests, 0, max(guests) OVER (), 50) AS chart  -- 一条伪图形的柱子
+    hour,                                     -- the hour of the day
+    guests,                                   -- how many entries fell on this hour
+    bar(guests, 0, max(guests) OVER (), 50) AS chart  -- a bar of pseudo-graphics
 FROM
 (
-    -- 内层查询：按小时的普通分组
+    -- The inner query: an ordinary grouping by hour
     SELECT toHour(created_at) AS hour, count() AS guests
     FROM passes
     GROUP BY hour
 )
-ORDER BY hour   -- 小时按升序，好让这幅图从上往下读
+ORDER BY hour   -- hours ascending, so the picture reads top to bottom
 SQL
 ```
 
@@ -613,20 +614,20 @@ SQL
 
 ```bash
 ch <<'SQL'
--- 每一条执行过的查询，ClickHouse 都记录在系统表 system.query_log 里。
+-- ClickHouse records every executed query in the system table system.query_log.
 SELECT
-    event_time,                                       -- 查询何时完成
-    query_duration_ms,                                -- 用了多少毫秒
-    formatReadableQuantity(read_rows) AS rows_read,   -- 读了多少行
-    formatReadableSize(read_bytes)    AS bytes_read,  -- 为此拉起了多少字节
-    -- 查询文本：把其中的换行折叠掉，取前 50 个字符，
-    -- 否则输出在屏幕上放不下
+    event_time,                                       -- when the query finished
+    query_duration_ms,                                -- how many milliseconds it took
+    formatReadableQuantity(read_rows) AS rows_read,   -- how many rows it read
+    formatReadableSize(read_bytes)    AS bytes_read,  -- how many bytes it pulled up in doing so
+    -- The query text: we collapse line breaks in it and take the first 50 characters,
+    -- otherwise the output won't fit on the screen
     substring(replaceRegexpAll(query, '\\s+', ' '), 1, 50) AS query
 FROM system.query_log
-WHERE type = 'QueryFinish'  -- 只看已完成的：开始时另有一条记录
-  AND user = 'analyst'      -- 只看你的，不含服务器自己的内部查询
-ORDER BY event_time DESC    -- 最近的排在上面
-LIMIT 10                    -- 十条就够了
+WHERE type = 'QueryFinish'  -- only finished ones: there's a separate record for the start
+  AND user = 'analyst'      -- only yours, without the server's own service queries
+ORDER BY event_time DESC    -- the recent ones on top
+LIMIT 10                    -- and ten is enough
 SQL
 ```
 
@@ -642,7 +643,7 @@ SQL
 
 ```bash
 ch <<'SQL'
--- 我们按通行证编号找单独一行。SELECT * 表示「返回所有列」。
+-- We look for a single row by pass number. SELECT * means "return all columns."
 SELECT * FROM passes WHERE pass_id = 424242 FORMAT JSON
 SQL
 ```
@@ -665,8 +666,8 @@ SQL
 现在做同一件事，但做对。保安通常知道的不只是编号，还有**它发生的时间**：
 
 ```sql
--- 同样的查找，但加了时间范围。created_at 上的条件落在
--- 排序键里，ClickHouse 会丢弃那一天之外的一切。
+-- The same search, but with a time frame. The condition on created_at lands
+-- in the sorting key, and ClickHouse discards everything outside that day.
 SELECT * FROM passes
 WHERE created_at >= '2026-03-01' AND created_at < '2026-03-02'
   AND pass_id = 424242
@@ -700,9 +701,9 @@ FORMAT JSON
 
 ```bash
 ch <<'SQL'
--- 我们在一行里改一位访客的姓名。命令会立即交回控制权，但工作
--- 并没有到此结束：ClickHouse 会把它排进队列，在后台执行。
-ALTER TABLE passes UPDATE guest_name = '王军' WHERE pass_id = 424242
+-- We change a guest's name in one row. The command returns control immediately, but the work
+-- doesn't end there: ClickHouse will queue it and carry it out in the background.
+ALTER TABLE passes UPDATE guest_name = 'Whitfield J.' WHERE pass_id = 424242
 SQL
 ```
 
@@ -710,12 +711,12 @@ SQL
 
 ```bash
 ch <<'SQL'
--- 表的延迟改动队列——ClickHouse 的又一张系统表。
+-- The queue of deferred changes to the table — another ClickHouse system table.
 SELECT
-    command,       -- 具体被要求做什么
-    is_done,       -- 工作完成则为 1
-    parts_to_do,   -- 还剩多少个 part 要重写
-    create_time    -- 任务何时被排进队列
+    command,       -- what exactly it's been told to do
+    is_done,       -- 1 if the work is finished
+    parts_to_do,   -- how many parts remain to be rewritten
+    create_time    -- when the task was put in the queue
 FROM system.mutations
 WHERE table = 'passes'
 ORDER BY create_time DESC
@@ -748,11 +749,11 @@ SQL
 
 ```bash
 cd labs/09-clickhouse
-# 脚本会读取这三个环境变量，所以必须在运行它之前、
-# 并且在同一个终端窗口里设置好它们。
-export KUBECONFIG=~/lab.kubeconfig       # 检查哪个集群
-export COZY_TENANT=workshop03            # 你的租户编号
-export CH_PASSWORD='你的-analyst-密码'  # 订购 ClickHouse 时你设的那个
+# The script reads these three environment variables, so you must set them before running it
+# and in the same terminal window.
+export KUBECONFIG=~/lab.kubeconfig       # which cluster to check
+export COZY_TENANT=workshop03            # your tenant number
+export CH_PASSWORD='your-analyst-password'  # the one you set when ordering ClickHouse
 ./check.sh
 ```
 
@@ -765,8 +766,8 @@ export CH_PASSWORD='你的-analyst-密码'  # 订购 ClickHouse 时你设的那�
 ## 清理
 
 ```bash
-# 工作用的 Pod 什么都不保存：所有工作都在 ClickHouse 内部发生，Pod 只是
-# 把查询传递过去。删掉它，不必可惜。
+# The working Pod stores nothing: all the work happened inside ClickHouse, and the Pod only
+# passed queries along. Delete it without regret.
 kubectl delete pod ch-workbench
 ```
 

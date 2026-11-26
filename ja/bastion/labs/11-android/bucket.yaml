@@ -1,43 +1,41 @@
 ---
-# ラボ 11. ビルド済み APK 用のバケット。
+# Lab 11. Bucket for built APKs.
 #
-# バケットとはオブジェクトストレージ内の名前付き領域であり、ファイルは丸ごとの
-# オブジェクトとして HTTP 経由で格納・取得され、どこにもマウントされません。内部に
-# ディレクトリは存在せず、オブジェクト名のスラッシュはインターフェース上でだけツリー
-# として描画されます。
+# A bucket is a named area in object storage: files are put and fetched as whole
+# objects, over HTTP, and are never mounted anywhere. There are no directories inside;
+# a slash in an object name is drawn as a tree only in the interface.
 #
-# これはテナントオブジェクトです。`lab` クラスタ内ではなく、管理クラスタ上の
-# あなたの namespace に存在します。だからここで必要な kubeconfig はテナント用のもので
-# あり、`lab` クラスタを操作するときに使うものではありません。これは意図的な設計です。
-# ビルド成果物はそれがビルドされたクラスタよりも長く存続すべきだからです。
+# This is a tenant object: it lives NOT in the `lab` cluster, but in your namespace
+# on the management cluster. That is why the kubeconfig here must be the tenant one,
+# not the one you use to work with the `lab` cluster. This is by design: build artifacts
+# must outlive the cluster they were built in.
 #
-# 適用する前に tenant-workshopXX を自分の namespace に置き換えてください。さもないと
-# 注文が誤ったテナントに送られ、おそらく権限チェックを通過しません。
+# Before applying, replace tenant-workshopXX with your own namespace, otherwise the order
+# will go to the wrong tenant and most likely will not pass the permission checks.
 #
 #     export KUBECONFIG=~/.kube/config
 #     kubectl apply -f bucket.yaml
 #
-# 同じことはテナントダッシュボードでマウスを使っても行えます（アプリケーションを作成 -> Bucket）。
-# 結果は同一で、違いはテキストならレビューして Git に入れられることです。
+# The same thing can be done with the mouse in the tenant dashboard (Create application -> Bucket).
+# The result is identical; the difference is that text can be reviewed and put into Git.
 #
-# 適用後に起きること: プラットフォームは数秒でバケットを立ち上げ、アクセスキーを
-# 発行し、それを同じ namespace 内のシークレット bucket-builds-ci-credentials に格納します。
-# そこにある 4 つの値（endpoint, bucketName, accessKey, secretKey）は手作業で
-# `lab` クラスタに転送します。クラスタは別物であり、何も自動では移動しません。
+# What happens after applying: the platform will bring up the bucket in a few seconds
+# and issue access keys, storing them in the secret bucket-builds-ci-credentials in the same
+# namespace. Four values from there (endpoint, bucketName, accessKey, secretKey)
+# are transferred into the `lab` cluster by hand — the clusters are different, nothing moves on its own.
 apiVersion: apps.cozystack.io/v1alpha1
 kind: Bucket
 metadata:
-  # Cozystack オブジェクトの名前であり、それだけです。ストレージ内の実際のバケット名は
-  # プラットフォーム自身が発行します。bucket-a9209f83-... のような長い形式です。それは
-  # 発行されるシークレットの bucketName フィールドに入り、ビルドに差し込むべきなのは
-  # まさにそれであって、`builds` ではありません。
+  # The name of the Cozystack object, and only that. The real bucket name in storage is
+  # issued by the platform itself — long, of the form bucket-a9209f83-... It will end up in the
+  # bucketName field of the issued secret, and that is exactly what must be plugged into the build, not `builds`.
   name: builds
   namespace: tenant-workshopXX
 spec:
   users:
-    # このマップの各キーは、それぞれ独自のキーペアを持つ別々の S3 ユーザーです。
-    # 空のオブジェクトは「読み取りと書き込みのフルアクセス」を意味します。
-    # こうすればビルダーには書き込みを、モバイルチームには読み取り専用を付与できます:
+    # Each key of this map is a separate S3 user with its own key pair.
+    # An empty object means "full read and write access".
+    # This way you can grant the builder write access, and the mobile team — read-only:
     #   ci: {}
     #   mobile:
     #     readonly: true

@@ -8,7 +8,7 @@
 
 直接把脚本从 GitHub 拉到机器上：
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/laptop/scripts/convert.sh
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/laptop/scripts/convert.sh
 ```
 
 打开它：
@@ -16,7 +16,7 @@ curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-work
 nano convert.sh
 ```
 
-**你在步骤 1 记下的那三个值，现在派上用场了。** 文件靠前的位置有一个标着「填入你自己的值」的代码块——把里面的占位符换成你自己的，引号保留原样：
+**你在步骤 1 记下的那三个值，现在派上用场了。** 文件靠前的位置有一个标着「PASTE YOUR VALUES」的代码块——把里面的占位符换成你自己的，引号保留原样：
 
 ```
 BUCKET="your-bucket-name"
@@ -28,7 +28,7 @@ SECRET_KEY="your-secretKey"
 
 在 nano 里保存：`Ctrl+O`，然后 `Enter`，再按 `Ctrl+X` 退出。检查一下没有占位符残留：
 ```bash
-grep ВСТАВЬТЕ convert.sh || echo "all filled in, ready to run"
+grep PASTE_ convert.sh || echo "all filled in, ready to run"
 ```
 
 运行它——一定要通过 `sudo`，脚本需要 root 权限：
@@ -44,6 +44,6 @@ sudo bash convert.sh
 
 最后脚本会打印出一个指向你镜像的 **预签名链接**——在输出里找以 `Share:` 这个词开头的那一行，链接就紧跟在它后面。
 
-**拿它做什么：** 把它复制到那同一个记事本里。下一步你会回到你的笔记本，打开 `manifests/03-app-vm.yaml`，把它粘贴到 `url` 字段里——就是现在放着 `ВСТАВЬТЕ_PRESIGNED_URL` 占位符的地方。就是我们填号码的时候我提醒过你的那个。
+**拿它做什么：** 把它复制到那同一个记事本里。下一步你会回到你的笔记本，打开 `manifests/03-app-vm.yaml`，把它粘贴到 `url` 字段里——就是现在放着 `PASTE_PRESIGNED_URL` 占位符的地方。就是我们填号码的时候我提醒过你的那个。
 
 这是一个临时的签名链接：存储没有对外开放，而这个链接是你用自己的密钥生成的。它能存活一周——对工作坊以及之后做实验来说都绰绰有余。

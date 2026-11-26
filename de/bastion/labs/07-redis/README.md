@@ -69,7 +69,7 @@ Alle Dateien haben Sie bereits — Sie haben sie zusammen mit dem Repository geh
 neu zu erstellen oder abzutippen: Wo unten `kubectl apply -f name.yaml` steht, stammt die Datei von hier.
 
 ```bash
-# alle Befehle dieses Labs laufen aus dem Lab-Ordner — wechseln Sie hinein
+# all commands in this lab run from the lab folder — switch into it
 cd labs/07-redis
 ```
 
@@ -172,15 +172,15 @@ Setzen Sie Ihre eigene Adresse ein:
 ```bash
 cd labs/07-redis
 
-# build = „baue das Image aus dem Dockerfile".
-#   --platform linux/amd64  für welchen Prozessor bauen; die Cluster-Nodes sind x86
-#   -t <host>/<projekt>/<name>:<tag>  wie das Ergebnis heißen soll; der Registry-Host am
-#                           Anfang des Namens ist das Ziel, wohin push es später schickt
-#   app/                    der Ordner mit Dockerfile und Quellen, aus denen gebaut wird
+# build = "build the image from the Dockerfile".
+#   --platform linux/amd64  which processor to build for; the cluster nodes are x86
+#   -t <host>/<project>/<name>:<tag>  what to name the result; the registry host at the
+#                           start of the name is where push will send it later
+#   app/                    the folder with the Dockerfile and sources to build from
 docker build --platform linux/amd64 -t harbor.workshop03.example.org/passes/passes-api:v2 app/
 
-# push = „schicke das Image in die Registry". Die Adresse stammt aus dem ersten Teil des
-# Image-Namens, die Zugangsdaten — aus dem docker login, das Sie im vorigen Lab gemacht haben.
+# push = "send the image to the registry". The address is taken from the first part of the
+# image name, the credentials — from the docker login you did in the previous lab.
 docker push harbor.workshop03.example.org/passes/passes-api:v2
 ```
 
@@ -197,26 +197,26 @@ und bearbeitet die Dateien an Ort und Stelle. Dann übergibt `apply` dem Cluster
 beschrieben ist, und `rollout status` wartet, bis die Kopien hochkommen.
 
 ```bash
-# KUBECONFIG sagt kubectl, welche Zugangsdatei zu verwenden ist. Wir wechseln zu
-# Ihrem `lab`-Cluster; das gilt, bis Sie das Terminalfenster schließen.
+# KUBECONFIG tells kubectl which access file to use. We switch to
+# your `lab` cluster; it holds until you close the terminal window.
 export KUBECONFIG=~/lab.kubeconfig
 
-# sed -i = „bearbeite die Datei an Ort und Stelle".
-#   's|alt|neu|g'  jedes Vorkommen ersetzen; als Trenner wird | statt / verwendet, weil
-#                  die Adresse Schrägstriche enthält
-#   Die macOS-Version von sed verlangt nach -i ein zwingendes Argument; leere Anführungszeichen
-#   bedeuten „keine Sicherungskopie anlegen". Unter Linux darf dieses Argument nicht dastehen.
-#   Am Zeilenende stehen zwei Dateien: sed nimmt mehrere auf einmal und bearbeitet sie in einem Durchgang.
+# sed -i = "edit the file in place".
+#   's|old|new|g'  replace every occurrence; the | separator is used instead of / because
+#                  the address contains slashes
+#   The macOS version of sed requires a mandatory argument after -i; empty quotes
+#   mean "don't make a backup". On Linux that argument must not be there.
+#   There are two files at the end of the line: sed accepts several at once and edits them in one pass.
 
 # Linux
 sed -i    's|HARBOR-HOST|harbor.workshop03.example.org|g' hr-legacy.yaml passes-api.yaml
 # macOS
 sed -i '' 's|HARBOR-HOST|harbor.workshop03.example.org|g' hr-legacy.yaml passes-api.yaml
 
-# apply = „bringe den Cluster in den in den Dateien beschriebenen Zustand". Das Flag -f wird für jede Datei wiederholt.
+# apply = "bring the cluster to what's described in the files". The -f flag is repeated for each file.
 kubectl apply -f hr-legacy.yaml -f passes-api.yaml
 
-# rollout status wartet auf die Bereitschaft der Kopien und beendet sich von selbst; andernfalls gibt es einen Fehler zurück
+# rollout status waits for the copies to be ready and exits on its own; if they don't, it returns an error
 kubectl rollout status deployment/hr-legacy
 kubectl rollout status deployment/passes-api
 ```
@@ -225,14 +225,14 @@ kubectl rollout status deployment/passes-api
 Lab. Wenn Sie es nicht gemacht haben, landen die Pods in `ImagePullBackOff`. Das Secret erstellen:
 
 ```bash
-# create secret docker-registry = „erstelle ein Secret mit Registry-Zugangsdaten";
-# ein solches Secret kann der kubelet selbst lesen, wenn er das Image auf einen Node zieht.
-#   harbor             der Name des Secrets im Cluster — beide Manifeste verweisen darauf
-#   --docker-server    für welche Registry diese Zugangsdaten gelten
-#   --docker-username  wer sich anmeldet; --docker-password — das Passwort des Harbor-Administrators
+# create secret docker-registry = "create a Secret with registry credentials";
+# such a Secret can be read by the kubelet itself when it pulls the image onto a node.
+#   harbor             the Secret's name in the cluster — both manifests reference it
+#   --docker-server    which registry these credentials are for
+#   --docker-username  who logs in; --docker-password — the Harbor administrator password
 kubectl create secret docker-registry harbor \
   --docker-server=harbor.workshop03.example.org \
-  --docker-username=admin --docker-password='IHR-PASSWORT'
+  --docker-username=admin --docker-password='YOUR-PASSWORD'
 ```
 
 Prüfen wir, dass die Kette funktioniert. Der Dienst ist nur von innerhalb des Clusters sichtbar, deshalb
@@ -240,15 +240,15 @@ stellen wir die Anfrage auch von dort: Wir starten einen Einweg-Pod mit `curl`, 
 `passes-api`, gibt die Antwort aus und verschwindet.
 
 ```bash
-# run probe = „starte einen Pod namens probe".
-#   --rm              den Pod löschen, sobald er fertig ist
-#   -i                uns seine Ausgabe zeigen
-#   --restart=Never   nicht neu starten: dies ist ein einmaliger Befehl, kein dauerhafter Dienst
-#   --image=...       welches Image verwenden; die Version ist fixiert, damit nichts Neues ankommt
-#   --quiet           keine Dienstzeilen ausgeben, nur die Antwort
-#   --                alles nach diesen zwei Strichen ist der Befehl im Pod
-# Eine Adresse der Form <service>.<namespace>.svc.cluster.local ist der interne Name des Dienstes;
-# darüber finden sich die Pods, ohne Adressen zu kennen.
+# run probe = "run a Pod named probe".
+#   --rm              delete the Pod as soon as it's done
+#   -i                show us its output
+#   --restart=Never   don't restart: this is a one-time command, not a permanent service
+#   --image=...       which image to use; the version is pinned so nothing new arrives
+#   --quiet           don't print service lines, only the answer
+#   --                everything after these two dashes is the command inside the Pod
+# An address of the form <service>.<namespace>.svc.cluster.local is the service's internal name;
+# by it the Pods find each other without knowing addresses.
 kubectl run probe --rm -i --restart=Never --image=curlimages/curl:8.11.1 --quiet -- \
   curl -s "http://passes-api.default.svc.cluster.local/employee?id=42"
 ```
@@ -273,7 +273,7 @@ Rollen Sie den Generator aus. Er kommt hoch wie eine gewöhnliche Anwendung und 
 dem Dienst — so hängt die Messung nicht von Ihrem Internet oder dem Tunnel ab:
 
 ```bash
-# die Datei enthält zwei Objekte: den Generator selbst und einen Service dafür
+# the file has two objects: the generator itself and a service for it
 kubectl apply -f fortio.yaml
 kubectl rollout status deployment/fortio
 ```
@@ -282,17 +282,17 @@ Jetzt starten wir die Last. Der Befehl `kubectl exec` führt etwas innerhalb ein
 Pods aus — hier, innerhalb des Generators, wird der Generator selbst gestartet, im Beschuss-Modus:
 
 ```bash
-# exec deploy/fortio = einen Befehl im Pod dieser Anwendung ausführen
-#   --            die Grenze: links kubectl, rechts der Befehl, der in den Pod geht
-#   fortio load   Beschuss-Modus: Anfragen senden und die Antwortzeit messen
-#   -qps 20       zwanzig Anfragen pro Sekunde — wir geben ein Tempo vor, nicht „so fest wie möglich"
-#   -t 20s        wie lange die Messung dauert
-#   -c 16         sechzehn parallele Verbindungen. Die Zahl ist nicht willkürlich:
-#                 das Verzeichnis antwortet in 800 ms, also schafft eine Verbindung
-#                 etwas mehr als eine Anfrage pro Sekunde. Um die gesetzten 20 pro
-#                 Sekunde zu halten, brauchen Sie mindestens sechzehn Verbindungen — sonst
-#                 stößt Fortio an die Latenzwand und liefert das gewünschte Tempo nicht.
-#   das letzte Argument ist die Adresse, die wir beschießen
+# exec deploy/fortio = run a command inside this application's Pod
+#   --            the boundary: kubectl on the left, on the right the command that goes into the Pod
+#   fortio load   bombardment mode: send requests and measure the response time
+#   -qps 20       twenty requests per second — we set a pace, not "push as hard as we can"
+#   -t 20s        how long the measurement lasts
+#   -c 16         sixteen parallel connections. The number isn't arbitrary:
+#                 the directory answers in 800 ms, so one connection manages
+#                 a little more than one request per second. To hold the set 20 per
+#                 second, you need no fewer than sixteen connections — otherwise Fortio
+#                 will hit the latency wall and not deliver the requested pace.
+#   the last argument is the address we're bombarding
 kubectl exec deploy/fortio -- fortio load -qps 20 -t 20s -c 16 \
   "http://passes-api.default.svc.cluster.local/employee?id=42"
 ```
@@ -316,10 +316,10 @@ die Katalogeinträge des Tenants, aber in Ihren `lab`-Cluster schaut es nicht hi
 hat eine eigene Weboberfläche, und die müssen Sie über einen Tunnel erreichen.
 
 ```bash
-# port-forward svc/fortio = ein Tunnel vom Bastion zum Service des Generators im Cluster
-#   8081:8080 — die linke Zahl ist der Port auf Ihrem Bastion, die rechte der Service-Port im Cluster
-# Port 8081 wird verwendet, weil 8080 auf Ihrer Maschine von etwas anderem belegt sein könnte.
-# Fenster nicht schließen: Der Tunnel lebt, solange der Befehl läuft. Zum Abbrechen — Ctrl+C.
+# port-forward svc/fortio = a tunnel from the bastion to the generator's service in the cluster
+#   8081:8080 — the left number is the port on your bastion, the right one the service port in the cluster
+# Port 8081 is used because 8080 might be taken by something else on your machine.
+# Don't close the window: the tunnel lives as long as the command runs. To stop it — Ctrl+C.
 kubectl port-forward svc/fortio 8081:8080
 ```
 
@@ -420,11 +420,11 @@ zwei verschiedene Cluster, und als Erstes muss man sich vergewissern, dass der z
 Sehen wir uns an, welche Services aufgetaucht sind:
 
 ```bash
-# --kubeconfig setzt die Zugangsdatei direkt im Befehl — nur dieses eine Mal, ohne KUBECONFIG anzurühren.
-# So kann man zwei Befehle hintereinander an verschiedene Cluster richten, ohne durcheinanderzukommen.
-#   -n tenant-workshopXX  der Namespace Ihres Tenants
-#   get svc               „zeige die Services" — dauerhafte Adressen, hinter denen Pods stehen
-#   | grep redis          nur die Zeilen mit dem Wort redis in der Ausgabe behalten
+# --kubeconfig sets the access file right in the command — just once, without touching KUBECONFIG.
+# This way two commands in a row can be addressed to different clusters without getting confused.
+#   -n tenant-workshopXX  the namespace of your tenant
+#   get svc               "show the services" — permanent addresses backed by Pods
+#   | grep redis          keep only the lines with the word redis in the output
 kubectl --kubeconfig ~/.kube/config -n tenant-workshopXX get svc | grep redis
 ```
 
@@ -466,15 +466,15 @@ davor, und die Warnung stummzuschalten, statt die Ursache zu beseitigen, ist ein
 ```bash
 export KUBECONFIG=~/lab.kubeconfig
 
-# run redis-probe = ein Einweg-Pod mit dem redis-cli-Client:
-#   --rm --restart=Never  hat seine Arbeit getan und sich gelöscht, kein Neustart nötig
-#   -i --quiet            uns die Ausgabe zeigen und keine Dienstzeilen ausgeben
-#   --env=REDISCLI_AUTH   das Passwort geht als Umgebungsvariable in den Pod, nicht als Argument
-#   --                    rechts von diesen Strichen steht der Befehl, der in den Pod geht
-#   redis-cli -h <name>   mit welchem Server verbinden; der Name ist genau jener vollständige
-#   ping                  ein kurzes „lebst du"; die Antwort darauf ist PONG
+# run redis-probe = a one-off Pod with the redis-cli client:
+#   --rm --restart=Never  it did its job and deleted itself, no need to restart
+#   -i --quiet            show us the output and don't print service lines
+#   --env=REDISCLI_AUTH   the password goes into the Pod as an environment variable, not an argument
+#   --                    to the right of these dashes is the command that goes into the Pod
+#   redis-cli -h <name>   which server to connect to; the name is that same full one
+#   ping                  a short "are you alive"; the answer to it is PONG
 kubectl run redis-probe --rm -i --restart=Never --image=redis:7-alpine --quiet \
-  --env=REDISCLI_AUTH='IHR-PASSWORT' -- \
+  --env=REDISCLI_AUTH='YOUR-PASSWORD' -- \
   redis-cli -h rfrm-redis-cache.tenant-workshopXX.svc.cozy.local ping
 ```
 
@@ -488,8 +488,8 @@ PONG
 Namen des Management-Clusters von Ihrem Cluster aus nicht sichtbar. Das behebt man, indem man ihn über die IP anspricht:
 
 ```bash
-# -o jsonpath='{.spec.clusterIP}' — ein Feld des Objekts ausgeben: die interne Adresse,
-# die die Plattform diesem Service zugewiesen hat. {"\n"} fügt einen Zeilenumbruch hinzu.
+# -o jsonpath='{.spec.clusterIP}' — print one field of the object: the internal address
+# the platform assigned to this service. {"\n"} adds a line break.
 kubectl --kubeconfig ~/.kube/config -n tenant-workshopXX get svc rfrm-redis-cache \
   -o jsonpath='{.spec.clusterIP}{"\n"}'
 ```
@@ -508,19 +508,19 @@ was sich ändert. Zuerst setzen wir die Adresse Ihres Redis in den Patch ein, da
 dem Cluster: `kubectl patch` fügt Änderungen an ein bereits vorhandenes Objekt an, statt es komplett zu ersetzen.
 
 ```bash
-# dieselbe Adress-Ersetzung wie zuvor, nur der Platzhalter ist ein anderer — REDIS-ADDR
+# the same address substitution as before, only the placeholder is different — REDIS-ADDR
 
 # Linux
 sed -i    's|REDIS-ADDR|rfrm-redis-cache.tenant-workshopXX.svc.cozy.local|g' cache-patch-broken.yaml
 # macOS
 sed -i '' 's|REDIS-ADDR|rfrm-redis-cache.tenant-workshopXX.svc.cozy.local|g' cache-patch-broken.yaml
 
-# patch deployment passes-api = „bessere dieses Objekt mit dem aus, was in der Datei steht"
-#   --patch-file  woher die Änderungen genommen werden
-# Änderung von Umgebungsvariablen bedeutet neue Pods: die alten werden ersetzt.
+# patch deployment passes-api = "fix up this object with what's in the file"
+#   --patch-file  where to take the changes from
+# Changing environment variables means new Pods: the old ones will be replaced.
 kubectl patch deployment passes-api --patch-file cache-patch-broken.yaml
 
-# warten, bis die neuen Kopien bereit sind — sonst messen wir noch die alten
+# wait until the new copies become ready — otherwise we'll measure the old ones still
 kubectl rollout status deployment/passes-api
 ```
 
@@ -528,7 +528,7 @@ Messen Sie erneut — mit demselben Befehl, mit dem wir vor dem Einschalten des 
 Beschuss-Bedingungen müssen bis zum letzten Flag übereinstimmen, sonst gibt es nichts zu vergleichen:
 
 ```bash
-# dieselben zwanzig Anfragen pro Sekunde, dieselben zwanzig Sekunden, dieselben sechzehn Verbindungen
+# the same twenty requests per second, the same twenty seconds, the same sixteen connections
 kubectl exec deploy/fortio -- fortio load -qps 20 -t 20s -c 16 \
   "http://passes-api.default.svc.cluster.local/employee?id=42"
 ```
@@ -548,7 +548,7 @@ Schauen Sie zuerst, was die Anwendung selbst antwortet: Die Antwort hat Felder, 
 eingeschaltet ist und ob die Antwort aus ihm kam.
 
 ```bash
-# derselbe Einweg-Pod mit curl wie zuvor: wir fragen den Dienst von innerhalb des Clusters
+# the same one-off Pod with curl as before: we ask the service from inside the cluster
 kubectl run probe --rm -i --restart=Never --image=curlimages/curl:8.11.1 --quiet -- \
   curl -s "http://passes-api.default.svc.cluster.local/employee?id=42"
 ```
@@ -564,9 +564,9 @@ Jetzt das Log. Die Anwendung schreibt dorthin, was ihr nicht gelungen ist — un
 an dem die Wahrheit derzeit sichtbar ist:
 
 ```bash
-# logs = „zeige, was die Anwendung in ihre Ausgabe geschrieben hat".
-#   -l app=passes-api  über alle Kopien mit diesem Label auf einmal, nicht über eine benannte
-#   --tail=20          die letzten zwanzig Zeilen jeder Kopie, nicht das ganze Log
+# logs = "show what the application wrote to its output".
+#   -l app=passes-api  across all copies with this label at once, not one named copy
+#   --tail=20          the last twenty lines of each copy, not the whole log
 kubectl logs -l app=passes-api --tail=20
 ```
 
@@ -601,19 +601,19 @@ Das Redis-Passwort lebt im Management-Cluster, und die Anwendung braucht es in I
 hinüber — über eine Shell-Variable, damit das Passwort nicht in der Befehlshistorie landet:
 
 ```bash
-# read legt das über die Tastatur Eingegebene in die Variable REDIS_PASS:
-#   -s  das Eingegebene nicht auf dem Bildschirm anzeigen
-#   -r  einen Backslash nicht als Sonderzeichen behandeln
-# Nach dieser Zeile erscheint nichts auf dem Bildschirm: fügen Sie das Passwort aus dem Dashboard ein und Enter.
+# read puts what's typed on the keyboard into the REDIS_PASS variable:
+#   -s  don't show what's typed on the screen
+#   -r  don't treat a backslash as a special character
+# Nothing will appear on screen after this line: paste the password from the dashboard and Enter.
 read -rs REDIS_PASS
 
-# create secret generic = ein gewöhnliches Secret, eine Menge von Schlüssel-Wert-Paaren.
-#   redis-password              der Name des Secrets im Cluster
-#   --from-literal=password=... darin einen Schlüssel password mit diesem Wert anlegen;
-#                               genau auf das Paar „Secret-Name + Schlüssel" verweist der Patch
+# create secret generic = an ordinary Secret, a set of key-value pairs.
+#   redis-password              the Secret's name in the cluster
+#   --from-literal=password=... create a password key in it with this value;
+#                               it's the "Secret name + key" pair the patch will reference
 kubectl create secret generic redis-password --from-literal=password="$REDIS_PASS"
 
-# unset löscht die Variable, damit das Passwort nicht an die nächsten Befehle in diesem Fenster gelangt
+# unset erases the variable so the password doesn't reach the next commands in this window
 unset REDIS_PASS
 ```
 
@@ -621,14 +621,14 @@ Wenden Sie den vollständigen Patch an. Er enthält dieselbe Redis-Adresse plus 
 erstellte Secret und die Lebensdauer der Cache-Einträge; die Erläuterung steht im Spoiler direkt nach dem Befehl.
 
 ```bash
-# dieselbe Adress-Ersetzung, jetzt in der funktionierenden Patch-Datei
+# the same address substitution, now in the working patch file
 
 # Linux
 sed -i    's|REDIS-ADDR|rfrm-redis-cache.tenant-workshopXX.svc.cozy.local|g' cache-patch.yaml
 # macOS
 sed -i '' 's|REDIS-ADDR|rfrm-redis-cache.tenant-workshopXX.svc.cozy.local|g' cache-patch.yaml
 
-# das vorhandene Deployment mit dem Inhalt der Datei ausbessern und auf die neuen Kopien warten
+# fix up the existing Deployment with the file's contents and wait for the new copies
 kubectl patch deployment passes-api --patch-file cache-patch.yaml
 kubectl rollout status deployment/passes-api
 ```
@@ -678,10 +678,10 @@ Prüfen wir Stück für Stück, bevor wir Last aufbringen. Zwei identische Anfra
 Bezeichner, der noch nicht abgefragt wurde: Die erste muss langsam sein, die zweite — schnell.
 
 ```bash
-# derselbe Einweg-Pod mit curl, aber darin wird eine sh-Shell gestartet:
-#   sh -c '...'  mehrere als eine Zeichenkette übergebene Befehle ausführen
-#   ; echo       zwischen die Antworten einen Zeilenumbruch einfügen, damit sie nicht zusammenkleben
-# id=777 wird verwendet, weil dieser Mitarbeiter noch nicht abgefragt wurde: im Cache ist er definitiv nicht.
+# the same one-off Pod with curl, but an sh shell is launched inside it:
+#   sh -c '...'  run several commands passed as a single string
+#   ; echo       insert a line break between the answers so they don't run together
+# id=777 is used because this employee hasn't been asked for yet: it's definitely not in the cache.
 kubectl run probe --rm -i --restart=Never --image=curlimages/curl:8.11.1 --quiet -- \
   sh -c 'curl -s "http://passes-api.default.svc.cluster.local/employee?id=777"; echo;
          curl -s "http://passes-api.default.svc.cluster.local/employee?id=777"'
@@ -700,7 +700,7 @@ zweite ist ein Hit: Die Antwort lag bereits vor, 1 ms.
 Jetzt eine Messung unter Last, derselbe Befehl mit denselben Flags, ein drittes Mal:
 
 ```bash
-# wir ändern nichts an den Beschuss-Bedingungen: es ändert sich nur, was im Dienst steckt
+# we change nothing in the bombardment conditions: only what's inside the service changes
 kubectl exec deploy/fortio -- fortio load -qps 20 -t 20s -c 16 \
   "http://passes-api.default.svc.cluster.local/employee?id=42"
 ```
@@ -744,8 +744,8 @@ langsamer. Bestätigen können Sie das so — führen Sie zwei kurze Serien übe
 schauen Sie auf die jeweils ersten Anfragen:
 
 ```bash
-# zwei Beschüsse hintereinander über verschiedene Mitarbeiter, je zehn Sekunden.
-# Zu Beginn jeder Serie ist der Cache für diesen Schlüssel leer — und die erste Anfrage geht ins Verzeichnis.
+# two bombardments in a row over different employees, ten seconds each.
+# At the start of each series the cache is empty for that key — and the first request goes to the directory.
 kubectl exec deploy/fortio -- fortio load -qps 20 -t 10s -c 16 \
   "http://passes-api.default.svc.cluster.local/employee?id=1"
 kubectl exec deploy/fortio -- fortio load -qps 20 -t 10s -c 16 \
@@ -802,13 +802,13 @@ zwingend, die dritte ist der Pfad zum Tenant-Kubeconfig.
 ```bash
 cd labs/07-redis
 
-# in welchem Cluster die Anwendung geprüft wird — in Ihrem `lab`
+# which cluster to check the application in — your `lab`
 export KUBECONFIG=~/lab.kubeconfig
-# Ihre Tenant-Nummer: daraus setzt das Skript den Namespace-Namen tenant-workshop03 zusammen
+# your tenant number: from it the script assembles the namespace name tenant-workshop03
 export COZY_TENANT=workshop03
-# wo der Zugang zum Management-Cluster liegt — dort schaut das Skript auf Redis selbst.
-# Sie können sie nicht setzen: dann sucht das Skript ~/.kube/config, und findet es das nicht — überspringt
-# es die Prüfungen auf dem Management-Cluster und sagt das.
+# where the access to the management cluster lives — there the script looks at Redis itself.
+# You can leave it unset: then the script looks for ~/.kube/config, and not finding it — skips
+# the checks on the management cluster and says so.
 export COZY_KUBECONFIG=~/.kube/config
 
 ./check.sh
@@ -829,9 +829,9 @@ Alles wird in den folgenden Labs gebraucht — jetzt löschen wir nichts.
 Wenn Sie mit allen Labs fertig sind:
 
 ```bash
-# delete -f = genau die in den Dateien beschriebenen Objekte aus dem Cluster entfernen
+# delete -f = remove from the cluster exactly the objects described in the files
 kubectl delete -f passes-api.yaml -f hr-legacy.yaml -f fortio.yaml
-# das Secret wurde durch einen Befehl erstellt, nicht durch eine Datei — wir löschen es nach Namen
+# the Secret was created by a command, not a file — we delete it by name
 kubectl delete secret redis-password
 ```
 

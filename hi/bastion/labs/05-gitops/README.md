@@ -47,10 +47,10 @@
 
 ## लैब फ़ोल्डर में क्या है
 
-सारी फ़ाइलें पहले से ही आपकी हैं — आपने उन्हें रिपॉज़िटरी के साथ ले लिया था। कुछ भी नए सिरे से बनाने या टाइप करने की ज़रूरत नहीं: नीचे जहाँ भी `kubectl apply -f नाम.yaml` लिखा है, फ़ाइल यहीं से आती है।
+सारी फ़ाइलें पहले से ही आपकी हैं — आपने उन्हें रिपॉज़िटरी के साथ ले लिया था। कुछ भी नए सिरे से बनाने या टाइप करने की ज़रूरत नहीं: नीचे जहाँ भी `kubectl apply -f name.yaml` लिखा है, फ़ाइल यहीं से आती है।
 
 ```bash
-# यहाँ से आगे सभी कमांड इसी फ़ोल्डर से चलती हैं: `kubectl apply -f` में दिए पथ इसी से गिने जाते हैं।
+# From here on, all commands run from this folder: the paths in `kubectl apply -f` are relative to it.
 cd labs/05-gitops
 ```
 
@@ -79,11 +79,11 @@ cd labs/05-gitops
 रिपॉज़िटरी को अपनी मशीन पर खींचें:
 
 ```bash
-# clone = रिपॉज़िटरी को पूरी तरह डाउनलोड करना, उसके संपूर्ण संपादन-इतिहास सहित। आपको
-# किसी साझा फ़ोल्डर का एक्सेस नहीं, बल्कि डिस्क पर अपनी पूरी कॉपी मिलती है: इसके साथ ऑफ़लाइन भी काम कर सकते हैं।
-# `आपका-लॉगिन` की जगह अपना GitHub लॉगिन डालें, वरना कमांड किसी और की रिपॉज़िटरी में चली जाएगी।
-git clone https://github.com/आपका-लॉगिन/passes-gitops.git
-# clone रिपॉज़िटरी के नाम वाला एक फ़ोल्डर बनाता है। यहाँ से आगे हम उसी के भीतर काम करते हैं।
+# clone = download the repository in full, together with its entire edit history. You get
+# not access to a shared folder but your own full copy on disk: you can work with it offline.
+# Replace `YOUR-LOGIN` with your own GitHub login, or the command will go to someone else's repository.
+git clone https://github.com/YOUR-LOGIN/passes-gitops.git
+# clone creates a folder named after the repository. From here on we work inside it.
 cd passes-gitops
 ```
 
@@ -94,12 +94,12 @@ cd passes-gitops
 इस लैब के फ़ोल्डर में दो फ़ाइलें हैं: `app/namespace.yaml` और `app/passes.yaml`। इन्हें अपनी रिपॉज़िटरी में, `apps` फ़ोल्डर में कॉपी करें:
 
 ```bash
-# apps — वह फ़ोल्डर जहाँ से Flux वर्णन खींचेगा। नाम हमने चुना है, और ठीक यही नाम
-# Flux की कॉन्फ़िगरेशन में दर्ज है, इसलिए इसे बेवजह बदलने की कोई वजह नहीं।
-#   -p  अगर फ़ोल्डर पहले से मौजूद है तो इसे त्रुटि न मानें
+# apps — the folder Flux will pull descriptions from. We chose the name, and it's the exact
+# same one named in the Flux configuration, so there's no reason to change it without cause.
+#   -p  don't treat it as an error if the folder already exists
 mkdir -p apps
-# वर्कशॉप सामग्री से दोनों फ़ाइलें (वे ~/workshop में हैं) अपनी
-# रिपॉज़िटरी में कॉपी करें; `*.yaml` दोनों फ़ाइलें एक साथ ले लेगा।
+# Copy both files from the workshop materials (they live in ~/workshop) into your own
+# repository; `*.yaml` will take both files at once.
 cp ~/workshop/labs/05-gitops/app/*.yaml apps/
 ```
 
@@ -163,13 +163,13 @@ spec:
 इसे GitHub भेजें। Git सब कुछ अंधाधुंध याद नहीं रखता, बल्कि वही जो उसे साफ़-साफ़ दिखाया गया — इसीलिए तीन कमांड हैं, हर एक अपना काम करती है:
 
 ```bash
-# add = उन फ़ाइलों को चिह्नित करना जो इतिहास की अगली प्रविष्टि में जाएँगी।
+# add = mark the files that will go into the next history entry.
 git add apps
-# commit = चिह्नित को एक प्रविष्टि के रूप में सहेजना: सामग्री, लेखक, समय और कारण।
-#   -m "..."  वही कारण। यह हमेशा के लिए इतिहास में रहता है, और लोग इसे पढ़ेंगे।
-# कमिट फ़िलहाल सिर्फ़ आपके bastion पर है — GitHub में यह अभी नहीं है।
+# commit = save what's marked as one entry: contents, author, time, and reason.
+#   -m "..."  that very reason. It stays in the history forever, and people will read it.
+# The commit lives only on your bastion for now — it's not yet in GitHub.
 git commit -m "add passes service v1"
-# push = जमा हुए कमिट GitHub भेजना। इस कमांड तक वहाँ कुछ नहीं बदलता।
+# push = send the accumulated commits to GitHub. Until this command, nothing there changes.
 git push
 ```
 
@@ -188,36 +188,36 @@ Flux आपके क्लस्टर के भीतर कई सेवा�
 macOS:
 
 ```bash
-# Homebrew, Flux प्रोजेक्ट की रिपॉज़िटरी से फ़ॉर्मूला लेकर एक निष्पादन-योग्य फ़ाइल रख देता है।
+# Homebrew takes the formula from the Flux project's repository and drops one executable file.
 brew install fluxcd/tap/flux
 ```
 
 Linux:
 
 ```bash
-# Flux साइट से आया स्क्रिप्ट आपकी आर्किटेक्चर पहचानता है और फ़ाइल को /usr/local/bin में रख देता है।
-#   -s          curl चुपचाप काम करता है, बिना डाउनलोड सूचक के
-#   | sudo bash डाउनलोड किया गया टेक्स्ट तुरंत प्रशासक अधिकारों के साथ चलाया जाता है — सिस्टम
-#               फ़ोल्डर में लिखने की वजह से वे अधिकार ज़रूरी हैं
+# The script from the Flux site detects your architecture and drops the file into /usr/local/bin.
+#   -s          curl works silently, without a download indicator
+#   | sudo bash the downloaded text is executed straight away with administrator rights — they're
+#               needed because of the write into a system folder
 curl -s https://fluxcd.io/install.sh | sudo bash
 ```
 
 Windows (PowerShell, अगर Chocolatey इंस्टॉल है):
 
 ```powershell
-# choco — Windows के लिए एक तीसरे-पक्ष का पैकेज मैनेजर; यह वही एकल flux.exe फ़ाइल इंस्टॉल करता है।
+# choco — a third-party package manager for Windows; it installs the same single flux.exe file.
 choco install flux
 ```
 
 अब हम सेवाओं को खुद क्लस्टर में इंस्टॉल करते हैं:
 
 ```bash
-# एक्सेस फ़ाइल सेट करें: नीचे की कमांड क्लस्टर में ऑब्जेक्ट बनाती है, और यह मायने रखता है कि किसमें।
+# Set the access file: the command below creates objects in the cluster, and it matters in which one.
 export KUBECONFIG=~/lab.kubeconfig
-# flux install क्लस्टर में एक `flux-system` namespace बनाता है और सेवाओं को उसमें तैनात करता है।
-#   --components=...  ठीक-ठीक कौन-सी इंस्टॉल करनी हैं:
-#     source-controller     Git में जाता है और रिपॉज़िटरी की ताज़ा कॉपी रखता है
-#     kustomize-controller  डाउनलोड की गई चीज़ को क्लस्टर में लागू करता है और विचलनों पर नज़र रखता है
+# flux install sets up a `flux-system` namespace in the cluster and deploys the services into it.
+#   --components=...  which ones exactly to install:
+#     source-controller     reaches into Git and keeps a fresh copy of the repository
+#     kustomize-controller  applies what was downloaded to the cluster and watches for divergences
 flux install --components=source-controller,kustomize-controller
 ```
 
@@ -234,8 +234,8 @@ flux install --components=source-controller,kustomize-controller
 पक्का करें कि सेवाएँ चालू हो गईं:
 
 ```bash
-# -n flux-system — वह namespace जिसमें Flux ने डेरा जमाया। इस फ़्लैग के बिना kubectl
-# default namespace में देखता है और कुछ नहीं दिखाता।
+# -n flux-system — the namespace Flux settled into. Without this flag kubectl looks in the
+# default namespace and shows nothing.
 kubectl get pods -n flux-system
 ```
 
@@ -247,8 +247,8 @@ kubectl get pods -n flux-system
 बिल्कुल यही चीज़ एक साधारण मैनिफ़ेस्ट से, बिना टूल के, इंस्टॉल हो जाती है:
 
 ```bash
-# सेवाओं का वही सेट, लेकिन बने-बनाए वर्णन के रूप में: -f डिस्क पर पथ ही नहीं
-# बल्कि एक लिंक भी स्वीकार करता है। kubectl फ़ाइल डाउनलोड करेगा और उसकी सामग्री लागू करेगा।
+# The same set of services, but as a ready-made description: -f accepts not only a path on disk
+# but also a link. kubectl will download the file and apply its contents.
 kubectl apply -f https://github.com/fluxcd/flux2/releases/latest/download/install.yaml
 ```
 
@@ -262,10 +262,10 @@ kubectl apply -f https://github.com/fluxcd/flux2/releases/latest/download/instal
 
 Flux इंस्टॉल हो गया, लेकिन उसे अभी नहीं पता कि कहाँ जाना है। हम उसे यह दो ऑब्जेक्ट से बताएँगे।
 
-इस लैब के फ़ोल्डर से `flux/gitrepository.yaml` खोलें और `मुझे-बदलें` प्लेसहोल्डर की जगह **अपनी** रिपॉज़िटरी का पता डालें:
+इस लैब के फ़ोल्डर से `flux/gitrepository.yaml` खोलें और `REPLACE-ME` प्लेसहोल्डर की जगह **अपनी** रिपॉज़िटरी का पता डालें:
 
 ```yaml
-  url: https://github.com/मुझे-बदलें/passes-gitops
+  url: https://github.com/REPLACE-ME/passes-gitops
 ```
 
 <details>
@@ -277,7 +277,7 @@ Flux इंस्टॉल हो गया, लेकिन उसे अभी
 kind: GitRepository
 spec:
   interval: 1m
-  url: https://github.com/मुझे-बदलें/passes-gitops
+  url: https://github.com/REPLACE-ME/passes-gitops
   ref:
     branch: main
 ```
@@ -315,18 +315,18 @@ spec:
 दोनों लागू करें:
 
 ```bash
-# -f किसी फ़ाइल की नहीं, फ़ोल्डर की ओर इशारा करता है: उसमें पड़े सभी मैनिफ़ेस्ट लागू होंगे —
-# GitRepository भी और Kustomization भी। दोनों flux-system namespace में बनते हैं।
+# -f points at a folder, not a file: all the manifests in it will be applied —
+# both GitRepository and Kustomization. Both are created in the flux-system namespace.
 kubectl apply -f flux/
 ```
 
 देखते हैं इससे क्या निकला:
 
 ```bash
-# हम Flux से रिकॉन्साइल की अवस्था पूछते हैं।
-#   --watch  खिड़की को व्यस्त रखो और बदलाव होते ही पंक्ति ताज़ा करो
-# READY: True का मतलब रिपॉज़िटरी की सामग्री क्लस्टर तक पहुँची और लागू हो गई।
-# REVISION — branch और अभी लागू कमिट का छोटा पहचानकर्ता।
+# We ask Flux about the reconciliation state.
+#   --watch  keep the window busy and refresh the line as things change
+# READY: True means the repository's contents reached the cluster and were applied.
+# REVISION — the branch and the short identifier of the commit currently applied.
 flux get kustomizations --watch
 ```
 
@@ -340,8 +340,8 @@ passes   main@sha1:a1b2c3d   False      True   Applied revision: main@sha1:a1b2c
 `Ctrl+C` से देखना बंद करें और देखें कि क्लस्टर में क्या आया:
 
 ```bash
-# all — मुख्य ऑब्जेक्ट प्रकारों के लिए एक साथ शॉर्टहैंड: Pods, Deployment, Service और बाकी।
-# `passes` namespace आपने हाथ से नहीं बनाया: वह एप्लिकेशन के साथ रिपॉज़िटरी से आया।
+# all — a shorthand for the main object types at once: Pods, Deployment, Service, and the rest.
+# You didn't create the `passes` namespace by hand: it arrived from the repository along with the application.
 kubectl get all -n passes
 ```
 
@@ -365,7 +365,7 @@ spec:
 इसे भेजें:
 
 ```bash
-# पहली बार भेजने जैसे ही तीन कदम: फ़ाइल चिह्नित करो, कारण के साथ सहेजो, भेजो।
+# The same three steps as in the first send: mark the file, save with a reason, send.
 git add apps/passes.yaml
 git commit -m "passes: two replicas so the gate does not go dark during rollout"
 git push
@@ -374,8 +374,8 @@ git push
 अब क्लस्टर देखें और इंतज़ार करें:
 
 ```bash
-# -w = «देखो और जोड़ते रहो»: खिड़की व्यस्त रहती है, हर बार जब कॉपियों की अवस्था
-# बदलती है तब एक नई पंक्ति आती है। बाहर निकलने के लिए Ctrl+C।
+# -w = "watch and keep appending": the window stays busy, a new line appears every time
+# the state of the copies changes. Exit with Ctrl+C.
 kubectl get pods -n passes -w
 ```
 
@@ -384,19 +384,19 @@ kubectl get pods -n passes -w
 एक मिनट इंतज़ार नहीं करना चाहते — तो आप Flux से अभी रिकॉन्साइल करने को कह सकते हैं:
 
 ```bash
-# reconcile = «अभी रिकॉन्साइल करो, अगले मिनट का इंतज़ार किए बिना»।
-#   kustomization passes  किस ऑब्जेक्ट को रिकॉन्साइल करना है
-#   --with-source         पहले Git में ताज़ा कमिट के लिए जाओ और तभी लागू करो;
-#                         इस फ़्लैग के बिना रिकॉन्साइल पहले डाउनलोड की गई कॉपी के आधार पर चलेगा
+# reconcile = "reconcile right now, without waiting for the next minute."
+#   kustomization passes  which object to reconcile
+#   --with-source         first go to Git for the fresh commit and only then apply;
+#                         without this flag the reconciliation goes off the copy downloaded earlier
 flux reconcile kustomization passes --with-source
 ```
 
 कमिट संदेश पर ध्यान दें। `two replicas so the gate does not go dark during rollout` — यही कारण है। छह महीने बाद, जब कोई पूछेगा «यहाँ दो क्यों हैं, एक क्यों नहीं», तो जवाब पाँच सेकंड में मिल जाएगा:
 
 ```bash
-# log = कमिट का इतिहास, सबसे ताज़ा ऊपर।
-#   --oneline         प्रति कमिट एक पंक्ति: एक छोटा पहचानकर्ता और कारण का टेक्स्ट
-#   apps/passes.yaml  केवल वही कमिट दिखाओ जिन्होंने ठीक इसी फ़ाइल को छुआ
+# log = the history of commits, freshest on top.
+#   --oneline         one line per commit: a short identifier and the reason text
+#   apps/passes.yaml  show only the commits that touched this exact file
 git log --oneline apps/passes.yaml
 ```
 
@@ -409,8 +409,8 @@ git log --oneline apps/passes.yaml
 रात, एक घटना, सेवा के पास कॉपियाँ कम हैं। आप वही करते हैं जो हमेशा करते थे:
 
 ```bash
-# कॉपियों की संख्या सीधे क्लस्टर में बदलें, Git को दरकिनार करते हुए — जैसे आज तक करते आए।
-#   -n passes  एप्लिकेशन इसी namespace में रहता है; फ़्लैग के बिना कमांड उसे नहीं ढूँढ पाएगी
+# Change the number of copies right in the cluster, bypassing Git — as you did until today.
+#   -n passes  the application lives in this namespace; without the flag the command won't find it
 kubectl scale deployment passes -n passes --replicas=5
 ```
 
@@ -421,14 +421,14 @@ deployment.apps/passes scaled
 काम कर गया। जाँचते हैं:
 
 ```bash
-# READY कॉलम «तैयार/आदेशित» की तरह पढ़ा जाता है: कितनी कॉपियाँ जवाब देती हैं और कितनी होनी चाहिए।
+# The READY column reads as "ready/ordered": how many copies respond and how many there should be.
 kubectl get deployment passes -n passes
 ```
 
 पाँच कॉपियाँ। एक मिनट रुकें और फिर देखें:
 
 ```bash
-# वही कमांड। फ़र्क सिर्फ़ इतना कि दोनों बार चलाने के बीच एक मिनट बीत गया।
+# The same command. The only difference is that a minute passed between the two runs.
 kubectl get deployment passes -n passes
 ```
 
@@ -467,15 +467,15 @@ passes   2/2     2            2           8m
 **कब यह आड़े आता है।** यह किसी घटना के दौरान आड़े आता है, जब आपको सचमुच कुछ फ़ौरन बदलना होता है और चर्चा का समय नहीं होता। ऐसे मामलों के लिए Flux रुक सकता है:
 
 ```bash
-# suspend = इस ऑब्जेक्ट के लिए रिकॉन्साइल रोक देना। Flux क्लस्टर को वर्णन तक लाना बंद
-# कर देता है, और हाथ से किए बदलाव जीने लगते हैं। इस बीच Git की सामग्री नहीं बदलती।
+# suspend = pause reconciliation for this object. Flux stops bringing the cluster to the
+# description, and manual changes start to live. The contents of Git don't change meanwhile.
 flux suspend kustomization passes
 ```
 
 इसके बाद रिकॉन्साइल नहीं चलता, और हाथ से आप कुछ भी कर सकते हैं। इसे उलटने के लिए:
 
 ```bash
-# resume = रिकॉन्साइल फिर से चालू करना। अगला ही रिकॉन्साइल हाथ से किया सब कुछ हटा देता है।
+# resume = turn reconciliation back on. The very next reconciliation removes everything done by hand.
 flux resume kustomization passes
 ```
 
@@ -504,8 +504,8 @@ flux resume kustomization passes
 इसे भेजें। एक जान-बूझकर किया गया खराब बदलाव उसी रास्ते जाता है जिस रास्ते अच्छा: अभी आपके `push` और क्लस्टर के बीच कोई जाँच नहीं है — और यही इस स्टेप की बात है।
 
 ```bash
-# वही add, commit, push। कमिट में कारण ईमानदारी से लिखा है — यह पाँच मिनट में काम
-# आएगा, जब बदलाव को रद्द करना पड़ेगा।
+# The same add, commit, push. The reason in the commit is written honestly — it'll come in handy
+# in five minutes, when the change has to be undone.
 git add apps/passes.yaml
 git commit -m "passes: trim memory limit"
 git push
@@ -514,14 +514,14 @@ git push
 हम इंतज़ार करते और देखते हैं:
 
 ```bash
-# कॉपियों को तब तक देखें जब तक रिकॉन्साइल नया वर्णन न ले आए।
+# Watch the copies until the reconciliation brings the new description.
 kubectl get pods -n passes -w
 ```
 
 **आपको क्या दिखना चाहिए** — नई कॉपियाँ चालू नहीं होतीं। `OOMKilled` अवस्था का मतलब है कि प्रक्रिया को मेमोरी लिमिट पार करने के लिए मार दिया गया; `CrashLoopBackOff` का मतलब है कि क्लस्टर पहले ही कॉपी को लगातार कई बार पुनः चालू कर चुका है और अब अगली कोशिश से पहले उत्तरोत्तर ज़्यादा इंतज़ार करता है। Nginx चार मेगाबाइट में नहीं समाता और शुरू होते ही मर जाता है।
 
 ```bash
-# वही सूची, लेकिन एक ही स्नैपशॉट के रूप में, बिना देखे रहे।
+# The same list, but as a single snapshot, without watching.
 kubectl get pods -n passes
 ```
 
@@ -536,7 +536,7 @@ passes-7f8a1b2c3-qq7lp    0/1     CrashLoopBackOff   3          90s
 **पहले आप कैसे रोलबैक करते:**
 
 ```bash
-# undo, Deployment को पिछली रिवीज़न पर लौटा देता — संपादन से पहले की सेटिंग्स पर।
+# undo would return the Deployment to the previous revision — to the settings from before the edit.
 kubectl rollout undo deployment/passes -n passes
 ```
 
@@ -545,20 +545,20 @@ kubectl rollout undo deployment/passes -n passes
 **`rollout undo` न करें। वहाँ रोलबैक करें जहाँ सत्य रहता है** — Git में:
 
 ```bash
-# revert = एक नया कमिट जोड़ना जो बताए गए कमिट के बदलावों को रद्द करता है।
-#   HEAD       «वर्तमान branch का आख़िरी कमिट» — वही, खराब लिमिट वाला
-#   --no-edit  कमिट संदेश के लिए एडिटर न खोलें; Git ख़ुद शीर्षक लिख देता है
+# revert = add a new commit that undoes the changes of the specified one.
+#   HEAD       "the last commit of the current branch" — the very one with the bad limit
+#   --no-edit  don't open an editor for the commit message; Git writes the header itself
 git revert --no-edit HEAD
-# जब तक रद्द करने वाला कमिट GitHub नहीं भेजा जाता, Flux को उसके बारे में कुछ नहीं पता।
+# Until the reverting commit is sent to GitHub, Flux knows nothing about it.
 git push
 ```
 
 **आपको क्या दिखना चाहिए** — `Revert "passes: trim memory limit"` शीर्षक वाला एक नया कमिट, और एक मिनट के भीतर क्लस्टर में फिर से दो काम करती कॉपियाँ।
 
 ```bash
-# कॉपियाँ फिर चालू होती हैं: काम करने वाली मेमोरी लिमिट वापस आ गई।
+# The copies come up again: the working memory limit is back.
 kubectl get pods -n passes
-# और यहाँ दिखता है कि अभी कौन-सा कमिट लागू है — यह रद्द करने वाले से मेल खाना चाहिए।
+# And here you can see which commit is applied now — it should match the reverting one.
 flux get kustomizations
 ```
 
@@ -568,7 +568,7 @@ flux get kustomizations
 `git revert` खराब कमिट को नहीं मिटाता। यह एक **नया** कमिट जोड़ता है जो खराब कमिट के बदलावों को रद्द करता है। इतिहास में सब कुछ बना रहता है: क्या टूटा, कब देखा गया, और क्या रोलबैक किया गया।
 
 ```bash
-# -4 — चार सबसे हाल के कमिट दिखाओ; सबसे ऊपर वाला सबसे ताज़ा है।
+# -4 — show the four most recent commits; the top one is the freshest.
 git log --oneline -4
 ```
 
@@ -596,9 +596,9 @@ c71a4f9 passes: two replicas so the gate does not go dark during rollout
 बदलाव के लिए एक branch शुरू करें:
 
 ```bash
-# checkout -b = एक नई branch शुरू करो और तुरंत उसमें चले जाओ। branch बदलावों की एक अलग
-# धारा है: इसमें किए गए कमिट `main` तक नहीं पहुँचते, और इसलिए क्लस्टर तक भी नहीं।
-#   passes/version-line  branch का नाम; नाम में तिरछी लकीर की अनुमति है और वह समूहीकरण के काम आती है
+# checkout -b = start a new branch and switch to it right away. A branch is a separate line
+# of changes: commits made in it don't reach `main`, and therefore don't reach the cluster either.
+#   passes/version-line  the branch name; a slash in the name is allowed and serves for grouping
 git checkout -b passes/version-line
 ```
 
@@ -607,9 +607,9 @@ git checkout -b passes/version-line
 ```bash
 git add apps/passes.yaml
 git commit -m "passes: bump the version shown on the page"
-# origin — वह नाम जिसके तहत Git उस पते को याद रखता है जहाँ से आपने रिपॉज़िटरी क्लोन की थी।
-#   -u origin passes/version-line  GitHub में इसी नाम की branch बनाओ और उसके साथ की
-#                                  कड़ी याद रखो, ताकि आगे सिर्फ़ `git push` काफ़ी हो
+# origin — the name under which Git remembers the address you cloned the repository from.
+#   -u origin passes/version-line  create a branch of the same name in GitHub and remember
+#                                  the link with it, so that a bare `git push` is enough later
 git push -u origin passes/version-line
 ```
 
@@ -622,10 +622,10 @@ git push -u origin passes/version-line
 **Merge pull request** पर क्लिक करें — बदलाव `main` में उतरता है, और अगला रिकॉन्साइल उसे क्लस्टर तक ले आता है। एक मिनट में हम एक सुरंग खोलते हैं और देखते हैं कि सेवा क्या परोसती है:
 
 ```bash
-# port-forward = bastion से क्लस्टर के भीतर एक अस्थायी सुरंग।
-#   -n passes     वह namespace जिसमें सेवा रहती है
-#   svc/passes    कहाँ ले जाते हैं: Service तक, किसी ख़ास कॉपी तक नहीं
-#   8080:80       बाईं ओर bastion का पोर्ट, दाईं ओर क्लस्टर के भीतर सेवा का पोर्ट
+# port-forward = a temporary tunnel from the bastion into the cluster.
+#   -n passes     the namespace the service lives in
+#   svc/passes    where we lead: to the Service, not a specific copy
+#   8080:80       on the left the port on the bastion, on the right the service's port inside the cluster
 kubectl port-forward -n passes svc/passes 8080:80
 ```
 
@@ -653,10 +653,10 @@ kubectl port-forward -n passes svc/passes 8080:80
 📍 **कहाँ:** bastion पर, उसी टर्मिनल विंडो में जहाँ आपने `kubectl` के साथ काम किया।
 
 ```bash
-# लैब फ़ोल्डर में लौटें: स्क्रिप्ट वहाँ रहता है, और आप अपनी रिपॉज़िटरी के फ़ोल्डर में काम कर रहे थे।
+# Return to the lab folder: the script lives there, and you worked in your own repository's folder.
 cd labs/05-gitops
 export KUBECONFIG=~/lab.kubeconfig
-# स्क्रिप्ट क्लस्टर में कुछ नहीं बदलता: यह सिर्फ़ अवस्था पढ़ता है और एक रिपोर्ट छापता है।
+# The script changes nothing in the cluster: it only reads the state and prints a report.
 ./check.sh
 ```
 
@@ -667,8 +667,8 @@ export KUBECONFIG=~/lab.kubeconfig
 अगर आप चाहें कि स्क्रिप्ट आपकी रिपॉज़िटरी के इतिहास पर भी नज़र डाले — तो उसे बताएँ कि क्लोन कहाँ है:
 
 ```bash
-# LAB_REPO — वह वेरिएबल जिससे स्क्रिप्ट को पता चलता है कि आपकी रिपॉज़िटरी का क्लोन कहाँ है।
-# अगर आपने इसे होम फ़ोल्डर के अलावा कहीं और क्लोन किया है तो अपना पथ डालें।
+# LAB_REPO — the variable from which the script learns where the clone of your repository lives.
+# Put in your own path if you cloned it somewhere other than the home folder.
 export LAB_REPO=~/passes-gitops
 ./check.sh
 ```
@@ -682,8 +682,8 @@ export LAB_REPO=~/passes-gitops
 जब आप सभी लैब पूरी कर लें, तो सब कुछ एक साथ इस तरह हटा सकते हैं:
 
 ```bash
-# delete kustomization = रिकॉन्साइल ऑब्जेक्ट को क्लस्टर से हटाना।
-#   --silent  दोबारा पुष्टि न माँगें
+# delete kustomization = remove the reconciliation object from the cluster.
+#   --silent  don't ask for confirmation again
 flux delete kustomization passes --silent
 ```
 

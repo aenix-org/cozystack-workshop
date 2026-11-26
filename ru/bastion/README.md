@@ -37,7 +37,7 @@
 Один логин и один пароль — они одинаковы во всех трёх местах:
 
 * **дашборд** https://dashboard.workshop.aenix.io — вход в браузере, namespace `tenant-workshopXX`
-* **виртуалка** — вход по SSH: `ssh workshopXX@<адрес-виртуалки>`
+* **виртуалка** — вход по SSH: `ssh workshopXX@<bastion-address>`
 * внутри виртуалки доступ к кластеру уже настроен, kubeconfig лежит в `~/.kube/config`
 
 Везде дальше `workshopXX` меняйте на свой номер (его выдал ведущий).
@@ -45,7 +45,7 @@
 ## Заходим на виртуалку
 
 ```bash
-ssh workshopXX@<адрес-виртуалки>
+ssh workshopXX@<bastion-address>
 ```
 
 Пароль — тот же, что от дашборда. SSH-ключ не нужен: вход по паролю. Проверяем, что
@@ -69,11 +69,11 @@ kubectl get vminstance -n tenant-workshopXX
 ```bash
 cd ~/workshop
 ls manifests scripts
-grep -rl tenant-workshop manifests | head -1 | xargs grep -m1 namespace   # увидите свой номер
+grep -rl tenant-workshop manifests | head -1 | xargs grep -m1 namespace   # you will see your number
 ```
 
 Одно место остаётся заглушкой намеренно: в `manifests/03-app-vm.yaml` строка
-`url: "ВСТАВЬТЕ_PRESIGNED_URL"` — эту ссылку вы получите после второй фазы и впишете сами.
+`url: "PASTE_PRESIGNED_URL"` — эту ссылку вы получите после второй фазы и впишете сами.
 
 Подробно: [chat/10](chat/10-clone-and-set-number.md) ·
 карта файлов [chat/11](chat/11-file-map.md)
@@ -139,7 +139,7 @@ virtctl console --namespace=tenant-workshopXX vm-instance-convert
 ```
 
 Внутри: `nano convert.sh`, вставить текст `scripts/convert.sh`, вписать свои
-`bucketName`, `accessKey` и `secretKey` вместо `ВСТАВЬТЕ_...`.
+`bucketName`, `accessKey` и `secretKey` вместо `PASTE_...`.
 
 **Проходите воркшоп самостоятельно, не на нашем мероприятии?** `OVA_URL` в `convert.sh` указывает на демо-образ в объектном хранилище облака воркшопа. Мы держим его там, чтобы на мероприятии образ скачивался быстро и не тратил внешний трафик, но после воркшопа этой копии уже нет. Замените ссылку на публичную копию, `https://github.com/aenix-org/cozystack-workshop/releases/download/vmware-demo-ova/app-1.ova` (около 810 МБ), или на свой OVA.
 
@@ -148,9 +148,9 @@ virtctl console --namespace=tenant-workshopXX vm-instance-convert
 даже когда связь пропала:
 
 ```bash
-screen -S convert          # войти в отдельную сессию
-sudo bash convert.sh       # запустить внутри неё
-#  оборвалась связь? снова ssh на виртуалку, потом:  screen -r convert
+screen -S convert          # open a separate session
+sudo bash convert.sh       # run it inside that session
+#  connection dropped? ssh back into the bastion, then:  screen -r convert
 ```
 
 **Должны увидеть:** в конце вывода после слова `Share:` — подписанную ссылку на образ.
@@ -176,7 +176,7 @@ kubectl delete vmdisk convert-tools --namespace tenant-workshopXX
 ```
 
 Впишите полученную ссылку в `manifests/03-app-vm.yaml` вместо
-`url: "ВСТАВЬТЕ_PRESIGNED_URL"`, затем:
+`url: "PASTE_PRESIGNED_URL"`, затем:
 
 ```bash
 kubectl apply -f manifests/03-app-vm.yaml
@@ -265,13 +265,13 @@ curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/actuator/health
 отвечает `SCRAM authentication requires libpq version 10 or above`. Ставим свежий:
 
 ```bash
-# 1. Репозиторий PGDG — источник пакетов PostgreSQL
+# 1. The PGDG repository — the source of PostgreSQL packages
 yum install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm
 
-# 2. libzstd: в репозиториях CentOS 7 её нет, берём из архива EPEL
+# 2. libzstd: not in the CentOS 7 repositories, so we take it from the EPEL archive
 yum install -y https://archives.fedoraproject.org/pub/archive/epel/7/x86_64/Packages/l/libzstd-1.5.5-1.el7.x86_64.rpm
 
-# 3. Сам клиент — только из живого репозитория pgdg15
+# 3. The client itself — only from the live pgdg15 repository
 yum install -y --disablerepo='pgdg*' --enablerepo=pgdg15 postgresql15
 ```
 
@@ -291,7 +291,7 @@ psql --version
 Забираем схему и накатываем (эта app-VM в интернет ходит, файл скачается):
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/bastion/scripts/orders-schema.sql
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/bastion/scripts/orders-schema.sql
 
 PGPASSWORD='Orders2019!' psql \
   -h postgres-db-rw.tenant-workshopXX.svc.cozy.local -U orders -d orders \
@@ -342,16 +342,16 @@ curl -s https://app.workshopXX.workshop.aenix.io/api/orders
 > **Префикс `vmi/` нужен не всем командам, и это не опечатка.** Под правами тенанта
 > `virtctl console` принимает только **голое** имя (`vm-instance-app-1`); с `vmi/` он
 > отвечает `forbidden`, приняв слово `vmi` за имя машины. А `virtctl ssh` и
-> `virtctl port-forward`, наоборот, требуют форму `vmi/<имя>`.
+> `virtctl port-forward`, наоборот, требуют форму `vmi/<name>`.
 
 ```bash
-# зайти в app-VM (root / cozydemo)
+# log into the app-VM (root / cozydemo)
 virtctl console --namespace=tenant-workshopXX vm-instance-app-1
 
-# зайти в conversion-VM (ubuntu / ubuntu)
+# log into the conversion-VM (ubuntu / ubuntu)
 virtctl console --namespace=tenant-workshopXX vm-instance-convert
 
-# оболочка внутри app-VM по SSH (когда сеть в машине уже поднята)
+# a shell inside the app-VM over SSH (once the machine's network is up)
 virtctl ssh ubuntu@vmi/vm-instance-app-1 --namespace=tenant-workshopXX
 ```
 

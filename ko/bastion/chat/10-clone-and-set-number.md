@@ -30,4 +30,4 @@ cd ~/workshop
 `nano manifests/03-app-vm.yaml` (저장: `Ctrl+O`, `Enter`, 종료: `Ctrl+X`).
 
 의도적으로 남겨둔 유일한 자리표시자는 `manifests/03-app-vm.yaml`의 다음 줄,
-`url: "ВСТАВЬТЕ_PRESIGNED_URL"` 입니다. 이 URL은 이미지를 변환하면 받게 됩니다. 지금은 그저 그것이 거기서 여러분을 기다리고 있다는 것만 알아두면 됩니다.
+`url: "PASTE_PRESIGNED_URL"` 입니다. 이 URL은 이미지를 변환하면 받게 됩니다. 지금은 그저 그것이 거기서 여러분을 기다리고 있다는 것만 알아두면 됩니다.

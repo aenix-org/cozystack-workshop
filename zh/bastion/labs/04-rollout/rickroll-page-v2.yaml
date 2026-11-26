@@ -1,39 +1,39 @@
 ---
-# 实验 4。页面的第二个版本 —— 就是我们在负载下发布的那个。
-# 它应当有明显的区别：参与者看的是浏览器，而不是 diff。
+# Lab 4. The second version of the page — the one we roll out under load.
+# It should differ noticeably: the participant is looking at the browser, not at a diff.
 #
-# 只有一个对象。它应用在你的 `lab` 学习集群上，而不是管理集群上的
-# 租户里：
+# One object. Applied to your `lab` training cluster, not to the tenant
+# on the management cluster:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl apply -f rickroll-page-v2.yaml
-# 这里没有 tenant-workshopXX 之类的占位符 —— 无需在任何地方替换成你自己的编号。
+# There are no placeholders like tenant-workshopXX here — you don't need to substitute your number anywhere.
 #
-# 这里最容易绊倒人的地方：这个 apply 本身并不发布任何东西。
-# 它只是往集群里在第一个配置文件旁边再放一个配置文件。只要 Deployment 的 `page`
-# 卷仍然引用 rickroll-page-v1，用户看到的就是第一个版本。
-# 发布是在实验的下一步才发生 —— 把卷切换到这个 ConfigMap。
-# 之所以用两个对象这种结构：第一个版本原封不动地留在集群里，
-# 回滚能整体地把它恢复回来，而不是凭记忆重建它。
+# The main thing people stumble over here: this apply by itself rolls out nothing.
+# It puts one more settings file into the cluster next to the first. As long as the `page`
+# volume of the Deployment references rickroll-page-v1, users see the first version.
+# The rollout becomes the next step of the lab — switching the volume to this ConfigMap.
+# Hence the whole construction with two objects: the first version stays in the cluster
+# untouched, and the rollback returns it as a whole rather than reconstructing it from memory.
 #
-# 如果我们改为就地修改 ConfigMap rickroll-page-v1，就没有地方可以
-# 回滚了，而且 Pod 会在不替换副本、也不在修订历史里留下记录的情况下
-# 拿到新内容 —— 也就是缺失了这个实验存在的全部意义。
+# Had we instead edited the ConfigMap rickroll-page-v1 in place, there would be
+# nowhere to roll back to, and the pods would get new content without replacing copies and without a record
+# in the revision history — that is, without everything the lab is made for.
 #
-# 对象名称不能修改：README 里的补丁引用了 rickroll-page-v2，
-# check.sh 里的检查也一样。
+# The object name must not be changed: the patch from the README references rickroll-page-v2,
+# as does the check in check.sh.
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: rickroll-page-v2
 data:
-  # `|` 之后缩进以下的所有内容，都是将出现在容器内部的 index.html 文件的
-  # 逐字内容。这已经不是 YAML 了：这里没有、也不可能有注释，
-  # 井号会作为普通文本出现在页面上。
+  # Everything below the indentation after `|` is the verbatim content of the index.html file
+  # that will end up inside the container. This is no longer YAML: there are no comments here
+  # and there can be none — a hash would land on the page as ordinary text.
   #
-  # 标记中有两处对 check.sh 很重要：文字「版本 2」——
-  # 检查靠它把第二个版本和第一个版本区分开，以及占位符 __POD__ ——
-  # 它会按 ConfigMap rickroll-conf（实验 1）里的规则替换成 nginx Pod 的名字。
-  # 移除其中任何一个 —— 实验检查都不会通过，尽管发布本身会成功。
+  # Two things in the markup matter to check.sh: the label «VERSION 2» —
+  # by it the check tells the second version from the first, and the placeholder __POD__ — it is
+  # replaced with the nginx pod name by the rule from the ConfigMap rickroll-conf (lab 1).
+  # Remove either of them and the lab check will not pass, even though the rollout will succeed.
   index.html: |
     <!doctype html>
     <html lang="ru">
@@ -56,9 +56,9 @@ data:
       .pod b{display:block;margin-top:.4em;color:#00ffa3;font-size:1.35em;word-break:break-all}
       .hint{margin-top:3em;color:#3f5561;font-size:14px}
     </style>
-    <div class="tag">版本 2</div>
+    <div class="tag">VERSION 2</div>
     <h1>We're No Strangers To Love</h1>
     <p class="lyr">You know the rules &middot; And so do I</p>
-    <div class="pod">为您服务的 Pod<b>__POD__</b></div>
-    <p class="hint">更新在负载下顺利发布。查看 Fortio：零错误。</p>
+    <div class="pod">served by pod<b>__POD__</b></div>
+    <p class="hint">The update rolled out under load. Check Fortio: zero errors.</p>
     </html>

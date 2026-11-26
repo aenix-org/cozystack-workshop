@@ -1,76 +1,76 @@
-# Lab 6 · Ihre eigene private Image-Registry. Build-Rezept für das Image des Dienstes «Gästeausweis».
+# Lab 6 · Your own private image registry. Build recipe for the «Guest Pass» service image.
 #
-# Was ein Dockerfile ist: ein Schritt-für-Schritt-Rezept, das aus Quellcode ein Image macht —
-# ein startbereiter Schnappschuss des Dateisystems zusammen mit der Angabe, was darin ausgeführt werden soll.
-# Die nächste Entsprechung in vSphere ist das Erstellen einer goldenen VM-Vorlage, nur als Text beschrieben und
-# wiederholbar: dasselbe Rezept liefert auf jeder Maschine dasselbe Ergebnis.
+# What a Dockerfile is: a step-by-step recipe that turns sources into an image —
+# a ready-to-run snapshot of the filesystem together with instructions on what to run inside it.
+# The closest analogy in vSphere is building a golden VM template, only described as text and
+# repeatable: the same recipe yields the same result on any machine.
 #
-# Wird auf Ihrem Laptop gebaut, aus dem Lab-Ordner (das letzte Argument ist der Ordner mit dieser
-# Datei und den Quellen):
+# Built on your laptop, from the lab folder (the last argument is the folder with this
+# file and the sources):
 #     docker build --platform linux/amd64 -t HARBOR-HOST/passes/passes-api:v1 app/
 #     docker push HARBOR-HOST/passes/passes-api:v1
-# Ersetzen Sie HARBOR-HOST durch die Adresse Ihres eigenen Harbor: der erste Teil des Image-Namens ist
-# die Registry-Adresse, und daran erkennt docker push, wohin es gesendet werden soll.
+# Replace HARBOR-HOST with the address of your own Harbor: the first part of the image name is
+# the registry address, and that is how docker push knows where to send it.
 #
-# ACHTUNG: --platform linux/amd64 ist auf einem Mac mit Apple-Silicon-Prozessor und auf jedem
-# ARM-Laptop zwingend erforderlich. Ohne ihn erhalten Sie ein ARM-Image: es baut ohne Fehler, wird
-# ohne Fehler in die Registry gepusht und stürzt dann im Cluster (dessen Knoten x86 sind) mit «exec format error» ab.
+# ATTENTION: --platform linux/amd64 is mandatory on a Mac with an Apple Silicon processor and on any
+# ARM laptop. Without it you get an ARM image: it builds without errors, pushes to the
+# registry without errors, and then in the cluster (whose nodes are x86) crashes with «exec format error».
 #
-# Jede Zeile des Rezepts erzeugt eine Schicht — einen unveränderlichen Ausschnitt des Dateisystems. Schichten werden
-# zwischengespeichert und wiederverwendet: deshalb werden Dateien einzeln kopiert und nicht der ganze Ordner
-# auf einmal — das Bearbeiten von main.go erzwingt kein erneutes Herunterladen der Abhängigkeiten.
+# Each line of the recipe creates a layer — an immutable slice of the filesystem. Layers are
+# cached and reused: that is why files are copied one by one rather than the whole folder
+# at once — editing main.go does not force re-downloading the dependencies.
 #
-# ZWEI STUFEN. Die erste ist die Build-Stufe: hier wird der gesamte Go-Compiler benötigt, das sind etwa 350 MB.
-# Die zweite ist das, was in den Cluster geht: dorthin wird nur das fertige Binary übertragen.
-# Das resultierende Image wird etwa 10 MB groß statt 350, und darin gibt es weder einen Compiler
-# noch Quellen noch einen Paketmanager — also nichts, was demjenigen nützt, der
-# es doch in den Container schafft.
+# TWO STAGES. The first is the build stage: it needs the whole Go compiler, which is about 350 MB.
+# The second is what ships to the cluster: only the finished binary is carried over there.
+# The resulting image ends up around 10 MB instead of 350, and inside it there is no compiler,
+# no sources and no package manager — that is, nothing to use for anyone who
+# does end up inside the container.
 
-# --- Stufe 1: Build -----------------------------------------------------------------
-# FROM — von welchem fertigen Image wir ausgehen. Hier ist es das offizielle Image mit dem Go-Compiler
-# auf Basis von Alpine (ein minimales Linux, ein paar Megabyte). Die Version ist festgelegt: mit dem
-# Tag latest würde dasselbe Rezept ein halbes Jahr später etwas anderes bauen.
-# AS build — der Name der Stufe; die zweite Stufe holt sich darüber das Ergebnis.
+# --- Stage 1: build -----------------------------------------------------------------
+# FROM — which ready-made image we start from. Here it is the official image with the Go compiler
+# on top of Alpine (a minimal Linux, a few megabytes). The version is pinned: with the
+# latest tag the same recipe would build something different half a year later.
+# AS build — the name of the stage; the second stage will pull the result by it.
 FROM golang:1.23-alpine AS build
-# Arbeitsordner innerhalb des Images: nachfolgende Befehle werden relativ dazu ausgeführt.
-# Wenn der Ordner nicht existiert, wird er erstellt.
+# Working folder inside the image: subsequent commands run relative to it.
+# If the folder does not exist, it is created.
 WORKDIR /src
-# go.mod — die Modulbeschreibung: Name und Go-Version. Die Anwendung hat keine externen
-# Abhängigkeiten, es gibt also nichts aus dem Internet herunterzuladen, und der Build läuft dort, wo es keinen Zugang nach außen gibt.
+# go.mod — the module description: its name and Go version. The application has no external
+# dependencies, so there is nothing to download from the internet, and the build works where there is no outbound access.
 COPY go.mod ./
-# Der Quellcode selbst. Wird in einer eigenen Zeile kopiert, damit das Bearbeiten des Codes den Cache
-# der vorherigen Schicht nicht verwirft.
+# The source itself. Copied on a separate line so that editing the code does not invalidate the cache
+# of the previous layer.
 COPY main.go ./
-# RUN führt einen Befehl beim Build aus (nicht beim Start) und speichert das Ergebnis als Schicht.
-#   CGO_ENABLED=0  statisch bauen, ohne Bindung an Systembibliotheken. Ohne dies
-#                  bräuchte das Binary glibc, die im endgültigen Image nicht vorhanden sein wird,
-#                  und der Container würde beim Start abstürzen, nicht beim Build
-#   -trimpath      die Pfade der Build-Maschine aus dem Binary entfernen: der Build wird
-#                  reproduzierbar, und der Name Ihres Home-Ordners gelangt nicht nach außen
-#   -ldflags="-s -w"  die Debug-Tabellen verwerfen — die Datei wird deutlich kleiner
-#   -o /out/...    wohin das Ergebnis gelegt wird; von hier holt es die zweite Stufe ab
+# RUN executes a command at build time (not at run time) and saves the result as a layer.
+#   CGO_ENABLED=0  build statically, without tying to system libraries. Without this
+#                  the binary would need glibc, which will not be present in the final image,
+#                  and the container would crash at startup rather than at build time
+#   -trimpath      strip the build machine's paths from the binary: the build becomes
+#                  reproducible, and the name of your home folder does not leak outward
+#   -ldflags="-s -w"  drop the debug tables — the file becomes noticeably smaller
+#   -o /out/...    where to put the result; the second stage picks it up from here
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/passes-api .
 
-# --- Stufe 2: was in den Cluster geht -----------------------------------------------
-# Das zweite FROM beginnt das Image von Neuem, mit einem leeren Blatt: alles, was in der ersten Stufe entstanden ist,
-# bleibt dort und gelangt nicht in das endgültige Image.
+# --- Stage 2: what ships to the cluster -----------------------------------------------
+# The second FROM starts the image anew, from a clean slate: everything acquired in the first stage
+# stays there and does not make it into the final image.
 FROM alpine:3.21
-# Wir legen den Benutzer an, unter dem die Anwendung laufen wird: als root darf sie nicht laufen.
-# In einem korrekt konfigurierten Cluster wird ein Pod, der als root läuft, gar nicht zugelassen, und das ist keine
-# Spitzfindigkeit, sondern eine standardmäßige Sicherheitsanforderung.
-#   -D          ohne Passwort erstellen, ohne Fragen zu stellen
-#   -u 10001    numerischer Identifikator; der Cluster prüft genau die Zahl, nicht den Namen
+# Create the user the application will run as: it must not run as root.
+# In a properly configured cluster a pod running as root will not be admitted at all, and this is not
+# nitpicking but a standard security requirement.
+#   -D          create without a password, asking no questions
+#   -u 10001    numeric identifier; the cluster checks the number itself, not the name
 RUN adduser -D -u 10001 app
-# Das Einzige, was aus der ersten Stufe übertragen wird, ist das fertige Binary. --from=build
-# verweist auf den Namen der Stufe. /usr/local/bin ist ein Ordner, der im PATH jedes Linux vorhanden ist.
+# The only thing carried over from the first stage is the finished binary. --from=build
+# points to the stage name. /usr/local/bin is a folder that exists in the PATH of any Linux.
 COPY --from=build /out/passes-api /usr/local/bin/passes-api
-# Ab dieser Stelle läuft der Prozess im Container unter dem Benutzer 10001, nicht unter root.
-# Die Reihenfolge ist wichtig: die Zeilen darüber liefen als root, sonst hätte adduser nicht funktioniert.
+# From this point on the process in the container runs as user 10001, not as root.
+# Order matters: the lines above ran as root, otherwise adduser would not have worked.
 USER 10001
-# Die Port-Deklaration — ein informativer Hinweis für Menschen und Werkzeuge. Sie öffnet den Port nicht
-# und konfiguriert nichts: der Zugriff darauf wird im Manifest (passes.yaml) beschrieben.
+# Declaring the port — an informational note for humans and tools. It does not open the port
+# and configures nothing: access to it is described in the manifest (passes.yaml).
 EXPOSE 8080
-# Was beim Start des Containers ausgeführt wird. Als Liste statt als String: so wird der Befehl
-# direkt ausgeführt, ohne zwischengeschaltete Shell, und das Stopp-Signal vom Cluster
-# erreicht die Anwendung selbst und nicht die Shell, die sie gestartet hat.
+# What to run when the container starts. As a list rather than a string: this way the command
+# runs directly, without an intermediate shell, and the stop signal from the cluster
+# reaches the application itself rather than the shell that spawned it.
 ENTRYPOINT ["/usr/local/bin/passes-api"]

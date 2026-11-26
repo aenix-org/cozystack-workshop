@@ -1,46 +1,46 @@
-# लैब 9 · प्रवेश-पास लॉग पर एनालिटिक्स के लिए ClickHouse डेटाबेस ऑर्डर करें।
-# आप क्या पाना चाहते हैं इसका विवरण; सेवा को प्लेटफ़ॉर्म असेंबल और कॉन्फ़िगर करता है।
-# वही चीज़ जो आप डैशबोर्ड में माउस से ऑर्डर करते — बस टेक्स्ट के रूप में।
-# लैब क्लस्टर में नहीं, बल्कि मैनेजमेंट क्लस्टर पर एक टेनेंट में लागू किया जाता है:
+# Lab 9 · order a ClickHouse database for analytics over the access-pass log.
+# A description of what you want to get; the platform assembles and configures the service.
+# The same thing you would order with the mouse in the dashboard — just as text.
+# Applied NOT to the lab cluster, but to a tenant on the management cluster:
 #   kubectl --kubeconfig="$HOME/.kube/config" apply -f clickhouse.yaml
 #
-# लागू करने से पहले: tenant-workshopXX को अपने namespace से बदलें,
-# और ЗдесьВашПароль को उस पासवर्ड से जो आप सोचेंगे।
+# BEFORE APPLYING: replace tenant-workshopXX with your namespace,
+# and YourPasswordHere with a password you come up with.
 apiVersion: apps.cozystack.io/v1alpha1
 kind: ClickHouse
 metadata:
   name: analytics
   namespace: tenant-workshopXX
 spec:
-  # एक कॉपी और एक शार्ड। प्रोडक्शन में कम से कम दो कॉपी रखी जाती हैं, वरना एक नोड का खोना
-  # डेटा के अनुपलब्ध हो जाने का मतलब है — लेकिन हमें एक मिलियन पंक्तियाँ चाहिए, फ़ॉल्ट
-  # टॉलरेंस नहीं, और एक अतिरिक्त कॉपी बस स्टैंड के संसाधन खा जाती।
+  # One copy and one shard. In production you keep at least two copies, otherwise losing a node
+  # means the data becomes unavailable — but we need a million rows, not fault
+  # tolerance, and an extra copy would just eat up the stand's resources.
   replicas: 1
   shards: 1
-  # टेबल डेटा के लिए डिस्क। इस लैब की एक मिलियन पंक्तियाँ दसियों मेगाबाइट लेंगी:
-  # शब्दकोशों के साथ कॉलमनार स्टोरेज ऐसे लॉग को बहुत ज़्यादा संपीड़ित करता है।
+  # Disk for the table data. A million rows from this lab will take up tens of megabytes:
+  # columnar storage with dictionaries compresses such a log very heavily.
   size: 5Gi
-  # सर्वर के सिस्टम लॉग के लिए अलग डिस्क, जिसमें क्वेरी लॉग भी शामिल है।
+  # A separate disk for the server's system logs, including the query log.
   logStorageSize: 2Gi
-  # कितने दिनों बाद क्वेरी लॉग को हटाना है। हम इसमें देखने वाले हैं।
+  # After how many days to discard the query log. We are going to look into it.
   logTTL: 15
-  # replicated — वे वॉल्यूम जिनकी क्लस्टर के दूसरे नोड पर एक कॉपी होती है: नोड गिर गया,
-  # डेटा बना रहा।
+  # replicated — volumes that have a copy on another cluster node: the node dropped out,
+  # the data stayed.
   storageClass: replicated
-  # 1 CPU, 4 GB। ClickHouse मेमोरी में गणना करता है, और एक मिलियन पंक्तियों पर
-  # ग्रुपिंग में यह ध्यान देने योग्य है।
+  # 1 CPU, 4 GB. ClickHouse computes in memory, and on groupings over
+  # a million rows this is noticeable.
   resourcesPreset: u1.small
-  # डेटाबेस उपयोगकर्ता और उसका पासवर्ड। अपना खुद का पासवर्ड सोचें और याद रखें: यह
-  # वर्कर पॉड (CH_AUTH वेरिएबल) और जाँच स्क्रिप्ट (CH_PASSWORD वेरिएबल) को चाहिए।
-  # बनने के बाद यह डैशबोर्ड में, clickhouse-analytics-credentials सीक्रेट में दिखता है।
+  # The database user and its password. Come up with your own password and remember it: it is needed
+  # by the worker pod (the CH_AUTH variable) and the check script (the CH_PASSWORD variable).
+  # After creation it is visible in the dashboard, in the clickhouse-analytics-credentials secret.
   users:
     analyst:
-      password: ЗдесьВашПароль
-  # ऑब्जेक्ट स्टोरेज में बैकअप। यहाँ का डेटा जनरेट किया गया है,
-  # बहाल करने को कुछ नहीं है — ट्रेनिंग स्टैंड पर बंद किया गया है।
+      password: YourPasswordHere
+  # Backups to object storage. The data here is generated,
+  # there is nothing to restore — disabled on the training stand.
   backup:
     enabled: false
-  # कॉपियों के बीच समन्वय के लिए Keeper चाहिए। कॉपी एक है — समन्वय के लिए
-  # कोई नहीं है, और तीन Keeper पॉड व्यर्थ में संसाधन ले लेते।
+  # Keeper is needed to reconcile between copies. There is one copy — there is no one
+  # to reconcile with, and three Keeper pods would take up resources for nothing.
   clickhouseKeeper:
     enabled: false

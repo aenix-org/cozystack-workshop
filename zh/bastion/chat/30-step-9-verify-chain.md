@@ -20,14 +20,14 @@ curl -s -o /dev/null -w '%{http_code}\n' localhost:8080/actuator/health
 📍 **接下来 —— 从外部按域名做一次检查。** 这条路径不需要端口转发：讲师已经提前在你的租户里创建了一个 `Ingress`，只要机器内部的应用在 `8080` 上监听，商店就会发布在 `https://app.workshopXX.workshop.aenix.io`（`XX` 是你的编号）。在你笔记本的浏览器里打开它 —— 或者直接在 bastion 上用 `curl` 检查：
 
 ```bash
-# 健康检查
+# health
 curl -s https://app.workshopXX.workshop.aenix.io/actuator/health
 
-# 创建一个订单
+# create an order
 curl -s -X POST https://app.workshopXX.workshop.aenix.io/api/orders \
   -H 'Content-Type: application/json' -d '{"item":"test"}'
 
-# 看看它是否被记录下来了
+# see that it was recorded
 curl -s https://app.workshopXX.workshop.aenix.io/api/orders
 ```
 

@@ -1,54 +1,54 @@
 ---
-# लैब 11. बिल्ड स्वयं: ConfigMap में एक स्क्रिप्ट और एक Job जो उसे चलाता है।
-# एक फ़ाइल में दो ऑब्जेक्ट, `---` लाइन से अलग किए गए।
+# Lab 11. The build itself: a script in a ConfigMap and a Job that runs it.
+# Two objects in one file, separated by a `---` line.
 #
-# यह आपके प्रशिक्षण क्लस्टर `lab` पर लागू होता है, प्रबंधन क्लस्टर के टेनेंट पर नहीं:
+# Applied to your training cluster `lab`, not to the tenant on the management cluster:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl apply -f android-build.yaml
-# यहाँ tenant-workshopXX जैसे कोई प्लेसहोल्डर नहीं हैं — आपको कहीं भी अपना नंबर डालने की ज़रूरत नहीं है।
+# There are no placeholders like tenant-workshopXX here — you don't need to substitute your number anywhere.
 #
-# लागू करने से पहले, क्लस्टर में दो ऑब्जेक्ट पहले से मौजूद होने चाहिए, वरना बिल्ड पॉड शुरू नहीं होगा:
-# क्लस्टर उसे माउंट नहीं करता जो मौजूद नहीं है, और पॉड प्रतीक्षा करता रहता है।
-#     configmap/propusk-src   स्रोत: kubectl apply -f propusk-src.yaml
-#     secret/bucket-creds     बकेट तक पहुँच की चार कुंजियाँ, हाथ से दर्ज की जाती हैं
+# Before applying, two objects must already exist in the cluster, otherwise the build pod won't start:
+# the cluster doesn't mount what isn't there, and the pod keeps waiting.
+#     configmap/propusk-src   sources: kubectl apply -f propusk-src.yaml
+#     secret/bucket-creds     four bucket access keys, entered by hand
 #
-# Job, Deployment नहीं: बिल्ड का एक अंत होता है। Deployment एक समाप्त हुई प्रक्रिया को
-# विफलता मान लेता है और एक नई प्रति चालू कर देता है — बिल्ड चक्र में चलता रहता और कभी नहीं रुकता।
+# Job, not Deployment: a build has an end. A Deployment treats a finished process
+# as a failure and spins up a fresh copy — the build would loop and never stop.
 #
-# बिल्ड स्क्रिप्ट एक अलग ऑब्जेक्ट के रूप में क्यों रहती है, न कि Job के अपने command फ़ील्ड में एक स्ट्रिंग के रूप में:
-#   - YAML फ़ील्ड के भीतर साठ लाइनें shell की न पढ़ी जा सकती हैं न जाँची जा सकती हैं: यहाँ यह
-#     एक साधारण फ़ाइल है जिसे एडिटर हाइलाइट करता है और जो `bash -n` स्वीकार करती है;
-#   - इसे एक ही कमांड से पूरा देखा जा सकता है: kubectl get configmap android-build-script -o yaml;
-#   - आप बिल्ड को ठीक कर सकते हैं बिना जॉब परिभाषा को छुए, और इसके विपरीत।
-# सुविधा की कीमत: स्क्रिप्ट Job से अलग रहती है। ConfigMap बदलें — पहले से चल रहा
-# बिल्ड इसे नहीं देखेगा; नया टेक्स्ट केवल अगला रन ही देखेगा।
+# WHY THE BUILD SCRIPT LIVES AS A SEPARATE OBJECT rather than a string in the Job's own command field:
+#   - sixty lines of shell inside a YAML field can't be read or checked: here it's
+#     an ordinary file that the editor highlights and that accepts `bash -n`;
+#   - you can see it in full with one command: kubectl get configmap android-build-script -o yaml;
+#   - you can fix the build without touching the job definition, and vice versa.
+# The price of convenience: the script lives separately from the Job. Change the ConfigMap — a
+# build already running won't notice; only the next run will see the new text.
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: android-build-script
 data:
-  # पाँच बिल्ड चरण — ठीक वही कमांड जो आप एक बिल्ड सर्वर पर हाथ से टाइप करते।
-  # कंटेनर लगभग खाली शुरू होता है: Java और Gradle इमेज से आते हैं, बाकी स्क्रिप्ट
-  # अपने साथ लाती है।
-  #   1/5  command-line tools डाउनलोड करता है — वे उपकरण जिनसे Android SDK स्वयं इंस्टॉल होता है (1-2 मिनट)
-  #   2/5  लाइसेंस स्वीकार करता है और SDK, प्लेटफ़ॉर्म 34 और build-tools इंस्टॉल करता है। सबसे लंबा चरण,
-  #        5-15 मिनट, और पूरे समय लॉग शांत रहता है: sdkmanager गैर-इंटरैक्टिव मोड में
-  #        कोई प्रगति नहीं छापता। यहाँ की शांति कोई अटकाव नहीं है
-  #   3/5  gradle :app:assembleDebug — /src से स्रोतों को APK में संकलित करता है (3-8 मिनट)
-  #   4/5  mc इंस्टॉल करता है, ऑब्जेक्ट स्टोरेज के लिए कंसोल क्लाइंट
-  #   5/5  APK को बकेट में दो नामों से रखता है: एक तारीख वाला और propusk-latest (सेकंडों में)
+  # Five build steps — exactly the commands you'd type by hand on a build server.
+  # The container starts almost empty: Java and Gradle come from the image, the rest the script
+  # brings with it.
+  #   1/5  downloads the command-line tools — the utilities used to install the Android SDK itself (1-2 min)
+  #   2/5  accepts licenses and installs the SDK, platform 34 and build-tools. The longest step,
+  #        5-15 minutes, and the whole time the log is silent: sdkmanager prints no progress
+  #        in non-interactive mode. Silence here is not a hang
+  #   3/5  gradle :app:assembleDebug — compiles the sources from /src into an APK (3-8 minutes)
+  #   4/5  installs mc, the console client for object storage
+  #   5/5  puts the APK into the bucket under two names: a dated one and propusk-latest (seconds)
   #
-  # हर बिल्ड समान रूप से लंबा चलता है: कोई कैश नहीं है, /work डिस्क एक-बार-उपयोग वाली है (फ़ाइल के अंत में
-  # emptyDir देखें)। एक वास्तविक बिल्ड सर्वर पर इसके बजाय एक स्थायी वॉल्यूम होता, और दूसरा
-  # बिल्ड मिनटों में पूरा हो जाता।
+  # Every build takes equally long: there's no cache, the /work disk is disposable (see emptyDir
+  # at the end of the file). On a real build server there'd be a persistent volume instead, and a second
+  # build would finish in minutes.
   #
-  # नीचे build.sh फ़ाइल की शब्दशः सामग्री है, YAML नहीं। इसके भीतर हैश वाली लाइनें
-  # स्क्रिप्ट में ज्यों-की-त्यों चली जाती हैं: ये shell की टिप्पणियाँ हैं, और इन्हें हटाने की ज़रूरत नहीं है।
+  # Below is the verbatim content of the build.sh file, not YAML. The hash lines inside it
+  # go into the script as-is: they are shell comments, and there's no need to remove them.
   build.sh: |
     #!/usr/bin/env bash
-    # यहाँ set -e उपयुक्त है: यह कोई जाँच नहीं, यह एक बिल्ड है। यदि कोई चरण विफल हुआ —
-    # जारी रखना व्यर्थ है, Job को एक त्रुटि के साथ समाप्त होना चाहिए और अपने लॉग के साथ
-    # क्लस्टर में बना रहना चाहिए।
+    # Here set -e is appropriate: this isn't a check, it's a build. If a step fails —
+    # continuing is pointless, the Job should finish with an error and remain
+    # in the cluster with its logs.
     set -euo pipefail
 
     WORK=/work
@@ -56,42 +56,42 @@ data:
     export ANDROID_SDK_ROOT="$WORK/android-sdk"
     export ANDROID_HOME="$ANDROID_SDK_ROOT"
     export GRADLE_USER_HOME="$WORK/gradle-home"
-    # एक-बार-उपयोग वाले कंटेनर में Gradle डेमन की ज़रूरत नहीं: वह अगले
-    # बिल्ड के लिए जीता है, और इस कंटेनर में कोई अगला बिल्ड नहीं होगा।
-    # -Duser.home अनिवार्य है, और यह ऊपर के export HOME की नकल नहीं है। Java होम
-    # डायरेक्टरी पर्यावरण चर से नहीं बल्कि सिस्टम यूज़र रिकॉर्ड से लेता है, और एक
-    # अविशेषाधिकृत uid के पास वह नहीं होता — Gradle "?" डाल देता है और APK की पैकेजिंग पर
-    # विफल हो जाता है: वह हस्ताक्षर कुंजी को /work/project/app/?/.android/ जैसे पथ पर खोजता है।
+    # The Gradle daemon isn't needed in a disposable container: it lives for the next
+    # build, and there will be no next build in this container.
+    # -Duser.home is mandatory, and it's not a duplicate of export HOME above. Java takes the home
+    # directory not from the environment variable but from the system user record, and an
+    # unprivileged uid has none — Gradle substitutes "?" and fails at packaging the
+    # APK: it looks for the signing key at a path like /work/project/app/?/.android/.
     export GRADLE_OPTS="-Xmx3g -Dorg.gradle.daemon=false -Duser.home=$WORK"
 
     CMDLINE_TOOLS_URL="https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"
     MC_URL="https://github.com/pgsty/mc/releases/download/RELEASE.2026-09-13T00-00-00Z/mcli_20260913000000.0.0_linux_amd64.tar.gz"
 
-    echo "== 1/5 Android command-line tools इंस्टॉल कर रहा हूँ =="
+    echo "== 1/5 installing Android command-line tools =="
     mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
     cd "$ANDROID_SDK_ROOT/cmdline-tools"
     curl -fsSL -o tools.zip "$CMDLINE_TOOLS_URL"
-    # unzip हर बेस इमेज में नहीं होता, लेकिन JDK का jar zip खोल सकता है।
+    # unzip isn't in every base image, but jar from the JDK can unpack zip.
     unzip -q tools.zip 2>/dev/null || jar xf tools.zip
     rm -f tools.zip
     mv cmdline-tools latest
     export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
 
-    echo "== 2/5 लाइसेंस स्वीकार कर रहा हूँ और SDK डाउनलोड कर रहा हूँ (सबसे लंबा चरण) =="
-    # `yes` को SIGPIPE मिलता है जब sdkmanager अपना इनपुट बंद करता है, और वह
-    # एक गैर-शून्य कोड लौटाता है। set -o pipefail के साथ यह बिल्ड को बिना किसी कारण विफल कर देता,
-    # इसलिए यहाँ रिटर्न कोड को जानबूझकर दबा दिया गया है। यदि लाइसेंस वास्तव में
-    # स्वीकार नहीं हुए — अगली कमांड यह बता देगी।
+    echo "== 2/5 accepting licenses and downloading the SDK (the longest step) =="
+    # `yes` receives SIGPIPE when sdkmanager closes its input, and returns
+    # a non-zero code. With set -o pipefail that would fail the build for no reason,
+    # so the return code is suppressed here deliberately. If the licenses really
+    # weren't accepted — the next command will say so.
     yes | sdkmanager --sdk_root="$ANDROID_SDK_ROOT" --licenses >/dev/null 2>&1 || true
     sdkmanager --sdk_root="$ANDROID_SDK_ROOT" \
       "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
-    echo "== 3/5 APK बना रहा हूँ =="
-    # ConfigMap केवल-पढ़ने के लिए माउंट होता है, और Gradle स्रोतों के पास लिखता है,
-    # इसलिए पेड़ पहले डिस्क पर कॉपी किया जाता है।
-    # -L सांकेतिक लिंक को हल करता है: ConfigMap फ़ाइलों के रूप में नहीं,
-    # बल्कि आंतरिक ..data डायरेक्टरी के लिंक के रूप में माउंट होता है, और -L के बिना लिंक प्रोजेक्ट में चले जाएँगे।
-    # /src/. के बजाय एक ग्लोब — ताकि यह आंतरिक डायरेक्टरी स्वयं कॉपी न हो।
+    echo "== 3/5 building the APK =="
+    # The ConfigMap is mounted read-only, and Gradle writes next to the sources,
+    # so the tree is first copied to disk.
+    # -L dereferences symbolic links: a ConfigMap is mounted not as files,
+    # but as links into the internal ..data directory, and without -L the links would end up in the project.
+    # A glob instead of /src/. — so that this internal directory itself isn't copied.
     mkdir -p "$WORK/project"
     cp -rL /src/* "$WORK/project/"
     cd "$WORK/project"
@@ -100,31 +100,31 @@ data:
     APK="$WORK/project/app/build/outputs/apk/debug/app-debug.apk"
     ls -l "$APK"
 
-    echo "== 4/5 S3 क्लाइंट इंस्टॉल कर रहा हूँ =="
-    # हम क्लाइंट को कार्यशील डायरेक्टरी में रखते हैं, /usr/local/bin में नहीं। पॉड एक
-    # अविशेषाधिकृत यूज़र के रूप में चलता है, और इमेज की सिस्टम डायरेक्टरियाँ root की हैं:
-    # वहाँ लिखने का अंत Permission denied में होगा — और ठीक यहीं, चौथे चरण पर,
-    # यानी आधे घंटे के बिल्ड के बाद। /work डायरेक्टरी हमारी है, हम उसमें लिख सकते हैं।
+    echo "== 4/5 installing the S3 client =="
+    # We put the client in the working directory, NOT in /usr/local/bin. The pod runs as
+    # an unprivileged user, and the image's system directories belong to root:
+    # writing there would end in Permission denied — and right here, at the fourth step,
+    # i.e. after half an hour of building. The /work directory belongs to us, we can write to it.
     mkdir -p "$WORK/bin"
-    # dl.min.io больше не отдаёт клиент mc — берём совместимый форк pgsty/mc (mcli из tar.gz).
+    # dl.min.io no longer serves the mc client — use the compatible fork pgsty/mc (mcli from tar.gz).
     curl -fsSL "$MC_URL" | tar -xz -C "$WORK/bin" mcli
     mv "$WORK/bin/mcli" "$WORK/bin/mc"
     chmod +x "$WORK/bin/mc"
-    # PATH उन डायरेक्टरियों की सूची है जहाँ shell कमांड खोजता है। हम अपनी जोड़ते हैं ताकि आगे
-    # पूरे पथ के बजाय बस `mc` लिखा जा सके।
+    # PATH is the list of directories where the shell looks for commands. We append ours so that further on
+    # we can write just `mc` instead of the full path.
     export PATH="$WORK/bin:$PATH"
 
-    echo "== 5/5 APK को bucket में अपलोड कर रहा हूँ =="
-    # accessKey/secretKey/endpoint/bucketName चर Secret से envFrom के माध्यम से
-    # आते हैं। हम alias set का आउटपुट दबाते हैं: उसे लॉग में कुछ भी छापने की ज़रूरत नहीं।
-    # इसी कारण से स्क्रिप्ट में कोई set -x नहीं है — वह कुंजियाँ छाप देता।
-    # एलियास का नाम builds है, lab नहीं: शब्द `lab` सभी लैब में प्रशिक्षण क्लस्टर को नाम देता है,
-    # और दोनों को भ्रमित नहीं करना चाहिए।
+    echo "== 5/5 uploading the APK to the bucket =="
+    # The accessKey/secretKey/endpoint/bucketName variables come from the Secret
+    # via envFrom. We suppress the alias set output: no need for it to print anything to the log.
+    # For the same reason there's no set -x in the script — it would print the keys.
+    # The alias is named builds, not lab: the word `lab` names the training cluster in all the labs,
+    # and one shouldn't confuse the two.
     mc alias set builds "https://${endpoint}" "${accessKey}" "${secretKey}" >/dev/null
     STAMP="$(date -u +%Y%m%d-%H%M%S)"
     mc cp "$APK" "builds/${bucketName}/propusk/propusk-${STAMP}.apk"
     mc cp "$APK" "builds/${bucketName}/propusk/propusk-latest.apk"
-    # एक मार्कर लाइन: check.sh इससे "Job चला" को "APK पहुँचा" से अलग पहचानता है।
+    # A marker line: check.sh uses it to tell "the Job ran" from "the APK arrived".
     echo "APK-UPLOADED ${bucketName}/propusk/propusk-${STAMP}.apk"
     mc ls --recursive "builds/${bucketName}/propusk/"
 ---
@@ -133,63 +133,63 @@ kind: Job
 metadata:
   name: propusk-build
 spec:
-  # यदि बिल्ड विफल हो तो पॉड को कितनी बार फिर से बनाना है। शून्य अधिक ईमानदार होता,
-  # लेकिन SDK डाउनलोड करते समय नेटवर्क कभी-कभी झपकता है, और दूसरा प्रयास "मेरा क्यों विफल हुआ"
-  # समझाने से सस्ता है।
+  # How many times to recreate the pod if the build fails. Zero would be more honest,
+  # but the network sometimes blinks while downloading the SDK, and a second attempt is cheaper
+  # than explaining "why did mine fail".
   backoffLimit: 1
-  # पूरे बिल्ड पर एक सीमा। इसके बिना एक अटका हुआ बिल्ड नोड को शाम तक रोके रखता।
-  # गिनती Job के निर्माण से शुरू होती है, कंटेनर के शुरू होने से नहीं: Pending में बिताया समय और
-  # लैब में थोड़ा आगे नोड का पुनर्निर्माण भी इसे खर्च करते हैं। इसके लिए एक घंटा पर्याप्त नहीं था —
-  # व्यक्ति के प्रतीक्षा कर लेने के बाद बिल्ड DeadlineExceeded के साथ मर जाता था।
+  # A ceiling on the whole build. Without it a stuck build would hold the node until evening.
+  # The count starts from the CREATION of the Job, not from the container start: time in Pending and
+  # the node recreation a bit later in the lab also consume it. An hour wasn't enough —
+  # the build died with DeadlineExceeded after the person had already waited it out.
   activeDeadlineSeconds: 7200
-  # पॉड टेम्पलेट: इसी से Job वह पॉड ढालता है जिसमें बिल्ड चलेगा। पॉड का अपना कोई नाम
-  # नहीं होता — Job अपने नाम में एक यादृच्छिक पुछल्ला जोड़ता है, इसलिए पॉड को नाम से नहीं
-  # बल्कि job-name लेबल से खोजना पड़ता है।
+  # The pod template: the Job stamps out the pod that will run the build from it. The pod has no name
+  # of its own — the Job appends a random suffix to its own name, so you have to find the pod
+  # by the job-name label, not by name.
   template:
     spec:
-      # बिल्ड किसी और का कोड इंटरनेट से खींचता है और उसे तुरंत चलाता है। इसके लिए उसे root
-      # अधिकारों की ज़रूरत नहीं: वह केवल /work में लिखता है — जिसमें S3 क्लाइंट भी शामिल है, जिसे वह
-      # वहीं डाउनलोड करता है, क्योंकि एक अविशेषाधिकृत यूज़र को इमेज की सिस्टम डायरेक्टरियों में
-      # लिखने नहीं दिया जाएगा। वही तीन फ़ील्ड पहली लैब के एप्लिकेशन पर थे
-      # और उसी कारण से: उनके बिना पॉड को उस क्लस्टर में प्रवेश नहीं मिलेगा जहाँ
-      # `restricted` सुरक्षा प्रोफ़ाइल सक्षम है।
+      # The build pulls someone else's code from the internet and runs it right away. It doesn't need root
+      # rights for that: it writes only to /work — including the S3 client, which it downloads
+      # there too, because an unprivileged user won't be allowed to write to the image's
+      # system directories. The same three fields were on the application
+      # from the first lab and for the same reason: without them the pod won't be admitted to a cluster where
+      # the `restricted` security profile is enabled.
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
         seccompProfile:
           type: RuntimeDefault
-      # Job के लिए यह एक अनिवार्य फ़ील्ड है। Never का अर्थ है: विफल पॉड को
-      # उसी स्थान पर पुनः आरंभ न करें, बल्कि निर्णय Job को सौंप दें — वह एक नया बनाएगा।
+      # For a Job this is a required field. Never means: don't restart a failed pod
+      # in place, but hand the decision to the Job — it will create a new one.
       restartPolicy: Never
       containers:
         - name: build
-          # कंटेनर स्तर पर वही सख़्ती: अपने अधिकार बढ़ाना वर्जित है,
-          # हर एक linux क्षमता छीन ली गई है।
+          # The same strictness at the container level: escalating one's privileges is forbidden,
+          # every single linux capability is dropped.
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # Gradle और JDK 17 के साथ एक तैयार इमेज। JDK संस्करण मनमाने ढंग से नहीं चुना गया: यह
-          # app-build.gradle.kts में jvmTarget = "17" से मेल खाना ही चाहिए, वरना बिल्ड
-          # बाइटकोड संस्करण के बेमेल पर विफल हो जाएगा। इमेज में कोई Android SDK नहीं है — इसे
-          # स्क्रिप्ट का पहला चरण डाउनलोड करता है, क्योंकि SDK अंदर वाली इमेज दसियों
-          # गीगाबाइट की होती हैं और खुद SDK से भी अधिक समय में खिंचतीं।
+          # A ready-made image with Gradle and JDK 17. The JDK version isn't chosen arbitrarily: it
+          # must match jvmTarget = "17" in app-build.gradle.kts, otherwise the build
+          # will fail on a bytecode version mismatch. There's no Android SDK in the image — the
+          # first step of the script downloads it, because images with the SDK inside weigh tens of
+          # gigabytes and would pull longer than the SDK itself.
           image: gradle:8.9-jdk17
-          # हम वह नहीं चलाते जो इमेज डिफ़ॉल्ट रूप से करती है, बल्कि /scripts पर माउंट किए गए
-          # ConfigMap से अपनी स्क्रिप्ट चलाते हैं।
+          # We run not what the image does by default, but our own script from the ConfigMap
+          # mounted at /scripts.
           command: ["bash", "/scripts/build.sh"]
           envFrom:
-            # सीक्रेट की चारों कुंजियाँ उन्हीं नामों के साथ पर्यावरण चर बन जाती हैं:
-            # accessKey, secretKey, endpoint, bucketName।
+            # All four keys of the secret become environment variables
+            # with the same names: accessKey, secretKey, endpoint, bucketName.
             - secretRef:
                 name: bucket-creds
-          # एक Android बिल्ड की ईमानदार लागत, प्रयोग से निकाली गई। requests यह है कि कितना
-          # आरक्षित करना है: शेड्यूलर इस संख्या से नोड चुनता है, वास्तविक खपत से नहीं।
-          # Kotlin कंपाइलर चार गीगाबाइट से कम पर नहीं टिकता।
-          # limits सीमा है: CPU पर, इस पर पहुँचने से आपको थ्रॉटल किया जाता है; मेमोरी पर,
-          # कंटेनर को मार दिया जाता है (OOMKilled)। तुलना के लिए, पहली लैब का एप्लिकेशन
-          # 20m CPU और 32Mi मेमोरी में चल जाता था। इन्हीं संख्याओं के कारण प्रशिक्षण
-          # क्लस्टर का नोड बड़ा करना पड़ेगा: लैब 0 में ऑर्डर किए गए नोड में बिल्ड नहीं समाता।
+          # The honest cost of an Android build, found by experiment. requests is how much
+          # to reserve: the scheduler picks a node by this number, not by actual
+          # consumption. The Kotlin compiler won't survive on less than four gigabytes.
+          # limits is the ceiling: on CPU, hitting it throttles you; on memory, the
+          # container is killed (OOMKilled). For comparison, the application from the first lab
+          # got by on 20m of CPU and 32Mi of memory. It's precisely because of these numbers that the training
+          # cluster's node has to be enlarged: the build doesn't fit into the one ordered in lab 0.
           resources:
             requests:
               cpu: "1"
@@ -197,9 +197,9 @@ spec:
             limits:
               cpu: "2"
               memory: 6Gi
-          # तीन वॉल्यूम। स्रोत और स्क्रिप्ट — केवल-पढ़ने के लिए: ConfigMap वैसे भी केवल-पढ़ने
-          # के लिए माउंट होता है, लेकिन एक स्पष्ट readOnly तुरंत बता देता है कि बिल्ड वहाँ नहीं लिखता।
-          # वह /work में लिखता है, और यही एकमात्र स्थान है जहाँ उसे अनुमति है।
+          # Three volumes. Sources and script — read-only: a ConfigMap is mounted
+          # read-only anyway, but an explicit readOnly says right away that the build doesn't write there.
+          # It writes to /work, and that's the only place it's allowed to.
           volumeMounts:
             - name: src
               mountPath: /src
@@ -213,9 +213,9 @@ spec:
         - name: src
           configMap:
             name: propusk-src
-            # एक ConfigMap कुंजी में स्लैश नहीं हो सकता, लेकिन माउंट का पथ
-            # हो सकता है। इसी तरह एक सपाट मानचित्र उस डायरेक्टरी पेड़ में खुलता है
-            # जिसकी Gradle अपेक्षा करता है।
+            # A ConfigMap key can't contain a slash, but the mount path
+            # can. This is how a flat map unfolds into the directory tree
+            # that Gradle expects.
             items:
               - key: settings.gradle.kts
                 path: settings.gradle.kts
@@ -232,15 +232,15 @@ spec:
         - name: scripts
           configMap:
             name: android-build-script
-            # वॉल्यूम की फ़ाइलों के लिए अनुमतियाँ: पढ़ना और निष्पादित करना। स्क्रिप्ट को
-            # `bash /scripts/build.sh` के रूप में बुलाया जाता है, इसलिए यहाँ निष्पादन बिट एक सुरक्षा जाल है — यह
-            # उसके काम आएगी जो किसी दिन फ़ाइल को सीधे चलाएगा।
+            # File permissions for the volume: read and execute. The script is invoked as
+            # `bash /scripts/build.sh`, so the execute bit here is a safety net — it
+            # will be needed by whoever one day runs the file directly.
             defaultMode: 0755
         - name: work
-          # नोड पर एक अस्थायी डिस्क, ठीक उतने समय जीती है जितना पॉड।
-          # SDK, Gradle निर्भरताएँ और बिल्ड का परिणाम यहाँ आएँगे।
+          # A temporary disk on the node, lives exactly as long as the pod.
+          # The SDK, Gradle dependencies and the build result will land here.
           emptyDir:
-            # गुंजाइश के साथ बारह गीगाबाइट: SDK, Gradle कैश और बिल्ड परिणाम
-            # छह से आठ हैं। सीमा इसलिए चाहिए ताकि एक फूला हुआ बिल्ड नोड की डिस्क को
-            # पूरी तरह न खा जाए और पड़ोसी पॉड्स को अपने साथ न घसीट ले।
+            # Twelve gigabytes with headroom: the SDK, Gradle cache and build result are
+            # six to eight. The ceiling is needed so a bloated build doesn't eat the node's disk
+            # entirely and drag the neighboring pods down with it.
             sizeLimit: 12Gi

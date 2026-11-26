@@ -8,7 +8,7 @@
 
 直接把脚本从 GitHub 拉到机器上：
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/bastion/scripts/convert.sh
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/bastion/scripts/convert.sh
 ```
 
 打开它：
@@ -16,7 +16,7 @@ curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-work
 nano convert.sh
 ```
 
-**你在步骤 1 记下的那三个值，现在派上用场了。** 文件靠前的位置有一个标着「粘贴你的值」的代码块——把里面的占位符换成你自己的，引号保留原样：
+**你在步骤 1 记下的那三个值，现在派上用场了。** 文件靠前的位置有一个标着「PASTE YOUR VALUES」的代码块——把里面的占位符换成你自己的，引号保留原样：
 
 ```
 BUCKET="your-bucket-name"
@@ -28,15 +28,15 @@ SECRET_KEY="your-secretKey"
 
 在 nano 里保存：`Ctrl+O`，然后 `Enter`，再按 `Ctrl+X` 退出。检查一下没有占位符残留：
 ```bash
-grep ВСТАВЬТЕ convert.sh || echo "全部填好了，可以运行了"
+grep PASTE_ convert.sh || echo "all filled in, ready to run"
 ```
 
 运行它——一定要通过 `sudo`，脚本需要 root 权限。而且要**在 `screen` 里**运行：转换大约要五分钟，而你现在是挂在一条由两段连接组成的链路上（你的笔记本 → SSH 到 bastion → 转换机的控制台）。这条链路里任何一环断掉，普通的运行就会在中途中断。`screen` 能让进程一直活着，即使连接断了：
 
 ```bash
-screen -S convert          # 开一个独立的会话
-sudo bash convert.sh       # 在它里面运行
-#  连接断了？重新登录到这同一台机器，然后：  screen -r convert
+screen -S convert          # start a separate session
+sudo bash convert.sh       # run it inside that session
+#  connection dropped? log back in to this same machine, then:  screen -r convert
 ```
 
 内部发生的事：脚本会下载源镜像，运行 `virt-v2v`，压缩结果，再把它上传到你的 bucket。
@@ -47,6 +47,6 @@ sudo bash convert.sh       # 在它里面运行
 
 最后脚本会打印出一个指向你镜像的 **预签名链接**——在输出里找以 `Share:` 这个词开头的那一行，链接就紧跟在它后面。
 
-**拿它做什么：** 把它复制到那同一个记事本里。下一步你会回到 bastion，打开 `manifests/03-app-vm.yaml`，把它粘贴到 `url` 字段里——就是现在放着 `ВСТАВЬТЕ_PRESIGNED_URL` 占位符的地方。就是我们填号码的时候我提醒过你的那个。
+**拿它做什么：** 把它复制到那同一个记事本里。下一步你会回到 bastion，打开 `manifests/03-app-vm.yaml`，把它粘贴到 `url` 字段里——就是现在放着 `PASTE_PRESIGNED_URL` 占位符的地方。就是我们填号码的时候我提醒过你的那个。
 
 这是一个临时的签名链接：存储没有对外开放，而这个链接是你用自己的密钥生成的。它能存活一周——对工作坊以及之后做实验来说都绰绰有余。

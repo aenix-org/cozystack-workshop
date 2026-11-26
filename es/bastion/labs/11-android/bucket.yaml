@@ -1,41 +1,41 @@
 ---
-# Lab 11. Bucket para los APK compilados.
+# Lab 11. Bucket for built APKs.
 #
-# Un bucket es un área con nombre en el almacenamiento de objetos: los archivos se suben y
-# se descargan como objetos completos, por HTTP, y nunca se montan en ningún sitio. No hay
-# directorios dentro; una barra en el nombre de un objeto se dibuja como árbol solo en la interfaz.
+# A bucket is a named area in object storage: files are put and fetched as whole
+# objects, over HTTP, and are never mounted anywhere. There are no directories inside;
+# a slash in an object name is drawn as a tree only in the interface.
 #
-# Este es un objeto de tenant: vive NO en el clúster `lab`, sino en tu namespace
-# del clúster de gestión. Por eso el kubeconfig aquí debe ser el del tenant,
-# no el que usas para trabajar con el clúster `lab`. Está pensado así: los artefactos de compilación
-# deben sobrevivir al clúster en el que se compilaron.
+# This is a tenant object: it lives NOT in the `lab` cluster, but in your namespace
+# on the management cluster. That is why the kubeconfig here must be the tenant one,
+# not the one you use to work with the `lab` cluster. This is by design: build artifacts
+# must outlive the cluster they were built in.
 #
-# Antes de aplicar, reemplaza tenant-workshopXX por tu propio namespace, de lo contrario el pedido
-# irá al tenant equivocado y lo más probable es que no pase las comprobaciones de permisos.
+# Before applying, replace tenant-workshopXX with your own namespace, otherwise the order
+# will go to the wrong tenant and most likely will not pass the permission checks.
 #
 #     export KUBECONFIG=~/.kube/config
 #     kubectl apply -f bucket.yaml
 #
-# Lo mismo se puede hacer con el ratón en el dashboard del tenant (Crear aplicación -> Bucket).
-# El resultado es idéntico; la diferencia es que el texto se puede revisar y poner en Git.
+# The same thing can be done with the mouse in the tenant dashboard (Create application -> Bucket).
+# The result is identical; the difference is that text can be reviewed and put into Git.
 #
-# Qué ocurre tras aplicar: la plataforma levantará el bucket en unos segundos
-# y emitirá claves de acceso, guardándolas en el secreto bucket-builds-ci-credentials en el mismo
-# namespace. Cuatro valores de ahí (endpoint, bucketName, accessKey, secretKey)
-# se transfieren al clúster `lab` a mano — los clústeres son distintos, nada se traslada por sí solo.
+# What happens after applying: the platform will bring up the bucket in a few seconds
+# and issue access keys, storing them in the secret bucket-builds-ci-credentials in the same
+# namespace. Four values from there (endpoint, bucketName, accessKey, secretKey)
+# are transferred into the `lab` cluster by hand — the clusters are different, nothing moves on its own.
 apiVersion: apps.cozystack.io/v1alpha1
 kind: Bucket
 metadata:
-  # El nombre del objeto Cozystack, y solo eso. El nombre real del bucket en el almacenamiento lo
-  # emite la propia plataforma — largo, de la forma bucket-a9209f83-... Acabará en el campo
-  # bucketName del secreto emitido, y eso es exactamente lo que hay que poner en la compilación, no `builds`.
+  # The name of the Cozystack object, and only that. The real bucket name in storage is
+  # issued by the platform itself — long, of the form bucket-a9209f83-... It will end up in the
+  # bucketName field of the issued secret, and that is exactly what must be plugged into the build, not `builds`.
   name: builds
   namespace: tenant-workshopXX
 spec:
   users:
-    # Cada clave de este mapa es un usuario S3 independiente con su propio par de claves.
-    # Un objeto vacío significa «acceso completo de lectura y escritura».
-    # Así puedes conceder al compilador acceso de escritura, y al equipo móvil — solo lectura:
+    # Each key of this map is a separate S3 user with its own key pair.
+    # An empty object means "full read and write access".
+    # This way you can grant the builder write access, and the mobile team — read-only:
     #   ci: {}
     #   mobile:
     #     readonly: true

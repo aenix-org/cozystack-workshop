@@ -8,8 +8,8 @@
 ```
 dashboard: https://dashboard.workshop.aenix.io
 bastion:   ssh workshopXX@<bastion-address>
-login:     workshopXX      ← 你的编号，我会当面告诉你
-password:  ...             ← 我会当面告诉你
+login:     workshopXX      ← your number, I'll tell you in person
+password:  ...             ← I'll tell you in person
 ```
 
 登录 bastion —— 密码与控制台的相同，**不需要 SSH 密钥**：

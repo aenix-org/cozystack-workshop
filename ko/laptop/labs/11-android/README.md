@@ -107,14 +107,14 @@ cd labs/11-android
 파일이 필요합니다.
 
 ```bash
-# KUBECONFIG — kubectl이 어떤 접근 파일을 쓰는지. 여기서는 테넌트의 것입니다: 버킷은
-# lab 클러스터가 아니라 관리 클러스터에서 주문됩니다
+# KUBECONFIG — which access file kubectl uses. Here it's the tenant's: the bucket
+# is ordered on the management cluster, not in the lab cluster
 export KUBECONFIG=~/.kube/workshop
 
-# apply = "클러스터를 파일에 기술된 상태로 만들어라". 이 명령은 저장소를 직접 만들지
-# 않습니다 — 주문을 플랫폼에 넘길 뿐입니다.
-#   -f bucket.yaml   어떤 파일을 적용할지. 그 전에 파일 안의
-#                    tenant-workshopXX를 여러분의 namespace로 바꾸세요. 안 그러면 주문이 엉뚱한 곳으로 갑니다
+# apply = "bring the cluster to what's described in the file." The command doesn't create
+# the storage itself — it hands the order to the platform.
+#   -f bucket.yaml   which file to apply. Before this, replace
+#                    tenant-workshopXX in it with your namespace, or the order goes elsewhere
 kubectl apply -f bucket.yaml
 ```
 
@@ -180,15 +180,15 @@ Secret `bucket-builds-ci-credentials`를 찾으세요. 네 개의 값을 담고 
 추출합니다; 나머지도 같은 방식으로 가져오며, 필드 이름만 바뀝니다.
 
 ```bash
-# 이전 단계와 같은 테넌트 접근으로 작업합니다: 시크릿은 테넌트에 있습니다.
-# get secret = "비밀번호와 키가 든 객체를 보여줘". 시크릿 안의 값은
-# base64로 인코딩되어 있습니다 — 이것은 암호화가 아니라 이진 데이터를 텍스트로 쓰는 방식일 뿐입니다.
-#   -n tenant-workshopXX   어떤 namespace에서 찾을지
-#   -o jsonpath='...'      객체 전체가 아니라 그중 필드 하나만 반환:
-#                          .data.accessKey — data 섹션 안의 accessKey 필드
-#   base64 -d              읽을 수 있는 형태로 다시 디코딩(d = decode)
-#   ; echo                 줄바꿈 추가: 없으면 값이
-#                          다음 터미널 프롬프트에 붙어 버립니다
+# We work with the same tenant access as in the previous step: the secret lives in the tenant.
+# get secret = "show the object with passwords and keys." The values inside the secret are
+# base64-encoded — this isn't encryption, just a way of writing binary data as text.
+#   -n tenant-workshopXX   which namespace to look in
+#   -o jsonpath='...'      return not the whole object, but a single field from it:
+#                          .data.accessKey — the accessKey field inside the data section
+#   base64 -d              decode it back into readable form (d = decode)
+#   ; echo                 add a line break: without it the value would run into
+#                          the next terminal prompt
 kubectl -n tenant-workshopXX get secret bucket-builds-ci-credentials \
   -o jsonpath='{.data.accessKey}' | base64 -d; echo
 ```
@@ -208,20 +208,20 @@ secrets`는 `no`라고 답합니다. 권한은 특정 이름에 한정해 좁게
 마세요: 빌드 스크립트는 정확히 이 이름의 변수를 찾습니다.
 
 ```bash
-# 여기서부터 랩 끝까지는 테넌트가 아니라 lab 클러스터로 작업합니다
+# From here to the end of the lab we work with the lab cluster, not the tenant
 export KUBECONFIG=~/lab.kubeconfig
 
-# create secret generic = "지금 나열할 값들로 시크릿을 만들어라".
-# generic은 이미지 레지스트리 비밀번호나 TLS 인증서용으로 준비된 타입이 아니라
-# "임의의 이름-값 쌍의 집합"을 뜻합니다.
-#   bucket-creds        시크릿의 이름. Job이 이 이름으로 참조합니다
-#   --from-literal=name='value'   한 쌍. ВСТАВЬТЕ_... 자리에는
-#                       대시보드의 버킷 카드에 있는 값을 대입하세요
+# create secret generic = "create a secret from the values I'm about to list."
+# generic means "an arbitrary set of name-value pairs," not a ready-made type
+# for an image-registry password or a TLS certificate.
+#   bucket-creds        the secret's name. The Job will reference it by this name
+#   --from-literal=name='value'   one pair. In place of PASTE_..., substitute
+#                       the values from the bucket's card in the dashboard
 kubectl create secret generic bucket-creds \
-  --from-literal=endpoint='ВСТАВЬТЕ_endpoint' \
-  --from-literal=bucketName='ВСТАВЬТЕ_bucketName' \
-  --from-literal=accessKey='ВСТАВЬТЕ_accessKey' \
-  --from-literal=secretKey='ВСТАВЬТЕ_secretKey'
+  --from-literal=endpoint='PASTE_endpoint' \
+  --from-literal=bucketName='PASTE_bucketName' \
+  --from-literal=accessKey='PASTE_accessKey' \
+  --from-literal=secretKey='PASTE_secretKey'
 ```
 
 **보여야 할 결과:**
@@ -249,7 +249,7 @@ base64로 저장하는데, base64는 암호화가 아니라 표기 방식입니�
 소스 코드가 거기 있는 이유도 같습니다: 빌드에는 파일이 필요한데, 텍스트 파일 여섯 개를
 위해 네트워크 디스크를 마련할 이유는 없습니다.
 
-앱은 한 가지 일만 합니다: «방문객 출입증 신청하기»라는 문구를 표시합니다. 이것으로
+앱은 한 가지 일만 합니다: «Request a guest pass»라는 문구를 표시합니다. 이것으로
 충분합니다. 이 랩은 Android에 관한 것이 아니라 그것이 어디서 빌드되는지에 관한 것이기
 때문입니다.
 
@@ -341,7 +341,7 @@ class MainActivity : Activity() {
 빌드가 필요로 할 파일일 뿐입니다.
 
 ```bash
-# 안에 파일 여섯 개가 든 ConfigMap을 생성합니다. 제자리에 있는지 확인하려면:
+# Creates a ConfigMap with six files inside. To check it's in place:
 # kubectl get configmap propusk-src
 kubectl apply -f propusk-src.yaml
 ```
@@ -379,10 +379,10 @@ kubectl apply -f propusk-src.yaml
 세 줄은 자세히 볼 가치가 있습니다.
 
 ```bash
-# yes — "y"를 끝없이 출력하는 명령입니다: 이렇게 하면 "라이선스를
-# 수락하시겠습니까? [y/n]" 같은 질문 묶음이 사람 없이 답해집니다.
-#   >/dev/null 2>&1   일반 출력과 오류 출력을 모두 버림: 여기서는 필요 없음
-#   || true           "명령이 오류를 반환하더라도 괜찮은 것으로 간주하라"
+# yes — a command that prints "y" endlessly: this way a batch of "accept the
+# license? [y/n]" questions gets answered without a human.
+#   >/dev/null 2>&1   discard both normal output and error output: it's not needed here
+#   || true           "even if the command returned an error, treat it as fine"
 yes | sdkmanager --sdk_root="$ANDROID_SDK_ROOT" --licenses >/dev/null 2>&1 || true
 ```
 
@@ -392,11 +392,11 @@ SIGPIPE를 받고 0이 아닌 코드를 반환합니다. `set -o pipefail` 아�
 거부하므로, 우리가 오류를 숨기는 것은 아닙니다.
 
 ```bash
-# alias set = "저장소 주소와 키를 builds라는 짧은 이름으로 기억해 둬라". 그래야
-# 이후 모든 복사 명령에서 그것들을 반복하지 않습니다.
-#   "https://${endpoint}"   주소: https:// 접두사는 우리가 직접 붙입니다. 시크릿에는 없습니다
-#   ${accessKey} ${secretKey}   S3 용어로 로그인과 비밀번호이며, 시크릿에서 옵니다
-#   >/dev/null              출력을 끔
+# alias set = "remember the storage address and keys under the short name builds," so
+# we don't repeat them in every copy command that follows.
+#   "https://${endpoint}"   the address: we add the https:// prefix ourselves, it's not in the secret
+#   ${accessKey} ${secretKey}   the login and password in S3 terms, they come from the secret
+#   >/dev/null              suppress the output
 mc alias set builds "https://${endpoint}" "${accessKey}" "${secretKey}" >/dev/null
 ```
 
@@ -404,8 +404,8 @@ mc alias set builds "https://${endpoint}" "${accessKey}" "${secretKey}" >/dev/nu
 접근할 수 있는 모든 사람에게 보이며, 키가 거기 들어가서는 안 됩니다.
 
 ```bash
-# echo는 작업 로그에 한 줄을 출력합니다. 아무 일도 하지 않습니다 — 이전 복사
-# 명령이 끝까지 실행되었다는 표시입니다
+# echo prints a line to the task's log. It does no work — it's a marker
+# that the previous copy command ran to completion
 echo "APK-UPLOADED ${bucketName}/propusk/propusk-${STAMP}.apk"
 ```
 
@@ -506,14 +506,14 @@ ConfigMap 키는 슬래시를 담을 수 없지만, 마운트 경로는 담을 �
 job을 적용하고, 그것이 생성한 Pod를 바로 봅니다.
 
 ```bash
-# 파일에서 객체 두 개를 생성합니다: 스크립트가 든 ConfigMap과 Job 자체.
-# 이 순간부터 클러스터는 빌드를 위한 노드를 찾아 실행할 의무를 집니다
+# Creates two objects from the file: a ConfigMap with the script and the Job itself.
+# From this moment the cluster is obliged to find a node for the build and start it
 kubectl apply -f android-build.yaml
 
-# get pods = "Pod를 보여줘". 작업의 Pod에는 자기 이름이 없습니다 — Job이
-# 자기 이름 뒤에 무작위 꼬리를 붙여 스스로 지어냅니다. 그래서 이름이 아니라 레이블로 찾습니다:
-#   -l job-name=propusk-build   job-name 레이블이 job의 이름과 같은 Pod를 선택.
-#                               Job이 이 레이블을 자기 Pod에 스스로 붙입니다
+# get pods = "show the Pods." The task's Pod has no name of its own — the Job invents it
+# itself, appending a random tail to its own name. So we search not by name but by label:
+#   -l job-name=propusk-build   select Pods with the job-name label equal to the job's name.
+#                               The Job attaches this label to its Pods itself
 kubectl get pods -l job-name=propusk-build
 ```
 
@@ -529,10 +529,10 @@ propusk-build-x7k2p    0/1     Pending   0          40s
 기록입니다.
 
 ```bash
-# describe = "객체에 대해 알려진 모든 것을 보여줘": 설정, 상태, 이벤트.
-# 출력이 길어서, 그 끝부분만 남깁니다:
-#   sed -n '/Events:/,$p'   "Events:"가 나오는 줄부터
-#                           출력 끝까지 출력($ — 끝)
+# describe = "show everything known about the object": settings, state, events.
+# The output is long, so we keep only its tail:
+#   sed -n '/Events:/,$p'   print lines from the one where "Events:" appears,
+#                           through the end of the output ($ — end)
 kubectl describe pod -l job-name=propusk-build | sed -n '/Events:/,$p'
 ```
 
@@ -599,11 +599,11 @@ vSphere에서 여러분은 둘 다에 익숙합니다: DRS가 배치 시에 고�
 새 노드를 기다리세요. `lab` 클러스터에는 그래픽 콘솔이 없어서, 명령으로 지켜봅니다:
 
 ```bash
-# get nodes = "클러스터의 노드를 보여줘" — Pod가 그 위에서 돌아가는
-# 바로 그 가상 머신들입니다.
-#   -w   watch, "종료하지 말고 변경이 있을 때마다 줄을 덧붙여라". 옛 노드는
-#        목록에서 빠지고, 새 노드가 나타나 STATUS=Ready에 도달합니다.
-#        지켜보기를 벗어나려면 — Ctrl+C, 클러스터에는 아무 영향이 없습니다
+# get nodes = "show the cluster's nodes" — those very virtual machines on which
+# the Pods run.
+#   -w   watch, "don't exit; append lines on every change." The old node
+#        will drop from the list, a new one will appear and reach STATUS=Ready.
+#        To leave the watch — Ctrl+C, which has no effect on the cluster
 kubectl get nodes -w
 ```
 
@@ -611,8 +611,8 @@ kubectl get nodes -w
 Pod를 끊임없이 재검토하므로, 부탁할 필요가 없습니다. 움직이는지 확인합니다:
 
 ```bash
-# 노드 수정 전과 같은 질의입니다. 이제 STATUS 열에는
-# ContainerCreating가, 그리고 1~2분 뒤에는 Running이 보여야 합니다
+# The same query as before the node edit. Now the STATUS column should show
+# ContainerCreating, and in a minute or two Running
 kubectl get pods -l job-name=propusk-build
 ```
 
@@ -624,10 +624,10 @@ kubectl get pods -l job-name=propusk-build
 것에서 말이죠.
 
 ```bash
-# logs = "작업이 출력한 것을 보여줘".
-#   -f                  follow: 종료하지 말고 줄이 나타나는 대로 덧붙임.
-#                       종료 — Ctrl+C, 그래도 빌드는 계속됩니다
-#   job/propusk-build   Pod가 아니라 Job 자체를 가리켜도 됩니다: kubectl이 알아서 그 Pod를 찾습니다
+# logs = "show what the task printed."
+#   -f                  follow: don't exit, but append lines as they appear.
+#                       Exit — Ctrl+C, the build keeps going regardless
+#   job/propusk-build   you can point at the Job itself, not the Pod: kubectl will find its Pod on its own
 kubectl logs -f job/propusk-build
 ```
 
@@ -635,9 +635,9 @@ kubectl logs -f job/propusk-build
 
 | 로그 표시 | 대략 언제 |
 |---|---|
-| `== 1/5 Android command-line tools 설치 중 ==` | 즉시 |
-| `== 2/5 라이선스에 동의하고 SDK 내려받는 중 (가장 오래 걸리는 단계) ==` | +1~2분, 가장 오래 멈춰 있음 |
-| `== 3/5 APK 빌드 중 ==` | 시작으로부터 +5~15분 |
+| `== 1/5 installing Android command-line tools ==` | 즉시 |
+| `== 2/5 accepting licenses and downloading the SDK (the longest step) ==` | +1~2분, 가장 오래 멈춰 있음 |
+| `== 3/5 building the APK ==` | 시작으로부터 +5~15분 |
 | `BUILD SUCCESSFUL in ...` | 시작으로부터 +10~25분 |
 | `APK-UPLOADED bucket-.../propusk/propusk-...apk` | 바로 그 뒤 |
 
@@ -647,8 +647,8 @@ kubectl logs -f job/propusk-build
 보세요:
 
 ```bash
-# top = "지금 얼마나 소비하고 있는지". requests 요청이 아니라 바로 이 순간의
-# 실제 사용량입니다. 0이 아닌 CPU는 안에서 작업이 진행되고 있다는 뜻입니다
+# top = "how much it's consuming right now." Not the requests claim, but actual usage
+# this very second. Non-zero CPU means work is happening inside
 kubectl top pod -l job-name=propusk-build
 ```
 
@@ -656,7 +656,7 @@ Job은 Pod가 코드 0으로 종료되었을 때 완료된 것으로 간주됩�
 통용되는 "오류 없이 실행됨"입니다):
 
 ```bash
-# Pod가 아니라 job 자체를 봅니다: Pod에는 없는 열이 있습니다
+# We look not at the Pod but at the job itself: it has columns the Pod doesn't
 kubectl get job propusk-build
 ```
 
@@ -708,8 +708,8 @@ propusk/propusk-latest.apk
 📍 **위치:** 노트북에서, `kubectl`로 작업했던 바로 그 터미널 창에서.
 
 ```bash
-# 스크립트는 여러분과 같은 접근 파일로 lab 클러스터에 접속합니다. 버킷
-# 자격 증명은 bucket-creds 시크릿에서 가져옵니다 — 따로 입력할 것은 없습니다
+# The script reaches the lab cluster with the same access file as you. The bucket
+# credentials it takes from the bucket-creds secret — you don't need to enter anything separately
 export KUBECONFIG=~/lab.kubeconfig
 ./check.sh
 ```
@@ -731,11 +731,11 @@ export KUBECONFIG=~/lab.kubeconfig
 바로 삭제할 필요는 없습니다. 로그가 아직 쓸모 있습니다. 다 마쳤다면:
 
 ```bash
-# delete -f = "이 파일에 기술된 것을 클러스터에서 제거하라". Job과 함께
-# 그 로그도 사라지므로, 이 명령은 순서상 처음이 아니라 마지막에 옵니다
+# delete -f = "remove from the cluster what's described in this file." Along with the Job
+# its logs will disappear too, so this command comes last in time, not first
 kubectl delete -f android-build.yaml
 kubectl delete -f propusk-src.yaml
-# 시크릿은 따로 삭제합니다: 그에 해당하는 파일이 없으며, 여러분이 명령으로 만들었습니다
+# We delete the secret separately: there's no file for it, you created it with a command
 kubectl delete secret bucket-creds
 ```
 

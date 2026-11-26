@@ -1,63 +1,66 @@
-// 랩 10 · passes 컬렉션을 위한 문서 검증 규칙(스키마 검증기).
+// Lab 10 · document validation rule (schema validator) for the passes collection.
 //
-// mongosh — MongoDB 셸 — 을 위한 프로그램입니다. 노트북에서, 랩 클러스터를 대상으로,
-// README에 있는 짧은 명령 `mo`로 실행합니다:
+// A program for mongosh — the MongoDB shell. Runs on the laptop,
+// in the lab cluster, with the short command `mo` from the README:
 //     cd labs/10-mongodb && mo < validator.js
-// 응답으로 «규칙이 설치됨»라는 줄을 보게 됩니다.
+// In response you will see the line «rule installed».
 //
-// 검증 스키마란 무엇인가. 기본적으로 컬렉션에는 스키마가 없습니다: 데이터베이스는
-// 어떤 형태의 문서든 받아들이며, 필드 이름의 오타(«type» 대신 «tipe»)도 조용히
-// 저장합니다 — 이런 누락은 출입구의 경비가 잡아내지 못합니다. 검증기는 문서가 어떠해야
-// 하는지에 대한 기술(記述)입니다. 적용되는 순간부터 데이터베이스는 모든 삽입과 모든
-// 변경을 스스로 검사합니다.
+// What a validation schema is. By default a collection has no schema: the database accepts
+// a document of any shape and silently stores a typo in a field name («tipe» instead of «type») —
+// such an omission the guard at the checkpoint won't catch. A validator is a description of what
+// a document must be. From the moment it is applied, the database checks every insert and every
+// change itself.
 //
-// 규칙에 맞지 않는 문서에는 무슨 일이 일어나는가: 기록되지 않으며,
-// 연산은 MongoServerError: Document failed validation 오류를 반환합니다. 이미
-// 컬렉션에 들어 있는 문서는 규칙을 적용할 때 검사되지도 다시 쓰이지도 않습니다 —
-// 다만 그 문서를 이후에 수정하면 거부되기 시작합니다. 그래서 쓰레기
-// (type 필드가 없는 문서)는 이 파일을 적용한 뒤가 아니라 그 전에 치웁니다.
+// What happens to a document that does not match the rule: it will not be written,
+// and the operation returns a MongoServerError: Document failed validation. Documents
+// already in the collection are not checked and not rewritten when the rule is applied —
+// but subsequent edits to them will start being rejected. That is why junk
+// (documents without a type field) is removed before applying this file, not after.
 
-// runCommand — 익숙한 db.<컬렉션>.<...>를 거치지 않고 데이터베이스에 명령을 직접 보냅니다.
-// collMod — «기존 컬렉션의 설정을 변경하라». 규칙은 살아 있는 컬렉션에 사후에
-// 덧붙여집니다: 데이터베이스를 멈추거나 데이터를 옮길 필요가 없습니다.
+// runCommand — send a command to the database directly, bypassing the usual db.<collection>.<...>.
+// collMod — «change the settings of an existing collection». The rule is attached to a live
+// collection after the fact: no need to stop the database or migrate the data.
 db.runCommand({
   collMod: "passes",
-  // validator — 규칙 그 자체. $jsonSchema — 문서의 형태를 기술하는 방법:
-  // 어떤 필드가 필수인지, 어떤 타입인지, 어떤 값이 허용되는지.
+  // validator — the rule itself. $jsonSchema — a way to describe the shape of a document:
+  // which fields are required, of what type, and what values are allowed.
   validator: {
     $jsonSchema: {
-      // 최상위 문서 자체는 객체입니다.
+      // The top-level document itself is an object.
       bsonType: "object",
-      // 이것이 없으면 문서를 받지 않는 필드들. 목록에 무엇이 없는지 주목하세요:
-      // guest. 단체 통행증에는 손님 대신 조직이 들어가며, 규칙은 정당한 문서 형태가
-      // 통과할 만큼 충분히 넓어야 합니다. 제약은 곧바로 체감됩니다: 문서가 다양할수록
-      // 모두에게 한꺼번에 요구할 수 있는 것은 적어집니다.
+      // Fields without which the document will not be accepted. Note what is NOT in the list:
+      // guest. A group pass has an organization instead of a guest, and the rule must
+      // be broad enough that a legitimate document shape passes through it.
+      // The constraint is felt immediately: the more varied the documents,
+      // the less you can demand of all of them at once.
       required: ["type", "host"],
-      // 개별 필드에 대한 요구사항. 여기에 없는 필드는 전혀 검사되지 않습니다 —
-      // 낯선 필드가 문서에 그대로 들어옵니다. 이를 금지할 수는 있지만
-      // (additionalProperties: false), 그러면 새 필드마다 규칙을 고쳐야 하고,
-      // 매번 사소한 일에도 스키마 마이그레이션으로 되돌아갑니다. 어디에 선을 그을지는
-      // 당신의 결정이며, 그것은 언제나 타협입니다.
+      // Requirements for individual fields. A field not listed here is not checked
+      // at all — an unknown field will pass into the document. You can forbid this
+      // (additionalProperties: false), but then every new field will require editing
+      // the rule, and you are back to migrating the schema at every sneeze. Where to draw the line —
+      // is your decision, and it is always a compromise.
       properties: {
-        // 통행증 종류 — 열거된 네 값 중 오직 하나. 다섯 번째 종류는 이 규칙을
-        // 바꿔야 하며, 그것은 좋은 일입니다: 변경이 의식적인 것이 됩니다.
+        // The pass type — only one of the four listed values. A fifth type
+        // will require changing this rule, and that is good: the change becomes deliberate.
         type: {
-          enum: ["1회용", "주간", "차량", "단체"],
-          description: "통행증 종류, 허용된 목록에서만"
+          enum: ["single-use", "weekly", "vehicle", "group"],
+          description: "pass type, from the allowed list only"
         },
-        // 어느 직원이 통행증을 요청했는가. 필수 필드이며 문자열이어야 합니다.
+        // Which employee ordered the pass. The field is required, and it must be
+        // a string.
         host: {
           bsonType: "string",
-          description: "어느 직원이 요청했는가"
+          description: "which employee placed the order"
         },
-        // guest는 properties에는 있지만 required에는 없습니다: 필드가 문서에 있으면
-        // 문자열이어야 하고, 없으면 그래도 문서는 유효합니다.
+        // guest is in properties but not in required: if the field is present in the document,
+        // it must be a string; if it is absent — the document is still valid.
         guest: {
           bsonType: "string"
         },
-        // 규칙은 중첩된 객체 안에서도 작동합니다. car 필드가 없으면 — 아무 요구도
-        // 없습니다. 있으면 — 객체여야 하며, 그 안의 차량 번호는 필수이고, 트레일러는
-        // 지정된 경우 문자열 «아니요»가 아니라 논리값이어야 합니다.
+        // Rules also work inside nested objects. There is no car field — no
+        // requirements. If there is one — it must be an object, and the car plate in it
+        // is required, while the trailer, if specified, is a boolean, not the string
+        // «no».
         car: {
           bsonType: "object",
           required: ["plate"],
@@ -68,8 +71,8 @@ db.runCommand({
             weight_kg: { bsonType: ["int", "long", "double"] }
           }
         },
-        // 목록 안에서도 마찬가지입니다. items는 참가자 목록의 각 요소가 어떠해야
-        // 하는지를 기술합니다: 이름은 필수, 나이는 — 지정된 경우 — 정수.
+        // And inside lists. items describes what each element of the
+        // members list must be: name is required, age — if specified — an integer.
         members: {
           bsonType: "array",
           items: {
@@ -84,17 +87,18 @@ db.runCommand({
       }
     }
   },
-  // strict — 모든 삽입과 모든 변경을 검사. 더 부드러운 moderate 옵션은 새 문서와
-  // 이미 규칙에 맞는 문서에 대한 수정을 검사하고, 오래된 뒤섞임은 그대로 둡니다.
-  // 이미 쓰레기가 쌓인 컬렉션에서 검증을 켤 때 바로 moderate로 시작합니다: 먼저
-  // 더 나빠지는 것을 멈추고, 그다음 오래된 것을 고치고, 그다음 strict로 넘어갑니다.
+  // strict — check all inserts and all changes. The softer moderate option
+  // checks new documents and edits to those that already match the rule, and leaves the old
+  // mishmash alone. It is precisely with moderate that you enable validation on a collection
+  // that has already accumulated junk: first we stop making it worse, then we fix
+  // the old, then we switch to strict.
   validationLevel: "strict",
-  // error — 부적합한 문서를 거부. warn 옵션은 로그에 남기고도 여전히 받아들입니다:
-  // 거부를 켜서 누군가의 작동 중인 코드를 깨뜨리기 전에, 무엇이 들어오는지 일주일쯤
-  // 지켜보는 데 적합합니다.
+  // error — reject an unsuitable document. The warn option logs it and still
+  // accepts: good for watching for a week what comes in, before turning on
+  // rejection and breaking someone's working code.
   validationAction: "error"
 });
 
-// runCommand는 성공이 { ok: 1 }처럼 보이는 객체로 응답합니다. 파일 적용 결과가 한눈에
-// 읽히도록 우리만의 줄을 출력합니다.
-print("규칙이 설치됨");
+// runCommand replies with an object in which success looks like { ok: 1 }. We print
+// our own line so the result of applying the file reads at a glance.
+print("rule installed");

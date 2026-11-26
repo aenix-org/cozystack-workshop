@@ -144,12 +144,12 @@ Deployment यह सुनिश्चित करता है कि चल 
 **इसे लागू करें।**
 
 ```bash
-# KUBECONFIG kubectl को बताता है कि किस क्लस्टर से बात करनी है। यहाँ यह लैब 0 वाला lab क्लस्टर है;
-# टेनेंट की ज़रूरत बाद में पड़ेगी, उस स्टेप पर जहाँ हम स्टोर ऑर्डर करते हैं।
+# KUBECONFIG tells kubectl which cluster to talk to. Here it's the lab cluster
+# from Lab 0; the tenant will be needed later, at the step where we order the store.
 export KUBECONFIG=~/lab.kubeconfig
 cd labs/08-openbao
-# apply = "क्लस्टर को फ़ाइल में बताए गए रूप में ले आओ"। -f = विवरण फ़ाइल से लो।
-# इस नाम का कोई ऑब्जेक्ट अभी मौजूद नहीं है, तो वह बनाया जाएगा।
+# apply = "bring the cluster to what's described in the file". -f = take the description from the file.
+# No object with this name exists yet, so it will be created.
 kubectl apply -f secrets-demo-naive.yaml
 ```
 
@@ -158,16 +158,16 @@ kubectl apply -f secrets-demo-naive.yaml
 आइए देखें हमें क्या मिला:
 
 ```bash
-# logs = दिखाओ कि एप्लिकेशन ने अपने आउटपुट में क्या छापा। कोई अलग लॉग फ़ाइल नहीं है।
-#   deploy/secrets-demo  इस विवरण से उठाए गए Pod का आउटपुट लो
-#   --tail=2             सिर्फ़ आख़िरी दो पंक्तियाँ, स्टार्टअप के बाद का सब कुछ नहीं
+# logs = show what the application printed to its output. There's no separate log file.
+#   deploy/secrets-demo  take the output from the Pod brought up by this description
+#   --tail=2             only the last two lines, not everything since startup
 kubectl logs deploy/secrets-demo --tail=2
 ```
 
 **आपको क्या दिखना चाहिए** — कुछ ऐसा:
 
 ```
-08:14:31 passes-db.internal से passes_app के रूप में जुड़ रहा हूँ, पासवर्ड फ़िंगरप्रिंट sha256:a609df223d57
+08:14:31 connecting to passes-db.internal as passes_app, password fingerprint sha256:a609df223d57
 ```
 
 एप्लिकेशन काम करता है। पासवर्ड एक फ़ाइल में है, फ़ाइल Git में है। यह ठीक वही स्थिति है जो ऑडिट को मिली।
@@ -219,16 +219,16 @@ data:
 **इसे लागू करें।**
 
 ```bash
-# वही apply। फ़ाइल में दो ऑब्जेक्ट हैं — एक Secret और बदला हुआ Deployment; क्लस्टर बताए गए रूप की
-# अपने पास पहले से मौजूद के साथ तुलना करेगा और दोनों को मेल में ले आएगा।
+# The same apply. The file holds two objects — a Secret and the changed Deployment; the cluster will
+# compare what's described against what it already has and bring the two into line.
 kubectl apply -f secrets-demo-secret.yaml
 ```
 
 आइए पुष्टि करें कि एप्लिकेशन अब भी काम करता है:
 
 ```bash
-# rollout status तब तक रुकता है जब तक एप्लिकेशन का नया संस्करण पुराने की पूरी तरह जगह नहीं ले लेता, और तभी
-# नियंत्रण लौटाता है। इसके बिना आप पुराने Pod के लॉग पढ़ सकते हैं।
+# rollout status waits until the new version of the application has fully replaced the old one, and only
+# then returns control. Without it you might read the logs of the old Pod.
 kubectl rollout status deploy/secrets-demo
 kubectl logs deploy/secrets-demo --tail=2
 ```
@@ -243,8 +243,8 @@ kubectl logs deploy/secrets-demo --tail=2
 अपने आप को समझाने की कोशिश करें कि अब सब ठीक है। क्लस्टर से पूछें कि सीक्रेट के अंदर क्या है:
 
 ```bash
-# get … -o yaml = "ऑब्जेक्ट को पूरा दिखाओ, ठीक वैसे जैसे क्लस्टर उसे रखता है"।
-# data फ़ील्ड देखें — वही सीक्रेट की सामग्री है।
+# get … -o yaml = "show the object in full, exactly as the cluster stores it".
+# Look at the data field — that's the secret's contents.
 kubectl get secret passes-db -o yaml
 ```
 
@@ -253,10 +253,10 @@ kubectl get secret passes-db -o yaml
 अब एक कमांड:
 
 ```bash
-#   -o jsonpath='{.data.password}'  ऑब्जेक्ट में से ठीक एक फ़ील्ड निकालो, बिना आवरण के
-#   | base64 -d                     उसे आगे भेजो और डिकोड करो: d = decode
-#   ; echo                          अंत में एक नई पंक्ति छापो, वरना नतीजा अगले
-#                                   टर्मिनल प्रॉम्प्ट से चिपक जाएगा
+#   -o jsonpath='{.data.password}'  pull exactly one field out of the object, without the wrapper
+#   | base64 -d                     pass it along and decode it: d = decode
+#   ; echo                          print a trailing newline, otherwise the result runs into
+#                                   the next terminal prompt
 kubectl get secret passes-db -o jsonpath='{.data.password}' | base64 -d; echo
 ```
 
@@ -358,8 +358,8 @@ spec:
 यह फ़ाइल **lab क्लस्टर में नहीं** बल्कि टेनेंट में लागू की जाती है:
 
 ```bash
-# --kubeconfig ऐक्सेस फ़ाइल को स्पष्ट रूप से नाम देता है और KUBECONFIG वैरिएबल को ओवरराइड करता है।
-# तो ऑर्डर प्रबंधन क्लस्टर पर टेनेंट में जाता है, lab क्लस्टर में नहीं।
+# --kubeconfig names the access file explicitly and overrides the KUBECONFIG variable.
+# So the order goes to the tenant on the management cluster, not to the lab cluster.
 kubectl --kubeconfig ~/.kube/workshop apply -f openbao.yaml
 ```
 
@@ -402,20 +402,20 @@ openbao-secrets.tenant-workshopXX.svc.cozy.local:8200
 लैपटॉप पर इंस्टॉल नहीं करना पड़ेगा। अपना टेनेंट नंबर डालें:
 
 ```bash
-# run दी गई इमेज से एक अकेला Pod बनाता है — क्लस्टर के भीतर एक इस्तेमाल-कर-फेंको छोटी मशीन।
-#   --image          सामग्री कहाँ से लेनी है: bao यूटिलिटी वाली आधिकारिक OpenBao इमेज
-#   --restart=Never  अंदर की कमांड ख़त्म होने पर इसे दोबारा मत उठाओ
-#   --env            Pod का एनवायरनमेंट वैरिएबल: उसके अंदर की कोई भी कमांड इसे देखेगी
-#   --command --     दो डैश के बाद जो कुछ है वह वही कमांड है जो Pod चलाएगा
-# sleep 86400 = "एक दिन तक कुछ मत करो": हमें Pod सिर्फ़ एक कार्यक्षेत्र के रूप में चाहिए।
+# run creates a single Pod from the given image — a disposable little machine inside the cluster.
+#   --image          where to take the contents from: the official OpenBao image with the bao utility
+#   --restart=Never  don't bring it up again once the command inside finishes
+#   --env            the Pod's environment variable: any command inside it will see it
+#   --command --     everything after the two dashes is the command the Pod will run
+# sleep 86400 = "do nothing for a day": we need the Pod only as a workspace.
 kubectl run bao-workbench \
   --image=openbao/openbao:2.5.1 \
   --restart=Never \
   --env=BAO_ADDR=http://openbao-secrets.tenant-workshopXX.svc.cozy.local:8200 \
   --command -- sleep 86400
-# wait टर्मिनल को तब तक थामे रखता है जब तक शर्त पूरी न हो।
-#   --for=condition=Ready  Pod शुरू हो चुका है और कमांड लेने को तैयार है
-#   --timeout=120s         दो मिनट बाद हार मानो और एक त्रुटि लौटाओ
+# wait holds the terminal until the condition is met.
+#   --for=condition=Ready  the Pod has started and is ready to accept commands
+#   --timeout=120s         give up after two minutes and return an error
 kubectl wait --for=condition=Ready pod/bao-workbench --timeout=120s
 ```
 
@@ -428,9 +428,9 @@ Pod एक इस्तेमाल-कर-फेंको कार्यशा
 आइए जाँचें कि lab क्लस्टर से टेनेंट दिखता है:
 
 ```bash
-# exec = पहले से चल रहे Pod के अंदर एक कमांड चलाओ; कमांड ख़ुद -- के बाद आती है।
-# bao status स्टोर से उसकी अवस्था पूछता है: क्या वह sealed है, क्या वह इनिशियलाइज़्ड है।
-# यहाँ यह एक कनेक्टिविटी जाँच का भी काम करता है: जवाब आया ही — यानी टेनेंट दिखता है।
+# exec = run a command inside an already-running Pod; the command itself comes after --.
+# bao status asks the store about its state: whether it's sealed, whether it's initialized.
+# Here it doubles as a connectivity check: a reply arrived at all — so the tenant is visible.
 kubectl exec bao-workbench -- bao status
 ```
 
@@ -457,7 +457,7 @@ Storage Type       file
 ⚠️ **अगर कमांड `connection refused`, `no such host`, या `i/o timeout` के साथ विफल हो —**
 आगे बढ़ने का कोई मतलब नहीं; पहले कनेक्टिविटी। सामान्य कारण, घटती संभावना के क्रम में:
 आपने `workshopXX` की जगह अपना नंबर नहीं डाला; डैशबोर्ड में एप्लिकेशन अभी तैयार नहीं है; नाम में एक टाइपो।
-नाम इस नियम से बनता है `openbao-<एप्लिकेशन का नाम>`: आपने एप्लिकेशन को `secrets` नाम दिया, इसलिए पते में
+नाम इस नियम से बनता है `openbao-<application name>`: आपने एप्लिकेशन को `secrets` नाम दिया, इसलिए पते में
 `openbao-secrets` है, `secrets` नहीं।
 
 ## एक अपेक्षित विफलता · स्टोर सेवा देने से इनकार करता है
@@ -465,9 +465,9 @@ Storage Type       file
 कनेक्टिविटी है, तो हम पासवर्ड सहेज सकते हैं। आज़माएँ:
 
 ```bash
-# bao kv put = स्टोर में एक रिकॉर्ड रखो।
-#   secret/passes/db  वह पाथ जहाँ यह रहेगा
-#   password=…        रिकॉर्ड की सामग्री: एक "फ़ील्ड नाम = मान" जोड़ा
+# bao kv put = place a record in the store.
+#   secret/passes/db  the path where it will live
+#   password=…        the record's contents: a "field name = value" pair
 kubectl exec bao-workbench -- bao kv put secret/passes/db password=Propusk2026
 ```
 
@@ -527,10 +527,10 @@ OpenBao फिर से sealed हो जाता है।** कोई नो
 के साथ हमें थमाएगा। यह दोबारा कभी नहीं होगा — कुंजियाँ ठीक एक बार दिखाई जाती हैं।
 
 ```bash
-# operator init स्टोर के जीवन में एक बार चलता है: यह मास्टर कुंजी बनाता है और
-# उसके हिस्सों को एक root टोकन के साथ छापता है। ये मान दोबारा कोई नहीं दिखाएगा।
-#   -key-shares=1     मास्टर कुंजी को कितने हिस्सों में काटना है
-#   -key-threshold=1  उसे दोबारा जोड़ने के लिए कितने हिस्से पेश करने होंगे
+# operator init runs once in the life of the store: it creates the master key and prints
+# its shares together with a root token. No one will show these values again.
+#   -key-shares=1     how many shares to cut the master key into
+#   -key-threshold=1  how many shares must be presented to reassemble it
 kubectl exec bao-workbench -- bao operator init -key-shares=1 -key-threshold=1
 ```
 
@@ -573,10 +573,10 @@ Initial Root Token: s.7Yx…
 इसे unseal करें। अपनी unseal कुंजी डालें:
 
 ```bash
-# unseal स्टोर को मास्टर कुंजी का एक हिस्सा थमाता है। जब हिस्से थ्रेशोल्ड तक पहुँच जाते हैं,
-# कुंजी प्रोसेस की मेमोरी में आ जाती है और स्टोर अनुरोधों की सेवा शुरू कर देता है।
-kubectl exec bao-workbench -- bao operator unseal <आपकी-unseal-कुंजी>
-# बदली हुई अवस्था देखने के लिए हम status दोहराते हैं।
+# unseal hands the store one share of the master key. Once the shares reach the threshold,
+# the key ends up in the process's memory and the store starts serving requests.
+kubectl exec bao-workbench -- bao operator unseal <your-unseal-key>
+# We repeat status to see the changed state.
 kubectl exec bao-workbench -- bao status
 ```
 
@@ -585,9 +585,9 @@ kubectl exec bao-workbench -- bao status
 अब हम root टोकन से लॉगिन करते हैं। यह वर्किंग Pod के भीतर याद रह जाएगा, और आगे की कमांड टोकन नहीं पूछेंगी:
 
 ```bash
-# login दर्ज किए टोकन को Pod के भीतर एक फ़ाइल में एक प्रविष्टि से बदल देता है — फिर यूटिलिटी टोकन को
-# वहीं से ख़ुद लेती है, और आपको उसे हर कमांड में टाइप नहीं करना पड़ता।
-# -it Pod को एक टर्मिनल देता है: उसके बिना यूटिलिटी के पास अपना प्रॉम्प्ट छापने की जगह नहीं और इनपुट लेने की जगह नहीं।
+# login exchanges the entered token for an entry in a file inside the Pod — from then on the utility
+# takes the token from there itself, and you won't have to type it into every command.
+# -it gives the Pod a terminal: without it the utility has nowhere to print its prompt and nowhere to take input.
 kubectl exec -it bao-workbench -- bao login
 ```
 
@@ -596,7 +596,7 @@ Initial Root Token पेस्ट करें।
 
 ⚠️ **अगर `bao login` शिकायत करे कि वह टोकन फ़ाइल नहीं लिख सकता**, तो टोकन को हर कमांड में एक
 एनवायरनमेंट वैरिएबल के रूप में पास करें:
-`kubectl exec bao-workbench -- env BAO_TOKEN='आपका-टोकन' bao status`।
+`kubectl exec bao-workbench -- env BAO_TOKEN='your-token' bao status`।
 यह काम करता है, पर टोकन आपके कमांड इतिहास में चला जाता है — लैब में सहनीय, प्रोडक्शन में नहीं।
 
 ## स्टेप 6. इंजन चालू करें और पासवर्ड सहेजें
@@ -607,9 +607,9 @@ Initial Root Token पेस्ट करें।
 जाते हैं।
 
 ```bash
-# secrets enable एक इंजन चालू करता है — स्टोर का एक हिस्सा जो एक तरह का काम जानता है।
-#   -path=secret  उसे किस पाथ पर टाँगना है: यहाँ से आगे सब कुछ secret/… के रूप में लिखा जाता है
-#   kv-v2         ठीक कौन-सा इंजन: वर्शन इतिहास वाला "की-वैल्यू"
+# secrets enable turns on an engine — a part of the store that knows one kind of work.
+#   -path=secret  which path to hang it on: from here on everything is written as secret/…
+#   kv-v2         which engine exactly: "key-value" with version history
 kubectl exec bao-workbench -- bao secrets enable -path=secret kv-v2
 ```
 
@@ -638,8 +638,8 @@ OpenBao एक अकेला स्टोर नहीं, बल्कि इ
 पासवर्ड सहेजें:
 
 ```bash
-# kv put एक पूरा नया वर्शन लिखता है: सूचीबद्ध फ़ील्ड उसकी सामग्री बन जाते हैं।
-# फ़ील्ड कितने भी हो सकते हैं; यहाँ दो हैं — पासवर्ड और डेटाबेस उपयोगकर्ता नाम।
+# kv put writes a whole new version: the listed fields become its contents.
+# There can be any number of fields; here there are two — the password and the database username.
 kubectl exec bao-workbench -- \
   bao kv put secret/passes/db password=Propusk2026 username=passes_app
 ```
@@ -649,8 +649,8 @@ kubectl exec bao-workbench -- \
 आइए जाँचें कि यह वापस पढ़ा जाता है:
 
 ```bash
-# kv get रिकॉर्ड पढ़ता है और उसके फ़ील्डों को एक टेबल के रूप में छापता है। हम अब भी root टोकन से पढ़ रहे हैं — यानी,
-# हम जाँच रहे हैं कि रिकॉर्ड पहुँचा, न कि यह कि एप्लिकेशन के पास पर्याप्त अनुमतियाँ होंगी।
+# kv get reads the record and prints its fields as a table. We're still reading with the root token — that is,
+# we're checking that the record landed, not that the application will have enough permissions.
 kubectl exec bao-workbench -- bao kv get secret/passes/db
 ```
 
@@ -664,11 +664,11 @@ kubectl exec bao-workbench -- bao kv get secret/passes/db
 आइए एक पॉलिसी लिखें:
 
 ```bash
-# policy write स्टोर में अनुमतियों की एक नामित सूची सहेजता है।
-#   passes-read  पॉलिसी का नाम; बाद में इसी नाम से यह किसी टोकन को दी जाती है
-#   -            पॉलिसी टेक्स्ट किसी फ़ाइल से नहीं, बल्कि स्टैंडर्ड इनपुट से लो
-#   -i           kubectl exec में: उस इनपुट को Pod में आगे भेजो
-# <<'HCL' … HCL बहु-पंक्ति टेक्स्ट को बिना किसी फ़ाइल के सीधे कमांड में पास करने का एक तरीका है।
+# policy write saves a named list of permissions in the store.
+#   passes-read  the policy's name; it's later granted to a token by this name
+#   -            take the policy text from standard input rather than from a file
+#   -i           in kubectl exec: forward that input into the Pod
+# <<'HCL' … HCL is a way to pass multi-line text straight into the command, without a file.
 kubectl exec -i bao-workbench -- bao policy write passes-read - <<'HCL'
 path "secret/data/passes/db" {
   capabilities = ["read"]
@@ -712,11 +712,11 @@ path "secret/data/passes/db" {
 इस पॉलिसी के साथ एक टोकन जारी करें:
 
 ```bash
-# token create एक नया टोकन जारी करता है और उससे अनुमतियों का एक सेट बाँध देता है।
-#   -policy=passes-read  कौन-सी अनुमतियाँ: ऊपर लिखी पॉलिसी
-#   -ttl=24h             आयु; एक दिन बाद टोकन अपने आप काम करना बंद कर देता है
-#   -field=token         सिर्फ़ टोकन मान छापो, उसके इर्द-गिर्द टेबल के बिना —
-#                        ताकि उसे कॉपी करके आगे पास करना आसान हो
+# token create issues a new token and binds a set of permissions to it.
+#   -policy=passes-read  which permissions: the policy written above
+#   -ttl=24h             lifetime; after a day the token stops working on its own
+#   -field=token         print only the token value, without the table around it —
+#                        that way it's easy to copy and pass along
 kubectl exec bao-workbench -- \
   bao token create -policy=passes-read -ttl=24h -field=token
 ```
@@ -736,12 +736,12 @@ kubectl exec bao-workbench -- \
 कुछ है।
 
 ```bash
-# create secret generic डिस्क पर किसी फ़ाइल को छोड़कर, सीधे क्लस्टर में एक Secret ऑब्जेक्ट बनाता है।
-#   passes-bao-token      ऑब्जेक्ट का नाम; एप्लिकेशन का विवरण इसी नाम से सीक्रेट का संदर्भ देगा
-#   --from-literal=name=…  मान को कमांड लाइन से एक स्ट्रिंग के रूप में सेट करो
-#                          (एक --from-file भी है, जब मान किसी फ़ाइल में हो)
+# create secret generic creates a Secret object directly in the cluster, bypassing a file on disk.
+#   passes-bao-token      the object's name; the application's description will reference the secret by it
+#   --from-literal=name=…  set the value as a string from the command line
+#                          (there's also --from-file, when the value is in a file)
 kubectl create secret generic passes-bao-token \
-  --from-literal=token='पिछले-स्टेप-का-टोकन-यहाँ-पेस्ट-करें'
+  --from-literal=token='paste-the-token-from-the-previous-step'
 ```
 
 **ध्यान दें: एक कमांड, कोई फ़ाइल नहीं।** टोकन सीधे क्लस्टर में बनता है और Git में कभी नहीं पहुँचता —
@@ -785,12 +785,12 @@ kubectl create secret generic passes-bao-token \
 अब हम साफ़ मैनिफ़ेस्ट लागू करते हैं। पहले, अपना टेनेंट नंबर डालें:
 
 ```bash
-# sed टेक्स्ट को इस पैटर्न से संपादित करता है s/क्या-बदलना-है/किससे/g; g = पंक्ति की हर जगह पर,
-# सिर्फ़ पहली पर नहीं। -i का मतलब है "फ़ाइल को ही संपादित करो", नतीजा स्क्रीन पर
-# छापने के बजाय। उदाहरण के workshop03 की जगह, अपना नंबर डालें।
+# sed edits text by the pattern s/what-to-replace/with-what/g; g = in every place on the line,
+# not just the first. -i means "edit the file itself" rather than print the result
+# to the screen. In place of workshop03 from the example, substitute your own number.
 
-# macOS: -i के बाद ख़ाली उद्धरण अनिवार्य हैं — वरना sed अगले शब्द को
-# बैकअप-फ़ाइल एक्सटेंशन मान लेगा और कुछ नहीं बदलेगा
+# macOS: the empty quotes after -i are mandatory — otherwise sed will take the next word
+# as a backup-file extension and replace nothing
 sed -i '' 's/tenant-workshopXX/tenant-workshop03/g' secrets-demo.yaml
 # Linux
 sed -i 's/tenant-workshopXX/tenant-workshop03/g' secrets-demo.yaml
@@ -878,8 +878,8 @@ base64 में, न किसी ऐसे ऑब्जेक्ट के स
 
 ```bash
 kubectl apply -f secrets-demo.yaml
-# हम तब तक रुकते हैं जब तक नया संस्करण पुराने की पूरी तरह जगह नहीं ले लेता। अगर init कंटेनर पासवर्ड
-# नहीं ला सका, तो प्रतीक्षा पूरी नहीं होगी — और यही वह व्यवहार है जो हम चाहते हैं।
+# We wait until the new version has fully replaced the old one. If the init container can't fetch
+# the password, the wait won't finish — and that's exactly the behavior we want.
 kubectl rollout status deploy/secrets-demo
 ```
 
@@ -890,21 +890,21 @@ kubectl rollout status deploy/secrets-demo
 पहले देखें कि init कंटेनर ने क्या कहा:
 
 ```bash
-# -c Pod के भीतर एक कंटेनर चुनता है। यहाँ दो हैं, और -c के बिना kubectl अंदाज़ा नहीं लगा सकता कि आपका
-# मतलब किससे है। fetch-secret वह है जो एप्लिकेशन के शुरू होने से पहले चला।
+# -c selects a container inside the Pod. There are two here, and without -c kubectl can't guess which
+# one you mean. fetch-secret is the one that ran before the application started.
 kubectl logs deploy/secrets-demo -c fetch-secret
 ```
 
 **आपको क्या दिखना चाहिए:**
 
 ```
-पासवर्ड OpenBao से लिया गया, मैनिफ़ेस्ट में मौजूद नहीं
+password fetched from OpenBao, not present in the manifest
 ```
 
 अब ख़ुद सर्विस:
 
 ```bash
-# मुख्य कंटेनर: यह वह फ़ाइल पढ़ता है जो init कंटेनर ने रखी।
+# The main container: it reads the file the init container placed.
 kubectl logs deploy/secrets-demo -c app --tail=2
 ```
 
@@ -914,8 +914,8 @@ kubectl logs deploy/secrets-demo -c app --tail=2
 आइए भोले सीक्रेट को हटाएँ; अब उसकी ज़रूरत नहीं और वह बस रास्ते में आता है:
 
 ```bash
-# delete ऑब्जेक्ट को क्लस्टर से हटा देता है। एप्लिकेशन अब उसका संदर्भ नहीं देता,
-# इसलिए विलोपन कुछ नहीं तोड़ेगा।
+# delete removes the object from the cluster. The application no longer references it,
+# so the deletion won't break anything.
 kubectl delete secret passes-db
 ```
 
@@ -929,14 +929,14 @@ kubectl delete secret passes-db
 अब:
 
 ```bash
-# वही kv put। रिकॉर्ड का पिछला वर्शन मिटता नहीं — उसके बग़ल में एक दूसरा प्रकट हो जाता है।
+# The same kv put. The previous version of the record isn't erased — a second one appears alongside it.
 kubectl exec bao-workbench -- \
-  bao kv put secret/passes/db password=Propusk2026-शरद username=passes_app
-# rollout restart एप्लिकेशन के Pods को उसके विवरण की एक भी पंक्ति बदले बिना दोबारा बनाता है।
-# यह सब इसी के लिए था: नया पासवर्ड अगले स्टार्ट पर उठा लिया जाता है।
+  bao kv put secret/passes/db password=Propusk2026-autumn username=passes_app
+# rollout restart recreates the application's Pods without changing a single line in its description.
+# This is what it was all for: the new password is picked up on the next start.
 kubectl rollout restart deploy/secrets-demo
 kubectl rollout status deploy/secrets-demo
-# लॉग में फ़िंगरप्रिंट दिखाएगा कि पासवर्ड बदला, बिना पासवर्ड ख़ुद दिखाए।
+# The fingerprint in the log will show that the password changed, without showing the password itself.
 kubectl logs deploy/secrets-demo -c app --tail=2
 ```
 
@@ -950,8 +950,8 @@ kubectl logs deploy/secrets-demo -c app --tail=2
 आइए इतिहास देखें:
 
 ```bash
-# kv metadata get मान नहीं, बल्कि रिकॉर्ड के वर्शनों के बारे में जानकारी दिखाता है: कितने हैं,
-# हर एक कब बना, और अभी कौन-सा वर्तमान है।
+# kv metadata get shows not the values but information about the record's versions: how many there are,
+# when each was created, and which is current now.
 kubectl exec bao-workbench -- bao kv metadata get secret/passes/db
 ```
 
@@ -961,7 +961,7 @@ kubectl exec bao-workbench -- bao kv metadata get secret/passes/db
 आप पिछला मान पूरा भी पढ़ सकते हैं:
 
 ```bash
-# -version=1 वर्तमान के बजाय पहला लिखा गया वर्शन पढ़ता है।
+# -version=1 reads the first version written instead of the current one.
 kubectl exec bao-workbench -- bao kv get -version=1 secret/passes/db
 ```
 
@@ -976,12 +976,12 @@ kubectl exec bao-workbench -- bao kv get -version=1 secret/passes/db
 ऑडिटर की दूसरी माँग — "मुझे दिखाइए कि पासवर्ड किसने पढ़ा।" आइए लॉग चालू करें:
 
 ```bash
-# audit enable एक ऑडिट डिवाइस चालू करता है।
-#   file              डिवाइस का प्रकार: रिकॉर्ड को टेक्स्ट के रूप में लिखो
-#   file_path=stdout  डिस्क पर किसी फ़ाइल के बजाय — Pod के स्टैंडर्ड आउटपुट पर, जहाँ से
-#                     प्लेटफ़ॉर्म लॉग इकट्ठा करता है
+# audit enable turns on an audit device.
+#   file              the device type: write records as text
+#   file_path=stdout  instead of a file on disk — to the Pod's standard output, from where
+#                     the platform collects the logs
 kubectl exec bao-workbench -- bao audit enable file file_path=stdout
-# audit list चालू डिवाइसों की सूची देता है — एक जाँच कि ऊपर की कमांड चली।
+# audit list lists the enabled devices — a check that the command above went through.
 kubectl exec bao-workbench -- bao audit list
 ```
 
@@ -1023,11 +1023,11 @@ kubectl exec bao-workbench -- bao audit list
 
 ```bash
 cd labs/08-openbao
-# स्क्रिप्ट इन तीन एनवायरनमेंट वैरिएबलों को पढ़ती है, इसलिए आपको इन्हें चलाने से पहले और उसी
-# टर्मिनल विंडो में सेट करना होगा।
-export KUBECONFIG=~/lab.kubeconfig     # किस क्लस्टर की जाँच करनी है
-export COZY_TENANT=workshop03          # आपका टेनेंट नंबर
-export BAO_TOKEN='आपका-रूट-टोकन'       # वही जो bao operator init ने छापा था
+# The script reads these three environment variables, so you must set them before running it
+# and in the same terminal window.
+export KUBECONFIG=~/lab.kubeconfig     # which cluster to check
+export COZY_TENANT=workshop03          # your tenant number
+export BAO_TOKEN='your-root-token'     # the one bao operator init printed
 ./check.sh
 ```
 
@@ -1044,9 +1044,9 @@ export BAO_TOKEN='आपका-रूट-टोकन'       # वही जो 
 ## सफ़ाई
 
 ```bash
-# delete -f = "इस फ़ाइल में बताई गई हर चीज़ को क्लस्टर से हटाओ"।
+# delete -f = "remove from the cluster everything described in this file".
 kubectl delete -f secrets-demo.yaml
-# जो किसी फ़ाइल के बजाय किसी कमांड से बनाया गया था, उसे नाम से मिटाया जाता है।
+# What was created by a command rather than a file is deleted by name.
 kubectl delete secret passes-bao-token
 kubectl delete pod bao-workbench
 ```

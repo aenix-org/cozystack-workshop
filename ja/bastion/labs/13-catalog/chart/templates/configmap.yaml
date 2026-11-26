@@ -1,20 +1,20 @@
-# ラボ 13。ConfigMap テンプレート: 「パス」ページと nginx の設定。
+# Lab 13. ConfigMap template: the "Passes" page and nginx configuration.
 #
-# ConfigMap はテキストファイルを保持し、Pod に配信する。ページはイメージの中ではなく
-# ここに置かれており、再ビルドせずにテキストを変更できる: greeting の値はレンダリング時に
-# 差し込まれ、リリースを更新するだけで済む。
+# The ConfigMap stores text files and serves them to the pods. The page lives here rather than
+# inside the image, so the text can be changed without a rebuild: the greeting value is substituted
+# at render time, and it is enough to update the release.
 #
-# 差し込みは `|` ブロックの中でも機能する: Helm はテンプレートファイルを単なるテキストとして
-# 処理し、YAML の構造については何も知らない。詳細は templates/deployment.yaml を参照。
+# Substitution works inside `|` blocks too: Helm processes the template file as plain
+# text and knows nothing about the YAML structure. See templates/deployment.yaml for details.
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ .Release.Name }}
-# data 内のキーはファイル名であり、`|` の下にあるものはその全内容である。
-# 各キーは個別のファイルとしてコンテナにマウントされる。Deployment の volumeMounts を参照。
+# Keys in data are file names, and what is under `|` is their entire contents.
+# Each key is mounted into the container as a separate file, see volumeMounts in the Deployment.
 data:
-  # 従業員が目にするページ。ここには 2 つの値が入る: 注文フォームの greeting と
-  # リリース名 — 開いたページを見れば誰の注文かが分かるようにするため。
+  # The page the employee will see. Two values land here: greeting from the order
+  # form and the release name — so that the open page shows whose order it is.
   index.html: |
     <!doctype html>
     <html lang="en">
@@ -31,9 +31,9 @@ data:
     <p>Guest Pass service, release <b>{{ .Release.Name }}</b></p>
     <div class="pod">served by __POD__</div>
     </html>
-  # nginx の設定。sub_filter はページを配信する瞬間に __POD__ マーカーを Pod 名に置き換える:
-  # こうすることでどのコピーが応答したかがブラウザで分かる。/healthz への個別の応答は
-  # Deployment の readinessProbe が必要とする — まさにこのアドレスに問い合わせるからだ。
+  # nginx configuration. sub_filter replaces the __POD__ marker with the pod name at the moment the
+  # page is served: this way the browser shows which of the copies answered. A separate response on /healthz
+  # is needed by the readinessProbe from the Deployment — it queries exactly this address.
   default.conf: |
     server {
       listen 8080;

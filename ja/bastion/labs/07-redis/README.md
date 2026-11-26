@@ -55,7 +55,7 @@
 必要なファイルはすべて揃っています — リポジトリと一緒に受け取っています。作ったり打ち直したりするものは何もありません。以下で `kubectl apply -f name.yaml` と書いてある箇所のファイルは、すべてここにあります。
 
 ```bash
-# このラボのコマンドはすべてラボフォルダーから実行する — そこへ移動する
+# all commands in this lab run from the lab folder — switch into it
 cd labs/07-redis
 ```
 
@@ -143,15 +143,15 @@ tr.MaxIdleConnsPerHost = 64
 ```bash
 cd labs/07-redis
 
-# build = 「Dockerfile からイメージをビルドする」。
-#   --platform linux/amd64  どのプロセッサ向けにビルドするか。クラスターのノードは x86
-#   -t <host>/<project>/<name>:<tag>  結果に付ける名前。名前の先頭のレジストリホストが、
-#                           後で push が送る先になる
-#   app/                    ビルド元となる Dockerfile とソースのあるフォルダー
+# build = "build the image from the Dockerfile".
+#   --platform linux/amd64  which processor to build for; the cluster nodes are x86
+#   -t <host>/<project>/<name>:<tag>  what to name the result; the registry host at the
+#                           start of the name is where push will send it later
+#   app/                    the folder with the Dockerfile and sources to build from
 docker build --platform linux/amd64 -t harbor.workshop03.example.org/passes/passes-api:v2 app/
 
-# push = 「イメージをレジストリに送る」。アドレスはイメージ名の先頭部分から取られ、
-# 認証情報は前のラボで行った docker login から取られる。
+# push = "send the image to the registry". The address is taken from the first part of the
+# image name, the credentials — from the docker login you did in the previous lab.
 docker push harbor.workshop03.example.org/passes/passes-api:v2
 ```
 
@@ -164,26 +164,26 @@ docker push harbor.workshop03.example.org/passes/passes-api:v2
 どちらのマニフェストにも、レジストリのアドレスの代わりに `HARBOR-HOST` というプレースホルダーが入っています。`sed` がそれを置き換え、ファイルをその場で編集します。次に `apply` がファイルに記述された内容をクラスターに渡し、`rollout status` がコピーの起動を待ちます。
 
 ```bash
-# KUBECONFIG は kubectl にどのアクセスファイルを使うか伝える。ここで
-# あなたの `lab` クラスターに切り替える。ターミナルウィンドウを閉じるまで保持される。
+# KUBECONFIG tells kubectl which access file to use. We switch to
+# your `lab` cluster; it holds until you close the terminal window.
 export KUBECONFIG=~/lab.kubeconfig
 
-# sed -i = 「ファイルをその場で編集する」。
-#   's|old|new|g'  出現箇所をすべて置換。区切り文字に / でなく | を使うのは、
-#                  アドレスにスラッシュが含まれるため
-#   macOS 版の sed は -i の後に引数が必須。空のクォートは
-#   「バックアップを作らない」の意味。Linux ではその引数があってはならない。
-#   行末にファイルが2つある：sed は複数を一度に受け取り、1回で編集する。
+# sed -i = "edit the file in place".
+#   's|old|new|g'  replace every occurrence; the | separator is used instead of / because
+#                  the address contains slashes
+#   The macOS version of sed requires a mandatory argument after -i; empty quotes
+#   mean "don't make a backup". On Linux that argument must not be there.
+#   There are two files at the end of the line: sed accepts several at once and edits them in one pass.
 
 # Linux
 sed -i    's|HARBOR-HOST|harbor.workshop03.example.org|g' hr-legacy.yaml passes-api.yaml
 # macOS
 sed -i '' 's|HARBOR-HOST|harbor.workshop03.example.org|g' hr-legacy.yaml passes-api.yaml
 
-# apply = 「クラスターをファイルに記述された状態にする」。-f フラグは各ファイルごとに繰り返す。
+# apply = "bring the cluster to what's described in the files". The -f flag is repeated for each file.
 kubectl apply -f hr-legacy.yaml -f passes-api.yaml
 
-# rollout status はコピーの準備完了を待ち、自ら終了する。準備できなければエラーを返す
+# rollout status waits for the copies to be ready and exits on its own; if they don't, it returns an error
 kubectl rollout status deployment/hr-legacy
 kubectl rollout status deployment/passes-api
 ```
@@ -191,11 +191,11 @@ kubectl rollout status deployment/passes-api
 ⚠️ どちらのマニフェストも `harbor` Secret を参照しています — 前のラボの `imagePullSecret` そのものです。作っていないと、Pod は `ImagePullBackOff` になります。Secret を作るには：
 
 ```bash
-# create secret docker-registry = 「レジストリの認証情報を持つ Secret を作る」。
-# このような Secret は、kubelet がノードにイメージを pull するときに自分で読み取れる。
-#   harbor             クラスター内での Secret の名前 — 両方のマニフェストがこれを参照する
-#   --docker-server    この認証情報がどのレジストリ向けか
-#   --docker-username  誰でログインするか。--docker-password — Harbor 管理者のパスワード
+# create secret docker-registry = "create a Secret with registry credentials";
+# such a Secret can be read by the kubelet itself when it pulls the image onto a node.
+#   harbor             the Secret's name in the cluster — both manifests reference it
+#   --docker-server    which registry these credentials are for
+#   --docker-username  who logs in; --docker-password — the Harbor administrator password
 kubectl create secret docker-registry harbor \
   --docker-server=harbor.workshop03.example.org \
   --docker-username=admin --docker-password='YOUR-PASSWORD'
@@ -204,15 +204,15 @@ kubectl create secret docker-registry harbor \
 つながりが機能しているか確かめましょう。サービスはクラスターの内側からしか見えないので、リクエストもそこから出します。`curl` を持つ使い捨ての Pod を起動し、それが `passes-api` サービスに問い合わせ、答えを表示して消えます。
 
 ```bash
-# run probe = 「probe という名前の Pod を実行する」。
-#   --rm              終わったらすぐ Pod を削除する
-#   -i                その出力を我々に見せる
-#   --restart=Never   再起動しない：これは一回きりのコマンドで、常駐サービスではない
-#   --image=...       使うイメージ。バージョンを固定して新しいものが来ないようにする
-#   --quiet           サービス行を出さず、答えだけ表示する
-#   --                この2つのダッシュより後は Pod 内で実行されるコマンド
-# <service>.<namespace>.svc.cluster.local 形式のアドレスはサービスの内部名。
-# これによって Pod どうしはアドレスを知らずに互いを見つける。
+# run probe = "run a Pod named probe".
+#   --rm              delete the Pod as soon as it's done
+#   -i                show us its output
+#   --restart=Never   don't restart: this is a one-time command, not a permanent service
+#   --image=...       which image to use; the version is pinned so nothing new arrives
+#   --quiet           don't print service lines, only the answer
+#   --                everything after these two dashes is the command inside the Pod
+# An address of the form <service>.<namespace>.svc.cluster.local is the service's internal name;
+# by it the Pods find each other without knowing addresses.
 kubectl run probe --rm -i --restart=Never --image=curlimages/curl:8.11.1 --quiet -- \
   curl -s "http://passes-api.default.svc.cluster.local/employee?id=42"
 ```
@@ -235,7 +235,7 @@ kubectl run probe --rm -i --restart=Never --image=curlimages/curl:8.11.1 --quiet
 生成ツールをデプロイします。ふつうのアプリケーションと同じように起動し、サービスの隣でクラスター内に居続けます — そうすれば計測があなたのインターネットやトンネルに左右されません。
 
 ```bash
-# ファイルには2つのオブジェクトがある：生成ツール本体と、そのためのサービス
+# the file has two objects: the generator itself and a service for it
 kubectl apply -f fortio.yaml
 kubectl rollout status deployment/fortio
 ```
@@ -243,17 +243,17 @@ kubectl rollout status deployment/fortio
 さあ負荷をかけます。`kubectl exec` コマンドはすでに動いている Pod の中で何かを実行します — ここでは生成ツールの中で、生成ツール自身を砲撃モードで起動します。
 
 ```bash
-# exec deploy/fortio = このアプリケーションの Pod の中でコマンドを実行する
-#   --            境界：左が kubectl、右が Pod に入るコマンド
-#   fortio load   砲撃モード：リクエストを送って応答時間を計測する
-#   -qps 20       1秒あたり20リクエスト — ペースを決める、「全力で押す」ではない
-#   -t 20s        計測がどれだけ続くか
-#   -c 16         16本の並列接続。この数は適当ではない：
-#                 名簿は800ミリ秒で応答するので、1接続では1秒あたり
-#                 1リクエスト強しか処理できない。設定した毎秒20を保つには、
-#                 16本以上の接続が要る — さもないと Fortio は
-#                 レイテンシの壁にぶつかり、要求したペースを出せない。
-#   最後の引数は砲撃対象のアドレス
+# exec deploy/fortio = run a command inside this application's Pod
+#   --            the boundary: kubectl on the left, on the right the command that goes into the Pod
+#   fortio load   bombardment mode: send requests and measure the response time
+#   -qps 20       twenty requests per second — we set a pace, not "push as hard as we can"
+#   -t 20s        how long the measurement lasts
+#   -c 16         sixteen parallel connections. The number isn't arbitrary:
+#                 the directory answers in 800 ms, so one connection manages
+#                 a little more than one request per second. To hold the set 20 per
+#                 second, you need no fewer than sixteen connections — otherwise Fortio
+#                 will hit the latency wall and not deliver the requested pace.
+#   the last argument is the address we're bombarding
 kubectl exec deploy/fortio -- fortio load -qps 20 -t 20s -c 16 \
   "http://passes-api.default.svc.cluster.local/employee?id=42"
 ```
@@ -274,10 +274,10 @@ Code 200 : 400 (100.0 %)
 マウスで — これは Cozystack のダッシュボードではありません。あちらは管理クラスターを扱い、テナントのカタログエントリを表示しますが、あなたの `lab` クラスターの中は覗きません。生成ツール自身が独自のWebインターフェースを持っていて、トンネル経由でそこへ到達する必要があります。
 
 ```bash
-# port-forward svc/fortio = bastion からクラスター内の生成ツールのサービスへのトンネル
-#   8081:8080 — 左の数字は自分の bastion 上のポート、右はクラスター内のサービスのポート
-# ポート 8081 を使うのは、8080 が自分のマシンで他の何かに取られているかもしれないため。
-# ウィンドウを閉じないこと：トンネルはコマンドが動いている間だけ生きる。止めるには Ctrl+C。
+# port-forward svc/fortio = a tunnel from the bastion to the generator's service in the cluster
+#   8081:8080 — the left number is the port on your bastion, the right one the service port in the cluster
+# Port 8081 is used because 8080 might be taken by something else on your machine.
+# Don't close the window: the tunnel lives as long as the command runs. To stop it — Ctrl+C.
 kubectl port-forward svc/fortio 8081:8080
 ```
 
@@ -353,11 +353,11 @@ Redis は管理クラスター上のあなたのテナントに、アプリケ�
 どんなサービスが現れたか見てみましょう。
 
 ```bash
-# --kubeconfig はコマンドの中でアクセスファイルを指定する — 一度だけ、KUBECONFIG に触れずに。
-# こうすれば連続する2つのコマンドを、混乱せずに異なるクラスターへ宛てられる。
-#   -n tenant-workshopXX  あなたのテナントの namespace
-#   get svc               「サービスを表示する」 — Pod に裏打ちされた恒久的なアドレス
-#   | grep redis          出力のうち redis という語を含む行だけ残す
+# --kubeconfig sets the access file right in the command — just once, without touching KUBECONFIG.
+# This way two commands in a row can be addressed to different clusters without getting confused.
+#   -n tenant-workshopXX  the namespace of your tenant
+#   get svc               "show the services" — permanent addresses backed by Pods
+#   | grep redis          keep only the lines with the word redis in the output
 kubectl --kubeconfig ~/.kube/config -n tenant-workshopXX get svc | grep redis
 ```
 
@@ -390,13 +390,13 @@ rfrm-redis-cache.tenant-workshopXX.svc.cozy.local
 ```bash
 export KUBECONFIG=~/lab.kubeconfig
 
-# run redis-probe = redis-cli クライアントを持つ使い捨ての Pod：
-#   --rm --restart=Never  役目を果たして自分を削除する、再起動は不要
-#   -i --quiet            出力を我々に見せ、サービス行は出さない
-#   --env=REDISCLI_AUTH   パスワードは引数ではなく環境変数として Pod に入る
-#   --                    このダッシュより右が Pod に入るコマンド
-#   redis-cli -h <name>   どのサーバーに接続するか。名前はあの完全なもの
-#   ping                  短い「生きてるか」。それへの答えは PONG
+# run redis-probe = a one-off Pod with the redis-cli client:
+#   --rm --restart=Never  it did its job and deleted itself, no need to restart
+#   -i --quiet            show us the output and don't print service lines
+#   --env=REDISCLI_AUTH   the password goes into the Pod as an environment variable, not an argument
+#   --                    to the right of these dashes is the command that goes into the Pod
+#   redis-cli -h <name>   which server to connect to; the name is that same full one
+#   ping                  a short "are you alive"; the answer to it is PONG
 kubectl run redis-probe --rm -i --restart=Never --image=redis:7-alpine --quiet \
   --env=REDISCLI_AUTH='YOUR-PASSWORD' -- \
   redis-cli -h rfrm-redis-cache.tenant-workshopXX.svc.cozy.local ping
@@ -411,8 +411,8 @@ PONG
 ⚠️ **`PONG` の代わりに名前解決のエラーが出た場合** — 管理クラスターの内部名があなたのクラスターから見えていない、ということです。これは IP で宛てることで解決します。
 
 ```bash
-# -o jsonpath='{.spec.clusterIP}' — オブジェクトの1つのフィールドを表示する：プラットフォームが
-# このサービスに割り当てた内部アドレス。{"\n"} は改行を加える。
+# -o jsonpath='{.spec.clusterIP}' — print one field of the object: the internal address
+# the platform assigned to this service. {"\n"} adds a line break.
 kubectl --kubeconfig ~/.kube/config -n tenant-workshopXX get svc rfrm-redis-cache \
   -o jsonpath='{.spec.clusterIP}{"\n"}'
 ```
@@ -426,26 +426,26 @@ kubectl --kubeconfig ~/.kube/config -n tenant-workshopXX get svc rfrm-redis-cach
 アプリケーションを、まるごとのマニフェストではなくパッチで変更します — そうすれば何が変わるかが正確に見えます。まずあなたの Redis のアドレスをパッチに埋め込み、次にパッチをクラスターに渡します：`kubectl patch` は、すでに存在するオブジェクトをまるごと置き換えるのではなく、変更を追記します。
 
 ```bash
-# 先ほどと同じアドレスの置換、ただしプレースホルダーが違う — REDIS-ADDR
+# the same address substitution as before, only the placeholder is different — REDIS-ADDR
 
 # Linux
 sed -i    's|REDIS-ADDR|rfrm-redis-cache.tenant-workshopXX.svc.cozy.local|g' cache-patch-broken.yaml
 # macOS
 sed -i '' 's|REDIS-ADDR|rfrm-redis-cache.tenant-workshopXX.svc.cozy.local|g' cache-patch-broken.yaml
 
-# patch deployment passes-api = 「このオブジェクトをファイルの内容で手直しする」
-#   --patch-file  変更をどこから取るか
-# 環境変数の変更は新しい Pod を意味する：古いものは置き換えられる。
+# patch deployment passes-api = "fix up this object with what's in the file"
+#   --patch-file  where to take the changes from
+# Changing environment variables means new Pods: the old ones will be replaced.
 kubectl patch deployment passes-api --patch-file cache-patch-broken.yaml
 
-# 新しいコピーが準備完了になるまで待つ — さもないと古いほうを計測してしまう
+# wait until the new copies become ready — otherwise we'll measure the old ones still
 kubectl rollout status deployment/passes-api
 ```
 
 もう一度計測します — キャッシュを有効にする前に計測したのと同じコマンドで。砲撃の条件は最後のフラグまで一致していなければなりません。さもないと比較のしようがありません。
 
 ```bash
-# 同じ毎秒20リクエスト、同じ20秒、同じ16接続
+# the same twenty requests per second, the same twenty seconds, the same sixteen connections
 kubectl exec deploy/fortio -- fortio load -qps 20 -t 20s -c 16 \
   "http://passes-api.default.svc.cluster.local/employee?id=42"
 ```
@@ -462,7 +462,7 @@ kubectl exec deploy/fortio -- fortio load -qps 20 -t 20s -c 16 \
 まずアプリケーション自身が何を答えるか見ましょう：応答には、キャッシュが有効か、答えがそこから来たかを示すフィールドがあります。
 
 ```bash
-# 先ほどと同じ curl を持つ使い捨ての Pod：クラスターの内側からサービスに問い合わせる
+# the same one-off Pod with curl as before: we ask the service from inside the cluster
 kubectl run probe --rm -i --restart=Never --image=curlimages/curl:8.11.1 --quiet -- \
   curl -s "http://passes-api.default.svc.cluster.local/employee?id=42"
 ```
@@ -476,9 +476,9 @@ kubectl run probe --rm -i --restart=Never --image=curlimages/curl:8.11.1 --quiet
 さてログです。アプリケーションは、できなかったことをそこに書きます — そして今、真実が見える唯一の場所がそこです。
 
 ```bash
-# logs = 「アプリケーションが自分の出力に書いたものを表示する」。
-#   -l app=passes-api  名前で指定した1つではなく、このラベルを持つすべてのコピーをまとめて
-#   --tail=20          全ログではなく、各コピーの最後の20行
+# logs = "show what the application wrote to its output".
+#   -l app=passes-api  across all copies with this label at once, not one named copy
+#   --tail=20          the last twenty lines of each copy, not the whole log
 kubectl logs -l app=passes-api --tail=20
 ```
 
@@ -504,33 +504,33 @@ cache unavailable (redis: NOAUTH Authentication required.), going to the directo
 Redis のパスワードは管理クラスターに住んでいて、アプリケーションはそれをあなたのクラスターで必要とします。それを移します — シェル変数を通して、パスワードがコマンド履歴に残らないように。
 
 ```bash
-# read はキーボードで打たれたものを REDIS_PASS 変数に入れる：
-#   -s  打たれたものを画面に表示しない
-#   -r  バックスラッシュを特殊文字として扱わない
-# この行の後、画面には何も現れない：ダッシュボードからパスワードを貼り付けて Enter。
+# read puts what's typed on the keyboard into the REDIS_PASS variable:
+#   -s  don't show what's typed on the screen
+#   -r  don't treat a backslash as a special character
+# Nothing will appear on screen after this line: paste the password from the dashboard and Enter.
 read -rs REDIS_PASS
 
-# create secret generic = ふつうの Secret、キーバリューのペアの集まり。
-#   redis-password              クラスター内での Secret の名前
-#   --from-literal=password=... その中に password キーをこの値で作る；
-#                               それがパッチの参照する「Secret 名 + キー」のペア
+# create secret generic = an ordinary Secret, a set of key-value pairs.
+#   redis-password              the Secret's name in the cluster
+#   --from-literal=password=... create a password key in it with this value;
+#                               it's the "Secret name + key" pair the patch will reference
 kubectl create secret generic redis-password --from-literal=password="$REDIS_PASS"
 
-# unset は変数を消去し、パスワードがこのウィンドウの次のコマンドに届かないようにする
+# unset erases the variable so the password doesn't reach the next commands in this window
 unset REDIS_PASS
 ```
 
 完全なパッチを適用します。同じ Redis のアドレスに加えて、たった今作った Secret への参照と、キャッシュエントリの寿命が入っています。解説はコマンドのすぐ後のスポイラーにあります。
 
 ```bash
-# 同じアドレスの置換、今度は動作するパッチファイルで
+# the same address substitution, now in the working patch file
 
 # Linux
 sed -i    's|REDIS-ADDR|rfrm-redis-cache.tenant-workshopXX.svc.cozy.local|g' cache-patch.yaml
 # macOS
 sed -i '' 's|REDIS-ADDR|rfrm-redis-cache.tenant-workshopXX.svc.cozy.local|g' cache-patch.yaml
 
-# 既存の Deployment をファイルの内容で手直しし、新しいコピーを待つ
+# fix up the existing Deployment with the file's contents and wait for the new copies
 kubectl patch deployment passes-api --patch-file cache-patch.yaml
 kubectl rollout status deployment/passes-api
 ```
@@ -571,10 +571,10 @@ spec:
 負荷をかける前に、1件ずつ確かめましょう。まだ問い合わせられたことのない識別子に対する、同一の2つの連続リクエスト：1回目は必ず遅く、2回目は速いはずです。
 
 ```bash
-# 同じ curl を持つ使い捨ての Pod、ただし中で sh シェルを起動する：
-#   sh -c '...'  1つの文字列として渡した複数のコマンドを実行する
-#   ; echo       答えどうしが繋がらないよう、間に改行を入れる
-# id=777 を使うのは、この従業員がまだ問い合わせられていないため：確実にキャッシュにない。
+# the same one-off Pod with curl, but an sh shell is launched inside it:
+#   sh -c '...'  run several commands passed as a single string
+#   ; echo       insert a line break between the answers so they don't run together
+# id=777 is used because this employee hasn't been asked for yet: it's definitely not in the cache.
 kubectl run probe --rm -i --restart=Never --image=curlimages/curl:8.11.1 --quiet -- \
   sh -c 'curl -s "http://passes-api.default.svc.cluster.local/employee?id=777"; echo;
          curl -s "http://passes-api.default.svc.cluster.local/employee?id=777"'
@@ -592,7 +592,7 @@ kubectl run probe --rm -i --restart=Never --image=curlimages/curl:8.11.1 --quiet
 さて負荷をかけての計測、同じフラグの同じコマンドで、3回目：
 
 ```bash
-# 砲撃の条件は何も変えない：変わるのはサービスの中身だけ
+# we change nothing in the bombardment conditions: only what's inside the service changes
 kubectl exec deploy/fortio -- fortio load -qps 20 -t 20s -c 16 \
   "http://passes-api.default.svc.cluster.local/employee?id=42"
 ```
@@ -630,8 +630,8 @@ Code 200 : 400 (100.0 %)
 **すべてのリクエストが一意。** もし来客リストが毎回新しい従業員の情報を要求したら、ヒットは1つも起きず、すべてのリクエストに Redis への往復が上乗せされるだけです。遅くなります。次のように確かめられます — 異なる識別子で2つの短いシリーズを走らせ、それぞれの最初のリクエストを見ます：
 
 ```bash
-# 異なる従業員に対する2つの連続した砲撃、各10秒。
-# 各シリーズの最初では、そのキーについてキャッシュは空 — そして最初のリクエストは名簿へ行く。
+# two bombardments in a row over different employees, ten seconds each.
+# At the start of each series the cache is empty for that key — and the first request goes to the directory.
 kubectl exec deploy/fortio -- fortio load -qps 20 -t 10s -c 16 \
   "http://passes-api.default.svc.cluster.local/employee?id=1"
 kubectl exec deploy/fortio -- fortio load -qps 20 -t 10s -c 16 \
@@ -678,13 +678,13 @@ TTL はキャッシュの唯一の本当のパラメータであり、それは�
 ```bash
 cd labs/07-redis
 
-# アプリケーションをどのクラスターでチェックするか — あなたの `lab`
+# which cluster to check the application in — your `lab`
 export KUBECONFIG=~/lab.kubeconfig
-# あなたのテナント番号：これからスクリプトは namespace 名 tenant-workshop03 を組み立てる
+# your tenant number: from it the script assembles the namespace name tenant-workshop03
 export COZY_TENANT=workshop03
-# 管理クラスターへのアクセスがどこにあるか — そこでスクリプトは Redis そのものを見る。
-# 未設定のままでよい：その場合スクリプトは ~/.kube/config を探し、見つからなければ
-# 管理クラスターでのチェックをスキップし、その旨を伝える。
+# where the access to the management cluster lives — there the script looks at Redis itself.
+# You can leave it unset: then the script looks for ~/.kube/config, and not finding it — skips
+# the checks on the management cluster and says so.
 export COZY_KUBECONFIG=~/.kube/config
 
 ./check.sh
@@ -701,9 +701,9 @@ export COZY_KUBECONFIG=~/.kube/config
 すべてのラボが終わったら：
 
 ```bash
-# delete -f = ファイルに記述されたオブジェクトそのものをクラスターから取り除く
+# delete -f = remove from the cluster exactly the objects described in the files
 kubectl delete -f passes-api.yaml -f hr-legacy.yaml -f fortio.yaml
-# この Secret はファイルではなくコマンドで作った — 名前で削除する
+# the Secret was created by a command, not a file — we delete it by name
 kubectl delete secret redis-password
 ```
 

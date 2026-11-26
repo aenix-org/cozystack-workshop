@@ -9,7 +9,7 @@
 
 GitHub에서 스크립트를 머신으로 바로 가져옵니다:
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/laptop/scripts/convert.sh
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/laptop/scripts/convert.sh
 ```
 
 엽니다:
@@ -18,7 +18,7 @@ nano convert.sh
 ```
 
 **1단계에서 메모해 둔 세 개의 값이 바로 여기서 쓸모가 있습니다.** 파일 상단에
-«값을 붙여넣으세요»라고 표시된 블록이 있습니다. 따옴표는 그대로 두고 그 안의
+«PASTE YOUR VALUES»라고 표시된 블록이 있습니다. 따옴표는 그대로 두고 그 안의
 플레이스홀더를 여러분의 값으로 바꾸세요:
 
 ```
@@ -33,7 +33,7 @@ SECRET_KEY="your-secretKey"
 nano에서 저장하기: `Ctrl+O`, 그다음 `Enter`, 그다음 종료하려면 `Ctrl+X`. 플레이스홀더가
 남아 있지 않은지 확인하세요:
 ```bash
-grep ВСТАВЬТЕ convert.sh || echo "all filled in, ready to run"
+grep PASTE_ convert.sh || echo "all filled in, ready to run"
 ```
 
 실행합니다. 반드시 `sudo`로 실행하세요. 스크립트에는 root 권한이 필요합니다:
@@ -55,7 +55,7 @@ sudo bash convert.sh
 단어로 시작하는 줄을 찾으세요. 링크는 바로 그 뒤에 옵니다.
 
 **이 링크로 할 일:** 같은 메모장에 복사하세요. 다음 단계에서 노트북으로 돌아가
-`manifests/03-app-vm.yaml`을 열고, 지금 `ВСТАВЬТЕ_PRESIGNED_URL` 플레이스홀더가 있는
+`manifests/03-app-vm.yaml`을 열고, 지금 `PASTE_PRESIGNED_URL` 플레이스홀더가 있는
 `url` 필드에 붙여 넣습니다. 우리가 번호를 채워 넣을 때 제가 미리 경고했던 바로 그 필드입니다.
 
 이것은 임시 서명 링크입니다: 저장소는 외부로 열려 있지 않고, 링크는 여러분 자신의 키로 만든

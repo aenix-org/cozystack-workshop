@@ -94,7 +94,7 @@ ssh_pwauth: true
 write_files:
   - path: /opt/directory/index.html
     content: |
-      <!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Directorio</title></head><body><h1>Directorio de personal</h1><ul><li>Herrera J. — 101</li><li>Pérez P. — 102</li></ul></body></html>
+      <!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Directory</title></head><body><h1>Staff directory</h1><ul><li>Whitfield J. — 101</li><li>Petersen P. — 102</li></ul></body></html>
   - path: /etc/systemd/system/directory.service
     content: |
       [Unit]
@@ -115,12 +115,12 @@ Este cloud-init convierte el directorio en un servidor: coloca una página HTML 
 **Lo mismo como texto.** Ambos objetos, el disco y la máquina, están en un solo archivo, `staff-directory-vm.yaml`, y se crean con un único comando: primero el disco, luego la máquina. Antes de aplicar, abre el archivo y reemplaza el marcador `tenant-workshopXX` que hay en él por el nombre de tu propio tenant; de lo contrario los objetos acabarán en el lugar equivocado.
 
 ```bash
-# KUBECONFIG es la variable de la que kubectl lee la dirección del clúster y los datos de acceso.
-# Aquí necesitas el archivo de acceso al TENANT: la VM vive en el tenant, en el clúster de gestión.
+# KUBECONFIG is the variable kubectl reads the cluster address and login data from.
+# Here you need the TENANT access file: the VM lives in the tenant on the management cluster.
 export KUBECONFIG=~/.kube/config
-# apply = «llevar el clúster a lo que está escrito en el archivo». Si no hay objetos, los crea;
-# si los objetos ya existen, los lleva al estado descrito.
-#   -f   leer la descripción desde un archivo
+# apply = "bring the cluster to what's written in the file". No objects — it creates them,
+# objects present — it brings them to the described state.
+#   -f   read the description from a file
 kubectl apply -f staff-directory-vm.yaml
 ```
 
@@ -205,8 +205,8 @@ El primer encendido toma de 3 a 5 minutos: cloud-init expande el sistema de arch
 El instructor ha publicado el directorio por adelantado: tu tenant ya tiene un `Ingress spravochnik` con el host `spravochnik.workshopXX.workshop.aenix.io` y un `Service spravochnik-http` que enruta al puerto 8080 dentro de la máquina. La publicación está lista para recibir el directorio en cuanto empiece a responder. Comprobémoslo ahora mismo, sin esperar a que la máquina termine de cargar.
 
 ```bash
-# curl — «ve a la dirección y muestra la respuesta». Reemplaza XX por tu propio número de tenant.
-#   --max-time 5   rendirse tras 5 segundos en vez de esperar mucho rato
+# curl — "go to the address and show the response". Replace XX with your own tenant number.
+#   --max-time 5   give up after 5 seconds instead of waiting a long time
 curl --max-time 5 http://spravochnik.workshopXX.workshop.aenix.io
 ```
 
@@ -254,13 +254,13 @@ La ficha tiene una consola: es la misma pantalla que «Open Console» en vSphere
 Vale la pena repasar de antemano una peculiaridad de su sintaxis, o tu primerísimo comando volverá denegado. El objetivo de `virtctl` no se da como un nombre a secas, sino con un prefijo de tipo: `vmi/<name>`. `vmi` es virtual machine instance, la **instancia en ejecución** de la máquina; el objeto `VMInstance` que creaste y la instancia en ejecución son dos objetos distintos en la API. Bajo el acceso de tenant los permisos se otorgan sobre el **subrecurso** `virtualmachineinstances` (`console` y `portforward`), no sobre los objetos `virtualmachines` completos: un nombre a secas llega al objeto vm y vuelve `forbidden`. La plataforma construye el nombre de la instancia a partir del prefijo `vm-instance-` más el nombre de tu máquina: `spravochnik` es la instancia `vm-instance-spravochnik`.
 
 ```bash
-# acceso de tenant: la máquina vive en el tenant
+# tenant access: the machine lives in the tenant
 export KUBECONFIG=~/.kube/config
-# console = conectarse a la consola serie de la máquina. Es la misma pantalla que
-# «Open Console» te da en vSphere, solo que en modo texto:
-#   --namespace  en qué sección del clúster mirar; para tu tenant se llama
-#                tenant- más tu login, reemplaza XX por tu propio número
-#   vmi/...      el objetivo: la instancia en ejecución de la máquina, no la descripción VMInstance
+# console = connect to the machine's serial console. It's the same screen that
+# "Open Console" gives you in vSphere, only text-based:
+#   --namespace  which section of the cluster to look in; for your tenant it's called
+#                tenant- plus your login, replace XX with your own number
+#   vmi/...      the target: the running instance of the machine, not the VMInstance description
 virtctl console --namespace=tenant-workshopXX vmi/vm-instance-spravochnik
 ```
 
@@ -269,9 +269,9 @@ Si la pantalla está en blanco tras conectar, pulsa Enter y aparecerá el prompt
 Por dentro es un Ubuntu corriente. Asegúrate de que el directorio se ha levantado:
 
 ```bash
-uname -a                       # kernel y arquitectura: la misma línea que en un servidor bare-metal
-systemctl status directory     # el servicio del directorio: debería estar active (running)
-curl -s localhost:8080 | head  # la misma página, pero solicitada desde dentro de la propia máquina
+uname -a                       # kernel and architecture: the same line as on a bare-metal server
+systemctl status directory     # the directory service: should be active (running)
+curl -s localhost:8080 | head  # the same page, but requested from inside the machine itself
 ```
 
 Si `systemctl status directory` muestra `active (running)` y el `curl` a `localhost:8080` devolvió el HTML con la lista de empleados, el servidor está listo, y la publicación de cara al exterior está a punto de cambiar el `503` por la página. No hay ni rastro de Kubernetes dentro, y no debería haberlo: el invitado no sabe que está en un clúster, exactamente igual que una VM en vSphere no tiene por qué saber de vCenter.
@@ -289,7 +289,7 @@ curl http://spravochnik.workshopXX.workshop.aenix.io
 **Lo que deberías ver**: el HTML de la página del directorio:
 
 ```html
-<h1>Directorio de personal</h1><ul><li>Herrera J. — 101</li><li>Pérez P. — 102</li></ul>
+<h1>Staff directory</h1><ul><li>Whitfield J. — 101</li><li>Petersen P. — 102</li></ul>
 ```
 
 Abre esta dirección en un navegador y verás la misma lista. El directorio es visible desde fuera por un nombre de dominio amigable, con HTTPS de la plataforma, sin un solo ticket a redes ni para un certificado.
@@ -307,12 +307,12 @@ Esto es exactamente lo que significa «lo heredado no tiene por qué conteneriza
 El script no comprueba la presencia de objetos, sino el funcionamiento en esencia: el nombre de dominio devuelve un `200` y es la página del directorio, la máquina misma está en marcha, y el `Ingress` que la publica está en su sitio. La comprobación por dominio funciona incluso sin acceso de tenant: le basta con `curl`; el acceso de tenant añade las comprobaciones del estado de la máquina.
 
 ```bash
-# acceso de tenant: de aquí el script toma la propia VM y el Ingress
+# tenant access: from here the script takes the VM itself and the Ingress
 export KUBECONFIG=~/.kube/config
-# tu login sin la palabra tenant-: de él el script construye tanto el nombre de la sección tenant-workshopXX
-# como el nombre de dominio spravochnik.workshopXX.workshop.aenix.io
+# your login without the word tenant-: from it the script builds both the section name tenant-workshopXX
+# and the domain name spravochnik.workshopXX.workshop.aenix.io
 export COZY_TENANT=workshopXX
-# el ./ antes del nombre significa «el archivo de la carpeta actual», es decir, de labs/12-vm
+# the ./ before the name means "the file from the current folder", i.e. from labs/12-vm
 ./check.sh
 ```
 

@@ -17,14 +17,14 @@ PGDG リポジトリから取得しますが、CentOS 7 向けにそこで入手
 3つのコマンドを続けて実行します。それぞれに理由が1つずつあります:
 
 ```bash
-# 1. PostgreSQL パッケージの提供元である PGDG リポジトリを追加する。
+# 1. Wire up the PGDG repository — the source of PostgreSQL packages.
 yum install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm
 
-# 2. libzstd ライブラリ。これがないとクライアントはインストールできない。CentOS 7 の
-#    リポジトリには存在しないので、EPEL のアーカイブから取得する。
+# 2. The libzstd library, without which the client won't install. It's not in the CentOS 7
+#    repositories, so we take it from the EPEL archive.
 yum install -y https://archives.fedoraproject.org/pub/archive/epel/7/x86_64/Packages/l/libzstd-1.5.5-1.el7.x86_64.rpm
 
-# 3. クライアント本体 — 生きている pgdg15 リポジトリからのみ取得する。
+# 3. The client itself — only from the live pgdg15 repository.
 yum install -y --disablerepo='pgdg*' --enablerepo=pgdg15 postgresql15
 ```
 
@@ -55,7 +55,7 @@ psql --version
 **スキーマファイルを取得します** — マシンには既にネットワークがあります:
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/laptop/scripts/orders-schema.sql
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/laptop/scripts/orders-schema.sql
 ```
 
 **適用します。** 手探りで入力しなくて済むよう、コマンドを部分ごとに分解して見ていきましょう:

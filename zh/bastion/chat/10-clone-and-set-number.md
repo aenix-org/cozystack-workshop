@@ -30,4 +30,4 @@ cd ~/workshop
 `nano manifests/03-app-vm.yaml`（保存：`Ctrl+O`、`Enter`，退出：`Ctrl+X`）。
 
 唯一被有意保留下来的占位符在 `manifests/03-app-vm.yaml` 里，即这一行
-`url: "ВСТАВЬТЕ_PRESIGNED_URL"`。等你转换完镜像就会拿到那个链接。现在只需知道它正在那里等着你。
+`url: "PASTE_PRESIGNED_URL"`。等你转换完镜像就会拿到那个链接。现在只需知道它正在那里等着你。

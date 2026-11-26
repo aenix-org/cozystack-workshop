@@ -1,74 +1,74 @@
--- लैब 9 · डेटा जनरेटर: दस लाख टर्नस्टाइल प्रविष्टियाँ, जिन्हें ClickHouse ने खुद ही बना लिया।
+-- Lab 9 · data generator: a million turnstile entries, invented by ClickHouse itself.
 --
--- कहाँ चलता है: लैपटॉप पर, लैब क्लस्टर में, README से छोटी कमांड `ch`
--- के साथ:
+-- Where it runs: on the laptop, in the lab cluster, with the short command `ch`
+-- from the README:
 --     cd labs/09-clickhouse && ch < 02-generate.sql
--- इससे पहले टेबल बन चुकी होनी चाहिए — 01-schema.sql।
+-- Before this, the table must already be created — 01-schema.sql.
 --
--- कितनी देर प्रतीक्षा करें: दस लाख पंक्तियाँ कुछ ही सेकंड में गणना होकर लिखी जाती हैं,
--- पूरी तरह सर्वर के अंदर। डेटा नेटवर्क से नहीं गुजरता और आपके लैपटॉप से होकर नहीं जाता।
--- INSERT का उत्तर खाली होता है — यही सफलता है। जाँचने के लिए: echo 'SELECT count() FROM passes' | ch
+-- How long to wait: a million rows are computed and written in a few seconds,
+-- entirely inside the server. The data does not travel over the network and does not pass through your laptop.
+-- The INSERT reply is empty — that means success. To check: echo 'SELECT count() FROM passes' | ch
 --
--- फ़ाइल को दो बार चलाएँ और पंक्तियाँ बीस लाख हो जाएँगी: INSERT केवल जोड़ता है और
--- कुछ भी नहीं बदलता। फिर से शुरू करने के लिए: TRUNCATE TABLE passes, फिर यह फ़ाइल दोबारा।
+-- Run the file twice and there will be two million rows: INSERT only appends and
+-- replaces nothing. To start over: TRUNCATE TABLE passes, then run this file again.
 --
--- नीचे एक ही INSERT ... SELECT कमांड है: पंक्तियाँ बाहर से नहीं आतीं, बल्कि उसके बाद
--- आने वाली क्वेरी द्वारा गणना की जाती हैं।
+-- Below is a single INSERT ... SELECT command: the rows do not come from outside, they are computed
+-- by the query that follows.
 INSERT INTO passes
 SELECT
-    -- पास नंबर। number जनरेटर के भीतर अद्वितीय है — इसलिए pass_id
-    -- भी अद्वितीय है।
+    -- Pass number. number is unique within the generator — so pass_id
+    -- is unique too.
     number AS pass_id,
-    -- प्रवेश का समय तीन हिस्सों से बनता है: दिन, घंटा और मिनट। हर हिस्सा —
-    -- अपनी अलग छद्म-यादृच्छिक संख्या है, जो cityHash64(number, 'नमक') के रूप में मिलती है।
-    -- cityHash64 एक तेज़ हैश-फ़ंक्शन है: एक ही इनपुट के लिए यह हमेशा
-    -- वही परिणाम देता है, इसलिए डेटा पुनरुत्पादनीय होता है, जबकि अलग «नमक»
-    -- ('day', 'hour', 'minute', ...) एक ही number से जितनी चाहें उतनी
-    -- परस्पर स्वतंत्र यादृच्छिक मान बना देता है।
+    -- The entry time is assembled from three parts: day, hour, and minute. Each part is
+    -- its own pseudo-random number, obtained as cityHash64(number, 'salt').
+    -- cityHash64 is a fast hash function: for the same input it always gives
+    -- the same result, so the data is reproducible, while a different 'salt'
+    -- ('day', 'hour', 'minute', ...) turns a single number into as many
+    -- mutually independent random values as you like.
     addMinutes(
         addHours(
             addDays(
-                -- संदर्भ बिंदु — 1 जनवरी। 57600 से भाग देने पर शेष 57599 तक की संख्या देता है,
-                -- उसका वर्गमूल 0 से 239 तक का दिन है, यानी आठ महीने।
-                -- यहाँ वर्गमूल सुंदरता के लिए नहीं है: यह प्रविष्टियों को अवधि के
-                -- अंत की ओर सघन करता है। समय के साथ मेहमान अधिक होते जाते हैं — जैसे
-                -- असल ज़िंदगी में, और यही वृद्धि प्रबंधन रिपोर्ट में देखना चाहता है।
+                -- The reference point is January 1st. The remainder modulo 57600 gives a number up to 57599,
+                -- its square root is a day from 0 to 239, that is, eight months.
+                -- The square root here is not for looks: it clusters entries
+                -- toward the end of the period. Over time there are more guests — as
+                -- in real life, and it is exactly this growth that management wants to see in the report.
                 toDateTime('2026-01-01 00:00:00'),
                 toUInt16(sqrt(cityHash64(number, 'day') % 57600))
             ),
-            -- आगमन का घंटा समान रूप से «8 से 18» तक नहीं लिया जाता, बल्कि एक ऐरे से जहाँ
-            -- घंटे अलग-अलग बारंबारता से दोहराए जाते हैं: 10 तीन बार आता है, 15 तीन बार,
-            -- 8 — एक बार। इससे दो स्पष्ट शिखर बनते हैं, दोपहर के भोजन से पहले और बाद;
-            -- रिपोर्ट को उन्हें ढूँढना है। अच्छा होता है जब परीक्षण डेटा में वही हो
-            -- जिसे हम उसमें ढूँढने वाले हैं।
-            -- ClickHouse में ऐरे की अनुक्रमणिका एक से शुरू होती है, इसीलिए 1 + …
+            -- The arrival hour is taken not uniformly "from 8 to 18", but from an array where
+            -- hours repeat with different frequency: 10 appears three times, 15 three times,
+            -- 8 once. The result is two pronounced peaks, before lunch and after;
+            -- the report should find them. It is good when the test data contains what
+            -- we intend to look for in it.
+            -- Array indexing in ClickHouse starts at one, hence 1 + …
             [8, 9, 9, 10, 10, 10, 11, 11, 12,
              13, 14, 14, 15, 15, 15, 16, 17, 18][1 + cityHash64(number, 'hour') % 18]
         ),
-        -- घंटे के भीतर के मिनट — उसी number से एक और स्वतंत्र मान।
+        -- The minutes within the hour are yet another independent value from the same number.
         cityHash64(number, 'minute') % 60
     ) AS created_at,
-    -- मेहमान का नाम हर पंक्ति में अलग है: एक ही कॉलम में दस लाख अलग-अलग मान।
-    -- लैब में थोड़ा आगे यह दिखेगा कि डिस्क पर यही सबसे भारी कॉलम है।
-    concat('अतिथि सं. ', toString(number)) AS guest_name,
-    -- मेज़बान कर्मचारी का विभाग: पाँच मान, समान रूप से वितरित।
-    ['बिक्री', 'इंजीनियरिंग', 'लेखा',
-     'मानव संसाधन', 'लॉजिस्टिक्स'][1 + cityHash64(number, 'dept') % 5] AS host_dept,
-    -- प्रवेश द्वार। वही तरकीब, पर वितरण असमान है: «उत्तरी» छह में से
-    -- तीन कोष्ठ लेता है और आधा प्रवाह पाता है, «दक्षिणी» — एक तिहाई, «पश्चिमी» —
-    -- बाकी। समान डेटा रिपोर्ट में अविश्वसनीय दिखता है और कुछ भी
-    -- नहीं दिखाता।
-    ['उत्तरी', 'उत्तरी', 'उत्तरी',
-     'दक्षिणी', 'दक्षिणी', 'पश्चिमी'][1 + cityHash64(number, 'entrance') % 6] AS entrance,
-    -- पास का प्रकार: दस में से छह कोष्ठ एकल-उपयोग को, दो-दो साप्ताहिक को,
-    -- एक-एक वाहन और समूह को — प्रवेश द्वार पर यह ऐसा ही दिखता है।
-    ['एकल-उपयोग', 'एकल-उपयोग', 'एकल-उपयोग', 'एकल-उपयोग', 'एकल-उपयोग', 'एकल-उपयोग',
-     'साप्ताहिक', 'साप्ताहिक',
-     'वाहन', 'समूह'][1 + cityHash64(number, 'type') % 10] AS pass_type,
-    -- यात्रा की अवधि 30 से 329 मिनट। toUInt16 इसलिए ज़रूरी है क्योंकि कॉलम
-    -- UInt16 के रूप में घोषित है, जबकि अंकगणित का परिणाम अधिक चौड़ा है और खुद संकुचित नहीं होगा।
+    -- The guest name is unique to each row: a million different values in a single column.
+    -- A bit further into the lab it will be clear that on disk this is the heaviest column.
+    concat('Guest No. ', toString(number)) AS guest_name,
+    -- The host employee's department: five values, distributed equally.
+    ['Sales', 'Engineering', 'Accounting',
+     'HR', 'Logistics'][1 + cityHash64(number, 'dept') % 5] AS host_dept,
+    -- The entrance. The same trick, but the distribution is uneven: "North" takes
+    -- three cells out of six and gets half the flow, "South" a third, "West"
+    -- the rest. Uniform data looks implausible in a report and shows
+    -- nothing.
+    ['North', 'North', 'North',
+     'South', 'South', 'West'][1 + cityHash64(number, 'entrance') % 6] AS entrance,
+    -- Pass type: six cells out of ten go to single-use, two each to weekly,
+    -- one each to vehicle and group — that is how it looks at the entrance.
+    ['single-use', 'single-use', 'single-use', 'single-use', 'single-use', 'single-use',
+     'weekly', 'weekly',
+     'vehicle', 'group'][1 + cityHash64(number, 'type') % 10] AS pass_type,
+    -- Visit duration from 30 to 329 minutes. toUInt16 is needed because the column
+    -- is declared as UInt16, while the result of the arithmetic is wider and will not narrow itself.
     toUInt16(30 + cityHash64(number, 'duration') % 300) AS duration_min
--- numbers(1000000) — एक अंतर्निर्मित जनरेटर-टेबल: दस लाख पंक्तियाँ एकमात्र
--- कॉलम number के साथ जिसमें 0 से 999999 तक के मान हैं। डिस्क पर यह नहीं है, यह
--- चलते-चलते गणना होती है। अधिक या कम डेटा चाहिए — केवल यही संख्या बदलती है।
+-- numbers(1000000) is a built-in generator table: a million rows with a single
+-- column number holding values from 0 to 999999. It is not on disk, it is computed
+-- on the fly. If you need more or less data, only this number changes.
 FROM numbers(1000000)

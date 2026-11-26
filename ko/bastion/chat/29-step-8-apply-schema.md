@@ -17,14 +17,14 @@ PGDG 저장소에서 가져오는데, CentOS 7에서 그곳에 있는 최신 버
 명령 세 개를 연달아 실행하며, 각각에는 이유가 하나씩 있습니다:
 
 ```bash
-# 1. PGDG 저장소 연결 — PostgreSQL 패키지의 출처입니다.
+# 1. Wire up the PGDG repository — the source of PostgreSQL packages.
 yum install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm
 
-# 2. libzstd 라이브러리. 이게 없으면 클라이언트가 설치되지 않습니다. CentOS 7
-#    저장소에는 없으므로, EPEL 아카이브에서 가져옵니다.
+# 2. The libzstd library, without which the client won't install. It's not in the CentOS 7
+#    repositories, so we take it from the EPEL archive.
 yum install -y https://archives.fedoraproject.org/pub/archive/epel/7/x86_64/Packages/l/libzstd-1.5.5-1.el7.x86_64.rpm
 
-# 3. 클라이언트 본체 — 오직 살아 있는 pgdg15 저장소에서만.
+# 3. The client itself — only from the live pgdg15 repository.
 yum install -y --disablerepo='pgdg*' --enablerepo=pgdg15 postgresql15
 ```
 
@@ -55,7 +55,7 @@ psql --version
 **스키마 파일을 가져옵니다** — 이 머신에는 이미 네트워크가 있습니다:
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/bastion/scripts/orders-schema.sql
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/bastion/scripts/orders-schema.sql
 ```
 
 **적용합니다.** 무턱대고 입력하지 않도록, 명령을 부분별로 뜯어봅시다:

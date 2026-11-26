@@ -9,7 +9,7 @@
 
 स्क्रिप्ट को GitHub से सीधे मशीन पर ले आएँ:
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/bastion/scripts/convert.sh
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/bastion/scripts/convert.sh
 ```
 
 इसे खोलें:
@@ -18,7 +18,7 @@ nano convert.sh
 ```
 
 **अब स्टेप 1 में नोटबुक पर लिखे वे तीन मान काम आएँगे।** फ़ाइल के शुरू में
-«अपने मान यहाँ पेस्ट करें» लेबल वाला एक ब्लॉक है — उसमें दिए प्लेसहोल्डर को अपने मानों से बदल दें,
+«PASTE YOUR VALUES» लेबल वाला एक ब्लॉक है — उसमें दिए प्लेसहोल्डर को अपने मानों से बदल दें,
 कोट्स को यथावत छोड़ते हुए:
 
 ```
@@ -33,7 +33,7 @@ SECRET_KEY="your-secretKey"
 nano में सेव करने के लिए: `Ctrl+O`, फिर `Enter`, फिर बाहर निकलने के लिए `Ctrl+X`। जाँचें कि कोई
 प्लेसहोल्डर बाकी न रह गया हो:
 ```bash
-grep ВСТАВЬТЕ convert.sh || echo "all filled in, ready to run"
+grep PASTE_ convert.sh || echo "all filled in, ready to run"
 ```
 
 इसे चलाएँ — हमेशा `sudo` के ज़रिए, स्क्रिप्ट को root अधिकार चाहिए। और इसे **`screen` में** चलाएँ:
@@ -42,9 +42,9 @@ grep ВСТАВЬТЕ convert.sh || echo "all filled in, ready to run"
 बीच में ही रुक जाएगा। `screen` कनेक्शन टूटने पर भी प्रोसेस को चलता रखता है:
 
 ```bash
-screen -S convert          # एक अलग सेशन शुरू करें
-sudo bash convert.sh       # उसी सेशन के अंदर इसे चलाएँ
-#  कनेक्शन टूट गया? इसी मशीन पर फिर से लॉग-इन करें, फिर:  screen -r convert
+screen -S convert          # start a separate session
+sudo bash convert.sh       # run it inside that session
+#  connection dropped? log back in to this same machine, then:  screen -r convert
 ```
 
 अंदर क्या होता है: स्क्रिप्ट सोर्स इमेज डाउनलोड करती है, `virt-v2v` चलाती है,
@@ -62,7 +62,7 @@ sudo bash convert.sh       # उसी सेशन के अंदर इस�
 
 **इसका क्या करें:** इसे उसी नोटबुक में कॉपी कर लें। अगले स्टेप में आप bastion पर वापस जाएँगे,
 `manifests/03-app-vm.yaml` खोलेंगे और इसे `url` फ़ील्ड में पेस्ट करेंगे — ठीक वहाँ, जहाँ
-अभी `ВСТАВЬТЕ_PRESIGNED_URL` प्लेसहोल्डर है। वही, जिसके बारे में मैंने आपको तब चेताया था,
+अभी `PASTE_PRESIGNED_URL` प्लेसहोल्डर है। वही, जिसके बारे में मैंने आपको तब चेताया था,
 जब हम नंबर भर रहे थे।
 
 यह एक अस्थायी साइन किया हुआ लिंक है: स्टोरेज बाहर की ओर खुला नहीं है, और लिंक आपने

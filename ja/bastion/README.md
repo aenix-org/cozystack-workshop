@@ -70,11 +70,11 @@ kubectl get vminstance -n tenant-workshopXX
 ```bash
 cd ~/workshop
 ls manifests scripts
-grep -rl tenant-workshop manifests | head -1 | xargs grep -m1 namespace   # あなたの番号が表示されます
+grep -rl tenant-workshop manifests | head -1 | xargs grep -m1 namespace   # you will see your number
 ```
 
 1か所だけ、意図的にプレースホルダーのまま残してあります。`manifests/03-app-vm.yaml` の
-`url: "ВСТАВЬТЕ_PRESIGNED_URL"` という行です — このリンクは第2フェーズの後に得られるので、自分で
+`url: "PASTE_PRESIGNED_URL"` という行です — このリンクは第2フェーズの後に得られるので、自分で
 書き込みます。
 
 詳しくは: [chat/10](chat/10-clone-and-set-number.md) ·
@@ -141,7 +141,7 @@ kubectl get vminstance convert -n tenant-workshopXX -w
 virtctl console --namespace=tenant-workshopXX vm-instance-convert
 ```
 
-中で: `nano convert.sh` を実行し、`scripts/convert.sh` の内容を貼り付け、`ВСТАВЬТЕ_...` の代わりに
+中で: `nano convert.sh` を実行し、`scripts/convert.sh` の内容を貼り付け、`PASTE_...` の代わりに
 自分の `bucketName`、`accessKey`、`secretKey` を書き込みます。
 
 **私たちのイベントではなく、ご自身でこのワークショップを進めていますか？** `convert.sh` の `OVA_URL` は、ワークショップ用クラウドのオブジェクトストレージにあるデモイメージを指しています。イベント中にすばやく、外部トラフィックを使わずにダウンロードできるようにそこに置いていますが、ワークショップが終わるとそのコピーはなくなります。リンクを公開コピー `https://github.com/aenix-org/cozystack-workshop/releases/download/vmware-demo-ova/app-1.ova`（約 810 MB）か、ご自身の OVA に置き換えてください。
@@ -150,9 +150,9 @@ virtctl console --namespace=tenant-workshopXX vm-instance-convert
 普通の実行は途中で打ち切られます。`screen` は接続がなくなってもプロセスを保ち続けます:
 
 ```bash
-screen -S convert          # 別のセッションに入る
-sudo bash convert.sh       # そのセッションの中で実行する
-#  接続が切れた? もう一度 bastion に ssh して、次を実行:  screen -r convert
+screen -S convert          # open a separate session
+sudo bash convert.sh       # run it inside that session
+#  connection dropped? ssh back into the bastion, then:  screen -r convert
 ```
 
 **表示されるはず:** 出力の最後、`Share:` という単語の後に、イメージへの署名付きリンク。次のフェーズで
@@ -177,7 +177,7 @@ kubectl delete vminstance convert --namespace tenant-workshopXX
 kubectl delete vmdisk convert-tools --namespace tenant-workshopXX
 ```
 
-得られたリンクを `manifests/03-app-vm.yaml` の `url: "ВСТАВЬТЕ_PRESIGNED_URL"` の代わりに書き込み、
+得られたリンクを `manifests/03-app-vm.yaml` の `url: "PASTE_PRESIGNED_URL"` の代わりに書き込み、
 それから:
 
 ```bash
@@ -269,13 +269,13 @@ curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/actuator/health
 `SCRAM authentication requires libpq version 10 or above` と答えます。新しいものをインストールします:
 
 ```bash
-# 1. PGDG リポジトリ — PostgreSQL パッケージの供給元
+# 1. The PGDG repository — the source of PostgreSQL packages
 yum install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm
 
-# 2. libzstd: CentOS 7 のリポジトリにはないので、EPEL のアーカイブから取ってくる
+# 2. libzstd: not in the CentOS 7 repositories, so we take it from the EPEL archive
 yum install -y https://archives.fedoraproject.org/pub/archive/epel/7/x86_64/Packages/l/libzstd-1.5.5-1.el7.x86_64.rpm
 
-# 3. クライアント本体 — 生きている pgdg15 リポジトリのみから
+# 3. The client itself — only from the live pgdg15 repository
 yum install -y --disablerepo='pgdg*' --enablerepo=pgdg15 postgresql15
 ```
 
@@ -296,7 +296,7 @@ psql --version
 されます）:
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/bastion/scripts/orders-schema.sql
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/bastion/scripts/orders-schema.sql
 
 PGPASSWORD='Orders2019!' psql \
   -h postgres-db-rw.tenant-workshopXX.svc.cozy.local -U orders -d orders \
@@ -351,13 +351,13 @@ curl -s https://app.workshopXX.workshop.aenix.io/api/orders
 > `virtctl ssh` と `virtctl port-forward` は逆に、`vmi/<name>` という形を要求します。
 
 ```bash
-# app-VM にログイン (root / cozydemo)
+# log into the app-VM (root / cozydemo)
 virtctl console --namespace=tenant-workshopXX vm-instance-app-1
 
-# conversion-VM にログイン (ubuntu / ubuntu)
+# log into the conversion-VM (ubuntu / ubuntu)
 virtctl console --namespace=tenant-workshopXX vm-instance-convert
 
-# SSH 経由で app-VM の中のシェル（マシンのネットワークが上がったら）
+# a shell inside the app-VM over SSH (once the machine's network is up)
 virtctl ssh ubuntu@vmi/vm-instance-app-1 --namespace=tenant-workshopXX
 ```
 

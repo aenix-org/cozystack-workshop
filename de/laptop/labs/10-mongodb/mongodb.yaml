@@ -1,53 +1,53 @@
-# Lab 10 · Bestellung einer MongoDB-Datenbank für Ausweise verschiedener Art.
-# Eine Beschreibung dessen, was Sie erhalten möchten; die Plattform baut und konfiguriert den Dienst.
-# Dasselbe, was Sie mit der Maus im Dashboard bestellen würden — nur als Text.
-# Wird NICHT auf den Lab-Cluster angewendet, sondern auf einen Tenant im Management-Cluster:
+# Lab 10 · ordering a MongoDB database for passes of different kinds.
+# A description of what you want to get; the platform assembles and configures the service.
+# The same thing you would order with the mouse in the dashboard — only as text.
+# Applied NOT to the lab cluster, but to a tenant on the management cluster:
 #   kubectl --kubeconfig="$HOME/.kube/workshop" apply -f mongodb.yaml
 #
-# VOR DEM ANWENDEN: Ersetzen Sie tenant-workshopXX durch Ihren Namespace
-# und ЗдесьВашПароль durch ein Passwort, das Sie sich ausdenken.
+# BEFORE APPLYING: replace tenant-workshopXX with your namespace,
+# and YourPasswordHere with a password you come up with.
 apiVersion: apps.cozystack.io/v1alpha1
 kind: MongoDB
 metadata:
   name: passes
   namespace: tenant-workshopXX
 spec:
-  # Eine einzelne Kopie. MongoDB ist für ein Replica-Set aus dreien ausgelegt: sie stimmen darüber ab, wer
-  # primär ist, und überstehen den Ausfall einer. Mit einer einzelnen Kopie gibt es niemanden zum Abstimmen,
-  # und der Chart aktiviert dafür einen separaten „unsicheren“ Modus. Für ein Lab in Ordnung,
-  # für die Produktion nicht.
+  # A single copy. MongoDB is designed for a replica set of three: they vote on who
+  # is primary and survive the loss of one. With a single copy there is no one to vote
+  # with, and the chart enables a separate "unsafe" mode for this. Fine for a lab,
+  # not for production.
   replicas: 1
-  # Festplatte für Daten. Ein Megabyte würde für vier Lerndokumente ausreichen, aber es ist
-  # einfacher, das Volume von vornherein großzügig zu bemessen, als es später zu erweitern.
+  # Disk for data. A megabyte would be enough for four learning documents, but it is
+  # easier to size the volume generously up front than to expand it later.
   size: 5Gi
-  # replicated — Volumes, die eine Kopie auf einem anderen Cluster-Knoten haben: fällt ein Knoten aus,
-  # bleiben die Daten erhalten.
+  # replicated — volumes that have a copy on another cluster node: a node drops out,
+  # the data remains.
   storageClass: replicated
-  # CPU und Arbeitsspeicher, die dem Datenbank-Pod zugewiesen sind. Mehr als genug für vier Dokumente.
+  # CPU and memory allocated to the database pod. More than enough for four documents.
   resourcesPreset: s1.small
-  # MongoDB-Zweig. Ein nachträgliches Ändern an einer laufenden Datenbank ist ohne ein Upgrade nicht möglich.
+  # MongoDB branch. Changing it after the fact on a live database is not possible without an upgrade.
   version: v8
-  # false — die Datenbank ist nur von innerhalb des Clusters erreichbar, es wird kein Port nach außen bereitgestellt.
-  # Sie greifen von einem daneben gestarteten Arbeits-Pod darauf zu.
+  # false — the database is reachable only from inside the cluster, no port is exposed outward.
+  # You will access it from a working pod started alongside it.
   external: false
-  # Sharding verteilt Daten über mehrere Gruppen von Servern. Nötig, wenn
-  # die Daten nicht auf einen einzelnen Server passen; vier Ausweise passen.
+  # Sharding splits data across several sets of servers. Needed when
+  # the data does not fit on a single server; four passes do fit.
   sharding: false
-  # Der Datenbankbenutzer und sein Passwort. Denken Sie sich Ihr eigenes Passwort aus und merken Sie es sich: es wird benötigt
-  # vom Arbeits-Pod (im MONGO_URI-Verbindungsstring) und vom Prüfskript
-  # (der Variable MONGO_PASSWORD). Das Konto wird in der Dienstdatenbank admin angelegt —
-  # deshalb ist authSource=admin im Verbindungsstring zwingend erforderlich.
+  # The database user and its password. Come up with your own password and remember it: it is needed
+  # by the working pod (in the MONGO_URI connection string) and by the check script
+  # (the MONGO_PASSWORD variable). The account is created in the service database admin —
+  # that is why authSource=admin is mandatory in the connection string.
   users:
     passapp:
-      password: ЗдесьВашПароль
-  # Die Datenbank passes und die Rechte darin: dem Benutzer passapp wird die admin-Rolle dieser Datenbank gewährt,
-  # das heißt, er kann lesen, schreiben, Indizes erstellen und Collection-Einstellungen ändern.
-  # Rechte an anderen Datenbanken gewährt dies nicht.
+      password: YourPasswordHere
+  # The passes database and permissions in it: the passapp user is granted the admin role of this database,
+  # meaning it can read, write, build indexes and change collection settings.
+  # This does not grant rights to other databases.
   databases:
     passes:
       roles:
         admin:
           - passapp
-  # Backups in den Objektspeicher. Auf dem Lernstand deaktiviert.
+  # Backups to object storage. Disabled on the learning stand.
   backup:
     enabled: false

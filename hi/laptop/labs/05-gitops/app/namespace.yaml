@@ -1,29 +1,29 @@
 ---
-# लैब 5 · Git में इंफ्रास्ट्रक्चर। «गेस्ट पास» सेवा के लिए नेमस्पेस।
+# Lab 5 · Infrastructure in Git. Namespace for the "Passes" service.
 #
-# यह फ़ाइल क्लस्टर पर हाथ से लागू नहीं की जाती। आप इसे GitHub पर अपनी रिपॉज़िटरी में,
-# apps/ फ़ोल्डर में रखते हैं, और Flux इसे `lab` क्लस्टर में ले जाता है — खुद, एक शेड्यूल पर:
+# This file is not applied to the cluster by hand. You put it into your repository on
+# GitHub, into the apps/ folder, and Flux carries it into the `lab` cluster — on its own, on a schedule:
 #     cp app/*.yaml ~/passes-gitops/apps/
 #     cd ~/passes-gitops && git add apps && git commit -m "add passes service v1" && git push
 #
-# किसी भी मैनिफ़ेस्ट को कैसे पढ़ें: apiVersion — विवरण स्कीमा का संस्करण (इससे क्लस्टर जानता है
-# कि इसे कैसे पार्स करना है), kind — हम क्या बना रहे हैं, metadata.name — वह नाम जिससे ऑब्जेक्ट को बाद में
-# खोजा जाता है। ये तीन फ़ील्ड हर ऑब्जेक्ट में मौजूद होते हैं और नीचे अलग से नहीं समझाए जाते।
+# How to read any manifest: apiVersion — the version of the description schema (the cluster uses it to know
+# how to parse the object), kind — what we are creating, metadata.name — the name by which the object is
+# later found. These three fields are present in every object and are not explained separately below.
 #
-# नेमस्पेस (namespace) — एक ही क्लस्टर के भीतर एक तार्किक विभाजन:
-# अपना नाम-क्षेत्र, अपने अधिकार, अपने कोटा। vSphere में इसके सबसे निकट vCenter वृक्ष में एक फ़ोल्डर
-# या एक resource pool है।
+# A namespace is a logical partition inside a single cluster:
+# its own name scope, its own permissions, its own quotas. The closest thing in vSphere is a folder
+# in the vCenter tree or a resource pool.
 #
-# यह एप्लिकेशन के साथ Git में क्यों रहता है, हाथ से क्यों नहीं बनाया जाता: जब सेवा
-# रिपॉज़िटरी से चली जाएगी, Flux नेमस्पेस को भी हटा देगा। कोई खाली विभाजन पीछे नहीं बचेगा,
-# जिसके बारे में आधे साल बाद कोई याद नहीं रखेगा कि इसे क्यों बनाया गया था।
+# Why it lives in Git together with the application instead of being created by hand: when the service leaves
+# the repository, Flux will remove the namespace too. No empty partition will be left behind,
+# the one that six months later nobody remembers why it was created.
 apiVersion: v1
 kind: Namespace
 metadata:
   name: passes
-  # यह लेबल सेवा के काम करने पर असर नहीं डालता — यह इसलिए ज़रूरी है कि एक ही कमांड से वह सब कुछ मिल जाए,
-  # जो «गेस्ट पास» से संबंधित है: kubectl get all -A -l app.kubernetes.io/part-of=passes.
-  # part-of नाम Kubernetes के सर्वस्वीकृत लेबल-समूह से लिया गया है, हमारे द्वारा गढ़ा नहीं गया:
-  # बाहरी उपकरण (मॉनिटरिंग, एक्सपोर्ट) ठीक इसी को खोजते हैं।
+  # The label does not affect how the service runs — it is needed so that a single command can find everything
+  # that belongs to "Passes": kubectl get all -A -l app.kubernetes.io/part-of=passes.
+  # The part-of name is taken from the common set of Kubernetes labels, not invented by us:
+  # third-party tools (monitoring, exports) look for exactly this one.
   labels:
     app.kubernetes.io/part-of: passes

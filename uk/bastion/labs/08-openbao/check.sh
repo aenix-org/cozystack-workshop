@@ -1,50 +1,49 @@
 #!/usr/bin/env bash
-# Перевірка лаби 8: пароль винесено з маніфесту в OpenBao і він живе за правилами.
+# Check for lab 8: the password is moved out of the manifest into OpenBao and lives by the rules.
 #
-# Перевіряємо не «об'єкт створено», а суть: сховище розпечатано, секрет читається
-# за токеном, версій більше однієї (отже, ротація справді була), аудит
-# увімкнено, а в застосованому маніфесті застосунку немає паролів відкритим текстом.
+# We check not "the object was created" but the essence: the vault is unsealed, the secret is
+# readable by token, there is more than one version (which means rotation actually happened), audit
+# is enabled, and the applied application manifest has no plaintext passwords.
 #
-# Жоден секрет до звіту не потрапляє. Значення не друкуються ніде.
+# No secret ends up in the report. Values are not printed anywhere.
 #
-# Скрипт піднімає одноразові Pod з curl, тому працює близько хвилини.
+# The script spins up throwaway pods with curl, so it takes about a minute to run.
 
-# LAB_NAME і LAB_TITLE ідуть у шапку звіту. Нижче підключається спільна бібліотека
-# перевірок: з неї беруться ok / warn / fail / evidence / finish і функції, які
-# запускають одноразові Pod всередині кластера. need_kubeconfig і need_tenant
-# зупиняють скрипт заздалегідь, якщо доступ або номер тенанта не задані: інакше
-# провалиться все одразу і зі звіту неможливо буде зрозуміти причину.
+# LAB_NAME and LAB_TITLE go into the report header. Below, the shared checks library is sourced:
+# it provides ok / warn / fail / evidence / finish and the functions that spin up throwaway pods
+# inside the cluster. need_kubeconfig and need_tenant stop the script early if access or the tenant
+# number are not set: otherwise everything would fail at once and the report would give no clue why.
 LAB_NAME="08-openbao"
-LAB_TITLE="Лаба 8 · Секрети не в маніфесті"
+LAB_TITLE="Lab 8 · Secrets not in the manifest"
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
 need_kubeconfig
 need_tenant
 
-# --- куди дивитися ---------------------------------------------------------
-# COZY_TENANT учасник задає як `workshop07`, але namespace називається
-# `tenant-workshop07`. Приймаємо обидва написання: помилитися тут легко, а
-# повідомлення про помилку було б невиразним («сервіс не відповідає»).
+# --- where to look ---------------------------------------------------------
+# The participant sets COZY_TENANT as `workshop07`, but the namespace is called
+# `tenant-workshop07`. We accept both spellings: it is easy to slip here, and the
+# error message would be cryptic ("service not responding").
 NS="$COZY_TENANT"
 case "$NS" in
   tenant-*) ;;
   *) NS="tenant-$NS" ;;
 esac
 
-# Що і де шукаємо. BAO_APP — ім'я застосунку OpenBao у тенанті, і воно входить у
-# внутрішню адресу сховища: назвали застосунок інакше — запускайте перевірку
-# як BAO_APP=ім'я ./check.sh. SECRET_PATH — шлях усередині сховища, за яким
-# лаба кладе пароль від бази.
+# What and where we look for. BAO_APP is the name of the OpenBao application in the tenant, and it is
+# part of the vault's internal address: if you named the application differently, run the check
+# as BAO_APP=name ./check.sh. SECRET_PATH is the path inside the vault where the lab puts the
+# database password.
 BAO_APP="${BAO_APP:-secrets}"
 BAO_URL="http://openbao-${BAO_APP}.${NS}.svc.cozy.local:8200"
 APP_DEPLOY="${APP_DEPLOY:-secrets-demo}"
 SECRET_PATH="${SECRET_PATH:-passes/db}"
 
-evidence "Адреса сховища" "$BAO_URL"
+evidence "Vault address" "$BAO_URL"
 
-# Дістати значення за ланцюжком ключів із JSON на стандартному вводі.
-# Повернення 1, якщо шляху немає або це не JSON, — так той, хто викликає, відрізняє
-# «ключа немає» від «порожнє значення».
+# Pull a value by a chain of keys from JSON on standard input.
+# Returns 1 if the path does not exist or it is not JSON, so the caller can tell
+# "no such key" from "empty value".
 jget() {
   python3 -c '
 import sys, json
@@ -62,13 +61,13 @@ print("" if d is None else d)
 }
 
 
-# Запит до OpenBao. Токен передаємо змінною оточення з тимчасового Secret'а,
-# а НЕ заголовком в аргументах: аргументи Pod бачить будь-хто з `get pods`, вони лежать
-# в etcd і йдуть в audit log. Тут це root-токен сховища — саме той витік,
-# проти якого написана вся лаба.
+# A request to OpenBao. We pass the token via an environment variable from a temporary Secret,
+# and NOT as a header in the arguments: a pod's arguments are visible to anyone with `get pods`,
+# they sit in etcd and go into the audit log. Here it is the vault's root token — exactly the leak
+# the whole lab is written against.
 #
-# Визначення стоїть ПЕРЕД першим викликом: коли воно лежало всередині гілки else, найперша
-# перевірка викликала неіснуючу функцію і лаба не складалася ніколи.
+# The definition sits BEFORE the first call: when it lived inside the else branch, the very first
+# check called a nonexistent function and the lab could never pass.
 bao_get() {
   in_cluster_with_secrets "curlimages/curl:8.11.1" \
     "BAO_TOKEN=${BAO_TOKEN:-}
@@ -77,57 +76,56 @@ BAO_PATH=$1" \
     sh -c 'curl -s --max-time 15 -H "X-Vault-Token: $BAO_TOKEN" "$BAO_URL$BAO_PATH"'
 }
 
-# --- 1. сховище відповідає -------------------------------------------------
-# Найперший запит відповідає одразу на два питання: чи піднявся застосунок і чи вірно
-# вказано номер тенанта. Запитуємо стан печатки — це єдина адреса, яку
-# OpenBao віддає без токена. Порожня відповідь далі означає «зв'язку немає», і всі перевірки
-# вмісту втрачають сенс.
+# --- 1. the vault responds -------------------------------------------------
+# The very first request answers two questions at once: did the application come up, and is the
+# tenant number correct. We ask for the seal status — it is the only endpoint OpenBao serves without
+# a token. An empty response further down means "no connection", and all content checks lose meaning.
 SEAL="$(bao_get "/v1/sys/seal-status")"
 
 if [ -z "$SEAL" ]; then
-  fail "OpenBao не відповідає за адресою ${BAO_URL}" \
-       "перевірте номер тенанта в COZY_TENANT та ім'я застосунку (за замовчуванням 'secrets'; інакше BAO_APP=ім'я ./check.sh); у дашборді застосунок має бути в готовому стані"
+  fail "OpenBao does not respond at ${BAO_URL}" \
+       "check the tenant number in COZY_TENANT and the application name (default 'secrets'; otherwise BAO_APP=name ./check.sh); in the dashboard the application must be in the ready state"
 else
-  ok "OpenBao відповідає за внутрішньою адресою тенанта"
+  ok "OpenBao responds at the tenant's internal address"
 fi
 
-# --- 2. ініціалізовано -----------------------------------------------------
-# Ініціалізація — разова операція, під час якої сховище створює собі майстер-ключ
-# і перший токен. Поки її не зробили, всередині немає нічого: ні секретів, ні місця під них.
+# --- 2. initialized --------------------------------------------------------
+# Initialization is a one-time operation in which the vault creates its master key
+# and first token. Until it is done, there is nothing inside: no secrets, no place for them.
 INITED="$(printf '%s' "$SEAL" | jget initialized)"
 if [ "$INITED" = "True" ]; then
-  ok "сховище ініціалізовано"
+  ok "vault is initialized"
 elif [ -n "$SEAL" ]; then
-  fail "сховище не ініціалізовано" \
-       "виконайте: kubectl exec bao-workbench -- bao operator init -key-shares=1 -key-threshold=1 і збережіть вивід"
+  fail "vault is not initialized" \
+       "run: kubectl exec bao-workbench -- bao operator init -key-shares=1 -key-threshold=1 and save the output"
 fi
 
-# --- 3. розпечатано --------------------------------------------------------
-# Запечатане сховище — звичайний стан після перезапуску Pod: дані на диску
-# лежать, але прочитати їх нічим, поки не введено unseal-ключ. Звідси й вимога
-# перевіряти поведінку, а не наявність об'єкта: «застосунок готовий» і «секрети віддаються» —
-# це два різні твердження, і друге з першого не випливає.
+# --- 3. unsealed -----------------------------------------------------------
+# A sealed vault is the normal state after a pod restart: the data is on disk, but there is nothing
+# to read it with until the unseal key is entered. Hence the requirement to check behavior, not the
+# presence of an object: "application ready" and "secrets are served" are two different statements,
+# and the second does not follow from the first.
 SEALED="$(printf '%s' "$SEAL" | jget sealed)"
 if [ "$SEALED" = "False" ]; then
-  ok "сховище розпечатано і обслуговує запити"
-  evidence "Стан сховища" "$SEAL"
+  ok "vault is unsealed and serving requests"
+  evidence "Vault state" "$SEAL"
 elif [ -n "$SEAL" ]; then
-  fail "сховище запечатано — на будь-який запит воно відповідає відмовою 503" \
-       "виконайте: kubectl exec bao-workbench -- bao operator unseal <ваш-unseal-ключ>"
-  evidence "Стан сховища" "$SEAL"
+  fail "vault is sealed — it answers any request with a 503 refusal" \
+       "run: kubectl exec bao-workbench -- bao operator unseal <your-unseal-key>"
+  evidence "Vault state" "$SEAL"
 fi
 
-# --- 4. секрет на місці і читається ----------------------------------------
-# Далі потрібен токен. Без нього перевіряти нічого, але й мовчки пропускати не можна:
-# читач повинен побачити, чого не вистачає.
+# --- 4. the secret is in place and readable --------------------------------
+# Next we need a token. Without it there is nothing to check, but we must not silently skip either:
+# the reader must see what is missing.
 if [ -z "$SEAL" ]; then
-  # Зв'язку немає — перевіряти вміст безглуздо. Мовчимо, щоб не завалити
-  # звіт чотирма провалами, у яких одна й та сама причина, названа вище.
-  warn "вміст сховища не перевірено: до OpenBao немає зв'язку" \
-       "розберіться зі зв'язком, потім запустіть скрипт знову"
+  # No connection — checking the content is pointless. We stay quiet so as not to swamp the
+  # report with four failures that all share the same cause, named above.
+  warn "vault content not checked: no connection to OpenBao" \
+       "sort out the connection, then run the script again"
 elif [ -z "${BAO_TOKEN:-}" ]; then
-  fail "не задано змінну BAO_TOKEN, тому вміст сховища не перевірено" \
-       "export BAO_TOKEN='root-токен, надрукований при першій розпечатці сховища' і запустіть скрипт знову"
+  fail "the BAO_TOKEN variable is not set, so vault content was not checked" \
+       "export BAO_TOKEN='the root token printed at the first unseal of the vault' and run the script again"
 else
 
   DATA="$(bao_get "/v1/secret/data/${SECRET_PATH}")"
@@ -135,61 +133,61 @@ else
   DATA_VERSION="$(printf '%s' "$DATA" | jget data metadata version)"
 
   if [ -n "$PASS_PRESENT" ]; then
-    ok "секрет secret/${SECRET_PATH} читається за токеном, поле password не порожнє"
-    # У звіт кладемо номер версії, а не значення.
-    evidence "Секрет" "шлях: secret/${SECRET_PATH}
-поле password: є (значення приховано)
-поточна версія: ${DATA_VERSION:-невідома}"
+    ok "secret secret/${SECRET_PATH} is readable by token, the password field is not empty"
+    # Into the report we put the version number, not the value.
+    evidence "Secret" "path: secret/${SECRET_PATH}
+password field: present (value hidden)
+current version: ${DATA_VERSION:-unknown}"
   else
-    fail "за шляхом secret/${SECRET_PATH} немає поля password" \
-         "покладіть його: kubectl exec bao-workbench -- bao kv put secret/${SECRET_PATH} password=... ; якщо рушій ще не увімкнено — bao secrets enable -path=secret kv-v2"
+    fail "there is no password field at secret/${SECRET_PATH}" \
+         "put it there: kubectl exec bao-workbench -- bao kv put secret/${SECRET_PATH} password=... ; if the engine is not enabled yet — bao secrets enable -path=secret kv-v2"
   fi
 
-  # --- 5. ротація справді була --------------------------------------------
-  # Одна-єдина версія секрету означає, що його поклали і забули. Ротація —
-  # те, заради чого сховище й заводять: змінити пароль в одному місці, а не шукати його
-  # по маніфестах. Рахуємо не обіцянки, а версії: їхній лік сховище веде саме.
+  # --- 5. rotation actually happened --------------------------------------
+  # A single version of a secret means it was set once and forgotten. Rotation is the whole reason
+  # to have a vault: change the password in one place instead of hunting for it across manifests.
+  # We count not promises but versions: the vault keeps that count itself.
   META="$(bao_get "/v1/secret/metadata/${SECRET_PATH}")"
   CUR_VER="$(printf '%s' "$META" | jget data current_version)"
   case "$CUR_VER" in
     ''|*[!0-9]*) CUR_VER=0 ;;
   esac
   if [ "$CUR_VER" -ge 2 ]; then
-    ok "секрет змінювався: версій ${CUR_VER}, отже ротація проходила не лише на словах"
-    evidence "Історія версій секрету" "$(printf '%s' "$META" | jget data versions)"
+    ok "the secret was changed: ${CUR_VER} versions, so rotation happened for real and not just in words"
+    evidence "Secret version history" "$(printf '%s' "$META" | jget data versions)"
   else
-    fail "у секрету лише одна версія — ротацію не робили" \
-         "змініть пароль: kubectl exec bao-workbench -- bao kv put secret/${SECRET_PATH} password=<новий> і перезапустіть застосунок"
+    fail "the secret has only one version — rotation was not done" \
+         "change the password: kubectl exec bao-workbench -- bao kv put secret/${SECRET_PATH} password=<new> and restart the application"
   fi
 
-  # --- 6. політика вузька, а не «все можна» --------------------------------
-  # Політика і є відповідь на питання «що зможе зробити той, хто здобув токен». Тому
-  # дивимося не на факт її існування, а на вміст: чи видана вона на конкретний
-  # шлях замість усього сховища і чи лише на читання.
+  # --- 6. the policy is narrow, not "anything goes" ------------------------
+  # The policy is the answer to "what will someone who obtained the token be able to do". So we look
+  # not at the fact of its existence but at its content: is it granted on a specific path instead of
+  # the whole vault, and is it read-only.
   POL="$(bao_get "/v1/sys/policies/acl/passes-read")"
   POL_BODY="$(printf '%s' "$POL" | jget data policy)"
   if [ -n "$POL_BODY" ]; then
-    ok "політика passes-read існує"
-    evidence "Політика passes-read" "$POL_BODY"
+    ok "the passes-read policy exists"
+    evidence "passes-read policy" "$POL_BODY"
     if printf '%s' "$POL_BODY" | grep -q 'secret/data/'"${SECRET_PATH}"; then
-      ok "політика видана на конкретний шлях, а не на все сховище"
+      ok "the policy is granted on a specific path, not on the whole vault"
     else
-      warn "політика є, але шляху secret/data/${SECRET_PATH} в ній не видно" \
-           "перевірте, що в політиці вказано приставку data: secret/data/${SECRET_PATH}"
+      warn "the policy exists, but the path secret/data/${SECRET_PATH} is not visible in it" \
+           "check that the policy uses the data prefix: secret/data/${SECRET_PATH}"
     fi
     if printf '%s' "$POL_BODY" | grep -Eq '"(create|update|delete|sudo)"'; then
-      warn "політика дозволяє не лише читання" \
-           "застосунку достатньо read; зайві права варто прибрати"
+      warn "the policy allows more than reading" \
+           "the application only needs read; the extra permissions should be removed"
     fi
   else
-    fail "політику passes-read не знайдено" \
-         "створіть її: kubectl exec -i bao-workbench -- bao policy write passes-read - < ваш файл політики (розбір політики — у README)"
+    fail "the passes-read policy was not found" \
+         "create it: kubectl exec -i bao-workbench -- bao policy write passes-read - < your policy file (policy walkthrough — in the README)"
   fi
 
-  # --- 7. аудит увімкнено --------------------------------------------------
-  # Без журналу аудиту на питання «хто і коли читав цей секрет» відповісти нічим — а це
-  # перше питання, яке ставлять після інциденту. Рахуємо підключені пристрої
-  # журналювання: хоча б один має бути.
+  # --- 7. audit is enabled -------------------------------------------------
+  # Without an audit log there is nothing to answer "who read this secret and when" with — and that
+  # is the first question asked after an incident. We count the attached audit devices: there must
+  # be at least one.
   AUD="$(bao_get "/v1/sys/audit")"
   AUD_COUNT="$(printf '%s' "$AUD" | python3 -c '
 import sys, json
@@ -204,36 +202,36 @@ print(len([k for k in data if isinstance(data.get(k), dict)]))
     ''|*[!0-9]*) AUD_COUNT=0 ;;
   esac
   if [ "$AUD_COUNT" -ge 1 ]; then
-    ok "аудит-журнал увімкнено (пристроїв: ${AUD_COUNT})"
-    evidence "Аудит-пристрої" "$AUD"
+    ok "audit log is enabled (devices: ${AUD_COUNT})"
+    evidence "Audit devices" "$AUD"
   else
-    warn "аудит-журнал не увімкнено — відповісти, хто читав секрет, буде нічим" \
-         "увімкніть: kubectl exec bao-workbench -- bao audit enable file file_path=stdout"
+    warn "audit log is not enabled — there will be nothing to answer who read the secret with" \
+         "enable it: kubectl exec bao-workbench -- bao audit enable file file_path=stdout"
   fi
 fi
 
-# --- 8. застосунок у лабораторному кластері --------------------------------
-# Досі ми перевіряли сховище на кластері керування. Далі — ваш кластер lab,
-# де живе сам застосунок. Важливий тут не факт, що Deployment створено, а наявність
-# готових копій: init-контейнер, який не зумів забрати пароль, не дасть Pod піднятися,
-# і саме цей стан треба відрізнити від «все добре».
+# --- 8. the application in the lab cluster ---------------------------------
+# Up to here we checked the vault on the management cluster. Next comes your lab cluster, where the
+# application itself lives. What matters here is not the fact that the Deployment was created, but the
+# presence of ready replicas: an init container that failed to fetch the password will not let the pod
+# come up, and it is exactly this state that must be told apart from "all good".
 if ! kubectl get deploy "$APP_DEPLOY" >/dev/null 2>&1; then
-  fail "у лабораторному кластері немає застосунку ${APP_DEPLOY}" \
-       "застосуйте: kubectl apply -f secrets-demo.yaml (не забувши підставити свій номер тенанта)"
+  fail "the lab cluster has no application ${APP_DEPLOY}" \
+       "apply: kubectl apply -f secrets-demo.yaml (do not forget to substitute your tenant number)"
 else
   READY="$(kubectl get deploy "$APP_DEPLOY" -o jsonpath='{.status.readyReplicas}' 2>/dev/null)"
   case "$READY" in
     ''|*[!0-9]*) READY=0 ;;
   esac
   if [ "$READY" -ge 1 ]; then
-    ok "застосунок ${APP_DEPLOY} запущено (готових копій: ${READY})"
+    ok "application ${APP_DEPLOY} is running (ready replicas: ${READY})"
   else
-    fail "застосунок ${APP_DEPLOY} є, але жодна копія не готова" \
-         "дивіться kubectl describe deploy/${APP_DEPLOY} і kubectl logs deploy/${APP_DEPLOY} -c fetch-secret — зазвичай init-контейнер не зміг достукатися до сховища або отримав відмову за токеном"
+    fail "application ${APP_DEPLOY} exists, but no replica is ready" \
+         "look at kubectl describe deploy/${APP_DEPLOY} and kubectl logs deploy/${APP_DEPLOY} -c fetch-secret — usually the init container could not reach the vault or was refused by token"
   fi
 
-  # --- 9. у маніфесті немає паролів відкритим текстом ----------------------
-  # Дивимося застосований об'єкт, а не файл на диску: застосувати могли будь-що.
+  # --- 9. no plaintext passwords in the manifest ---------------------------
+  # We look at the applied object, not the file on disk: anything could have been applied.
   LEAKS="$(kubectl get deploy "$APP_DEPLOY" -o json 2>/dev/null | python3 -c '
 import sys, json, re
 try:
@@ -246,50 +244,50 @@ found = []
 for c in list(spec.get("initContainers", [])) + list(spec.get("containers", [])):
     for e in c.get("env", []):
         if "value" in e and suspicious.search(e.get("name", "")):
-            found.append("%s / env %s задано значенням, а не посиланням" % (c.get("name"), e.get("name")))
+            found.append("%s / env %s is set by value, not by reference" % (c.get("name"), e.get("name")))
 print("\n".join(found))
 ' 2>/dev/null)"
 
   if [ -z "$LEAKS" ]; then
-    ok "у маніфесті застосунку немає змінних з паролем, заданим значенням"
+    ok "the application manifest has no variables with a password set by value"
   else
-    fail "у маніфесті застосунку залишилися чутливі значення відкритим текстом" \
-         "приберіть їх: значення має приходити зі сховища, а в маніфесті — лише посилання. Див. secrets-demo.yaml"
-    evidence "Що знайдено в маніфесті" "$LEAKS"
+    fail "the application manifest still has sensitive values in plaintext" \
+         "remove them: the value must come from the vault, and the manifest — only a reference. See secrets-demo.yaml"
+    evidence "What was found in the manifest" "$LEAKS"
   fi
 
-  # --- 10. застосунок справді отримав секрет -------------------------------
-  # Останній доказ беремо з логів, а не з опису об'єкта. Маніфест може
-  # бути бездоганним, а пароль у Pod так і не приїхати. Дивимося на дві речі одразу:
-  # init-контейнер повідомив, що сходив у сховище, і застосунок друкує відбиток —
-  # отже, з отриманим паролем він справді працює.
+  # --- 10. the application actually received the secret --------------------
+  # The final proof comes from the logs, not from the object description. The manifest can be
+  # flawless while the password never arrives in the pod. We look at two things at once: the init
+  # container reported that it went to the vault, and the application prints a fingerprint —
+  # meaning it really works with the received password.
   INIT_LOG="$(kubectl logs "deploy/${APP_DEPLOY}" -c fetch-secret --tail=5 2>/dev/null)"
   if printf '%s' "$INIT_LOG" | grep -qi 'openbao'; then
-    ok "init-контейнер забрав секрет зі сховища"
-    evidence "Лог init-контейнера" "$INIT_LOG"
+    ok "the init container fetched the secret from the vault"
+    evidence "Init container log" "$INIT_LOG"
   else
-    fail "не видно, щоб init-контейнер забирав секрет зі сховища" \
-         "перевірте kubectl logs deploy/${APP_DEPLOY} -c fetch-secret; якщо контейнера немає — застосовано старий маніфест"
+    fail "there is no sign that the init container fetched the secret from the vault" \
+         "check kubectl logs deploy/${APP_DEPLOY} -c fetch-secret; if there is no such container — an old manifest was applied"
   fi
 
   APP_LOG="$(kubectl logs "deploy/${APP_DEPLOY}" -c app --tail=3 2>/dev/null)"
   if printf '%s' "$APP_LOG" | grep -q 'sha256:'; then
-    ok "застосунок працює з отриманим паролем (у лог пишеться відбиток, а не значення)"
-    evidence "Лог застосунку" "$APP_LOG"
+    ok "the application works with the received password (a fingerprint is written to the log, not the value)"
+    evidence "Application log" "$APP_LOG"
   else
-    fail "у лозі застосунку немає відбитка пароля" \
-         "перевірте kubectl logs deploy/${APP_DEPLOY} -c app — контейнер міг не стартувати"
+    fail "the application log has no password fingerprint" \
+         "check kubectl logs deploy/${APP_DEPLOY} -c app — the container may have failed to start"
   fi
 fi
 
-# --- 11. наївний секрет прибрано -------------------------------------------
-# Зараховуємо «видалено» лише якщо лабу взагалі робили: на чистому кластері секрету
-# не було ніколи, і звіт хвалив би учасника за прибирання, якого не відбувалося.
+# --- 11. the naive secret is removed ---------------------------------------
+# We count it as "removed" only if the lab was actually done: on a clean cluster the secret never
+# existed, and the report would praise the participant for a cleanup that never happened.
 if kubectl get secret passes-db >/dev/null 2>&1; then
-  warn "у кластері залишився секрет passes-db з наївного ступеня" \
-       "він більше не потрібен і містить старий пароль: kubectl delete secret passes-db"
+  warn "the cluster still has the passes-db secret from the naive stage" \
+       "it is no longer needed and holds the old password: kubectl delete secret passes-db"
 elif kubectl get deployment secrets-demo >/dev/null 2>&1; then
-  ok "наївний секрет passes-db видалено"
+  ok "the naive passes-db secret has been removed"
 fi
 
 finish

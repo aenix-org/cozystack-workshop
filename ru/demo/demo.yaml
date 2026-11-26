@@ -1,7 +1,7 @@
-# Демо-стенд Cozystack — набор managed-сервисов для показа каталога и метрик.
-# Применение одной командой:
+# Cozystack demo stand — a set of managed services to showcase the catalog and metrics.
+# Apply with a single command:
 #   kubectl apply -f https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/demo/demo.yaml
-# Все объекты создаются в tenant-workshop00.
+# All objects are created in tenant-workshop00.
 ---
 apiVersion: apps.cozystack.io/v1alpha1
 kind: Postgres

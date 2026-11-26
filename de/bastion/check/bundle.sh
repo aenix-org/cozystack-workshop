@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# Sammelt die Ergebnisse aller Labs in einer einzigen Datei zum Hochladen in das Zertifizierungssystem.
+# Collects the results of all labs into a single file for upload to the certification system.
 #
-# Wichtige Eigenschaft: Das Skript FÜHRT NICHTS ERNEUT AUS. Es nimmt das, was jedes Lab
-# in dem Moment aufgezeichnet hat, als Sie es eingereicht haben. Andernfalls käme Folgendes
-# heraus: Die Labs selbst weisen Sie an, hinter sich aufzuräumen, und die Tenant-Quota lässt
-# es nicht zu, alle Dienste wochenlang laufen zu lassen — eine abschließende Nachprüfung würde
-# also einen Fehlschlag für Arbeit anzeigen, die vor drei Wochen ehrlich erledigt wurde.
+# Important property: the script DOES NOT RE-RUN ANYTHING. It takes what each lab
+# recorded at the moment you submitted it. Otherwise you would get this: the labs
+# themselves tell you to clean up after yourself, and the tenant quota won't let you
+# keep all the services running for weeks — so a final re-check would show a failure
+# for work honestly done three weeks ago.
 #
-#   ./bundle.sh                 alles Gefundene sammeln
-#   ./bundle.sh --rerun 07-redis  ein einzelnes Lab erneut durchlaufen und sein Ergebnis aktualisieren
+#   ./bundle.sh                 collect everything found
+#   ./bundle.sh --rerun 07-redis  re-run a single lab and update its result
 #
 set -uo pipefail
 
@@ -18,23 +18,23 @@ REPO="$(cd "$HERE/.." && pwd)"
 OUT="${1:-$HOME/cozystack-labs-bundle.json}"
 
 if [ "${1:-}" = "--rerun" ]; then
-  lab="${2:?geben Sie ein Lab an, zum Beispiel: ./bundle.sh --rerun 07-redis}"
-  [ -d "$REPO/labs/$lab" ] || { echo "kein solches Lab: $lab"; exit 1; }
-  echo "durchlaufe $lab erneut…"
+  lab="${2:?specify a lab, for example: ./bundle.sh --rerun 07-redis}"
+  [ -d "$REPO/labs/$lab" ] || { echo "no such lab: $lab"; exit 1; }
+  echo "re-running $lab…"
   ( cd "$REPO/labs/$lab" && ./check.sh )
-  echo "Ergebnis aktualisiert, führen Sie jetzt ./bundle.sh ohne Optionen aus"
+  echo "result updated, now run ./bundle.sh without options"
   exit 0
 fi
 
 if [ ! -d "$RESULTS_DIR" ] || [ -z "$(ls -A "$RESULTS_DIR" 2>/dev/null)" ]; then
   cat <<'MSG'
-Keine Ergebnisse gefunden.
+No results found.
 
-Jedes Lab speichert sein Ergebnis, wenn Sie darin ./check.sh ausführen.
-Schließen Sie mindestens eines ab und führen Sie die Prüfung aus — kommen Sie dann hierher zurück.
+Each lab saves its result when you run ./check.sh in it.
+Complete at least one and run the check — then come back here.
 
-Wenn Sie die Labs auf einem anderen Rechner durchgeführt haben, kopieren Sie von dort den Ordner
-~/.cozystack-labs/results oder geben Sie den Pfad an: COZY_LAB_RESULTS=/pfad ./bundle.sh
+If you ran the labs on a different machine, copy the folder
+~/.cozystack-labs/results from there or specify the path: COZY_LAB_RESULTS=/path ./bundle.sh
 MSG
   exit 1
 fi
@@ -44,9 +44,9 @@ import json, os, sys, glob, datetime
 
 results_dir, out_path, repo = sys.argv[1], sys.argv[2], sys.argv[3]
 
-# Wie viele Labs es überhaupt gibt — gezählt anhand des Vorhandenseins eines Prüfskripts.
-# Das sechzehnte ("Was am Montag zu tun ist") hat kein Skript: Es ist eine Textübung,
-# und es zählt nicht für die Bewertung.
+# How many labs exist at all — counted by the presence of a check script.
+# The sixteenth one ("What to do on Monday") has no script: it is a text
+# exercise, and it does not count toward the grade.
 all_labs = sorted(
     os.path.basename(os.path.dirname(p))
     for p in glob.glob(os.path.join(repo, "labs", "*", "check.sh"))
@@ -58,10 +58,10 @@ for path in sorted(glob.glob(os.path.join(results_dir, "result-*.json"))):
         with open(path) as fh:
             d = json.load(fh)
     except Exception as exc:
-        problems.append(f"{os.path.basename(path)}: kann nicht gelesen werden ({exc})")
+        problems.append(f"{os.path.basename(path)}: cannot be read ({exc})")
         continue
     if d.get("schema_version") != 1:
-        problems.append(f"{os.path.basename(path)}: unbekannte Formatversion")
+        problems.append(f"{os.path.basename(path)}: unknown format version")
         continue
     labs.append(d)
     if d.get("env", {}).get("cluster_uid"):
@@ -80,46 +80,46 @@ bundle = {
                       .strftime("%Y-%m-%dT%H:%M:%SZ"),
     "labs_total": len(all_labs),
     "labs_passed": len(passed),
-    "cluster_uids": sorted(uids),          # mehr als eins — auf verschiedenen Clustern durchgeführt
+    "cluster_uids": sorted(uids),          # more than one — done on different clusters
     "kubernetes_versions": sorted(versions),
     "results": labs,
 }
 with open(out_path, "w") as fh:
     json.dump(bundle, fh, ensure_ascii=False, indent=1)
 
-# Dasselbe als Klartext — damit eine Person sehen kann, was sie sendet.
+# The same thing in plain text — so a person can see what they are sending.
 txt = out_path.rsplit(".", 1)[0] + ".txt"
 with open(txt, "w") as fh:
-    fh.write("Cozystack-Laborergebnisse\n")
-    fh.write("Gesammelt: %s\n\n" % bundle["generated_at"])
-    fh.write("%d von %d Labs bestanden\n\n" % (len(passed), len(all_labs)))
+    fh.write("Cozystack lab results\n")
+    fh.write("Collected: %s\n\n" % bundle["generated_at"])
+    fh.write("Passed %d of %d labs\n\n" % (len(passed), len(all_labs)))
     for lab in all_labs:
         rec = next((d for d in labs if d["lab"] == lab), None)
         if rec is None:
-            mark, extra = "—", "kein Ergebnis"
+            mark, extra = "—", "no result"
         elif rec["verdict"] == "passed":
-            mark = "bestanden"
-            extra = "Prüfungen: %d" % len(rec["checks"])
+            mark = "passed"
+            extra = "checks: %d" % len(rec["checks"])
         else:
-            mark = "nicht bestanden"
-            extra = "fehlgeschlagen: %d" % rec["totals"]["fail"]
+            mark = "not passed"
+            extra = "failed: %d" % rec["totals"]["fail"]
         fh.write("  %-20s %-9s %s\n" % (lab, mark, extra))
-    fh.write("\nCluster: %d. Kubernetes-Versionen: %s\n"
-             % (len(uids), ", ".join(sorted(versions)) or "nicht ermittelt"))
-    fh.write("\nNur Prüfungskennungen und ihre Ergebnisse gelangen in die Datei.\n"
-             "Keine Adressen, keine Namen, keine Log-Inhalte sind darin enthalten.\n")
+    fh.write("\nClusters: %d. Kubernetes versions: %s\n"
+             % (len(uids), ", ".join(sorted(versions)) or "not determined"))
+    fh.write("\nOnly check identifiers and their outcomes go into the file.\n"
+             "No addresses, no names, no log contents are in it.\n")
 
-print("%d von %d Labs bestanden." % (len(passed), len(all_labs)))
+print("Passed %d of %d labs." % (len(passed), len(all_labs)))
 if failed:
-    print("Nicht bestanden: %s" % ", ".join(failed))
+    print("Not passed: %s" % ", ".join(failed))
 if missing:
-    print("Kein Ergebnis: %s" % ", ".join(missing))
+    print("No result: %s" % ", ".join(missing))
 if len(uids) > 1:
-    print("\nAchtung: Die Ergebnisse stammen von %d verschiedenen Clustern. Das ist zulässig, "
-          "aber der Satz wird beim Hochladen markiert." % len(uids))
+    print("\nWarning: results were taken from %d different clusters. This is allowed, "
+          "but the set will be flagged on upload." % len(uids))
 for p in problems:
-    print("  Problem: %s" % p)
-print("\nDatei zum Hochladen: %s" % out_path)
-print("Dasselbe als Klartext:  %s" % txt)
-print("Sehen Sie sich die Textdatei vor dem Senden an — sie zeigt alles, was hinausgeht.")
+    print("  problem: %s" % p)
+print("\nFile for upload: %s" % out_path)
+print("Same as plain text:  %s" % txt)
+print("Review the text file before sending — it shows everything that goes out.")
 PYEOF

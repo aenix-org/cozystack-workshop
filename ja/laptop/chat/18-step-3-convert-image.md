@@ -8,7 +8,7 @@
 
 スクリプトを GitHub からマシンへ直接取得します:
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/laptop/scripts/convert.sh
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-workshop/master/en/laptop/scripts/convert.sh
 ```
 
 開きます:
@@ -16,7 +16,7 @@ curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-work
 nano convert.sh
 ```
 
-**ここで、ステップ1でメモしておいた3つの値が役に立ちます。** ファイルの先頭付近に「自分の値を入力」というラベルの付いたブロックがあります。その中のプレースホルダーを、引用符はそのままにして自分の値に置き換えてください:
+**ここで、ステップ1でメモしておいた3つの値が役に立ちます。** ファイルの先頭付近に「PASTE YOUR VALUES」というラベルの付いたブロックがあります。その中のプレースホルダーを、引用符はそのままにして自分の値に置き換えてください:
 
 ```
 BUCKET="your-bucket-name"
@@ -28,7 +28,7 @@ SECRET_KEY="your-secretKey"
 
 nano での保存: `Ctrl+O`、次に `Enter`、続いて `Ctrl+X` で終了します。プレースホルダーが残っていないか確認します:
 ```bash
-grep ВСТАВЬТЕ convert.sh || echo "all filled in, ready to run"
+grep PASTE_ convert.sh || echo "all filled in, ready to run"
 ```
 
 実行します。必ず `sudo` を付けてください。スクリプトには root 権限が必要です:
@@ -44,6 +44,6 @@ sudo bash convert.sh
 
 最後に、スクリプトはあなたのイメージへの **presigned リンク** を表示します。出力の中から `Share:` という語で始まる行を探してください。リンクはそのすぐ後に続きます。
 
-**これで何をするか:** 同じメモ帳にコピーしてください。次のステップでノートパソコンに戻り、`manifests/03-app-vm.yaml` を開いて、`url` フィールドに貼り付けます。いま `ВСТАВЬТЕ_PRESIGNED_URL` というプレースホルダーが入っているところです。番号を入力していたときに私が注意しておいた、まさにあれです。
+**これで何をするか:** 同じメモ帳にコピーしてください。次のステップでノートパソコンに戻り、`manifests/03-app-vm.yaml` を開いて、`url` フィールドに貼り付けます。いま `PASTE_PRESIGNED_URL` というプレースホルダーが入っているところです。番号を入力していたときに私が注意しておいた、まさにあれです。
 
 これは一時的な署名付きリンクです。ストレージは外部に公開されておらず、リンクはあなた自身のキーで作られたものです。有効期間は1週間です。ワークショップにも、その後の実験にも十分に足ります。

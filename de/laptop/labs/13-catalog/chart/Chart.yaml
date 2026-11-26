@@ -1,25 +1,25 @@
-# Labor 13. Steckbrief des Charts „Pässe".
+# Lab 13. Passport of the "Passes" chart.
 #
-# Ein Chart ist ein Ordner: Manifest-Vorlagen in templates/, Standardwerte in values.yaml
-# und das Parameterschema in values.schema.json. Es wird mit dem Befehl
-# `helm install <Release-Name> chart` aus dem Labor-Ordner ausgerollt, und im Cozystack-Katalog — von der
-# Plattform selbst, wenn jemand eine Anwendung über das Dashboard bestellt.
+# A chart is a folder: manifest templates in templates/, default values in values.yaml
+# and the parameter schema in values.schema.json. It is deployed with the command
+# `helm install <release-name> chart` from the lab folder, and in the Cozystack catalog — by the
+# platform itself, when someone orders an application through the dashboard.
 #
-# Chart.yaml ist das Deckblatt des Pakets: daraus erfährt Helm, wie das Paket heißt und welche Version es hat.
+# Chart.yaml is the package cover: from it Helm learns what the package is called and what version it is.
 apiVersion: v2
 name: guest-pass
 description: Internal guest pass service — order a pass for a visitor
 type: application
 
-# Als Nächstes kommen zwei Versionen, und sie werden häufiger verwechselt als alles andere in Helm. Das sind verschiedene Dinge.
+# Next come two versions, and they are confused more often than anything else in Helm. These are different things.
 #
-# version — die Verpackungsversion. Sie ändert sich, wenn Sie die Vorlagen, Werte oder das Schema bearbeiten,
-# auch wenn die Anwendung darin gleich geblieben ist. Genau diese vergleicht Helm beim Aktualisieren eines
-# Release, und an ihr unterscheiden sich die ins Repository hochgeladenen Pakete. Ohne sie zu erhöhen, geht die
-# Plattform davon aus, dass sich das Paket nicht geändert hat, und die neue Version kann unbemerkt bleiben.
+# version — the packaging version. It changes when you edit the templates, values or schema,
+# even if the application inside stayed the same. This is exactly what Helm compares when upgrading a
+# release, and it is what distinguishes packages uploaded to the repository. Without bumping it the
+# platform considers that the package has not changed, and the new version may go unnoticed.
 version: 0.1.0
-# appVersion — die Version der Anwendung selbst innerhalb des Pakets, hier ist es nginx. Sie führt ihr eigenes
-# Leben: die Anwendung kann zehnmal aktualisiert werden, ohne eine einzige Änderung an den Vorlagen, und umgekehrt —
-# Sie haben die Vorlagen neu geschrieben, aber die Anwendung ist dieselbe. In Objektnamen taucht sie nicht auf, sie wird
-# in der Ausgabe von `helm list` und in der Katalogkarte angezeigt.
+# appVersion — the version of the application itself inside the package, here it is nginx. It lives its own
+# life: the application may be updated ten times without a single edit to the templates, and vice versa —
+# you rewrote the templates, but the application is the same. It does not appear in object names, it is shown
+# in the output of `helm list` and in the catalog card.
 appVersion: "1.0"

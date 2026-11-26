@@ -1,17 +1,17 @@
 ---
-# 实验 7 · 带 Web 界面的负载生成器。
-# 与扩缩容实验中用的是同一个：在浏览器里点按钮启动负载，
-# 延迟直方图也在同一处可见。如果它在你的环境里已经部署过——就不需要
-# 应用本文件，kubectl 会回复「unchanged」。
+# Lab 7 · load generator with a web UI.
+# The same one as in the scaling lab: load is launched with a button in the browser,
+# and the latency histogram is visible right there. If it is already deployed in your
+# setup, you do not need to apply this file — kubectl will answer "unchanged".
 #
-# 应用位置：你的 `lab` 集群（export KUBECONFIG=~/lab.kubeconfig）。
-# 命令：kubectl apply -f fortio.yaml
+# Where it is applied: your `lab` cluster (export KUBECONFIG=~/lab.kubeconfig).
+# Command: kubectl apply -f fortio.yaml
 #
-# 用 `---` 分隔的两个对象：Deployment（生成器本身）和 Service（用于访问它的名字）。
-# 下文不再对 apiVersion、kind 和 metadata.name 作注释。
+# Two objects separated by `---`: Deployment (the generator itself) and Service (the name
+# used to reach it). apiVersion, kind and metadata.name are not commented on further below.
 #
-# 镜像从公共 Docker Hub 拉取，而非从你的 Harbor：Fortio 不是「通行证」服务的
-# 一部分，而是临时驻留在集群中的一台测量仪器。
+# The image is pulled from the public Docker Hub, not from your Harbor: Fortio is not part
+# of the "Propusk" service but a measuring instrument that lives in the cluster temporarily.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -19,10 +19,10 @@ metadata:
   labels:
     app: fortio
 spec:
-  # 一个副本。负载生成器不需要扩容——需要的是让它独自
-  # 如实地统计延迟。两个副本会给出两份未合并的直方图。
+  # A single copy. The load generator does not need to be scaled — what is needed is for it
+  # alone to count latencies honestly. Two copies would give two unmerged histograms.
   replicas: 1
-  # Deployment 借以识别自己 Pod 的标签。与下方 template 中的标签一致。
+  # The label by which the Deployment recognizes its pod. Matches the label in the template below.
   selector:
     matchLabels:
       app: fortio
@@ -31,8 +31,8 @@ spec:
       labels:
         app: fortio
     spec:
-      # 与其余组件相同的安全要求：进程不以 root 运行，
-      # 系统调用受 seccomp 配置限制。
+      # The same security requirements as everything else: the process does not run as root,
+      # and system calls are restricted by a seccomp profile.
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
@@ -44,13 +44,13 @@ spec:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # 这里的 `latest` 标签是为工作坊做的简化，它与私有镜像仓库实验
-          # 所教的内容相悖：该标签下的镜像可能在两次 apply 之间悄然改变，
-          # 昨天的测量结果便会变得不可复现。对于教学台架上的
-          # 负载生成器这是可以接受的，但对生产系统则不行。
+          # The `latest` tag here is a simplification for the workshop, and it contradicts what
+          # the private-registry lab teaches: the image under this tag can silently change
+          # between two applies, and yesterday's measurement will become unreproducible. For a
+          # load generator on a training stand this is acceptable, for a production system it is not.
           image: fortio/fortio:latest
-          # `server` 是 Fortio 启动 Web 界面并等待你按下按钮的模式。
-          # 没有这个参数，镜像会执行一次性命令后退出。
+          # `server` is the mode in which Fortio brings up the web interface and waits until you
+          # press a button. Without this argument the image runs a one-off command and exits.
           args: ["server"]
           ports:
             - containerPort: 8080
@@ -60,15 +60,15 @@ spec:
               cpu: 100m
               memory: 64Mi
             limits:
-              # 生成器需要一些 CPU 余量，否则它会触及
-              # 自身上限，那样你压的就是 Fortio 而不是应用。
+              # The generator needs some CPU headroom, otherwise it will hit
+              # its own limit and you will be loading Fortio rather than the application.
               cpu: "1"
               memory: 256Mi
 ---
-# 需要 Service 来打开 Web 界面：通过端口转发按名字访问生成器——
-# kubectl port-forward svc/fortio 8081:8080——然后访问
-# localhost:8081。不用 Service 也能压测服务，用命令
-# kubectl exec deploy/fortio，但只有这条路径能在浏览器里给出直方图。
+# The Service is needed to open the web interface: the generator is reached by name through
+# port forwarding — kubectl port-forward svc/fortio 8081:8080 — and accessed at
+# localhost:8081. You can hammer the service without a Service too, with the command
+# kubectl exec deploy/fortio, but only this path gives you the histogram in the browser.
 apiVersion: v1
 kind: Service
 metadata:
@@ -76,8 +76,8 @@ metadata:
 spec:
   selector:
     app: fortio
-  # 这里 Service 的端口号与容器端口相同——不同于实验里其余的
-  # 服务，那些是外部 80、内部 8080。区别仅在于方便。
+  # Here the Service number and the container port coincide — unlike the other
+  # services in the lab, where it is 80 outside and 8080 inside. The difference is only convenience.
   ports:
     - port: 8080
       targetPort: http

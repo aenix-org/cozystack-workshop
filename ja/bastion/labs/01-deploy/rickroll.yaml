@@ -1,27 +1,27 @@
-# ラボ1。学習用アプリ rickroll のすべてを1ファイルに: nginx の設定、ページ、
-# デプロイそのもの、そしてそこへの恒久的なアドレス。`---` で区切られた4つのオブジェクト。
+# Lab 1. The entire rickroll training application in a single file: nginx settings, the page,
+# the deployment itself, and a permanent address to reach it. Four objects separated by `---`.
 #
-# これは管理クラスタのテナントではなく、あなたの学習用クラスタ `lab` に適用します:
+# Applied on your training cluster `lab`, not in a tenant on the management cluster:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl apply -f rickroll.yaml
-# ここには tenant-workshopXX のようなプレースホルダはありません — 自分の番号をどこかに入れる必要はありません。
+# There are no placeholders like tenant-workshopXX here — you don't need to substitute your number anywhere.
 #
-# 4つのオブジェクトすべてで繰り返されるフィールドは、ここで一度だけ説明します:
-#   apiVersion — このオブジェクトの型が属する API のセクション;
-#   kind       — オブジェクトの型そのもの;
-#   metadata.name — 後で `kubectl get` で探すときに使う名前。
-# 名前は同じ型の中で一意なので、下の Deployment と Service はどちらも
-# rickroll という名前でも衝突しません。
+# The fields that repeat across all four objects we go over once here:
+#   apiVersion — the API section this object type lives in;
+#   kind       — the object type itself;
+#   metadata.name — the name by which the object is later looked up via `kubectl get`.
+# The name is unique within its own type, so the Deployment and Service below are both called
+# rickroll and don't conflict.
 ---
-# nginx の設定。ページのバージョン間で変わらないので、別に切り出してあります。
-# ConfigMap — クラスタの中に単独で存在し、起動時にコンテナの中へ差し込まれる設定ファイル。
-# 狙いは、イメージを再ビルドせずに設定を変えられるようにすること。キー `default.conf` は
-# ボリュームがマウントされたディレクトリの中でのファイル名になります。
+# nginx settings. They don't change between page versions, so they're kept separate.
+# ConfigMap — a settings file that lives in the cluster on its own and is mounted
+# into the container at startup. The point is to change settings without rebuilding the
+# image. The `default.conf` key becomes the file name in the directory where the volume is mounted.
 #
-# `|` の後のインデントより下はすべて YAML ではなく、ファイルの内容そのままです。この
-# ブロック内のシャープ記号で始まる行は、解析時に消えるのではなく、そのまま nginx の設定に
-# 入ります。同じ理由で、下のページのブロックにはコメントを付けていません:
-# あれは HTML であり、その中のシャープ記号は画面上でユーザーに見えてしまうからです。
+# Everything below the indent after `|` is not YAML but the verbatim contents of the file. Lines
+# with a hash inside this block go into the nginx config as-is, rather than disappearing during
+# parsing. For the same reason no comments were added to the page block below:
+# it's HTML, and a hash in it would be visible to the user on the screen.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -33,8 +33,8 @@ data:
       root /usr/share/nginx/html;
 
       location / {
-        # このラボの肝: nginx が自分の Pod 名を HTML に直接差し込みます。
-        # Pod 内の $hostname がまさに Pod 名です。
+        # The whole gist of the lab: nginx substitutes its own pod's name right into the HTML.
+        # $hostname inside the pod is exactly the pod name.
         sub_filter '__POD__' '$hostname';
         sub_filter_once off;
       }
@@ -45,10 +45,10 @@ data:
       }
     }
 ---
-# ページ、バージョン1。設定とは別のオブジェクトにしてあります — ラボ4でアプリを
-# 第2バージョンに切り替えるとき、nginx の設定に触れずイメージも再ビルドせずに済むように。
-# 名前の -v1 という接尾辞は飾りではありません: 隣に rickroll-page-v2 が現れ、両者の間で
-# ボリュームを切り替えることこそが新バージョンのロールアウトになります。
+# The page, version 1. A separate object from the settings — so that in lab 4 the application
+# can be switched to the second version without touching the nginx config or rebuilding the image.
+# The -v1 suffix in the name is not decoration: rickroll-page-v2 will appear next to it, and switching
+# the volume between them is exactly what rolling out a new version is.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -76,13 +76,13 @@ data:
     </style>
     <h1>Never Gonna Give You Up</h1>
     <p class="lyr">Never gonna let you down &middot; Never gonna run around and desert you</p>
-    <div class="pod">対応したPod<b>__POD__</b></div>
-    <p class="hint">ページを再読み込みしてください。レプリカが増えると、名前が変わり始めます。</p>
+    <div class="pod">served by pod<b>__POD__</b></div>
+    <p class="hint">Refresh the page. Once there are more replicas, the name will start changing.</p>
     </html>
 ---
-# アプリ本体。Deployment は望ましい状態を記述します — どのイメージを起動し、
-# 何個のコピーを保ち、更新時にどう置き換えるか。あとはクラスタ自身が現実をこの記述に
-# 合わせ、作成時に一度だけでなく、常時それを監視し続けます。
+# The application itself. A Deployment describes the desired state — which image to run,
+# how many copies to keep, how to replace them during an update. The cluster then brings
+# reality into line with this description and watches it continuously, not just once at creation.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -90,28 +90,28 @@ metadata:
   labels:
     app: rickroll
 spec:
-  # 何個のコピーを起動状態で保つか。言い回しはまさにこうです: 「1つ起動しろ」ではなく
-  # 「1つ保て」。コピーが消えれば、クラスタは何も尋ねずに新しいものを作ります。ラボ3では
-  # このフィールドをオートスケーリングが変え始めるので、以降は手で触りません。
+  # How many copies to keep running. The wording is deliberate: not "run one",
+  # but "keep one". A copy disappears — the cluster creates a new one without asking. In lab 3
+  # this same field starts being changed by autoscaling, so you don't touch it by hand anymore.
   replicas: 1
-  # Deployment がどのラベルで Pod を自分のものと見なすか。ここのラベルと下の template の
-  # ラベルは一致していなければなりません: 食い違うとオブジェクトはそもそも作成されません。
+  # By which label the Deployment considers pods its own. The label here and the label in the template
+  # below must match: on a mismatch the object won't be created at all.
   selector:
     matchLabels:
       app: rickroll
-  # Pod のテンプレート — 各コピーはこれから打ち出されます。template 内のどのフィールドを
-  # 直しても、アプリの新しいリビジョンとなり、コピーを順に置き換えます(これがまさにラボ4)。
-  # template の外のフィールド(例えば replicas)を直してもリビジョンは作られません。
+  # The pod template — every copy is stamped from it. Editing any field inside template
+  # means a new revision of the application and replacing copies one by one (that's exactly lab 4).
+  # Editing fields outside template (for example, replicas) does not create a revision.
   template:
     metadata:
       labels:
-        # 同じラベルは Pod 自身にも付いています: ファイル末尾の Service がこれで Pod を見つけます。
+        # The same label sits on the pods themselves: the Service at the end of the file finds them by it.
         app: rickroll
     spec:
-      # Pod 全体のレベルでの `restricted` セキュリティプロファイルの要件: root では
-      # なく動かすこと、特定の UID、標準の seccomp プロファイル。`restricted` を有効にした
-      # 企業クラスタでは、これらのフィールドがない Pod は起動を許可されません。しかも
-      # 拒否は manifest の apply 時ではなく、Pod の作成の瞬間に返ってきます。
+      # Requirements of the `restricted` security profile at the level of the whole pod: running
+      # not as root, a specific UID, and the standard seccomp profile. In a corporate
+      # cluster with `restricted` enabled, a pod without these fields won't be admitted to run,
+      # and the rejection comes at the moment the pod is created, not when the manifest is applied.
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
@@ -119,77 +119,77 @@ spec:
           type: RuntimeDefault
       containers:
         - name: nginx
-          # 同じ厳しさを、今度はコンテナのレベルで: 内部のプロセスは自分の権限を
-          # 昇格させることを禁じられ、すべての linux ケイパビリティを取り上げられます。
+          # The same strictness, but at the container level: the process inside is forbidden
+          # to escalate its privileges, and all linux capabilities are taken away from it.
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # 非特権版: 8080 を待ち受け、root ではなく動きます。
-          # これだけで `baseline` プロファイルには十分ですが、`restricted` には足りません — あちらは
-          # Pod とコンテナに明示的な securityContext を要求し、それらは上で設定済みです。企業
-          # クラスタではたいてい `restricted` のほうが有効になっています。
+          # An unprivileged variant: listens on 8080 and runs not as root.
+          # This alone is enough for the `baseline` profile, but not for `restricted` — that one needs
+          # explicit securityContext on the pod and on the container, they're set above. In a
+          # corporate cluster it's usually `restricted` that's enabled.
           image: nginxinc/nginx-unprivileged:1.27-alpine
-          # デフォルトで nginx はノードのコアごとに1つのワーカープロセスを立ち上げます。1コアの
-          # 学習用マシンではそれは1プロセスですが、64コアの本番ノードでは64プロセスになり、
-          # メモリ上限の小さい Pod は最初のリクエストの前に OOMKilled で落ちます。
-          # オートチューンはワーカーを CPU 上限から数えます: 300m なら1プロセスです。
-          # -g ではなく環境変数を通して: このディレクティブはイメージの基本設定に既にあり、
-          # 二度目の宣言は nginx を「duplicate」エラーで落とします。
+          # By default nginx spins up one worker process per node core. On a training
+          # machine with a single core that's one process, but on a production node with 64 cores it's 64,
+          # and a pod with a small memory limit crashes with OOMKilled before the first request.
+          # Autotune counts workers by the CPU limit: at 300m that's one process.
+          # Via an environment variable, not via -g: the directive is already in the image's base
+          # config, and a second declaration crashes nginx with a "duplicate" error.
           env:
             - name: NGINX_ENTRYPOINT_WORKER_PROCESSES_AUTOTUNE
               value: "1"
-          # ポートには番号だけでなく名前を付けています: `http` は下の readinessProbe と
-          # Service の targetPort が参照します。番号を変えても、直すのは1か所で済みます。
+          # The port is given a name, not just a number: `http` is referenced by the readinessProbe
+          # below and by the Service's targetPort. Change the number — you edit it in one place.
           ports:
             - containerPort: 8080
               name: http
-          # 絶えず混同される2つの別物。requests — リソースをどれだけ確実に予約するか;
-          # これをもとにスケジューラがノードを選び、またこれをもとにラボ3のオートスケーリングが
-          # 負荷をパーセントで計算します。
-          # limits — それ以上には上がらせない上限: CPU は限界に達すると絞られ、
-          # メモリは超えるとコンテナが殺されます。
+          # Two different things that are constantly confused. requests — how much of a resource
+          # to reserve guaranteed; by it the scheduler picks a node, and off it
+          # the autoscaling in lab 3 also computes load in percent.
+          # limits — the ceiling you're not allowed to go above: on the CPU when pushed
+          # they throttle you, on memory they kill the container.
           resources:
-            # わざと極小にしています: ワークショップではこういうアプリがたくさんあります。
-            # 20m はコアの100分の2です。値が低いのは意図的です: requests が小さいほど
-            # 負荷が速くしきい値を超え、ラボ3でのコピーの増加が30分ではなく
-            # 数秒で見えます。
+            # Deliberately tiny: at the workshop there will be many such applications.
+            # 20m is two hundredths of a core. The value is low on purpose: the smaller the
+            # requests, the faster the load overshoots the threshold and the growth of copies in lab 3
+            # is visible in seconds, not in half an hour.
             requests:
               cpu: 20m
               memory: 32Mi
             limits:
               cpu: 300m
               memory: 128Mi
-          # 準備完了チェック。このアドレスから応答が来るまで、クラスタはコピーに
-          # トラフィックを流しません。そのために nginx の設定に「ok」を返す専用の
-          # location /healthz が用意されています。このフィールドがラボ4での無停止ロールアウトを
-          # 支えます: 古いコピーは、新しいコピーが応答したあとで初めて落とされます。
-          # これを外すと、更新がリクエストを落とし始めます。
+          # Readiness check. Until a response comes back from this address, the cluster does not
+          # route traffic to the copy. For its sake a separate location /healthz with an "ok" response
+          # is set up in the nginx config. This field is what pays for the zero-downtime rollout
+          # in lab 4: the old copy is shut down only after the new one has responded.
+          # Remove it — and the update will start dropping requests.
           readinessProbe:
             httpGet:
               path: /healthz
               port: http
-            # 最初のノックまで2秒 — 経験から選んだ値です。これより短くしても意味は
-            # ありません、nginx の起動にそれだけかかります; これより長くすると、各ロールアウトを無駄に引き延ばします。
+            # Two seconds before the first knock — arrived at through experience. Less makes no
+            # sense, nginx takes that long to start; more would stretch out every rollout for nothing.
             initialDelaySeconds: 2
-          # ConfigMap の内容をコンテナ内のどこに置くか。ディレクトリは適当に選んだのでは
-          # ありません: 1つ目からは nginx がファイルを配信し、2つ目からは設定を読みます。
-          # この2行がなければ、両方の ConfigMap はクラスタに置かれたままになり、
-          # nginx は自分の標準ページを表示します。
+          # Where to place the ConfigMap contents inside the container. The directories are chosen
+          # not arbitrarily: from the first nginx serves files, from the second it reads settings.
+          # Without these two lines both ConfigMaps would just sit in the cluster,
+          # and nginx would show its default page.
           volumeMounts:
             - name: page
               mountPath: /usr/share/nginx/html
             - name: conf
               mountPath: /etc/nginx/conf.d
-      # どの ConfigMap を Pod に接続するか。ここのボリューム名が、上の volumeMounts の
-      # エントリと結びつけます — 一致すべきはまさに名前で、結びつけには順序は関係ありません。
-      # ですがラボ4では順序が関係します、下の警告を参照。
+      # Which ConfigMaps to attach to the pod. The volume name here ties it to the entry
+      # in volumeMounts above — it's the names that must match, the order doesn't matter for the tie.
+      # But for lab 4 it does matter, see the warning below.
       volumes:
-        # 注意: このボリュームは最初(volumes[0])でなければなりません。
-        # ラボ4はページのバージョンをインデックス指定のパッチで切り替えます。
-        # JSON Patch はリストの要素を名前ではなく番号で指定します。ボリュームを
-        # 入れ替えると、パッチはページの代わりに nginx の設定を黙って差し替え、アプリは
-        # 壊れ、エラーメッセージはまったく別のことを語ることになります。
+        # WARNING: this volume must be first (volumes[0]).
+        # Lab 4 switches the page version with a patch by index.
+        # JSON Patch addresses a list element by number, not by name. Swap the volumes
+        # around — and the patch will silently replace the nginx settings instead of the page, the application
+        # will break, and the error message will be talking about something else entirely.
         - name: page
           configMap:
             name: rickroll-page-v1
@@ -197,23 +197,23 @@ spec:
           configMap:
             name: rickroll-conf
 ---
-# アプリの恒久的なアドレス。コピーは生まれては死に、そのアドレスは変わりますが、クラスタの
-# 中での名前 `rickroll` は変わりません — 隣人はこれでアプリを呼びます。
-# この名前の裏にある生きたコピーのリストは、クラスタがラベルをもとに自分で管理します。
+# The permanent address of the application. Copies are born and die, their addresses change, but the name
+# `rickroll` inside the cluster stays the same — that's what neighbors call the application by.
+# The list of live copies behind this name the cluster maintains itself, by labels.
 apiVersion: v1
 kind: Service
 metadata:
   name: rickroll
 spec:
-  # このアドレスの裏に誰を置くか: このラベルを持つすべての Pod、それが誰に
-  # 作られたものであろうと。ここから典型的な厄介事が生じます — app: rickroll ラベルを持つ無関係な Pod が
-  # 黙ってロードバランシングに入り込み、あなたのユーザーに応答し始めます。このフォルダの
-  # スクリプト check.sh は、そうした偽物がいないことを別途チェックします。
+  # Who to put behind this address: all pods with such a label, whoever they were
+  # created by. Hence a typical annoyance — a stray pod with the label app: rickroll
+  # will silently end up in the balancing and start answering your users. The script
+  # check.sh in this folder separately verifies that there are no such impostors.
   selector:
     app: rickroll
   ports:
-    # port — サービス自身がどのポートで応答するか、targetPort — サービスが Pod の内部の
-    # どこにノックするか。ここでは targetPort をコンテナのポート名で指定しており、数字では
-    # ありません: コンテナ内の番号が変わっても、このファイルを直す必要はありません。
+    # port — on which port the service itself answers, targetPort — where it knocks into
+    # the pod. Here targetPort is set by the name of the port from the container, not by a number: change
+    # the number in the container — and you won't have to edit this file.
     - port: 80
       targetPort: http

@@ -1,75 +1,75 @@
 ---
-# Lab 3. Escalamos réplicas según la carga del procesador.
-# El objetivo es el 50% de requests.cpu (20m), es decir, el umbral es 10m por pod.
-# Elegido bajo a propósito: la carga debe activarse en segundos,
-# tenemos media hora para el lab, no medio día.
+# Lab 3. Scaling replicas by CPU load.
+# Target is 50% of requests.cpu (20m), i.e. the threshold is 10m per pod.
+# Chosen deliberately low: the load must trigger within seconds,
+# we have half an hour for the lab, not half a day.
 #
-# Un único objeto. Se aplica en tu clúster de entrenamiento `lab`, no en el tenant
-# del clúster de gestión:
+# A single object. Applied on your training cluster `lab`, not in the tenant
+# on the management cluster:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl apply -f hpa.yaml
-# Aquí no hay marcadores como tenant-workshopXX — no hace falta sustituir tu número en ninguna parte.
+# There are no placeholders like tenant-workshopXX here — no need to substitute your number anywhere.
 #
-# Dos condiciones sin las cuales el objeto se creará, pero no funcionará:
-#   1. El contenedor rickroll tiene requests.cpu definido — de lo contrario no hay nada de lo que calcular el porcentaje,
-#      y en la columna TARGETS de `kubectl get hpa` quedará para siempre <unknown>.
-#   2. En el clúster está corriendo metrics-server — la fuente del consumo actual de los pods.
-# Ambas condiciones las verifica check.sh en esta carpeta.
+# Two conditions without which the object will be created but won't work:
+#   1. The rickroll container has requests.cpu set — otherwise there is nothing to compute the percentage from,
+#      and the TARGETS column of `kubectl get hpa` will forever stay <unknown>.
+#   2. metrics-server is running in the cluster — the source of pods' current consumption.
+# check.sh in this folder verifies both conditions.
 #
-# Mientras el HPA exista, el campo replicas del Deployment le pertenece. Puedes cambiar el número
-# de copias a mano con `kubectl scale`, pero el HPA restaurará su valor en los próximos segundos.
-# Por eso en el lab 4, antes del despliegue, este objeto se elimina: dos mecanismos sobre un mismo campo —
-# una forma garantizada de no entender qué pasó.
+# As long as the HPA exists, the Deployment's replicas field belongs to it. You can change the number
+# of copies by hand via `kubectl scale`, but the HPA will restore its own value within seconds.
+# That is why in lab 4, before the rollout, this object is deleted: two mechanisms on one field —
+# a guaranteed way to not understand what happened.
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  # El nombre del HPA no tiene por qué coincidir con el nombre de la aplicación — la coincidencia aquí es por comodidad.
-  # Qué gestionar lo determina scaleTargetRef más abajo, no este nombre.
+  # The HPA name doesn't have to match the application name — the match here is for convenience.
+  # What to manage is determined by scaleTargetRef below, not by this name.
   name: rickroll
 spec:
-  # A quién observar y cuyo campo replicas cambiar. Tres campos juntos, porque un nombre
-  # sin tipo es ambiguo: un Deployment y un StatefulSet pueden llamarse igual.
+  # Whom to watch and whose replicas field to change. Three fields together, because a name
+  # without a type is ambiguous: a Deployment and a StatefulSet can be named the same.
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
     name: rickroll
-  # El corredor del que el HPA no saldrá bajo ninguna carga. El límite inferior es la misma
-  # única copia con la que empezó el lab. El superior es seis: esa cantidad cabe
-  # en un nodo de entrenamiento con limits.cpu 300m y aun así se aprecia a simple vista en la lista de pods.
-  # Pon maxReplicas: 1 y el objeto se creará y no hará nada.
+  # The corridor the HPA won't leave under any load. The lower bound is the same
+  # single copy the lab started with. The upper is six: that many fit
+  # on a training node at limits.cpu 300m and are still noticeable to the eye in the pod list.
+  # Set maxReplicas: 1 and the object will be created and do nothing.
   minReplicas: 1
   maxReplicas: 6
-  # En qué basar la decisión. Puede haber varias métricas, entonces el HPA toma la
-  # que requiere el mayor número de copias. Aquí hay una — el procesador.
+  # What to base the decision on. There can be several metrics, then the HPA takes the one
+  # that requires the larger number of copies. Here there is one — the CPU.
   metrics:
     - type: Resource
       resource:
         name: cpu
-        # Utilization es la fracción de requests.cpu del contenedor, no de la capacidad del nodo.
-        # De ahí una consecuencia poco intuitiva: el valor puede ser tranquilamente 600%, y eso
-        # no es un error: el pod consume seis veces más de lo que reservó.
-        # Una alternativa es AverageValue, donde el umbral se fija en milinúcleos directamente.
+        # Utilization is the fraction of the container's requests.cpu, not of the node's capacity.
+        # Hence a non-intuitive consequence: the value can calmly be 600%, and that is
+        # not an error: the pod eats six times more than it reserved.
+        # An alternative is AverageValue, where the threshold is set in millicores directly.
         target:
           type: Utilization
           averageUtilization: 50
-  # Con qué agilidad reaccionar. El bloque es opcional: sin él se usan los valores
-  # por defecto, pensados para la operación en producción, no para una demostración.
+  # How briskly to react. The block is optional: without it the default values are used,
+  # designed for production operation, not for a demonstration.
   behavior:
     scaleUp:
-      # Por defecto Kubernetes espera la estabilización y crece despacio.
-      # En un lab esto parece «no pasa nada», por eso lo aceleramos.
+      # By default Kubernetes waits for stabilization and grows slowly.
+      # In a lab this looks like "nothing is happening", so we speed it up.
       stabilizationWindowSeconds: 0
-      # No más de dos copias nuevas cada quince segundos. El paso se eligió de forma
-      # empírica: el crecimiento se ve como crecimiento, y no como un salto instantáneo de una directamente a seis,
-      # en el que el participante no tiene nada que observar.
+      # No more than two new copies every fifteen seconds. The step was chosen empirically:
+      # growth is seen as growth, and not as an instant jump from one straight to six,
+      # in which the participant has nothing to observe.
       policies:
         - type: Pods
           value: 2
           periodSeconds: 15
     scaleDown:
-      # Y hacia abajo, al contrario — no de forma instantánea, de lo contrario los pods desaparecerán
-      # antes de que el participante alcance a observarlos.
-      # Un minuto en lugar de los cinco por defecto: el lab dura media hora, no hay con qué llenar
-      # cinco de ellos esperando la reducción. En un clúster de producción una ventana larga sí es útil —
-      # amortigua los vaivenes en una carga irregular.
+      # And downward, on the contrary — not instantly, otherwise the pods will disappear
+      # before the participant manages to observe them.
+      # A minute instead of the default five: the lab runs for half an hour, there's nothing
+      # to fill five of them with while waiting for the scale-down. In a production cluster a long window is actually useful —
+      # it dampens the swings on uneven load.
       stabilizationWindowSeconds: 60

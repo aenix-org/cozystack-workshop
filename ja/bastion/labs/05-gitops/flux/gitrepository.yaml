@@ -1,39 +1,39 @@
 ---
-# ラボ5 · Git によるインフラ管理。ソース: Flux が望ましい状態を取得する場所。
+# Lab 5 · Infrastructure in Git. Source: where Flux pulls the desired state from.
 #
-# 隣接する kustomization.yaml とともに、あなたの `lab` クラスタに適用します:
+# Applied on your `lab` cluster together with the neighboring kustomization.yaml:
 #     export KUBECONFIG=~/lab.kubeconfig
 #     kubectl apply -f flux/
 #
-# 注意: 適用する前に、url を「あなた自身の」リポジトリのアドレスに置き換えてください。
-# ЗАМЕНИТЕ-МЕНЯ という文字列はプレースホルダーで、そのままだと Flux は存在しないアドレスへ
-# アクセスし、エラーで停止します。ブランチも確認を: GitHub は新規リポジトリを main ブランチで作成します。
+# WARNING: REPLACE url with the address of YOUR repository before applying: the
+# REPLACE-ME string is a placeholder; with it Flux will go to a non-existent address and halt
+# with an error. Check the branch too: GitHub creates new repositories with a main branch.
 #
-# 各オブジェクトにおいて: apiVersion は記述スキーマのバージョン、kind は何を作成するか、
-# metadata.name はこのオブジェクトを後で参照するための名前です。以降では繰り返しません。
+# In every object: apiVersion is the schema version of the description, kind is what we create,
+# metadata.name is the name by which the object is referenced later. Not repeated below.
 #
-# このオブジェクトの唯一の役割は、リポジトリの最新コピーをクラスタ内に保持することです。
-# 何も適用せず、ダウンロードするだけです。適用するのは隣接する Kustomization で、
-# それは `passes` という名前でここを参照するため、名前を単独で変更することはできません。
+# The only job of this object is to keep a fresh copy of the repository in the cluster.
+# It applies nothing: it only downloads. The neighboring Kustomization applies it,
+# and it references this by the name `passes`, so the name can't be changed alone.
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: GitRepository
 metadata:
   name: passes
-  # flux-system は flux install コマンドが作成した名前空間で、Flux のサービス自体が
-  # ここに存在します。設定オブジェクトもここに置きます。そうしないとサービスが認識しません。
+  # flux-system is the namespace created by the flux install command; it hosts
+  # the Flux services themselves. Configuration objects go there too, otherwise the services won't see them.
   namespace: flux-system
 spec:
-  # Git へ新しい状態を取りに行く頻度。1分はラボ用です。
-  # 本番では通常1〜5分で、即時反応は GitHub からの webhook で実現します。
+  # How often to go to Git for the new state. One minute is for the lab;
+  # in production it's usually 1–5 minutes, and instant reaction is done with a webhook from GitHub.
   interval: 1m
-  # リポジトリのアドレス。公開リポジトリなので、ここにはログインもキーもありません —
-  # これは学習用スタンドの簡略化です。本番ではリポジトリは非公開で、その隣に
-  # deploy キーを持つシークレットへの参照(secretRef フィールド)が現れます。
-  url: https://github.com/ЗАМЕНИТЕ-МЕНЯ/passes-gitops
-  # どのブランチを信頼できる情報源とみなすか。main にマージされたものがクラスタへ反映され、
-  # 他のブランチにあるものは反映されません。ここからレビューが生まれます: 変更はまず自分の
-  # ブランチで生き、そこで確認でき、main へのマージだけがそれを有効にします。
-  # リポジトリが古い master ブランチで作成されている場合はここで修正してください。
-  # そうしないと Flux は読むべきものを見つけられません。
+  # The repository address. It's public, so there's neither a login nor a key here —
+  # this is a simplification of the training stand. In production the repository is private, and next to it appears
+  # a reference to a secret with a deploy key (the secretRef field).
+  url: https://github.com/REPLACE-ME/passes-gitops
+  # Which branch to treat as the source of truth. What is merged into main goes to the cluster;
+  # what lies in other branches does not. This is where review comes from: a change
+  # first lives in its own branch, where it can be reviewed, and only the merge into main
+  # makes it effective. If the repository was created with the old master branch —
+  # fix it here, otherwise Flux won't find what to read.
   ref:
     branch: main

@@ -1,76 +1,76 @@
-# 랩 6 · 나만의 프라이빗 이미지 레지스트리. «출입증» 서비스 이미지의 빌드 레시피.
+# Lab 6 · Your own private image registry. Build recipe for the «Guest Pass» service image.
 #
-# Dockerfile이란: 소스로부터 이미지를 만들어 내는 단계별 레시피 —
-# 실행 준비가 된 파일 시스템 스냅샷과 그 안에서 무엇을 실행할지에 대한 지시가 함께 담긴 것.
-# vSphere에서 가장 가까운 것은 골든 VM 템플릿을 만드는 것이며, 다만 그것을 텍스트로 기술하고
-# 반복 가능하게 한 것: 동일한 레시피는 어떤 머신에서든 동일한 결과를 낸다.
+# What a Dockerfile is: a step-by-step recipe that turns sources into an image —
+# a ready-to-run filesystem snapshot together with instructions on what to run inside it.
+# The closest thing in vSphere is building a golden VM template, only described as text and
+# repeatable: the same recipe yields the same result on any machine.
 #
-# 여러분의 VM에서, 랩 폴더 안에서 빌드된다(마지막 인자는 이
-# 파일과 소스가 들어 있는 폴더):
+# Built on your VM, from the lab folder (the last argument is the folder with this
+# file and the sources):
 #     docker build --platform linux/amd64 -t HARBOR-HOST/passes/passes-api:v1 app/
 #     docker push HARBOR-HOST/passes/passes-api:v1
-# HARBOR-HOST는 여러분 자신의 Harbor 주소로 바꾼다: 이미지 이름의 첫 부분이
-# 레지스트리 주소이며, 그것으로 docker push가 어디로 보낼지 알게 된다.
+# Replace HARBOR-HOST with the address of your own Harbor: the first part of the image name is the
+# registry address, and that is how docker push knows where to send it.
 #
-# 주의: --platform linux/amd64는 Apple Silicon 프로세서를 탑재한 Mac과 모든
-# ARM VM에서 필수다. 이것 없이는 ARM용 이미지가 빌드된다: 오류 없이 빌드되고,
-# 오류 없이 레지스트리로 푸시되지만, 클러스터(노드는 x86)에서 «exec format error»로 실패한다.
+# ATTENTION: --platform linux/amd64 is mandatory on a Mac with an Apple Silicon processor and on any
+# ARM VM. Without it you get an ARM image: it builds without errors, pushes to
+# the registry without errors, and then in the cluster (whose nodes are x86) fails with "exec format error".
 #
-# 레시피의 각 줄은 레이어 — 파일 시스템의 불변 조각 — 를 만든다. 레이어는
-# 캐시되고 재사용된다: 그래서 파일을 폴더 통째로가 아니라 하나씩 복사하는 것이며,
-# main.go를 수정해도 의존성을 다시 내려받게 만들지 않는다.
+# Each line of the recipe creates a layer — an immutable slice of the filesystem. Layers
+# are cached and reused: that is why files are copied one at a time rather than the whole
+# folder at once — editing main.go does not force re-downloading the dependencies.
 #
-# 두 단계. 첫째는 빌드 단계: 여기에는 Go 컴파일러 전체, 약 350 MB가 필요하다.
-# 둘째는 클러스터로 실려 갈 것: 거기로는 완성된 바이너리만 옮겨진다.
-# 결과 이미지는 350 대신 약 10 MB가 되고, 그 안에는 컴파일러도,
-# 소스도, 패키지 매니저도 없다 — 즉 어떻게든 컨테이너에 들어온 자가
-# 쓸 만한 것이 아무것도 없다.
+# TWO STAGES. The first is the build stage: it needs the entire Go compiler, about 350 MB.
+# The second is what ships to the cluster: only the finished binary is carried over.
+# The resulting image ends up around 10 MB instead of 350, and inside it there is no compiler,
+# no sources, and no package manager — that is, nothing to use for anyone who does
+# get into the container after all.
 
-# --- 단계 1: 빌드 -----------------------------------------------------------------
-# FROM — 어떤 기성 이미지에서 시작하는가. 여기서는 Alpine(최소한의 Linux, 몇 메가바이트)
-# 위에 Go 컴파일러가 올라간 공식 이미지다. 버전은 고정되어 있다: latest 태그였다면
-# 동일한 레시피가 반년 뒤에는 다른 것을 빌드했을 것이다.
-# AS build — 단계 이름, 이것으로 두 번째 단계가 결과를 가져간다.
+# --- Stage 1: build -----------------------------------------------------------------
+# FROM — which ready-made image we start from. Here it is the official image with the Go compiler
+# on top of Alpine (a minimal Linux, a few megabytes). The version is pinned: with the
+# latest tag the same recipe would build something different half a year later.
+# AS build — the stage name, by which the second stage will pick up the result.
 FROM golang:1.23-alpine AS build
-# 이미지 안의 작업 폴더: 이후 명령들은 이것을 기준으로 실행된다.
-# 폴더가 없으면 생성된다.
+# Working folder inside the image: subsequent commands run relative to it.
+# If the folder does not exist, it is created.
 WORKDIR /src
-# go.mod — 모듈 설명: 이름과 Go 버전. 애플리케이션에는 외부 의존성이 없으므로
-# 인터넷에서 내려받을 것이 없고, 외부 접속이 없는 곳에서도 빌드가 된다.
+# go.mod — the module description: name and Go version. The application has no external dependencies,
+# so there is nothing to download from the internet, and the build works where there is no outbound access.
 COPY go.mod ./
-# 소스 자체. 코드 수정이 이전 레이어의 캐시를 무효화하지 않도록 별도의 줄로
-# 복사된다.
+# The source itself. Copied on a separate line so that editing the code does not invalidate the cache
+# of the previous layer.
 COPY main.go ./
-# RUN은 빌드 시(실행 시가 아니라) 명령을 실행하고 그 결과를 레이어로 저장한다.
-#   CGO_ENABLED=0  시스템 라이브러리에 묶이지 않고 정적으로 빌드한다. 이것 없이는
-#                  바이너리가 glibc를 필요로 하는데, 최종 이미지에는 그것이 없으므로
-#                  컨테이너가 빌드 시가 아니라 시작 시에 실패한다
-#   -trimpath      바이너리에서 빌드 머신 경로를 제거한다: 빌드가
-#                  재현 가능해지고, 여러분 홈 폴더 이름이 밖으로 새지 않는다
-#   -ldflags="-s -w"  디버그 테이블을 버린다 — 파일이 눈에 띄게 작아진다
-#   -o /out/...    결과를 어디에 둘지; 두 번째 단계가 여기서 그것을 가져간다
+# RUN executes a command at build time (not at run time) and saves the result as a layer.
+#   CGO_ENABLED=0  build statically, without binding to system libraries. Without this
+#                  the binary would need glibc, which will not be in the final image,
+#                  and the container would fail at startup rather than at build time
+#   -trimpath      strip build-machine paths from the binary: the build becomes
+#                  reproducible, and the name of your home folder does not leak out
+#   -ldflags="-s -w"  drop the debug tables — the file becomes noticeably smaller
+#   -o /out/...    where to put the result; the second stage picks it up from there
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/passes-api .
 
-# --- 단계 2: 클러스터로 실려 갈 것 -----------------------------------------------
-# 두 번째 FROM은 이미지를 백지 상태에서 처음부터 시작한다: 첫 단계에서 쌓인 모든 것은
-# 거기에 남고 최종 이미지에는 들어가지 않는다.
+# --- Stage 2: what ships to the cluster -----------------------------------------------
+# The second FROM starts the image over, from a clean slate: everything built up in the first stage
+# stays there and does not make it into the final image.
 FROM alpine:3.21
-# 애플리케이션이 그 아래에서 동작할 사용자를 만든다: root로 동작해서는 안 된다.
-# 제대로 설정된 클러스터에서는 root로 도는 파드를 아예 허용하지 않으며, 이것은
-# 트집이 아니라 표준 보안 요구사항이다.
-#   -D          비밀번호 없이, 아무것도 묻지 않고 생성
-#   -u 10001    숫자 식별자; 클러스터는 이름이 아니라 바로 그 숫자를 확인한다
+# Create the user the application will run as: it must not run as root.
+# In a properly configured cluster a pod would not be allowed to run as root at all, and this is not
+# nitpicking but a standard security requirement.
+#   -D          create without a password, asking no questions
+#   -u 10001    numeric identifier; the cluster checks exactly the number, not the name
 RUN adduser -D -u 10001 app
-# 첫 단계에서 옮겨지는 유일한 것은 완성된 바이너리다. --from=build는
-# 단계 이름을 가리킨다. /usr/local/bin은 모든 Linux의 PATH에 있는 폴더다.
+# The only thing carried over from the first stage is the finished binary. --from=build
+# points to the stage name. /usr/local/bin is a folder that exists in the PATH of any Linux.
 COPY --from=build /out/passes-api /usr/local/bin/passes-api
-# 이 지점부터 컨테이너 안의 프로세스는 root가 아니라 사용자 10001로 동작한다.
-# 순서가 중요하다: 위의 줄들은 root로 실행되었으며, 그렇지 않았다면 adduser가 동작하지 않았을 것이다.
+# From this point on the process in the container runs as user 10001, not as root.
+# Order matters: the lines above ran as root, otherwise adduser would not have worked.
 USER 10001
-# 포트 선언 — 사람과 도구를 위한 참조용 기록. 이것은 포트를
-# 열지도, 무엇을 설정하지도 않는다: 그에 대한 접근은 매니페스트(passes.yaml)에 기술되어 있다.
+# Port declaration — a reference note for humans and tools. It does not open the port
+# and configures nothing: access to it is described in the manifest (passes.yaml).
 EXPOSE 8080
-# 컨테이너 시작 시 무엇을 실행할지. 문자열이 아니라 리스트 형태로: 이렇게 하면 명령이
-# 중간 셸 없이 직접 실행되고, 클러스터로부터의 정지 신호가
-# 그것을 낳은 shell이 아니라 애플리케이션 자체에 도달한다.
+# What to run when the container starts. In list form rather than a string: this way the command
+# is run directly, without an intermediate shell, and the stop signal from the cluster
+# reaches the application itself, not the shell that spawned it.
 ENTRYPOINT ["/usr/local/bin/passes-api"]

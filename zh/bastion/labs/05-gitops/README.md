@@ -50,7 +50,7 @@
 所有文件都已经是你的了——你连同仓库一起把它们拿走了。没有什么需要新建或重新敲一遍的：下文凡是写 `kubectl apply -f name.yaml` 的地方，文件都出自这里。
 
 ```bash
-# 从这里开始，所有命令都在这个文件夹里运行：`kubectl apply -f` 里的路径都是相对于它的。
+# From here on, all commands run from this folder: the paths in `kubectl apply -f` are relative to it.
 cd labs/05-gitops
 ```
 
@@ -79,11 +79,11 @@ cd labs/05-gitops
 把仓库拉到你的机器上：
 
 ```bash
-# clone = 把仓库连同它全部的编辑历史一起完整下载下来。你得到的
-# 不是对某个共享文件夹的访问权，而是磁盘上你自己的一份完整副本：你可以离线使用它。
-# 把 `YOUR-LOGIN` 换成你自己的 GitHub 登录名，否则这条命令会指向别人的仓库。
+# clone = download the repository in full, together with its entire edit history. You get
+# not access to a shared folder but your own full copy on disk: you can work with it offline.
+# Replace `YOUR-LOGIN` with your own GitHub login, or the command will go to someone else's repository.
 git clone https://github.com/YOUR-LOGIN/passes-gitops.git
-# clone 会创建一个以仓库命名的文件夹。从这里开始我们在它里面工作。
+# clone creates a folder named after the repository. From here on we work inside it.
 cd passes-gitops
 ```
 
@@ -94,12 +94,12 @@ cd passes-gitops
 这个实验的文件夹里有两个文件：`app/namespace.yaml` 和 `app/passes.yaml`。把它们复制到你的仓库里，放进 `apps` 文件夹：
 
 ```bash
-# apps —— Flux 将从中拉取描述的文件夹。名字是我们选的，它和
-# Flux 配置里所指定的完全一样，所以没有理由无缘无故去改它。
-#   -p  如果文件夹已经存在，不要当作错误处理
+# apps — the folder Flux will pull descriptions from. We chose the name, and it's the exact
+# same one named in the Flux configuration, so there's no reason to change it without cause.
+#   -p  don't treat it as an error if the folder already exists
 mkdir -p apps
-# 把两个文件从工作坊材料里（它们位于 ~/workshop）复制到你自己的
-# 仓库里；`*.yaml` 会一次把两个文件都取走。
+# Copy both files from the workshop materials (they live in ~/workshop) into your own
+# repository; `*.yaml` will take both files at once.
 cp ~/workshop/labs/05-gitops/app/*.yaml apps/
 ```
 
@@ -163,13 +163,13 @@ spec:
 把它发到 GitHub。Git 记住的不是不加区别的一切，而是被明确展示给它的东西——正因如此才有三条命令，各做各的事：
 
 ```bash
-# add = 标记那些将进入下一条历史记录的文件。
+# add = mark the files that will go into the next history entry.
 git add apps
-# commit = 把标记好的东西作为一条记录保存下来：内容、作者、时间和原因。
-#   -m "..."  就是那个原因。它会永远留在历史里，人们会读它。
-# 这次 commit 目前只活在你的 bastion 上——它还没进 GitHub。
+# commit = save what's marked as one entry: contents, author, time, and reason.
+#   -m "..."  that very reason. It stays in the history forever, and people will read it.
+# The commit lives only on your bastion for now — it's not yet in GitHub.
 git commit -m "add passes service v1"
-# push = 把攒下来的 commit 发到 GitHub。在这条命令之前，那边什么都没变。
+# push = send the accumulated commits to GitHub. Until this command, nothing there changes.
 git push
 ```
 
@@ -188,36 +188,36 @@ Flux 是你集群里的几个服务。一个伸进 Git 把内容下载下来，�
 macOS：
 
 ```bash
-# Homebrew 从 Flux 项目的仓库取来 formula，放下一个可执行文件。
+# Homebrew takes the formula from the Flux project's repository and drops one executable file.
 brew install fluxcd/tap/flux
 ```
 
 Linux：
 
 ```bash
-# Flux 站点上的脚本会检测你的架构，把文件放进 /usr/local/bin。
-#   -s          curl 静默工作，不显示下载进度
-#   | sudo bash 下载下来的文本立即以管理员权限执行——之所以需要管理员权限，
-#               是因为要写入一个系统文件夹
+# The script from the Flux site detects your architecture and drops the file into /usr/local/bin.
+#   -s          curl works silently, without a download indicator
+#   | sudo bash the downloaded text is executed straight away with administrator rights — they're
+#               needed because of the write into a system folder
 curl -s https://fluxcd.io/install.sh | sudo bash
 ```
 
 Windows（PowerShell，如果装了 Chocolatey）：
 
 ```powershell
-# choco —— Windows 的一个第三方包管理器；它装的是同一个单独的 flux.exe 文件。
+# choco — a third-party package manager for Windows; it installs the same single flux.exe file.
 choco install flux
 ```
 
 现在我们把服务本身装进集群：
 
 ```bash
-# 设置访问文件：下面的命令会在集群里创建对象，而在哪个集群里创建很关键。
+# Set the access file: the command below creates objects in the cluster, and it matters in which one.
 export KUBECONFIG=~/lab.kubeconfig
-# flux install 会在集群里建立一个 `flux-system` namespace，并把服务部署进去。
-#   --components=...  具体要装哪些：
-#     source-controller     伸进 Git，保持仓库一份新鲜的副本
-#     kustomize-controller  把下载下来的东西应用到集群，并盯着偏差
+# flux install sets up a `flux-system` namespace in the cluster and deploys the services into it.
+#   --components=...  which ones exactly to install:
+#     source-controller     reaches into Git and keeps a fresh copy of the repository
+#     kustomize-controller  applies what was downloaded to the cluster and watches for divergences
 flux install --components=source-controller,kustomize-controller
 ```
 
@@ -234,8 +234,8 @@ flux install --components=source-controller,kustomize-controller
 确认一下服务起来了：
 
 ```bash
-# -n flux-system —— Flux 安家的那个 namespace。没有这个标志，kubectl 会去
-# default namespace 里找，什么都显示不出来。
+# -n flux-system — the namespace Flux settled into. Without this flag kubectl looks in the
+# default namespace and shows nothing.
 kubectl get pods -n flux-system
 ```
 
@@ -247,8 +247,8 @@ kubectl get pods -n flux-system
 完全一样的东西，用一份普通的清单（manifest）就能装上，不需要那个工具：
 
 ```bash
-# 同一套服务，但作为一份现成的描述：-f 接受的不仅是磁盘上的路径，
-# 也可以是一个链接。kubectl 会下载这个文件并应用它的内容。
+# The same set of services, but as a ready-made description: -f accepts not only a path on disk
+# but also a link. kubectl will download the file and apply its contents.
 kubectl apply -f https://github.com/fluxcd/flux2/releases/latest/download/install.yaml
 ```
 
@@ -315,18 +315,18 @@ spec:
 把两个都应用上：
 
 ```bash
-# -f 指向一个文件夹，而不是一个文件：它里面所有的清单都会被应用——
-# GitRepository 和 Kustomization 都在内。两者都创建在 flux-system namespace 里。
+# -f points at a folder, not a file: all the manifests in it will be applied —
+# both GitRepository and Kustomization. Both are created in the flux-system namespace.
 kubectl apply -f flux/
 ```
 
 我们来看看结果如何：
 
 ```bash
-# 我们向 Flux 询问调谐的状态。
-#   --watch  让窗口保持占用，并在情况变化时刷新这一行
-# READY: True 意味着仓库的内容到达了集群并被应用了。
-# REVISION —— 分支，以及当前所应用 commit 的短标识。
+# We ask Flux about the reconciliation state.
+#   --watch  keep the window busy and refresh the line as things change
+# READY: True means the repository's contents reached the cluster and were applied.
+# REVISION — the branch and the short identifier of the commit currently applied.
 flux get kustomizations --watch
 ```
 
@@ -340,8 +340,8 @@ passes   main@sha1:a1b2c3d   False      True   Applied revision: main@sha1:a1b2c
 用 `Ctrl+C` 停止观察，看看集群里冒出来了什么：
 
 ```bash
-# all —— 一次列出主要对象类型的简写：Pod、Deployment、Service 等等。
-# 你并没有手动创建 `passes` namespace：它是随应用一起从仓库里到来的。
+# all — a shorthand for the main object types at once: Pods, Deployment, Service, and the rest.
+# You didn't create the `passes` namespace by hand: it arrived from the repository along with the application.
 kubectl get all -n passes
 ```
 
@@ -365,7 +365,7 @@ spec:
 把它发出去：
 
 ```bash
-# 和第一次发送一样的三步：标记文件、带上原因保存、发送。
+# The same three steps as in the first send: mark the file, save with a reason, send.
 git add apps/passes.yaml
 git commit -m "passes: two replicas so the gate does not go dark during rollout"
 git push
@@ -374,8 +374,8 @@ git push
 现在观察集群并等待：
 
 ```bash
-# -w = 「观察并持续追加」：窗口保持占用，每当副本的状态变化时就出现新的一行。
-# 用 Ctrl+C 退出。
+# -w = "watch and keep appending": the window stays busy, a new line appears every time
+# the state of the copies changes. Exit with Ctrl+C.
 kubectl get pods -n passes -w
 ```
 
@@ -384,19 +384,19 @@ kubectl get pods -n passes -w
 不想等一分钟——你可以让 Flux 立刻调谐：
 
 ```bash
-# reconcile = 「立刻调谐，不等下一分钟。」
-#   kustomization passes  要调谐哪个对象
-#   --with-source         先去 Git 取新鲜的 commit，然后才应用；
-#                         没有这个标志，调谐会基于早先下载的那份副本进行
+# reconcile = "reconcile right now, without waiting for the next minute."
+#   kustomization passes  which object to reconcile
+#   --with-source         first go to Git for the fresh commit and only then apply;
+#                         without this flag the reconciliation goes off the copy downloaded earlier
 flux reconcile kustomization passes --with-source
 ```
 
 留意一下 commit 信息。`two replicas so the gate does not go dark during rollout`——那就是原因。半年后，当有人问「这里为什么是两个而不是一个」，五秒钟就能找到答案：
 
 ```bash
-# log = commit 的历史，最新的在最上面。
-#   --oneline         每个 commit 一行：一个短标识和原因文本
-#   apps/passes.yaml  只显示碰过这个具体文件的 commit
+# log = the history of commits, freshest on top.
+#   --oneline         one line per commit: a short identifier and the reason text
+#   apps/passes.yaml  show only the commits that touched this exact file
 git log --oneline apps/passes.yaml
 ```
 
@@ -409,8 +409,8 @@ git log --oneline apps/passes.yaml
 夜里，一起事故，服务的副本不够用了。你做你一贯做的事：
 
 ```bash
-# 直接在集群里改副本数，绕过 Git——就像你到今天为止一直做的那样。
-#   -n passes  应用住在这个 namespace 里；没有这个标志命令找不到它
+# Change the number of copies right in the cluster, bypassing Git — as you did until today.
+#   -n passes  the application lives in this namespace; without the flag the command won't find it
 kubectl scale deployment passes -n passes --replicas=5
 ```
 
@@ -421,14 +421,14 @@ deployment.apps/passes scaled
 成功了。我们来检查：
 
 ```bash
-# READY 这一列读作「就绪/所要求」：有多少副本响应，以及本该有多少。
+# The READY column reads as "ready/ordered": how many copies respond and how many there should be.
 kubectl get deployment passes -n passes
 ```
 
 五个副本。等一分钟再看：
 
 ```bash
-# 同一条命令。唯一的区别是两次运行之间过了一分钟。
+# The same command. The only difference is that a minute passed between the two runs.
 kubectl get deployment passes -n passes
 ```
 
@@ -468,15 +468,15 @@ passes   2/2     2            2           8m
 **它什么时候碍事。** 它在事故当中碍事，当你确实需要立刻改动某样东西、没有时间去商量的时候。为了这类情况，Flux 可以暂停：
 
 ```bash
-# suspend = 为这个对象暂停调谐。Flux 停止把集群拉向描述，
-# 手动的改动开始能活下来。这期间 Git 的内容不变。
+# suspend = pause reconciliation for this object. Flux stops bringing the cluster to the
+# description, and manual changes start to live. The contents of Git don't change meanwhile.
 flux suspend kustomization passes
 ```
 
 在这之后，调谐不再运行，手动你可以做任何事。要反过来：
 
 ```bash
-# resume = 把调谐重新打开。紧接着的下一次调谐会消除一切手动做过的东西。
+# resume = turn reconciliation back on. The very next reconciliation removes everything done by hand.
 flux resume kustomization passes
 ```
 
@@ -505,8 +505,8 @@ flux resume kustomization passes
 把它发出去。一个明知是坏的变更，走的是和好变更一样的路：此刻在你的 `push` 和集群之间没有任何检查——而这正是这一步的要点。
 
 ```bash
-# 同样的 add、commit、push。commit 里的原因老实地写下来——五分钟后
-# 当这个变更不得不撤销时，它会派上用场。
+# The same add, commit, push. The reason in the commit is written honestly — it'll come in handy
+# in five minutes, when the change has to be undone.
 git add apps/passes.yaml
 git commit -m "passes: trim memory limit"
 git push
@@ -515,14 +515,14 @@ git push
 我们等待并观察：
 
 ```bash
-# 观察副本，直到调谐带来新的描述。
+# Watch the copies until the reconciliation brings the new description.
 kubectl get pods -n passes -w
 ```
 
 **你应该看到** ——新副本起不来。`OOMKilled` 状态意味着进程因超出内存限制而被杀掉；`CrashLoopBackOff` 意味着集群已经接连重启这个副本好几次，如今在下一次尝试之前等得越来越久。Nginx 塞不进四兆字节，一启动就死。
 
 ```bash
-# 同一份列表，但作为单张快照，不持续观察。
+# The same list, but as a single snapshot, without watching.
 kubectl get pods -n passes
 ```
 
@@ -537,7 +537,7 @@ passes-7f8a1b2c3-qq7lp    0/1     CrashLoopBackOff   3          90s
 **以前你会怎么回滚：**
 
 ```bash
-# undo 会把 Deployment 退回到上一个 revision——退到那次编辑之前的设置。
+# undo would return the Deployment to the previous revision — to the settings from before the edit.
 kubectl rollout undo deployment/passes -n passes
 ```
 
@@ -546,20 +546,20 @@ kubectl rollout undo deployment/passes -n passes
 **别做 `rollout undo`。到真相所在的地方去回滚** ——在 Git 里：
 
 ```bash
-# revert = 新增一个 commit，撤销指定 commit 的改动。
-#   HEAD       「当前分支的最后一个 commit」——正是带着那个坏限制的那个
-#   --no-edit  不为 commit 信息打开编辑器；Git 自己写好标题
+# revert = add a new commit that undoes the changes of the specified one.
+#   HEAD       "the last commit of the current branch" — the very one with the bad limit
+#   --no-edit  don't open an editor for the commit message; Git writes the header itself
 git revert --no-edit HEAD
-# 在这个 revert 的 commit 被发到 GitHub 之前，Flux 对它一无所知。
+# Until the reverting commit is sent to GitHub, Flux knows nothing about it.
 git push
 ```
 
 **你应该看到** ——一个新的 commit，标题是 `Revert "passes: trim memory limit"`，而一分钟内集群里又有了两个能工作的副本。
 
 ```bash
-# 副本又起来了：能工作的内存限制回来了。
+# The copies come up again: the working memory limit is back.
 kubectl get pods -n passes
-# 而在这里你能看到现在应用的是哪个 commit——它应该和那个 revert 的对上。
+# And here you can see which commit is applied now — it should match the reverting one.
 flux get kustomizations
 ```
 
@@ -569,7 +569,7 @@ flux get kustomizations
 `git revert` 不会抹掉那个坏的 commit。它新增一个 **新的** commit，撤销坏 commit 的改动。一切都留在历史里：什么曾经坏过、什么时候被发现、以及回滚了什么。
 
 ```bash
-# -4 —— 显示最近的四个 commit；最上面那个是最新的。
+# -4 — show the four most recent commits; the top one is the freshest.
 git log --oneline -4
 ```
 
@@ -597,9 +597,9 @@ c71a4f9 passes: two replicas so the gate does not go dark during rollout
 为这个变更起一个分支：
 
 ```bash
-# checkout -b = 起一个新分支并立刻切过去。分支是一条独立的变更线：
-# 在它里面做的 commit 到不了 `main`，因而也到不了集群。
-#   passes/version-line  分支名；名字里允许有斜杠，用于分组
+# checkout -b = start a new branch and switch to it right away. A branch is a separate line
+# of changes: commits made in it don't reach `main`, and therefore don't reach the cluster either.
+#   passes/version-line  the branch name; a slash in the name is allowed and serves for grouping
 git checkout -b passes/version-line
 ```
 
@@ -608,9 +608,9 @@ git checkout -b passes/version-line
 ```bash
 git add apps/passes.yaml
 git commit -m "passes: bump the version shown on the page"
-# origin —— Git 记住的、你当初克隆仓库所用地址的名字。
-#   -u origin passes/version-line  在 GitHub 里创建一个同名分支并记住
-#                                  与它的关联，这样以后一条光秃秃的 `git push` 就够了
+# origin — the name under which Git remembers the address you cloned the repository from.
+#   -u origin passes/version-line  create a branch of the same name in GitHub and remember
+#                                  the link with it, so that a bare `git push` is enough later
 git push -u origin passes/version-line
 ```
 
@@ -623,10 +623,10 @@ git push -u origin passes/version-line
 点击 **Merge pull request** ——变更落进 `main`，下一次调谐把它带到集群。一分钟后，我们开一个隧道，看看服务提供的是什么：
 
 ```bash
-# port-forward = 从 bastion 通往集群的一条临时隧道。
-#   -n passes     服务所在的 namespace
-#   svc/passes    我们通向哪里：通向 Service，而不是某个具体的副本
-#   8080:80       左边是 bastion 上的端口，右边是集群内部服务的端口
+# port-forward = a temporary tunnel from the bastion into the cluster.
+#   -n passes     the namespace the service lives in
+#   svc/passes    where we lead: to the Service, not a specific copy
+#   8080:80       on the left the port on the bastion, on the right the service's port inside the cluster
 kubectl port-forward -n passes svc/passes 8080:80
 ```
 
@@ -654,10 +654,10 @@ kubectl port-forward -n passes svc/passes 8080:80
 📍 **位置：** 在 bastion 上，在你操作 `kubectl` 的那同一个终端窗口里。
 
 ```bash
-# 回到实验文件夹：脚本住在那里，而你之前在你自己仓库的文件夹里工作。
+# Return to the lab folder: the script lives there, and you worked in your own repository's folder.
 cd labs/05-gitops
 export KUBECONFIG=~/lab.kubeconfig
-# 脚本不改动集群里的任何东西：它只读取状态并打印一份报告。
+# The script changes nothing in the cluster: it only reads the state and prints a report.
 ./check.sh
 ```
 
@@ -668,8 +668,8 @@ export KUBECONFIG=~/lab.kubeconfig
 如果你想让脚本也看看你仓库的历史——告诉它克隆在哪里：
 
 ```bash
-# LAB_REPO —— 脚本据以得知你仓库的克隆在哪里的变量。
-# 如果你把它克隆到了主目录以外的地方，填上你自己的路径。
+# LAB_REPO — the variable from which the script learns where the clone of your repository lives.
+# Put in your own path if you cloned it somewhere other than the home folder.
 export LAB_REPO=~/passes-gitops
 ./check.sh
 ```
@@ -683,8 +683,8 @@ export LAB_REPO=~/passes-gitops
 当你把所有实验都做完时，可以像这样一次性把一切都移除：
 
 ```bash
-# delete kustomization = 从集群里移除这个调谐对象。
-#   --silent  不要再问一遍确认
+# delete kustomization = remove the reconciliation object from the cluster.
+#   --silent  don't ask for confirmation again
 flux delete kustomization passes --silent
 ```
 

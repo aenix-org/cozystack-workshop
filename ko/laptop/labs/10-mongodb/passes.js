@@ -1,94 +1,95 @@
-// 랩 10 · passes 컬렉션에 담긴 서로 다른 네 가지 형태의 출입증 네 개.
+// Lab 10 · four passes of four different shapes in the passes collection.
 //
-// 이것은 설정 파일이 아니라 mongosh — JavaScript를 이해하는 MongoDB 셸 — 을 위한
-// 프로그램입니다. 노트북에서, 랩 클러스터 안에서, README에 있는 짧은 명령 `mo`로
-// 실행됩니다(이 명령은 작업 파드 안에서 mongosh를 띄웁니다):
+// This is not a settings file but a program for mongosh — the MongoDB shell, which
+// understands JavaScript. It runs on your laptop, in the lab cluster, with the short
+// `mo` command from the README (it launches mongosh inside the working pod):
 //     cd labs/10-mongodb && mo < passes.js
-// 응답으로 «컬렉션 문서 수: 4»라는 줄을 보게 됩니다.
+// In response you will see the line "documents in collection: 4".
 //
-// 파일을 두 번 실행하면 문서가 여덟 개가 됩니다: insertMany는 추가만 하기 때문입니다.
+// Run the file twice and there will be eight documents: insertMany only adds.
 
-// db는 현재 연결된 데이터베이스이고, passes는 그 안의 컬렉션(테이블에 가장 가까운
-// 대응물)입니다. insertMany는 «이 문서들을 추가하라»는 뜻입니다. 미리 테이블을 만들
-// 필요가 전혀 없고 필드를 기술할 곳도 없습니다: 컬렉션은 첫 삽입 순간에 생기며,
-// 문서에 어떤 필드가 있을 수 있는지에 대해 데이터베이스는 기본적으로 아무 의견이 없습니다.
-// 그래서 아래 네 문서는 서로 다른 필드 집합을 가지면서도 하나의 컬렉션 안에 나란히
-// 놓여 있습니다. 문서 모델이 존재하는 이유가 바로 이것입니다: 빈 컬럼도 없고,
-// 네 가지 출입증 유형을 위한 네 개의 테이블도, 그것들을 잇는 다섯 번째 테이블도 없습니다.
+// db is the database you are connected to; passes is a collection in it (the closest
+// analogue of a table); insertMany means "add these documents". You do not need to
+// create any table in advance, and there is nowhere to describe the fields: the
+// collection appears at the moment of the first insert, and by default the database
+// has no opinion about which fields a document may have.
+// That is why the four documents below have different sets of fields and yet lie side
+// by side, in one collection. This is exactly why the document model exists: no empty
+// columns, no four tables for four pass types, no fifth one to link them together.
 db.passes.insertMany([
   {
-    // 일회용 출입증 — 가장 짧은 형태: 여섯 개 필드, 모두 단순 값.
-    // 보통의 테이블에서라면 이것은 평범한 한 행이 되었을 것입니다.
-    // ISODate(...)는 문자열이 아니라 바로 날짜입니다. MongoDB는 문서를 이진
-    // 형식 BSON으로 저장하며, 거기서 값에는 타입이 있습니다: 날짜, 정수, 부동소수점, 논리값.
-    // 날짜로는 비교하고 정렬할 수 있지만, 문자열 «2026-09-01»로는 기록 형식이
-    // 운 좋게 맞아떨어질 때만 가능합니다.
-    type: "1회용",
-    guest: "김민준",
+    // A single-visit pass — the shortest shape: six fields, all simple values.
+    // In an ordinary table this would be an ordinary row.
+    // ISODate(...) is not a string but a date. MongoDB stores documents in the binary
+    // BSON format, where a value has a type: date, integer, float, boolean.
+    // A date can be compared and sorted; the string "2026-09-01" only if you are
+    // lucky with how it was written.
+    type: "single-use",
+    guest: "James P. Whitfield",
     host: "petrov@corp.example",
-    entrance: "북문",
+    entrance: "North",
     valid_on: ISODate("2026-09-01T09:00:00Z"),
-    purpose: "면접"
+    purpose: "job interview"
   },
   {
-    // 주간 출입증. valid_on 대신 valid_from과 valid_to 쌍이, 하나의 입구 대신
-    // 입구 목록 entrances가 바로 그 필드 안에 들어 있습니다. 테이블에서 그런 목록을
-    // 담으려면 별도의 «출입증 — 입구» 테이블이나, 나중에 제대로 검색할 수 없는
-    // 쉼표로 구분된 문자열이 필요했을 것입니다.
-    // 일회용 출입증에는 아예 없는 badge_returned 필드가 나타났습니다:
-    // NULL도 빈 값도 아니라, 그 문서에는 그런 필드가 그냥 없는 것입니다. 이 둘은 서로
-    // 다른 것이고, 검색하는 방법도 다릅니다.
-    type: "주간",
-    guest: "이서연",
+    // A weekly pass. Instead of valid_on there is a pair valid_from and valid_to, and
+    // instead of a single entrance a list of entrances right there in the field. In a
+    // table such a list would require either a separate "pass — entrance" table, or a
+    // comma-separated string that you then cannot search properly.
+    // A badge_returned field has appeared, which the single-visit pass does not have
+    // at all: not NULL and not empty, but simply no such field in that document. These
+    // are different things, and they are searched for differently.
+    type: "weekly",
+    guest: "Emma L. Prescott",
     host: "petrov@corp.example",
-    entrances: ["북문", "남문"],
+    entrances: ["North", "South"],
     valid_from: ISODate("2026-09-01T00:00:00Z"),
     valid_to: ISODate("2026-09-07T23:59:59Z"),
-    purpose: "외부 감사",
+    purpose: "external audit",
     badge_returned: false
   },
   {
-    // 차량 출입증. 자동차와 관련된 모든 것은 하나의 필드 car 안에 들어 있습니다.
-    // 이것은 JSON이 안에 든 문자열이 아니라 온전한 중첩 구조입니다:
-    // car.plate로 검색할 수 있고 그것에 인덱스를 만들 수 있습니다.
-    type: "차량",
-    guest: "박지훈",
+    // A vehicle pass. Everything related to the car lives inside a single field car.
+    // This is not a string with JSON inside, but a full nested structure: you can
+    // search by car.plate and build an index on it.
+    type: "vehicle",
+    guest: "Victor S. Marsh",
     host: "logistics@corp.example",
-    entrance: "서문",
+    entrance: "West",
     valid_on: ISODate("2026-09-02T07:30:00Z"),
     car: {
-      plate: "34가 1174",
-      model: "현대 스타렉스",
+      plate: "AB-1174-CD",
+      model: "Ford Transit",
       trailer: false,
       weight_kg: 3500
     },
     parking: "P2"
   },
   {
-    // 단체 출입증. 여기에는 객체 목록이 있습니다: 각 참가자는 자신의 필드를 가지며,
-    // 목록의 길이는 임의입니다.
-    // 그리고 가장 중요한 것 — 이 문서에는 guest 필드가 아예 없습니다: 손님 대신
-    // 조직과 연락 담당자가 있습니다. 이 형태는 다른 것들과 하나의 필드가 아니라
-    // 본질적으로 다릅니다. 이것은 랩 뒷부분에서 반향을 일으킵니다: 문서 검증 규칙이
-    // 모두에게 guest를 요구할 수 없게 됩니다. 그러지 않으면 정당한 단체 출입증이
-    // 통과하지 못하기 때문입니다.
-    type: "단체",
-    organization: "제1고등학교",
-    contact: "최지우",
+    // A group pass. Here there is a list of objects: each member has their own fields,
+    // and the length of the list is arbitrary.
+    // And most importantly — this document has no guest field at all: instead of a
+    // guest there is an organization and a contact person. The shape differs from the
+    // others not by one field but in essence. This will echo later in the lab: the
+    // document validation rule will not be able to require guest from everyone,
+    // otherwise a legitimate group pass would not pass.
+    type: "group",
+    organization: "City High School No. 1",
+    contact: "Olivia W. Grant",
     host: "hr@corp.example",
-    entrance: "북문",
+    entrance: "North",
     valid_on: ISODate("2026-09-03T10:00:00Z"),
-    escort: "정도현",
+    escort: "Alan A. Foster",
     members: [
-      { name: "강현우", age: 16 },
-      { name: "윤하은", age: 15 },
-      { name: "장준서", age: 17 }
+      { name: "Peter Hale", age: 16 },
+      { name: "Mary Fenwick", age: 15 },
+      { name: "Isaac Hart", age: 17 }
     ]
   }
 ]);
 
-// countDocuments({}) — 조건에 맞는 문서를 셉니다. 빈 조건은 «전부»를 뜻합니다.
-// 출력이 필요한 이유는 파일에 눈에 보이는 결과가 있게 하기 위해서입니다: insertMany
-// 자체는 발급된 식별자 목록으로 응답하는데, 그 안에서 실제로 몇 개의 문서가 들어갔는지
-// 알아보기가 쉽지 않습니다.
-print("컬렉션 문서 수: " + db.passes.countDocuments({}));
+// countDocuments({}) — count the documents matching a condition; an empty condition
+// means "all". The print is needed so the file has a visible result: insertMany itself
+// replies with a list of issued identifiers, and in it you can easily miss how many
+// documents actually landed.
+print("documents in collection: " + db.passes.countDocuments({}));

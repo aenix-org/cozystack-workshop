@@ -458,7 +458,7 @@ Storage Type       file
 ⚠️ **コマンドが `connection refused`、`no such host`、または `i/o timeout` で失敗する場合は——**
 先へ進んでも意味がありません。まず接続です。よくある原因を、可能性の高い順に。`workshopXX` を自分の番号に
 置き換えていない。ダッシュボードのアプリケーションがまだ準備できていない。名前のタイプミス。名前は
-`openbao-<アプリケーション名>` の規則で組み立てられます。あなたはアプリケーションを `secrets` と名付けたので、
+`openbao-<application name>` の規則で組み立てられます。あなたはアプリケーションを `secrets` と名付けたので、
 アドレスに含まれるのは `secrets` ではなく `openbao-secrets` です。
 
 ## 予測できる失敗 · ストアがサービスを拒む

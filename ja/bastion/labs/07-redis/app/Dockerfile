@@ -1,59 +1,59 @@
-# ラボ7 · サービス「Passes」のイメージのビルドレシピ、バージョン v2。
+# Lab 7 · build recipe for the "Passes" service image, version v2.
 #
-# Dockerfile とは、ソースコードからイメージを作る手順のリストです。イメージとは、実行コマンドと
-# 一緒になったファイルシステムの不変のスナップショットです。もっとも身近な例えは仮想マシンの
-# テンプレートですが、マウスではなくこのテキストで組み立てられ、レジストリに置かれ、
-# タグでバージョン管理されます。
+# A Dockerfile is a list of steps that turn source code into an image: an immutable
+# snapshot of the filesystem together with the command to run. The closest familiar analog
+# is a virtual machine template, but it is built not with a mouse but with this text, lives
+# in a registry, and is versioned by a tag.
 #
-# ビルドはクラスターではなく VM 上で行います（README のビルド手順を参照）:
+# It is built on a VM, not in the cluster (see the build step in the README):
 #   docker build --platform linux/amd64 -t <your-harbor>/passes/passes-api:v2 app/
 #   docker push  <your-harbor>/passes/passes-api:v2
 #
-# --platform linux/amd64 は Apple Silicon の Mac では必須です。これがないとイメージは
-# ARM 向けにビルドされ、何の文句も言わずにプッシュされ、クラスターで「exec format error」で落ちます。
+# --platform linux/amd64 is mandatory on a Mac with Apple Silicon: without it the image will
+# build for ARM, push without a single complaint, and crash in the cluster with "exec format error".
 #
-# 二段階ビルド。
+# Two-stage build.
 #
-# 最初の段階はビルド段階です。ここでは Go コンパイラ一式が必要で、これは約 350 MB あります。
-# 二番目の段階はクラスターに送られるものです。そこには完成したバイナリだけが入ります。
-# こうして最終イメージは 350 ではなく約 10 MB になり、その中にはコンパイラも
-# ソースもパッケージマネージャーもありません。つまり、コンテナに入り込んだ者が
-# 使えるものが何もないのです。
+# The first stage is the build stage: here the whole Go compiler is needed, which is about 350 MB.
+# The second stage is what ships to the cluster: only the finished binary lands there.
+# This way the final image ends up around 10 MB instead of 350, and inside it there is neither
+# a compiler, nor sources, nor a package manager — that is, nothing to use
+# for whoever does manage to get into the container.
 
-# FROM — どの既成イメージから始めるか。ここでは Alpine ベースの Go コンパイラ入りの公式
-# イメージを使います。AS build はこの段階に名前を付け、二番目の段階でそこから結果を
-# 取り出せるようにします。バージョンは latest ではなく固定されています（1.23）。さもないと
-# 同じソースの明日のビルドが別のバイナリを生むかもしれないからです。
+# FROM — which ready-made image we start from. Here we take the official image with the Go
+# compiler based on Alpine. AS build gives this stage a name so the second stage can grab the
+# result from it. The version is pinned (1.23), not latest: otherwise tomorrow's build of the same
+# source may produce a different binary.
 FROM golang:1.23-alpine AS build
-# WORKDIR — イメージ内の作業フォルダ。以降のすべてのコマンドはこの中で実行されます。
+# WORKDIR — the working folder inside the image. All following commands run in it.
 WORKDIR /src
-# COPY は VM 上のファイルをイメージ内に配置します。一行ではなく二行なのは、go.mod は
-# めったに変わらず、main.go はよく変わり、docker は各ステップを別々にキャッシュするからです。main.go だけを触れば
-# go.mod のステップはキャッシュから取られます。
+# COPY places files from the VM inside the image. In two lines, not one: go.mod changes
+# rarely, main.go often, and docker caches each step separately. Touch only main.go —
+# the go.mod step will be taken from cache.
 COPY go.mod ./
 COPY main.go ./
-# RUN — ビルドのまさに最中にコマンドを実行します。その結果はイメージに残ります。
-# CGO_ENABLED=0 — システムライブラリに依存せず、静的にビルドします。
-# これがないとバイナリは glibc を必要としますが、最終イメージにはそれがありません。
-# -trimpath はバイナリからあなたの VM 上のパスを取り除き、-ldflags="-s -w" は
-# デバッグ情報を捨てます。イメージは小さくなり、ログにあなたのフォルダ名が漏れません。
+# RUN — execute a command right during the build; its result stays in the image.
+# CGO_ENABLED=0 — build statically, without ties to system libraries.
+# Without this the binary would require glibc, which will not be in the final image.
+# -trimpath strips paths from your VM out of the binary, -ldflags="-s -w" throws out
+# debug information — the image is smaller, and your folder names do not leak into the log.
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/passes-api .
 
-# 二番目の FROM はイメージを白紙から作り直します。build 段階にあったものはすべて
-# ここで捨てられ、最終イメージには次の COPY --from=build コマンドで明示的に
-# コピーするものだけが入ります。
+# The second FROM starts the image over from a clean slate. Everything that was in the build stage
+# is discarded at this point, and only what we explicitly
+# copy with the next COPY --from=build command will land in the final image.
 FROM alpine:3.21
-# アプリは root ではなく実行されます。正しく設定されたクラスターでは root で動く Pod は
-# そもそも許可されません。これは揚げ足取りではなく、標準的なセキュリティ要件です。
+# The application runs not as root. In a properly configured cluster a pod running as root
+# will not be allowed at all, and this is not nitpicking but a standard security requirement.
 RUN adduser -D -u 10001 app
-# ビルド段階から移ってくる唯一のものは、一つのファイル、完成したバイナリだけです。
+# The only thing that moves over from the build stage is a single file: the finished binary.
 COPY --from=build /out/passes-api /usr/local/bin/passes-api
-# USER — どのユーザーでプロセスを実行するか。名前ではなく番号が指定されています。kubernetes は
-# マニフェスト内でまさに番号を確認し（runAsNonRoot は uid を見ます）、両者は一致しなければなりません。
+# USER — as whom to run the process. A number is given, not a name: kubernetes checks
+# exactly the number in the manifest (runAsNonRoot looks at the uid), and they must match.
 USER 10001
-# EXPOSE —「内部でこのポートを待ち受けている」という注記です。何も開かず、何も転送せず、
-# マニフェストを書く人のためのドキュメントです。
+# EXPOSE — a note that "this port is listened on inside". It does not open or forward anything,
+# it is documentation for whoever will write the manifest.
 EXPOSE 8080
-# ENTRYPOINT — コンテナが起動したときに実行されるもの。ここではプロセスは一つで、それが
-# 主プロセスです。それが終わればコンテナも終わり、クラスターが新しいコピーを立ち上げます。
+# ENTRYPOINT — what runs when the container starts. There is one process here and it is
+# the main one: when it ends the container ends, and the cluster brings up a new copy.
 ENTRYPOINT ["/usr/local/bin/passes-api"]
