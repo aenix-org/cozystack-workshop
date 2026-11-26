@@ -18,7 +18,7 @@ it. A correct-but-wooden translation is a failed translation here.
 
 - Translate **meaning and rhythm**, not word for word. The result must read as
   if it were written in the target language by an engineer who writes well.
-- **No unnecessary anglicisms.** In Chinese and Spanish especially, do not
+- **No unnecessary anglicisms.** Do not
   transliterate an English word when a natural, established term exists. Keep in
   English only what `GLOSSARY.md` says to keep (product names, CLI names,
   Kubernetes object names).
@@ -40,7 +40,7 @@ it. A correct-but-wooden translation is a failed translation here.
 
 ## Terminology
 
-- Follow `GLOSSARY.md` for every listed term, in every language.
+- Follow `GLOSSARY.md` for every listed term, in both languages.
 - Be consistent within and across files: the same source term always maps to the
   same target term.
 - The tenant placeholder `workshopXX`, `~/.kube/config`, `~/lab.kubeconfig`, and

@@ -1,15 +1,15 @@
 # Glossary — canonical terminology
 
-This table fixes how key terms are handled so every language reads consistently
+This table fixes how key terms are handled so both languages read consistently
 and no term drifts. Two rules override everything else:
 
 1. **Product, project and CLI names are never translated or transliterated** —
    in any language they stay exactly as written here.
-2. **Kubernetes object and command names stay in English** even in Chinese and
-   Spanish prose (this is what real localized Kubernetes documentation does).
+2. **Kubernetes object and command names stay in English** even in Russian
+   prose (this is what real localized Kubernetes documentation does).
    Translate the *idea* around them, not the identifier.
 
-## Never translated — keep verbatim in every language
+## Never translated — keep verbatim in both languages
 
 Cozystack · Kubernetes · KubeVirt · Talos · Flux · GitOps · Helm ·
 vSphere · vCenter · ESXi · DRS · Harbor · Redis · PostgreSQL · ClickHouse ·
@@ -28,30 +28,30 @@ inside code fences, the tenant placeholder `workshopXX`, the paths
 
 ## Translated concepts — use these targets
 
-| Concept (ru) | English | 中文 (zh) | Español (es) |
-|---|---|---|---|
-| кластер | cluster | 集群 | clúster |
-| control plane | control plane | 控制平面 | plano de control |
-| узел (node) | node | 节点 | nodo |
-| тенант | tenant | 租户 | tenant |
-| манифест | manifest | 清单 (manifest) | manifiesto |
-| применить (kubectl apply) | apply | 应用 | aplicar |
-| реконсиляция / сводит к желаемому | reconcile / reconciliation | 调谐 (reconcile) | reconciliación |
-| самолечение | self-healing | 自愈 | autoreparación |
-| автомасштабирование | autoscaling | 自动扩缩容 | autoescalado |
-| выкатка / раскатка | rollout | 滚动发布 | despliegue (rollout) |
-| образ | image | 镜像 | imagen |
-| диск | disk | 磁盘 | disco |
-| сеть | network | 网络 | red |
-| хранилище | storage | 存储 | almacenamiento |
-| виртуалка / виртуальная машина | virtual machine (VM) | 虚拟机 | máquina virtual (VM) |
-| контейнер | container | 容器 | contenedor |
-| управляющий кластер | management cluster | 管理集群 | clúster de gestión |
-| учебный кластер `lab` | lab cluster `lab` | 实验集群 `lab` | clúster de laboratorio `lab` |
-| виртуалка-bastion / джамп-хост | the bastion (shared VM) | bastion（跳板机） | el bastion (VM compartida) |
-| дашборд | dashboard | 控制台 (dashboard) | panel (dashboard) |
-| квота | quota | 配额 | cuota |
-| секрет (объект) | Secret | Secret | Secret |
+| Concept (ru) | English |
+|---|---|
+| кластер | cluster |
+| control plane | control plane |
+| узел (node) | node |
+| тенант | tenant |
+| манифест | manifest |
+| применить (kubectl apply) | apply |
+| реконсиляция / сводит к желаемому | reconcile / reconciliation |
+| самолечение | self-healing |
+| автомасштабирование | autoscaling |
+| выкатка / раскатка | rollout |
+| образ | image |
+| диск | disk |
+| сеть | network |
+| хранилище | storage |
+| виртуалка / виртуальная машина | virtual machine (VM) |
+| контейнер | container |
+| управляющий кластер | management cluster |
+| учебный кластер `lab` | lab cluster `lab` |
+| виртуалка-bastion / джамп-хост | the bastion (shared VM) |
+| дашборд | dashboard |
+| квота | quota |
+| секрет (объект) | Secret |
 
 When a term is not in this table, prefer the wording that a native engineer
 would actually use in that language's Kubernetes documentation — never a raw
@@ -69,7 +69,7 @@ These were pinned after review to stop drift. Use exactly these:
 | виртуалка / джамп-хост (the shared VM you SSH into) | **the bastion** | never "VM" — reserve "VM"/"virtual machine" for actual VMs and VMInstances |
 | Pod (the Kubernetes object) | **Pod** (capitalized) | even in running prose |
 
-## Placeholders, scripts and manifests: English only, in every language
+## Placeholders, scripts and manifests: English only, in both languages
 
 There is one copy of every script, manifest, SQL file and app source: the one in
 `en/`. Every other language folder carries byte-identical copies, and fenced code
@@ -95,189 +95,3 @@ placeholders to the English ones now used everywhere:
 Functional tokens: `workshopXX`, `PASTE_PRESIGNED_URL` and the `PASTE_...` fields
 in `convert.sh` (formerly `ВСТАВЬТЕ_...`). When a guide quotes a script, its output
 or a placeholder, quote the English text exactly as it is in the file.
-
-## Chinese (zh) — resolved canonical renderings
-
-Pinned after review to stop drift. Use exactly these Chinese head-terms everywhere
-(gloss `（English）` at first mention is fine; the head-term must be identical after):
-
-| Concept | 中文 (use this) | not |
-|---|---|---|
-| testbed | **测试环境** | 不用 raw "testbed" / 测试台 |
-| menagerie (the metaphor) | **动物园** | 不用 大杂烩 / 乱七八糟的东西 — one image everywhere, incl. index & headings |
-| the instructor (ведущий) | **讲师** | 不用 raw "instructor" |
-| workshop (the event) | **工作坊** | 不用 raw "workshop" |
-| catalog (platform catalog) | **目录** | 不用 raw "catalog" |
-| presigned link/URL | **预签名链接 / 预签名 URL** | 不用 raw "presigned" |
-| manifest | **清单** | 不用 raw "manifest" |
-| lab cluster `lab` | **实验集群 `lab`** | keep the `lab` backticks; not bare "lab 集群" |
-| ESXi host / host (the machine) | **主机** | 不用 raw "host" in prose |
-| reservation (vSphere) | **资源预留（reservation）** first, **预留** after | 不用 raw "reservation" |
-| hypervisor | **虚拟机监控程序（hypervisor）** | 不用 bare "hypervisor" |
-| home directory | **主目录** | 不用 "home 目录" |
-
-Punctuation in Chinese prose: use the full-width colon `：` (not `:`) and corner
-brackets `「」` for quoted/emphasized phrases — consistently across all files.
-Colons inside code fences, inline code, URLs, ports and ratios stay half-width.
-
-## Spanish (es) — resolved canonical renderings
-
-Pinned after review. Use exactly these; no raw English where a Spanish term exists:
-
-| Concept | Español (use this) | not |
-|---|---|---|
-| testbed / стенд | **entorno de pruebas** | not raw "testbed" / "banco de pruebas" mixed |
-| menagerie (the metaphor) | **zoológico** | not "menagerie" — one image everywhere, incl. index & headings |
-| the converter machine | **la máquina conversora** | one name everywhere |
-| dashboard | **el panel** | not raw "dashboard" in prose |
-| rollback (noun / verb) | **reversión / revertir** | not "rollback"/"hacer rollback" |
-| snapshot (vSphere) | **instantánea** | not raw "snapshot" |
-| timeout (in prose) | **tiempo de espera** ("se agota el tiempo") | not raw "timeout" |
-| health check | **comprobación de estado** | not "health check" / "chequeo de salud" |
-| library (code) | **biblioteca** | not "librería" (= bookstore) |
-| to parse | **analizar / interpretar** | not "parsear" |
-| gateway | **pasarela** | not raw "gateway" |
-| add-on | **complemento** | not "add-on" |
-| log (application) | **registro** | consistent with "registro de auditoría" |
-| failover | **conmutación por error** (gloss failover at 1st use) | — |
-| placeholder | **marcador** | not raw "placeholder" |
-| workshop (the event) | **taller** | not raw "workshop" (URLs/paths stay) |
-| Pod (object) | **Pod** (capitalized) | even in running prose |
-
-Register: participant-facing material uses **tú** throughout; CONVENTIONS.md must
-use tú too (not usted). Placeholders stay English as in the files (e.g. `YourPasswordHere`).
-
-### Spanish (es) — laptop-phase additions
-| Concept | Español | not |
-|---|---|---|
-| presigned link/URL | **enlace prefirmado / URL prefirmada** | not presigned/presignado |
-| to run (software/VM) | **ejecutarse / funcionar** | not "correr" |
-| the lab (exercise, abbrev) | **el lab** (masculine) | not "la lab" |
-| a catalog item | **un elemento del catálogo** | not "postura/posición" |
-| the trailing path segment (tail) | **el sufijo / la parte final** | not "la cola" |
-| the reader's machine | **la laptop** | not "portátil" (pick one: laptop) |
-| named Secret object | **el Secret `<name>`** | keep English "Secret"; "un secreto" only for generic confidential data |
-| monitoring | **monitoreo** | pick one (not mix with monitorización) |
-
-## Additional languages (ja / ko / de / hi) — concept terms
-
-Fixed product/CLI/Kubernetes-object names stay verbatim in these languages too
-(same never-translate list as above). Concept-term targets:
-
-| Concept | 日本語 (ja) | 한국어 (ko) | Deutsch (de) | हिन्दी (hi) |
-|---|---|---|---|---|
-| cluster | クラスター | 클러스터 | Cluster | क्लस्टर |
-| control plane | コントロールプレーン | 컨트롤 플레인 | Control Plane | कंट्रोल प्लेन |
-| node | ノード | 노드 | Node | नोड |
-| tenant | テナント | 테넌트 | Tenant | टेनेंट |
-| manifest | マニフェスト | 매니페스트 | Manifest | मैनिफ़ेस्ट |
-| apply (kubectl apply) | 適用 | 적용 | anwenden | लागू करना |
-| reconcile | リコンサイル | 조정(reconcile) | abgleichen (reconcile) | रिकॉन्साइल |
-| self-healing | 自己修復 | 자가 복구 | Selbstheilung | स्व-उपचार |
-| autoscaling | オートスケーリング | 오토스케일링 | Autoskalierung | ऑटोस्केलिंग |
-| rollout | ロールアウト | 롤아웃 | Rollout | रोलआउट |
-| image | イメージ | 이미지 | Image | इमेज |
-| virtual machine (VM) | 仮想マシン | 가상 머신 | virtuelle Maschine (VM) | वर्चुअल मशीन (VM) |
-| container | コンテナ | 컨테이너 | Container | कंटेनर |
-| management cluster | 管理クラスター | 관리 클러스터 | Management-Cluster | प्रबंधन क्लस्टर |
-| the bastion (shared VM) | bastion（共有VM） | bastion(공유 VM) | der Bastion (gemeinsame VM) | bastion (साझा VM) |
-| dashboard | ダッシュボード | 대시보드 | Dashboard | डैशबोर्ड |
-| quota | クォータ | 쿼터 | Quota | कोटा |
-| testbed | テスト環境 | 테스트베드 | Testumgebung | परीक्षण मंच |
-| menagerie (metaphor) | 動物園 | 동물원 | Zoo | चिड़ियाघर |
-| the instructor | 講師 | 강사 | die Lehrkraft | प्रशिक्षक |
-| workshop (event) | ワークショップ | 워크숍 | Workshop | वर्कशॉप |
-
-Placeholders (YourPasswordHere, YOUR-LOGIN, PASTE_*, workshopXX, ...) stay English,
-exactly as in the files. Pod, Secret and other K8s object names
-stay in English in all languages.
-
-### Japanese (ja) — resolved renderings
-| Concept | 日本語 | not |
-|---|---|---|
-| step (手順の番号) | **ステップ** | not 手順 (headings are ## ステップN) |
-| bucket | **バケット** | one form |
-| managed service | **マネージドサービス** | not raw "managed" |
-| error (in the pinned callout) | **エラー** | not 誤り/ミス/間違い |
-| credential labels in code (login:/password:) | keep **login: / password:** verbatim (as en) | do not localize the label |
-Fixed callout (CONVENTIONS, verbatim everywhere): spoiler heading = 「答えと、このエラーより広い教訓」; stop-and-think = 「読み進める前に、立ち止まって考えてください。」
-
-### Korean (ko) — resolved renderings
-| Concept | 한국어 | not |
-|---|---|---|
-| error | **오류** | not 에러 / 실수 |
-Fixed callouts (CONVENTIONS, verbatim everywhere):
-- spoiler <summary> heading = 「답과, 이 오류보다 더 넓은 교훈」
-- lesson opener (bold) = 「교훈은 이 오류보다 넓습니다.」
-- stop-and-think = 「더 읽기 전에 멈추고 생각해 보십시오.」
-
-### Korean (ko) — Phase/Step and managed
-- Phase (Фаза, the 3 big migration phases) → **페이즈 N** (keep distinct from Step)
-- Step (Шаг, numbered steps) → **N단계** (number before 단계: 2단계, not 단계 2, not 스텝)
-- managed service → **관리형 서비스** (natural Korean; not 매니지드 / raw "managed")
-- The pinned spoiler callout 「답과, 이 오류보다 더 넓은 교훈」 is ONLY for spoilers whose English is exactly "The answer, and a lesson broader than this error" — never overwrite a spoiler that has its own specific heading.
-
-### German (de) — resolved renderings
-Fixed callouts (CONVENTIONS, verbatim everywhere):
-- spoiler <summary> heading = 「Die Antwort und eine Lehre, die über diesen Fehler hinausgeht」 (Lehre never Lektion; verb hinausgeht never hinausreicht/weiter reicht; no comma/en-dash after Antwort)
-- lesson-opener bold = 「Die Lehre reicht über diesen Fehler hinaus.」
-- 'error' → **Fehler** (the term everywhere)
-German quotes: opening low „ (U+201E) + closing high " (U+201C) — never a straight ASCII close. Straight quotes inside code fences stay.
-
-### Hindi (hi) — resolved renderings
-| Concept | हिन्दी | not |
-|---|---|---|
-| queue | **क़तार** (with nuqta) | not raw "queue" / क्यू / कतार |
-| catalog | **कैटलॉग** | not raw "catalog" |
-| managed service | **प्रबंधित सेवा** | not raw "managed" |
-| application (spelling) | **एप्लिकेशन** | not ऐप्लिकेशन |
-Fixed callout (CONVENTIONS): stop-and-think = **आगे पढ़ने से पहले रुककर सोचिए।**
-Placeholders stay English as in the files (e.g. CH_PASSWORD='your-analyst-password').
-
-## Ukrainian (uk) — concept terms
-
-Fixed product/CLI/Kubernetes-object names stay verbatim (same never-translate
-list as above). Natural Ukrainian throughout — **no russianisms / surzhyk**
-(вузол not узел, образ not імідж, застосувати not застосовувати-кальки, викочування
-not раскатка). Quotes: use guillemets «…» as in the Russian source.
-
-| Concept | Українська (uk) | not |
-|---|---|---|
-| cluster | кластер | |
-| control plane | площина керування (control plane) | not контрол-плейн |
-| node | вузол | not нода |
-| tenant | тенант | |
-| manifest | маніфест | |
-| apply (kubectl apply) | застосувати | |
-| reconcile | узгодження (reconcile) | |
-| self-healing | самовідновлення | |
-| autoscaling | автомасштабування | |
-| rollout | викочування | not розкатка |
-| image | образ | not імідж |
-| virtual machine (VM) | віртуальна машина (VM) | |
-| container | контейнер | |
-| management cluster | кластер керування | |
-| the bastion (shared VM) | бастіон (спільна ВМ) | |
-| dashboard | дашборд | |
-| quota | квота | |
-| testbed | тестове середовище | |
-| menagerie (metaphor) | звіринець | |
-| the instructor | викладач | |
-| workshop (event) | воркшоп | |
-
-### Ukrainian (uk) — resolved renderings
-| Concept | Українська | not |
-|---|---|---|
-| step (numbered) | **Крок N** | not Шаг / Степ |
-| Phase (the 3 big migration phases) | **Фаза N** | keep distinct from Крок |
-| error | **помилка** | not ерор |
-| managed service | **керований сервіс** | not менеджед |
-| queue | **черга** | |
-| catalog | **каталог** | |
-| bucket | **бакет** | |
-| credential labels in code (login:/password:) | keep **login: / password:** verbatim (as en) | do not localize the label |
-
-Fixed callouts (CONVENTIONS, verbatim everywhere):
-- spoiler `<summary>` heading = «Відповідь і урок, ширший за цю помилку»
-- lesson-opener (bold) = «Урок ширший за цю помилку.»
-- stop-and-think = «Зупиніться і подумайте, перш ніж читати далі.»
