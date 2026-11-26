@@ -143,6 +143,8 @@ virtctl console --namespace=tenant-workshopXX vm-instance-convert
 Inside: `nano convert.sh`, paste in the text of `scripts/convert.sh`, and put your own
 `bucketName`, `accessKey` and `secretKey` in place of `PASTE_...`.
 
+**Running this on your own, outside our workshop?** `OVA_URL` in `convert.sh` points to the demo image in the workshop cloud's object storage. We keep it there so that during the event the image downloads quickly and doesn't eat external traffic, but that copy is gone once the workshop ends. Replace the link with the public copy, `https://github.com/aenix-org/cozystack-workshop/releases/download/vmware-demo-ova/app-1.ova` (about 810 MB), or with your own OVA.
+
 ⚠️ **Run the conversion inside `screen`** — it takes about five minutes, and if your SSH session
 to the bastion drops, an ordinary run will be cut off halfway. `screen` keeps the process alive,
 even when the connection is gone:

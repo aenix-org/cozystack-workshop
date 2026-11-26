@@ -200,6 +200,8 @@ Inside: `nano convert.sh`, paste in the text of `scripts/convert.sh`, put your o
 `bucketName`, `accessKey` and `secretKey` in place of `PASTE_...`, and run
 `bash convert.sh`.
 
+**Running this on your own, outside our workshop?** `OVA_URL` in `convert.sh` points to the demo image in the workshop cloud's object storage. We keep it there so that during the event the image downloads quickly and doesn't eat external traffic, but that copy is gone once the workshop ends. Replace the link with the public copy, `https://github.com/aenix-org/cozystack-workshop/releases/download/vmware-demo-ova/app-1.ova` (about 810 MB), or with your own OVA.
+
 **You should see:** at the end of the output, after the word `Share:` — a signed link to the image.
 You'll need it in the next phase.
 

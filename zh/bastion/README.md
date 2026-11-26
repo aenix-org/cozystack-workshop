@@ -111,6 +111,8 @@ virtctl console --namespace=tenant-workshopXX vm-instance-convert
 
 进去后：`nano convert.sh`，把 `scripts/convert.sh` 的内容粘进去，再把你自己的 `bucketName`、`accessKey` 和 `secretKey` 填到 `ВСТАВЬТЕ_...` 的位置。
 
+**不是在我们的活动现场，而是自己做这个工作坊？** `convert.sh` 里的 `OVA_URL` 指向工作坊云的对象存储中的演示镜像。我们把它放在那里，是为了活动期间下载得快、不占用外部流量，但工作坊结束后这份副本就没有了。请把链接换成公开副本 `https://github.com/aenix-org/cozystack-workshop/releases/download/vmware-demo-ova/app-1.ova`（约 810 MB），或者换成你自己的 OVA。
+
 ⚠️ **在 `screen` 里跑转换**——它大约要五分钟，如果你到 bastion 的 SSH 会话断了，普通方式跑的话会在半路被切断。`screen` 能把进程保住，哪怕连接掉了也在：
 
 ```bash
