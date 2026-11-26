@@ -5,30 +5,19 @@ understand **Cozystack** — not from slides, but with their hands on a real
 cluster. Kubernetes knowledge is not required: everything is explained along the
 way, through what you already know from vSphere.
 
-This repository holds the workshop in **several languages**. Every language is a
-fully localized experience — the prose, the on-screen output, and the demo
-applications' data and interface all read natively — while the executable content
-(commands, manifests, code) stays byte-identical, so a lab runs the same in every
-language.
+This repository holds the workshop in **English and Russian**. The prose is
+translated; the executable content (commands, manifests, scripts, code) is one
+English copy, byte-identical in both, so a lab runs the same either way.
 
 ## Languages
 
 | Directory | Language | Status |
 |-----------|----------|--------|
 | [`ru/`](ru/) | Russian — the authored source of truth | complete |
-| [`en/`](en/) | English — flagship translation, and the pivot for the others | complete |
-| [`zh/`](zh/) | Chinese (Simplified) | complete |
-| [`es/`](es/) | Spanish | complete |
-| [`ja/`](ja/) | Japanese | complete |
-| [`ko/`](ko/) | Korean | complete |
-| [`de/`](de/) | German | complete |
-| [`hi/`](hi/) | Hindi | complete |
-| [`uk/`](uk/) | Ukrainian | complete |
+| [`en/`](en/) | English — translated from Russian | complete |
 
-Russian is where the text is written and edited first. English is translated
-from Russian and polished to flagship quality; the other languages are produced
-from English (a cleaner pivot for machine translation) and reviewed by native
-speakers. See [`STYLE.md`](STYLE.md) for the translation rules and
+Russian is where the text is written and edited first; English is translated
+from Russian and polished to the same quality. See [`STYLE.md`](STYLE.md) for the translation rules and
 [`GLOSSARY.md`](GLOSSARY.md) for the canonical terminology.
 
 ## Fraud detection workshop
@@ -70,7 +59,7 @@ At the root of each language:
 
 ## What is localized, and what stays identical
 
-Localized into every language: all prose (each `README.md`, the `chat/*.md`
+Localized into both languages: all prose (each `README.md`, the `chat/*.md`
 messages, `CONVENTIONS.md`, `REQUIREMENTS.md`), the human-language **comments**
 inside the shipped manifests, scripts and code, the **on-screen output** of each
 `check.sh`, and the **demo applications' content** — the guest-pass sample data,
@@ -79,7 +68,7 @@ language uses one canonical demo dataset (native names, departments, entrances,
 pass types), so a lab's seed data, its queries, its `check.sh` and the
 surrounding prose all agree.
 
-Kept byte-identical across every language, so a lab runs the same everywhere:
+Kept byte-identical across both languages, so a lab runs the same everywhere:
 commands, code, YAML keys and identifiers, control flow, file and directory
 names, format specifiers, exit codes, the strings a `check.sh` matches against
 program output, and the functional fill-in placeholders. The executable content
@@ -94,8 +83,7 @@ source.
 ## How the translations were made
 
 Russian is authored first. English is translated from Russian and polished to
-flagship quality; Chinese and Spanish are translated from the English pivot.
-Every language's prose was then reviewed by **five independent reviewers**, each
+flagship quality. The prose was then reviewed by **five independent reviewers**, each
 on a different lens — technical accuracy, terminology against
 [`GLOSSARY.md`](GLOSSARY.md), literary fluency, absence of anglicisms, and
 structural integrity (code/output byte-identity, Markdown parity) — and every
@@ -113,5 +101,5 @@ Licensed under the [Apache License, Version 2.0](LICENSE). See [`NOTICE`](NOTICE
 3. Keep terminology in line with [`GLOSSARY.md`](GLOSSARY.md) and the voice in
    [`STYLE.md`](STYLE.md).
 4. Never let the executable content diverge between languages — if you change a
-   manifest or a script's code, copy it verbatim into every language; only prose,
+   manifest or a script's code, copy it verbatim into both languages; only prose,
    comments, on-screen output and demo content are localized per language.
