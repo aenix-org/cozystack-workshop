@@ -119,7 +119,7 @@ The VM was exported from vSphere as an OVA: a tar archive with an `.ovf` descrip
 
 ```bash
 curl -sL -r 0-65535 https://github.com/aenix-org/cozystack-workshop/releases/download/vmware-demo-ova/app-1.ova | tar xO app-1.ovf 2>/dev/null > app-1.ovf
-grep -E 'osType|ElementName>|capacity=' app-1.ovf
+grep -E 'osType|ElementName>|capacity=|ethernet' app-1.ovf
 ```
 
 Write down the guest OS, the number of vCPUs, the memory and the disk size. You will need them in part 3.
@@ -251,17 +251,17 @@ spec:
 git add platform/convert.yaml
 git commit -m "Temporary VM for disk conversion"
 git push
-kubectl get vmdisks,vminstances -w
+kubectl get vminstances -w
 ```
 
-**You should see:** the `convert` disk and VM appear within a minute and turn `READY True` a minute or two later. Stop watching with `Ctrl-C`.
+**You should see:** the `convert` VM appear within a minute and turn `READY True` a minute or two later. Stop watching with `Ctrl-C`, then check the disk as well: `kubectl get vmdisks`.
 
 <details><summary>What u1.large means</summary>
 
 An instance type is a named size, like an EC2 type: `u1.large` is 2 vCPU and 8 GiB. The platform has a ladder of them:
 
 ```bash
-kubectl get virtualmachineclusterinstancetypes -o custom-columns=NAME:.metadata.name,CPU:.spec.cpu.guest,MEMORY:.spec.memory.guest
+kubectl get virtualmachineclusterinstancetypes -o custom-columns=NAME:.metadata.name,CPU:.spec.cpu.guest,MEMORY:.spec.memory.guest | grep -E '^NAME|^u1\.'
 ```
 
 Named sizes keep VMs comparable and quotas predictable. When you need an exact shape, as in part 3, a `VMInstance` takes `resources` instead.
@@ -361,10 +361,10 @@ cd ~/vmware-migration
 git rm platform/convert.yaml
 git commit -m "Conversion done, remove the temporary VM"
 git push
-kubectl get vminstances,vmdisks -w
+kubectl get vminstances -w
 ```
 
-**You should see:** within a minute or two `convert` disappears from both lists. Flux noticed the file was gone and deleted the objects it had created from it. That is the `prune: true` setting of your `platform` Kustomization (`kubectl get kustomization platform -o yaml`).
+**You should see:** within a minute or two `convert` disappears from the list, and `kubectl get vmdisks` no longer shows it either. Flux noticed the file was gone and deleted the objects it had created from it. That is the `prune: true` setting of your `platform` Kustomization (`kubectl get kustomization platform -o yaml`).
 
 > **Stop and think.** What would have happened if you had deleted the VM with `kubectl delete vminstance convert` and left the file in Git?
 
@@ -516,7 +516,8 @@ spec:
 git add platform/postgres.yaml platform/kafka.yaml
 git commit -m "Order the database and the queue from the catalog"
 git push
-kubectl get postgres,kafka -w
+kubectl get postgres,kafka
+kubectl get kafka -w
 ```
 
 **You should see:** both turn `READY True`, PostgreSQL within a few minutes and Kafka within about ten. Carry on with part 5 while they start.
@@ -667,7 +668,7 @@ kubectl exec $BROKER -- bin/kafka-console-consumer.sh --bootstrap-server localho
 
 The broker pods are labelled by the Strimzi operator that runs Kafka for the catalog; `broker-role=true` picks a broker rather than a KRaft controller.
 
-**You should see:** the ids of the orders you created. The chain VM → PostgreSQL → Kafka works.
+**You should see:** the ids of the orders you created, then `TimeoutException` and `Processed a total of N messages`. The exception only means eight seconds passed without new messages, which is how `--timeout-ms` stops the consumer. The chain VM → PostgreSQL → Kafka works.
 
 ### 5.5 Publish the application over HTTPS
 
@@ -804,6 +805,8 @@ kubectl get virtualmachineinstancemigrations -w
 **You should see:** the migration going through `Scheduling`, `TargetReady`, `Running` to `Succeeded` in well under a minute, the VM on a different node afterwards with the same IP, and an unbroken row of `200` in the loop (at most one or two hiccups at the switch-over).
 
 The memory is copied while the VM runs; the disk does not move at all, because it sits on replicated storage that every node can reach.
+
+If the migration stays in `Scheduling` for minutes, no other node has enough free memory for a second copy of the VM: a live migration needs room for both the source and the target while memory is being copied. That is a capacity question for whoever runs the platform, and the same one you would ask about DRS headroom in vSphere.
 
 ### 6.3 Lose the database primary
 
