@@ -38,16 +38,14 @@ two ways to take it — pick the one your host tells you:
 |---|---|---|
 | **Tools** | you install them: `kubectl`, `virtctl`, `kubelogin` | already installed on the VM |
 | **Cluster access** | kubeconfig from the dashboard, browser login | you SSH in, access is already set up |
-| **Tenant number in files** | you substitute it yourself | pre-substituted on the VM |
-| **Checking the app** | `virtctl port-forward` + `localhost:8080` | by the platform domain name |
+| **Git** | you clone your GitLab repository | already cloned on the VM |
 
 Inside each of `laptop/` and `bastion/`:
 
-- `README.md` — the route through the path
+- `README.md` — the route: you write every manifest into your own Git repository, Flux applies it, and you convert and fix the VM by hand
 - `labs/00-cluster` … `labs/15-monday` — the sixteen labs, each with its own
   `README.md`, manifests, and a `check.sh` that verifies the lab worked
-- `chat/` — the step-by-step messages the host posts during a live session
-- `manifests/`, `scripts/` — files applied to or run inside the cluster
+- `scripts/orders-schema.sql` — the database schema the migrated application needs
 - `check/` — the shared library the per-lab `check.sh` scripts build on
 
 At the root of each language:
@@ -59,8 +57,8 @@ At the root of each language:
 
 ## What is localized, and what stays identical
 
-Localized into both languages: all prose (each `README.md`, the `chat/*.md`
-messages, `CONVENTIONS.md`, `REQUIREMENTS.md`), the human-language **comments**
+Localized into both languages: all prose (each `README.md`, `CONVENTIONS.md`,
+`REQUIREMENTS.md`), the human-language **comments**
 inside the shipped manifests, scripts and code, the **on-screen output** of each
 `check.sh`, and the **demo applications' content** — the guest-pass sample data,
 the text the apps print and render, and the reader-facing interface. Each

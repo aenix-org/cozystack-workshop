@@ -13,13 +13,12 @@ cluster from**. The instructor will tell you which one is yours.
 |---|---|---|
 | **Tools** | you install them yourself: `kubectl`, `virtctl`, `kubelogin` | already installed on the bastion |
 | **Cluster access** | kubeconfig from the dashboard, sign in through the browser | you log in over SSH, access already set up |
-| **Tenant number in the files** | you fill it in yourself | filled in ahead of time |
-| **Checking the app** | `virtctl port-forward` + `localhost:8080` | by domain name `app.<number>.workshop.aenix.io` |
+| **Your Git repository** | you clone it from GitLab | already cloned |
 | **For whom** | those without a shared bastion | a prepared testbed with a bastion |
 
-Inside each folder is a self-contained set: its own `README.md` (the route), `chat/`
-(the chat messages for each step), `manifests/`, `scripts/`. Open the README for your path
-and follow it.
+Inside each folder is a self-contained set: its own `README.md` (the route) and `scripts/`.
+You write the manifests yourself, into your own Git repository, and Flux applies them. Open
+the README for your path and follow it.
 
 ## Labs
 

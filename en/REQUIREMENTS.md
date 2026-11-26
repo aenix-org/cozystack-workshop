@@ -42,3 +42,7 @@ the monitoring add-on.
 
 The labs were written and verified on **Cozystack v1.6.1**. On earlier versions some
 catalog entries have a different name or a different set of fields.
+
+## The VMware migration workshop
+
+The route in `laptop/README.md` and `bastion/README.md` needs, per participant, a tenant with at least 40 CPUs and 48 GB of memory in quota, a GitLab repository read by Flux in the tenant, and a few rights on top of the tenant roles. `instructor/vmware/provision-vmware.sh` sets all of it up and its README lists what to check on the cluster first: the node image (DRBD 9.3.x, so running VMs are not paused while a replica is attached), free memory for the 8 GB conversion VMs and for live migration, and publishing through the platform ingress.
